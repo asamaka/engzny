@@ -2,9 +2,15 @@
 
 A project deployed on Vercel with custom domain configuration.
 
+**Live site**: https://thinx.fun
+
+## For AI Agents
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for complete deployment instructions, including how to make changes, verify deployments, and troubleshoot issues.
+
 ## Vercel Deployment
 
-This repository is configured for automatic deployment to Vercel.
+This repository is configured for automatic deployment to Vercel. Push to `main` to deploy.
 
 ## Domain Setup: thinx.fun (GoDaddy)
 
