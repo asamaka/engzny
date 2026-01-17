@@ -1,7 +1,6 @@
 {
-  "version": 2,
-  "name": "thinx-fun",
-  "alias": ["thinx.fun", "www.thinx.fun"],
+  "buildCommand": null,
+  "outputDirectory": "public",
   "headers": [
     {
       "source": "/(.*)",
@@ -19,12 +18,6 @@
           "value": "1; mode=block"
         }
       ]
-    }
-  ],
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
     }
   ]
 }
