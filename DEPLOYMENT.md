@@ -332,6 +332,121 @@ git commit --allow-empty -m "Trigger redeploy" && git push origin main
 - **Requires**: `ANTHROPIC_API_KEY` environment variable
 - **Returns**: JSON with AI analysis of the image
 
+### API Upload with Progress Tracking (`/api/upload`)
+
+Upload an image via API and get a job ID to track analysis progress.
+
+- **Method**: POST
+- **Content-Type**: multipart/form-data
+- **Fields**:
+  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 20MB)
+  - `question` (optional): Specific question about the image
+- **Requires**: `ANTHROPIC_API_KEY` environment variable
+- **Returns**: JSON with job ID and URLs
+
+**Example Request:**
+```bash
+curl -X POST https://thinx.fun/api/upload \
+  -F "image=@screenshot.png" \
+  -F "question=What does this show?"
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "jobId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "statusUrl": "/api/job/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status",
+  "viewUrl": "/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "message": "Job created successfully. Visit viewUrl to track progress."
+}
+```
+
+### Job Status (`/api/job/:jobId/status`)
+
+Get the current status and results of an analysis job.
+
+- **Method**: GET
+- **Returns**: JSON with job status, progress, and results (when complete)
+
+**Example Request:**
+```bash
+curl https://thinx.fun/api/job/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status
+```
+
+**Example Response (Processing):**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "processing",
+  "progress": 50,
+  "progressMessage": "Claude is analyzing the image...",
+  "createdAt": "2026-01-17T12:00:00.000Z",
+  "completedAt": null,
+  "question": "What does this show?",
+  "result": null,
+  "error": null
+}
+```
+
+**Example Response (Completed):**
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "completed",
+  "progress": 100,
+  "progressMessage": "Analysis complete!",
+  "createdAt": "2026-01-17T12:00:00.000Z",
+  "completedAt": "2026-01-17T12:00:15.000Z",
+  "question": "What does this show?",
+  "result": {
+    "analysis": "This image shows...",
+    "model": "claude-sonnet-4-20250514",
+    "usage": {"input_tokens": 1500, "output_tokens": 500}
+  },
+  "error": null
+}
+```
+
+### Job Progress Page (`/:jobId`)
+
+Visit `https://thinx.fun/{jobId}` in a browser to see a real-time progress page that:
+- Shows current analysis status
+- Displays a progress bar with percentage
+- Shows step-by-step progress indicators
+- Automatically displays results when complete
+- Allows copying results to clipboard
+
+### List Jobs (`/api/jobs`)
+
+Debug endpoint to list all jobs (useful for development).
+
+- **Method**: GET
+- **Returns**: JSON array of all jobs with their status
+
+## Testing
+
+### Test Images
+
+Test images are available in the `test-images/` directory:
+- `test-chart.svg` - A bar chart graphic
+- `test-text.svg` - A newspaper article mockup
+- `test-pattern.png` - A simple pattern
+- `test-gradient.png` - A gradient image
+- `test-tiny.png` - A 1x1 pixel test image
+
+### API Test Script
+
+Run the test script to validate all API endpoints:
+
+```bash
+# Test locally
+./scripts/test-api.sh http://localhost:3000
+
+# Test production
+./scripts/test-api.sh https://thinx.fun
+```
+
 ## Contact
 
 For issues with Vercel deployment, check:

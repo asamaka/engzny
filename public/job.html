@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Progress - thinx.fun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --bg-dark: #0f0f1a;
+            --bg-card: #1a1a2e;
+            --bg-input: #252540;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b8;
+            --border: #2d2d4a;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+        }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .logo:hover {
+            opacity: 0.9;
+        }
+        
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        /* Progress Section */
+        .progress-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+        
+        .progress-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .status-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .status-icon.pending {
+            background: rgba(99, 102, 241, 0.2);
+        }
+        
+        .status-icon.processing {
+            background: rgba(99, 102, 241, 0.2);
+            animation: pulse 2s infinite;
+        }
+        
+        .status-icon.completed {
+            background: rgba(16, 185, 129, 0.2);
+        }
+        
+        .status-icon.failed {
+            background: rgba(239, 68, 68, 0.2);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .status-icon svg {
+            width: 28px;
+            height: 28px;
+        }
+        
+        .status-icon.pending svg,
+        .status-icon.processing svg {
+            stroke: var(--primary-light);
+        }
+        
+        .status-icon.completed svg {
+            stroke: var(--success);
+        }
+        
+        .status-icon.failed svg {
+            stroke: var(--error);
+        }
+        
+        .progress-info h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+        
+        .progress-info .status-text {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+        
+        /* Progress Bar */
+        .progress-bar-container {
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-bar-track {
+            width: 100%;
+            height: 12px;
+            background: var(--bg-input);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--gradient-2);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+        
+        .progress-bar-fill.completed {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .progress-bar-fill.failed {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .progress-percentage {
+            text-align: right;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+        
+        /* Progress Steps */
+        .progress-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            background: var(--bg-input);
+            border-radius: 10px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            transition: all 0.3s;
+        }
+        
+        .step.active {
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--text-primary);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        
+        .step.completed {
+            color: var(--success);
+        }
+        
+        .step-indicator {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: var(--bg-dark);
+        }
+        
+        .step.active .step-indicator {
+            background: var(--primary);
+        }
+        
+        .step.completed .step-indicator {
+            background: var(--success);
+        }
+        
+        .step-indicator svg {
+            width: 14px;
+            height: 14px;
+            stroke: var(--text-secondary);
+        }
+        
+        .step.active .step-indicator svg,
+        .step.completed .step-indicator svg {
+            stroke: white;
+        }
+        
+        /* Spinner */
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Job Details */
+        .job-details {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+        
+        .job-detail {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            padding: 0.5rem 0;
+        }
+        
+        .job-detail-label {
+            color: var(--text-secondary);
+        }
+        
+        .job-detail-value {
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Monaco', monospace;
+            font-size: 0.8rem;
+        }
+        
+        /* Results Section */
+        .results-section {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            animation: fadeIn 0.5s ease;
+            margin-bottom: 2rem;
+        }
+        
+        .results-section.show {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .results-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .results-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .results-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: white;
+        }
+        
+        .results-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .results-content {
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+        
+        .results-content h1, .results-content h2, .results-content h3, 
+        .results-content h4, .results-content h5, .results-content h6 {
+            color: var(--text-primary);
+            margin: 1.5rem 0 0.75rem;
+            font-weight: 600;
+        }
+        
+        .results-content h1 { font-size: 1.5rem; }
+        .results-content h2 { font-size: 1.25rem; }
+        .results-content h3 { font-size: 1.1rem; }
+        
+        .results-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .results-content ul, .results-content ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .results-content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .results-content strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .results-content code {
+            background: var(--bg-input);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .results-content blockquote {
+            border-left: 3px solid var(--primary);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        /* Error State */
+        .error-section {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .error-section.show {
+            display: block;
+        }
+        
+        .error-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .error-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(239, 68, 68, 0.2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .error-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--error);
+        }
+        
+        .error-text h3 {
+            color: #fca5a5;
+            margin-bottom: 0.5rem;
+        }
+        
+        .error-text p {
+            color: #fca5a5;
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        /* Not Found State */
+        .not-found {
+            text-align: center;
+            padding: 3rem 2rem;
+        }
+        
+        .not-found-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: var(--bg-input);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .not-found-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: var(--text-secondary);
+        }
+        
+        .not-found h2 {
+            margin-bottom: 0.5rem;
+        }
+        
+        .not-found p {
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.875rem 1.5rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 500;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+        
+        .btn-primary {
+            background: var(--gradient-2);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        }
+        
+        .btn-secondary {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            border-color: var(--primary);
+        }
+        
+        .btn svg {
+            width: 18px;
+            height: 18px;
+        }
+        
+        /* Actions Row */
+        .actions-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 640px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .logo {
+                font-size: 2rem;
+            }
+            
+            .progress-section, .results-section {
+                padding: 1.5rem;
+            }
+            
+            .progress-header {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .job-detail {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+            
+            .actions-row {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="logo">thinx.fun</a>
+            <p class="tagline">AI-powered image analysis</p>
+        </header>
+        
+        <main>
+            <!-- Loading State -->
+            <section class="progress-section" id="progressSection">
+                <div class="progress-header">
+                    <div class="status-icon processing" id="statusIcon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="statusIconSvg">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 6v6l4 2"/>
+                        </svg>
+                    </div>
+                    <div class="progress-info">
+                        <h1 id="progressTitle">Analyzing Image...</h1>
+                        <p class="status-text" id="progressMessage">Initializing...</p>
+                    </div>
+                </div>
+                
+                <div class="progress-bar-container">
+                    <div class="progress-bar-track">
+                        <div class="progress-bar-fill" id="progressBar"></div>
+                    </div>
+                    <p class="progress-percentage" id="progressPercentage">0%</p>
+                </div>
+                
+                <div class="progress-steps" id="progressSteps">
+                    <div class="step" id="step1">
+                        <div class="step-indicator">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20,6 9,17 4,12"/>
+                            </svg>
+                        </div>
+                        <span>Job created</span>
+                    </div>
+                    <div class="step" id="step2">
+                        <div class="step-indicator">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20,6 9,17 4,12"/>
+                            </svg>
+                        </div>
+                        <span>Sending to Claude AI</span>
+                    </div>
+                    <div class="step" id="step3">
+                        <div class="step-indicator">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20,6 9,17 4,12"/>
+                            </svg>
+                        </div>
+                        <span>Analyzing image content</span>
+                    </div>
+                    <div class="step" id="step4">
+                        <div class="step-indicator">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20,6 9,17 4,12"/>
+                            </svg>
+                        </div>
+                        <span>Processing results</span>
+                    </div>
+                </div>
+                
+                <div class="job-details">
+                    <div class="job-detail">
+                        <span class="job-detail-label">Job ID</span>
+                        <span class="job-detail-value" id="jobId">-</span>
+                    </div>
+                    <div class="job-detail">
+                        <span class="job-detail-label">Created</span>
+                        <span class="job-detail-value" id="createdAt">-</span>
+                    </div>
+                    <div class="job-detail" id="questionRow" style="display: none;">
+                        <span class="job-detail-label">Question</span>
+                        <span class="job-detail-value" id="questionText">-</span>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection">
+                <div class="error-content">
+                    <div class="error-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </div>
+                    <div class="error-text">
+                        <h3>Analysis Failed</h3>
+                        <p id="errorMessage">An error occurred during analysis.</p>
+                    </div>
+                </div>
+                <div class="actions-row">
+                    <a href="/" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                        </svg>
+                        Try Again
+                    </a>
+                </div>
+            </section>
+            
+            <!-- Not Found Section -->
+            <section class="progress-section" id="notFoundSection" style="display: none;">
+                <div class="not-found">
+                    <div class="not-found-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M16 16s-1.5-2-4-2-4 2-4 2"/>
+                            <line x1="9" y1="9" x2="9.01" y2="9"/>
+                            <line x1="15" y1="9" x2="15.01" y2="9"/>
+                        </svg>
+                    </div>
+                    <h2>Job Not Found</h2>
+                    <p>This analysis job doesn't exist or has expired. Jobs are temporary and may be cleared after some time.</p>
+                    <div class="actions-row" style="justify-content: center;">
+                        <a href="/" class="btn btn-primary">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17,8 12,3 7,8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Upload New Image
+                        </a>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <div class="results-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 12l2 2 4-4"/>
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                    </div>
+                    <h2>Analysis Results</h2>
+                </div>
+                <div class="results-content" id="resultsContent"></div>
+                <div class="actions-row">
+                    <a href="/" class="btn btn-primary">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17,8 12,3 7,8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Analyze Another Image
+                    </a>
+                    <button class="btn btn-secondary" onclick="copyResults()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+                        </svg>
+                        Copy Results
+                    </button>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Powered by Claude AI | Built with care at <a href="https://thinx.fun">thinx.fun</a></p>
+        </footer>
+    </div>
+    
+    <script>
+        // Get job ID from URL
+        const jobId = window.location.pathname.substring(1);
+        
+        // DOM Elements
+        const progressSection = document.getElementById('progressSection');
+        const notFoundSection = document.getElementById('notFoundSection');
+        const errorSection = document.getElementById('errorSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const progressBar = document.getElementById('progressBar');
+        const progressPercentage = document.getElementById('progressPercentage');
+        const progressTitle = document.getElementById('progressTitle');
+        const progressMessage = document.getElementById('progressMessage');
+        const statusIcon = document.getElementById('statusIcon');
+        const statusIconSvg = document.getElementById('statusIconSvg');
+        const jobIdEl = document.getElementById('jobId');
+        const createdAtEl = document.getElementById('createdAt');
+        const questionRow = document.getElementById('questionRow');
+        const questionText = document.getElementById('questionText');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsContent = document.getElementById('resultsContent');
+        
+        // Step elements
+        const steps = [
+            document.getElementById('step1'),
+            document.getElementById('step2'),
+            document.getElementById('step3'),
+            document.getElementById('step4'),
+        ];
+        
+        let pollInterval = null;
+        let rawAnalysis = '';
+        
+        // Start polling for job status
+        async function pollJobStatus() {
+            try {
+                const response = await fetch(`/api/job/${jobId}/status`);
+                const data = await response.json();
+                
+                if (response.status === 404) {
+                    showNotFound();
+                    return;
+                }
+                
+                updateUI(data);
+                
+                // Stop polling if job is complete or failed
+                if (data.status === 'completed' || data.status === 'failed') {
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling job status:', error);
+            }
+        }
+        
+        function updateUI(job) {
+            // Update job details
+            jobIdEl.textContent = job.id.substring(0, 8) + '...';
+            jobIdEl.title = job.id;
+            
+            if (job.createdAt) {
+                createdAtEl.textContent = new Date(job.createdAt).toLocaleString();
+            }
+            
+            if (job.question) {
+                questionRow.style.display = 'flex';
+                questionText.textContent = job.question.length > 50 ? job.question.substring(0, 50) + '...' : job.question;
+                questionText.title = job.question;
+            }
+            
+            // Update progress bar
+            progressBar.style.width = job.progress + '%';
+            progressPercentage.textContent = job.progress + '%';
+            progressMessage.textContent = job.progressMessage;
+            
+            // Update steps
+            updateSteps(job.progress);
+            
+            // Handle different statuses
+            switch (job.status) {
+                case 'pending':
+                    progressTitle.textContent = 'Preparing Analysis...';
+                    statusIcon.className = 'status-icon pending';
+                    break;
+                    
+                case 'processing':
+                    progressTitle.textContent = 'Analyzing Image...';
+                    statusIcon.className = 'status-icon processing';
+                    break;
+                    
+                case 'completed':
+                    showCompleted(job);
+                    break;
+                    
+                case 'failed':
+                    showFailed(job);
+                    break;
+            }
+        }
+        
+        function updateSteps(progress) {
+            // Step thresholds
+            const thresholds = [10, 30, 50, 90];
+            
+            steps.forEach((step, index) => {
+                const indicator = step.querySelector('.step-indicator');
+                
+                if (progress >= thresholds[index]) {
+                    step.classList.add('completed');
+                    step.classList.remove('active');
+                } else if (index === 0 || progress >= thresholds[index - 1]) {
+                    // This is the active step
+                    step.classList.add('active');
+                    step.classList.remove('completed');
+                    
+                    // Add spinner to active step
+                    if (progress < 100) {
+                        indicator.innerHTML = '<div class="spinner"></div>';
+                    }
+                } else {
+                    step.classList.remove('active', 'completed');
+                    indicator.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20,6 9,17 4,12"/>
+                    </svg>`;
+                }
+            });
+        }
+        
+        function showCompleted(job) {
+            progressTitle.textContent = 'Analysis Complete!';
+            progressMessage.textContent = 'Your image has been analyzed successfully.';
+            statusIcon.className = 'status-icon completed';
+            progressBar.classList.add('completed');
+            
+            // Update icon to checkmark
+            statusIconSvg.innerHTML = `
+                <path d="M9 12l2 2 4-4"/>
+                <circle cx="12" cy="12" r="10"/>
+            `;
+            
+            // All steps completed
+            steps.forEach(step => {
+                step.classList.add('completed');
+                step.classList.remove('active');
+                const indicator = step.querySelector('.step-indicator');
+                indicator.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20,6 9,17 4,12"/>
+                </svg>`;
+            });
+            
+            // Show results
+            if (job.result && job.result.analysis) {
+                rawAnalysis = job.result.analysis;
+                displayResults(job.result.analysis);
+                resultsSection.classList.add('show');
+            }
+        }
+        
+        function showFailed(job) {
+            progressTitle.textContent = 'Analysis Failed';
+            progressMessage.textContent = job.error || 'An error occurred during analysis.';
+            statusIcon.className = 'status-icon failed';
+            progressBar.classList.add('failed');
+            
+            // Update icon to X
+            statusIconSvg.innerHTML = `
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+            `;
+            
+            // Show error section
+            errorMessage.textContent = job.error || 'An unexpected error occurred during analysis.';
+            errorSection.classList.add('show');
+        }
+        
+        function showNotFound() {
+            progressSection.style.display = 'none';
+            notFoundSection.style.display = 'block';
+            
+            if (pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        }
+        
+        function displayResults(analysis) {
+            // Convert markdown-like formatting to HTML
+            let html = analysis
+                // Headers
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Lists
+                .replace(/^\- (.*$)/gim, '<li>$1</li>')
+                .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                // Code
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                // Line breaks
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs
+            html = '<p>' + html + '</p>';
+            
+            // Fix list items
+            html = html.replace(/(<li>.*?<\/li>)+/g, (match) => {
+                return '<ul>' + match + '</ul>';
+            });
+            
+            resultsContent.innerHTML = html;
+        }
+        
+        function copyResults() {
+            navigator.clipboard.writeText(rawAnalysis).then(() => {
+                // Visual feedback
+                const btn = event.target.closest('.btn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20,6 9,17 4,12"/>
+                    </svg>
+                    Copied!
+                `;
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+        
+        // Initial poll
+        pollJobStatus();
+        
+        // Poll every 1 second
+        pollInterval = setInterval(pollJobStatus, 1000);
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+        });
+    </script>
+</body>
+</html>
