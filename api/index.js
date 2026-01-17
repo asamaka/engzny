@@ -169,8 +169,8 @@ Be factual, helpful, and highlight anything the user should be cautious about (m
   }
 });
 
-// API Upload endpoint - Returns a job ID for tracking progress
-// In serverless environments, we process synchronously to ensure completion
+// API Upload endpoint - Returns a job ID immediately for tracking progress
+// Processing happens asynchronously in the background
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
     // Check if image was uploaded
@@ -200,25 +200,24 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 
     jobStore.set(jobId, job);
 
-    // Process the job synchronously (required for serverless)
-    // This ensures the job completes before the function terminates
-    await processJob(jobId);
-
-    // Get updated job status
-    const completedJob = jobStore.get(jobId);
-
-    // Return job ID and final status
+    // Return job ID immediately - don't wait for processing
+    // The user will be redirected to the job page where they can see progress
     res.json({
-      success: completedJob.status === JOB_STATUS.COMPLETED,
+      success: true,
       jobId: jobId,
-      status: completedJob.status,
+      status: JOB_STATUS.PENDING,
       statusUrl: `/api/job/${jobId}/status`,
       viewUrl: `/${jobId}`,
-      message: completedJob.status === JOB_STATUS.COMPLETED 
-        ? 'Analysis complete! Visit viewUrl to see results.' 
-        : 'Analysis failed. Visit viewUrl for details.',
-      result: completedJob.result,
-      error: completedJob.error,
+      message: 'Image uploaded! Redirecting to progress page...',
+    });
+
+    // Start processing asynchronously AFTER sending the response
+    // In serverless, this continues running in the same execution context
+    // We use setImmediate to ensure the response is sent first
+    setImmediate(() => {
+      processJob(jobId).catch((error) => {
+        console.error(`Background job ${jobId} failed:`, error);
+      });
     });
   } catch (error) {
     console.error('Upload error:', error);
@@ -352,6 +351,18 @@ app.get('/api/job/:jobId/status', (req, res) => {
     return res.status(404).json({
       error: 'Job not found',
       message: 'The requested job does not exist or has expired.',
+    });
+  }
+
+  // If job is still pending and has image data, trigger processing
+  // This is a fallback for serverless environments where the upload function
+  // might have terminated before background processing started
+  if (job.status === JOB_STATUS.PENDING && job.imageData) {
+    // Start processing in background
+    setImmediate(() => {
+      processJob(jobId).catch((error) => {
+        console.error(`Fallback job ${jobId} processing failed:`, error);
+      });
     });
   }
 
