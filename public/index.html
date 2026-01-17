@@ -3,57 +3,701 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>thinx.fun</title>
+    <title>thinx.fun - AI Image Analyzer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --bg-dark: #0f0f1a;
+            --bg-card: #1a1a2e;
+            --bg-input: #252540;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0b8;
+            --border: #2d2d4a;
+            --success: #10b981;
+            --error: #ef4444;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+        }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-dark);
             min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: var(--gradient-2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+        
+        .tagline {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+        
+        /* Upload Section */
+        .upload-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-input);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+        
+        .upload-area.has-image {
+            padding: 1rem;
+        }
+        
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 1rem;
+            background: var(--gradient-2);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: white;
         }
-        .container {
-            text-align: center;
-            padding: 2rem;
+        
+        .upload-icon svg {
+            width: 32px;
+            height: 32px;
+            fill: white;
         }
-        h1 {
-            font-size: 4rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        
+        .upload-text h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
         }
-        p {
-            font-size: 1.5rem;
-            opacity: 0.9;
-            margin-bottom: 2rem;
+        
+        .upload-text p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
         }
-        .status {
-            background: rgba(255,255,255,0.2);
+        
+        .upload-text .formats {
+            margin-top: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        /* Preview Image */
+        .preview-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .preview-container.show {
+            display: flex;
+        }
+        
+        .upload-content {
+            display: block;
+        }
+        
+        .upload-content.hidden {
+            display: none;
+        }
+        
+        #imagePreview {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .change-image-btn {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+        }
+        
+        .change-image-btn:hover {
+            border-color: var(--primary);
+            color: var(--text-primary);
+        }
+        
+        /* Question Input */
+        .question-section {
+            margin-top: 1.5rem;
+        }
+        
+        .question-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        
+        .question-input {
+            width: 100%;
+            padding: 1rem;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+            transition: border-color 0.2s;
+        }
+        
+        .question-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        
+        .question-input::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.6;
+        }
+        
+        /* Analyze Button */
+        .analyze-btn {
+            width: 100%;
             padding: 1rem 2rem;
-            border-radius: 50px;
-            display: inline-block;
-            backdrop-filter: blur(10px);
+            margin-top: 1.5rem;
+            background: var(--gradient-2);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
-        .status::before {
-            content: '✓';
-            margin-right: 0.5rem;
-            color: #4ade80;
+        
+        .analyze-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+        }
+        
+        .analyze-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .analyze-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        /* Spinner */
+        .spinner {
+            display: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        .spinner.show {
+            display: block;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Results Section */
+        .results-section {
+            display: none;
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 2rem;
+            border: 1px solid var(--border);
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .results-section.show {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .results-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .results-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--gradient-2);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .results-icon svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+        
+        .results-header h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .results-content {
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+        
+        .results-content h1, .results-content h2, .results-content h3, 
+        .results-content h4, .results-content h5, .results-content h6 {
+            color: var(--text-primary);
+            margin: 1.5rem 0 0.75rem;
+            font-weight: 600;
+        }
+        
+        .results-content h1 { font-size: 1.5rem; }
+        .results-content h2 { font-size: 1.25rem; }
+        .results-content h3 { font-size: 1.1rem; }
+        
+        .results-content p {
+            margin-bottom: 1rem;
+        }
+        
+        .results-content ul, .results-content ol {
+            margin: 1rem 0;
+            padding-left: 1.5rem;
+        }
+        
+        .results-content li {
+            margin-bottom: 0.5rem;
+        }
+        
+        .results-content strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .results-content code {
+            background: var(--bg-input);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+        
+        .results-content blockquote {
+            border-left: 3px solid var(--primary);
+            padding-left: 1rem;
+            margin: 1rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+        
+        /* Error State */
+        .error-message {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-top: 1rem;
+        }
+        
+        .error-message.show {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .error-message svg {
+            width: 20px;
+            height: 20px;
+            fill: #fca5a5;
+            flex-shrink: 0;
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid var(--border);
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+        
+        footer a {
+            color: var(--primary-light);
+            text-decoration: none;
+        }
+        
+        footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Mobile Responsive */
+        @media (max-width: 640px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+            
+            .logo {
+                font-size: 2rem;
+            }
+            
+            .upload-section {
+                padding: 1.5rem;
+            }
+            
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+            
+            .results-section {
+                padding: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>thinx.fun</h1>
-        <p>Something exciting is coming soon</p>
-        <div class="status">Live at thinx.fun</div>
-        <p style="margin-top: 2rem; font-size: 0.9rem; opacity: 0.7;">Last deployment test: Jan 17, 2026</p>
+        <header>
+            <h1 class="logo">thinx.fun</h1>
+            <p class="tagline">AI-powered image analysis - Understand what you're looking at</p>
+        </header>
+        
+        <main>
+            <section class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="fileInput" accept="image/*">
+                    
+                    <div class="upload-content" id="uploadContent">
+                        <div class="upload-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17,8 12,3 7,8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                        </div>
+                        <div class="upload-text">
+                            <h3>Upload an image to analyze</h3>
+                            <p>Drag and drop or click to browse</p>
+                            <p class="formats">Supports JPEG, PNG, GIF, WebP (max 20MB)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-container" id="previewContainer">
+                        <img id="imagePreview" alt="Preview">
+                        <button type="button" class="change-image-btn" id="changeImageBtn">Change image</button>
+                    </div>
+                </div>
+                
+                <div class="question-section">
+                    <label class="question-label" for="questionInput">Ask a specific question (optional)</label>
+                    <textarea 
+                        class="question-input" 
+                        id="questionInput" 
+                        placeholder="e.g., Is this claim true? What's the price? What brand is this?"
+                        rows="2"
+                    ></textarea>
+                </div>
+                
+                <button class="analyze-btn" id="analyzeBtn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                    <span id="btnText">Analyze Image</span>
+                    <div class="spinner" id="spinner"></div>
+                </button>
+                
+                <div class="error-message" id="errorMessage">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="8" x2="12" y2="12"/>
+                        <line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                    <span id="errorText"></span>
+                </div>
+            </section>
+            
+            <section class="results-section" id="resultsSection">
+                <div class="results-header">
+                    <div class="results-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 12l2 2 4-4"/>
+                            <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                    </div>
+                    <h2>Analysis Results</h2>
+                </div>
+                <div class="results-content" id="resultsContent"></div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Powered by Claude AI | Built with care at <a href="https://thinx.fun">thinx.fun</a></p>
+        </footer>
     </div>
+    
+    <script>
+        // DOM Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const uploadContent = document.getElementById('uploadContent');
+        const previewContainer = document.getElementById('previewContainer');
+        const imagePreview = document.getElementById('imagePreview');
+        const changeImageBtn = document.getElementById('changeImageBtn');
+        const questionInput = document.getElementById('questionInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const btnText = document.getElementById('btnText');
+        const spinner = document.getElementById('spinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsContent = document.getElementById('resultsContent');
+        
+        let selectedFile = null;
+        
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        // Click to upload
+        uploadArea.addEventListener('click', (e) => {
+            if (e.target !== changeImageBtn) {
+                fileInput.click();
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        changeImageBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+        
+        // Handle file selection
+        function handleFile(file) {
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                showError('Please upload an image file (JPEG, PNG, GIF, WebP)');
+                return;
+            }
+            
+            // Validate file size (20MB)
+            if (file.size > 20 * 1024 * 1024) {
+                showError('File is too large. Maximum size is 20MB.');
+                return;
+            }
+            
+            selectedFile = file;
+            hideError();
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                uploadContent.classList.add('hidden');
+                previewContainer.classList.add('show');
+                uploadArea.classList.add('has-image');
+                analyzeBtn.disabled = false;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Analyze button handler
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                showError('Please select an image first');
+                return;
+            }
+            
+            // Show loading state
+            setLoading(true);
+            hideError();
+            resultsSection.classList.remove('show');
+            
+            try {
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                
+                const question = questionInput.value.trim();
+                if (question) {
+                    formData.append('question', question);
+                }
+                
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'Analysis failed');
+                }
+                
+                // Display results
+                displayResults(data.analysis);
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showError(error.message || 'An error occurred while analyzing the image. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        });
+        
+        // Helper functions
+        function setLoading(loading) {
+            analyzeBtn.disabled = loading;
+            spinner.classList.toggle('show', loading);
+            btnText.textContent = loading ? 'Analyzing...' : 'Analyze Image';
+        }
+        
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.add('show');
+        }
+        
+        function hideError() {
+            errorMessage.classList.remove('show');
+        }
+        
+        function displayResults(analysis) {
+            // Convert markdown-like formatting to HTML
+            let html = analysis
+                // Headers
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                // Bold
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                // Italic
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                // Lists
+                .replace(/^\- (.*$)/gim, '<li>$1</li>')
+                .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                // Code
+                .replace(/`(.*?)`/g, '<code>$1</code>')
+                // Line breaks
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs
+            html = '<p>' + html + '</p>';
+            
+            // Fix list items
+            html = html.replace(/(<li>.*?<\/li>)+/g, (match) => {
+                return '<ul>' + match + '</ul>';
+            });
+            
+            resultsContent.innerHTML = html;
+            resultsSection.classList.add('show');
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    </script>
 </body>
 </html>
