@@ -45,9 +45,7 @@ Add these records in GoDaddy DNS Management:
 
 ```
 /
-├── public/
-│   └── index.html    # Main landing page
-├── vercel.json       # Vercel configuration
+├── index.html    # Main landing page
 └── README.md
 ```
 
