@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
+const { EventEmitter } = require('events');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
 
@@ -9,6 +10,8 @@ const app = express();
 // In-memory job storage (fallback when Redis is not configured)
 // For production, configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
 const jobStore = new Map();
+const jobStoreTimers = new Map();
+const jobUpdateLocks = new Map();
 
 // Job status constants
 const JOB_STATUS = {
@@ -18,6 +21,24 @@ const JOB_STATUS = {
   COMPLETED: 'completed',
   FAILED: 'failed',
 };
+
+const JOB_TTL_SECONDS = Number.parseInt(process.env.JOB_TTL_SECONDS || '3600', 10);
+const JOB_QUEUE_CONCURRENCY = Math.max(
+  1,
+  Number.parseInt(process.env.JOB_QUEUE_CONCURRENCY || '2', 10),
+);
+const JOB_QUEUE_MAX = Math.max(1, Number.parseInt(process.env.JOB_QUEUE_MAX || '50', 10));
+const STREAM_POLL_INTERVAL_MS = Math.max(
+  500,
+  Number.parseInt(process.env.JOB_STREAM_POLL_INTERVAL_MS || '1000', 10),
+);
+const MAX_IMAGE_BYTES = Number.parseInt(
+  process.env.MAX_IMAGE_BYTES || String(5 * 1024 * 1024),
+  10,
+);
+const MAX_UPLOAD_BYTES = MAX_IMAGE_BYTES;
+const BASE64_IMAGE_FIELDS = ['imageBase64', 'imageData', 'dataUrl', 'image'];
+const DATA_URL_REGEX = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.*)$/;
 
 // Redis client (lazy loaded)
 let redis = null;
@@ -36,35 +57,73 @@ const getRedis = async () => {
   return null;
 };
 
+const queueJobUpdate = (jobId, task) => {
+  const previous = jobUpdateLocks.get(jobId) || Promise.resolve();
+  const next = previous.catch(() => {}).then(task);
+  jobUpdateLocks.set(
+    jobId,
+    next.finally(() => {
+      if (jobUpdateLocks.get(jobId) === next) {
+        jobUpdateLocks.delete(jobId);
+      }
+    }),
+  );
+  return next;
+};
+
 // Storage abstraction
 const storage = {
-  async setJob(jobId, data, ttl = 3600) {
+  async setJob(jobId, data, ttl = JOB_TTL_SECONDS) {
     const redis = await getRedis();
+    const ttlSeconds = data.ttlSeconds || ttl;
+    const expiresAt =
+      data.expiresAt || new Date(Date.now() + ttlSeconds * 1000).toISOString();
+    const payload = { ...data, ttlSeconds, expiresAt };
     if (redis) {
-      await redis.setex(`job:${jobId}`, ttl, JSON.stringify(data));
+      await redis.setex(`job:${jobId}`, ttlSeconds, JSON.stringify(payload));
     } else {
-      jobStore.set(jobId, data);
+      jobStore.set(jobId, payload);
+      if (jobStoreTimers.has(jobId)) {
+        clearTimeout(jobStoreTimers.get(jobId));
+      }
+      const timeout = setTimeout(() => {
+        jobStore.delete(jobId);
+        jobStoreTimers.delete(jobId);
+      }, ttlSeconds * 1000);
+      jobStoreTimers.set(jobId, timeout);
     }
   },
-  
+
   async getJob(jobId) {
     const redis = await getRedis();
     if (redis) {
       const data = await redis.get(`job:${jobId}`);
       return data ? (typeof data === 'string' ? JSON.parse(data) : data) : null;
     } else {
-      return jobStore.get(jobId) || null;
+      const job = jobStore.get(jobId) || null;
+      if (!job) return null;
+      if (job.expiresAt && new Date(job.expiresAt).getTime() < Date.now()) {
+        jobStore.delete(jobId);
+        if (jobStoreTimers.has(jobId)) {
+          clearTimeout(jobStoreTimers.get(jobId));
+          jobStoreTimers.delete(jobId);
+        }
+        return null;
+      }
+      return job;
     }
   },
-  
+
   async updateJob(jobId, updates) {
-    const job = await this.getJob(jobId);
-    if (job) {
-      const updated = { ...job, ...updates };
-      await this.setJob(jobId, updated);
-      return updated;
-    }
-    return null;
+    return queueJobUpdate(jobId, async () => {
+      const job = await this.getJob(jobId);
+      if (job) {
+        const updated = { ...job, ...updates };
+        await this.setJob(jobId, updated, job.ttlSeconds || JOB_TTL_SECONDS);
+        return updated;
+      }
+      return null;
+    });
   },
 };
 
@@ -72,7 +131,7 @@ const storage = {
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024, // 20MB limit
+    fileSize: MAX_UPLOAD_BYTES,
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -146,39 +205,383 @@ ${question ? `\n5. **User's Question**: The user specifically asked: "${question
 Be factual, helpful, and highlight anything the user should be cautious about (misleading claims, too-good-to-be-true offers, etc.).`;
 };
 
+const createHttpError = (status, error, message, details) => {
+  const err = new Error(message);
+  err.status = status;
+  err.error = error;
+  err.details = details;
+  return err;
+};
+
+const formatBytes = (bytes) => {
+  const mb = bytes / (1024 * 1024);
+  return `${Math.round(mb * 10) / 10}MB`;
+};
+
+const normalizeMediaType = (mediaType) => {
+  if (!mediaType) return mediaType;
+  if (mediaType === 'image/jpg') return 'image/jpeg';
+  return mediaType;
+};
+
+const parseBase64Image = (input, mediaTypeInput) => {
+  if (!input || typeof input !== 'string') return null;
+  let base64Data = input.trim();
+  let mediaType = mediaTypeInput;
+  const match = base64Data.match(DATA_URL_REGEX);
+  if (match) {
+    mediaType = match[1];
+    base64Data = match[2];
+  }
+  if (!mediaType) {
+    throw createHttpError(
+      400,
+      'Missing media type',
+      'mediaType is required when sending base64 image data.',
+    );
+  }
+  const normalizedMediaType = normalizeMediaType(mediaType);
+  if (!normalizedMediaType.startsWith('image/')) {
+    throw createHttpError(
+      400,
+      'Invalid media type',
+      'Only image media types are allowed.',
+    );
+  }
+  base64Data = base64Data.replace(/\s/g, '');
+  if (!base64Data) {
+    throw createHttpError(400, 'Invalid image data', 'Image data is empty.');
+  }
+  if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
+    throw createHttpError(400, 'Invalid image data', 'Image data is not valid base64.');
+  }
+  const buffer = Buffer.from(base64Data, 'base64');
+  if (!buffer.length) {
+    throw createHttpError(400, 'Invalid image data', 'Image data could not be decoded.');
+  }
+  return { buffer, base64Data, mediaType: normalizedMediaType };
+};
+
+const extractImagePayload = (req) => {
+  if (req.file) {
+    return {
+      buffer: req.file.buffer,
+      mediaType: normalizeMediaType(req.file.mimetype),
+      source: 'multipart',
+    };
+  }
+  const body = req.body || {};
+  const base64Input = BASE64_IMAGE_FIELDS.map((field) => body[field]).find(
+    (value) => typeof value === 'string' && value.trim().length > 0,
+  );
+  if (!base64Input) return null;
+  const mediaType =
+    typeof body.mediaType === 'string'
+      ? body.mediaType
+      : typeof body.mimeType === 'string'
+        ? body.mimeType
+        : undefined;
+  return { ...parseBase64Image(base64Input, mediaType), source: 'base64' };
+};
+
+const normalizeImagePayload = (payload) => {
+  if (!payload || !payload.buffer) {
+    throw createHttpError(400, 'Invalid image data', 'Image payload is missing.');
+  }
+  if (!payload.mediaType) {
+    throw createHttpError(
+      400,
+      'Missing media type',
+      'mediaType is required for the image payload.',
+    );
+  }
+  const imageBytes = payload.buffer.length;
+  if (imageBytes > MAX_IMAGE_BYTES) {
+    throw createHttpError(
+      413,
+      'Image too large',
+      `Image exceeds ${formatBytes(MAX_IMAGE_BYTES)} limit for analysis.`,
+      { maxImageBytes: MAX_IMAGE_BYTES },
+    );
+  }
+  return {
+    imageData: payload.base64Data || payload.buffer.toString('base64'),
+    mediaType: payload.mediaType,
+    imageBytes,
+    source: payload.source,
+  };
+};
+
+const jobQueue = [];
+const jobEmitters = new Map();
+const activeJobs = new Set();
+let activeWorkers = 0;
+let queueScheduled = false;
+
+const getQueuePosition = (jobId) => {
+  const index = jobQueue.indexOf(jobId);
+  return index === -1 ? null : index + 1;
+};
+
+const getQueueSnapshot = (jobId) => ({
+  position: getQueuePosition(jobId),
+  length: jobQueue.length,
+  active: activeWorkers,
+  concurrency: JOB_QUEUE_CONCURRENCY,
+});
+
+const getJobEmitter = (jobId) => {
+  if (!jobEmitters.has(jobId)) {
+    jobEmitters.set(jobId, new EventEmitter());
+  }
+  return jobEmitters.get(jobId);
+};
+
+const emitJobEvent = (jobId, event, payload) => {
+  const emitter = jobEmitters.get(jobId);
+  if (emitter) {
+    emitter.emit(event, payload);
+  }
+};
+
+const cleanupJobEmitter = (jobId) => {
+  const emitter = jobEmitters.get(jobId);
+  if (!emitter) return;
+  if (
+    emitter.listenerCount('status') === 0 &&
+    emitter.listenerCount('token') === 0 &&
+    emitter.listenerCount('complete') === 0 &&
+    emitter.listenerCount('error') === 0
+  ) {
+    jobEmitters.delete(jobId);
+  }
+};
+
+const scheduleQueueProcessing = () => {
+  if (queueScheduled) return;
+  queueScheduled = true;
+  setImmediate(async () => {
+    queueScheduled = false;
+    while (activeWorkers < JOB_QUEUE_CONCURRENCY && jobQueue.length > 0) {
+      const jobId = jobQueue.shift();
+      if (activeJobs.has(jobId)) continue;
+      activeJobs.add(jobId);
+      activeWorkers += 1;
+      processJob(jobId)
+        .catch((error) => {
+          console.error('Job processing error:', error);
+        })
+        .finally(() => {
+          activeWorkers -= 1;
+          activeJobs.delete(jobId);
+          scheduleQueueProcessing();
+        });
+    }
+  });
+};
+
+const enqueueJob = (jobId) => {
+  if (activeJobs.has(jobId) || jobQueue.includes(jobId)) return;
+  if (jobQueue.length >= JOB_QUEUE_MAX) {
+    throw createHttpError(
+      429,
+      'Queue full',
+      'Too many jobs are queued. Please try again in a moment.',
+    );
+  }
+  jobQueue.push(jobId);
+  scheduleQueueProcessing();
+};
+
+const updateJobStatus = async (jobId, updates) => {
+  const updated = await storage.updateJob(jobId, {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+  });
+  if (updated) {
+    emitJobEvent(jobId, 'status', {
+      status: updated.status,
+      progress: updated.progress,
+      message: updated.progressMessage,
+      queue: getQueueSnapshot(jobId),
+    });
+  }
+  return updated;
+};
+
+const processJob = async (jobId) => {
+  let job = await storage.getJob(jobId);
+  if (!job) return;
+  if ([JOB_STATUS.COMPLETED, JOB_STATUS.FAILED].includes(job.status)) return;
+  if (!job.imageData || !job.mediaType) {
+    await updateJobStatus(jobId, {
+      status: JOB_STATUS.FAILED,
+      progress: 0,
+      progressMessage: 'Missing image data',
+      error: 'Image data is no longer available.',
+    });
+    emitJobEvent(jobId, 'error', { message: 'Image data is no longer available.' });
+    return;
+  }
+
+  await updateJobStatus(jobId, {
+    status: JOB_STATUS.PROCESSING,
+    progress: 10,
+    progressMessage: 'Starting AI analysis...',
+    startedAt: new Date().toISOString(),
+  });
+
+  try {
+    const anthropic = getAnthropicClient();
+    const analysisPrompt = buildAnalysisPrompt(job.question);
+
+    await updateJobStatus(jobId, {
+      status: JOB_STATUS.STREAMING,
+      progress: 40,
+      progressMessage: 'Analyzing image...',
+    });
+
+    let fullText = job.streamedText || '';
+    let lastPersistedAt = Date.now();
+    let persistInFlight = false;
+
+    const persistStreamedText = async (force = false) => {
+      if (persistInFlight) return;
+      if (!force && Date.now() - lastPersistedAt < 1000) return;
+      persistInFlight = true;
+      const snapshot = fullText;
+      try {
+        await storage.updateJob(jobId, { streamedText: snapshot });
+        lastPersistedAt = Date.now();
+      } finally {
+        persistInFlight = false;
+      }
+    };
+
+    const stream = anthropic.messages.stream({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: {
+                type: 'base64',
+                media_type: job.mediaType,
+                data: job.imageData,
+              },
+            },
+            {
+              type: 'text',
+              text: analysisPrompt,
+            },
+          ],
+        },
+      ],
+    });
+
+    stream.on('text', (text) => {
+      fullText += text;
+      emitJobEvent(jobId, 'token', { text });
+      void persistStreamedText();
+    });
+
+    const finalMessage = await stream.finalMessage();
+    await persistStreamedText(true);
+
+    await storage.updateJob(jobId, {
+      status: JOB_STATUS.COMPLETED,
+      progress: 100,
+      progressMessage: 'Analysis complete!',
+      streamedText: fullText,
+      result: {
+        analysis: fullText,
+        model: finalMessage.model,
+        usage: finalMessage.usage,
+      },
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    emitJobEvent(jobId, 'complete', {
+      analysis: fullText,
+      model: finalMessage.model,
+      usage: finalMessage.usage,
+    });
+  } catch (error) {
+    console.error('Stream error:', error);
+    await storage.updateJob(jobId, {
+      status: JOB_STATUS.FAILED,
+      progress: 0,
+      progressMessage: 'Analysis failed',
+      error: error.message,
+      updatedAt: new Date().toISOString(),
+    });
+    emitJobEvent(jobId, 'error', {
+      message: error.message || 'An error occurred during analysis',
+    });
+  }
+};
+
 // ============================================
 // NEW: Queue-based upload endpoint
 // Returns immediately with jobId
 // ============================================
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image uploaded' });
+    const payload = extractImagePayload(req);
+    if (!payload) {
+      return res.status(400).json({
+        error: 'No image provided',
+        message: 'Upload an image file or send base64 image data.',
+      });
     }
+    const normalized = normalizeImagePayload(payload);
 
     // Generate unique job ID
     const jobId = crypto.randomUUID();
     
     // Get optional user question
-    const question = req.body.question || '';
+    const question = typeof req.body.question === 'string' ? req.body.question : '';
 
     // Create job record with image data
     const job = {
       id: jobId,
       status: JOB_STATUS.QUEUED,
       progress: 0,
-      progressMessage: 'Image uploaded, waiting to process...',
+      progressMessage: 'Queued for analysis...',
       createdAt: new Date().toISOString(),
-      imageData: req.file.buffer.toString('base64'),
-      mediaType: req.file.mimetype,
+      queuedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      imageData: normalized.imageData,
+      mediaType: normalized.mediaType,
+      imageBytes: normalized.imageBytes,
+      imageSource: normalized.source,
       question: question,
       result: null,
       streamedText: '',
       error: null,
+      ttlSeconds: JOB_TTL_SECONDS,
     };
 
     // Store job (in Redis or memory)
-    await storage.setJob(jobId, job, 3600); // 1 hour TTL
+    await storage.setJob(jobId, job, JOB_TTL_SECONDS);
+
+    // Enqueue job for processing
+    try {
+      enqueueJob(jobId);
+    } catch (queueError) {
+      await updateJobStatus(jobId, {
+        status: JOB_STATUS.FAILED,
+        progress: 0,
+        progressMessage: 'Queue is full',
+        error: queueError.message,
+      });
+      throw queueError;
+    }
+    const queue = getQueueSnapshot(jobId);
 
     // Return immediately with job info
     res.json({
@@ -188,14 +591,17 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       statusUrl: `/api/job/${jobId}/status`,
       streamUrl: `/api/job/${jobId}/stream`,
       viewUrl: `/${jobId}`,
+      queue,
       message: 'Image queued for analysis. Open viewUrl to see results.',
     });
     
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({
-      error: 'Upload failed',
+    const status = error.status || 500;
+    res.status(status).json({
+      error: error.error || 'Upload failed',
       message: error.message || 'An unexpected error occurred',
+      details: error.details,
     });
   }
 });
@@ -221,154 +627,166 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
   };
 
   try {
-    // Get job from storage
     let job = await storage.getJob(jobId);
-    
     if (!job) {
       sendEvent('error', { message: 'Job not found' });
       res.end();
       return;
     }
 
-    // If job is already completed, send the result
-    if (job.status === JOB_STATUS.COMPLETED) {
-      sendEvent('complete', {
-        analysis: job.result?.analysis || job.streamedText,
-        model: job.result?.model,
-      });
-      res.end();
-      return;
-    }
+    let closed = false;
+    let pollTimer = null;
+    let emitter = null;
+    let lastSentLength = job.streamedText ? job.streamedText.length : 0;
+    let lastStatus = job.status;
+    let lastProgress = job.progress;
+    let lastMessage = job.progressMessage;
 
-    // If job failed, send error
-    if (job.status === JOB_STATUS.FAILED) {
-      sendEvent('error', { message: job.error || 'Analysis failed' });
+    const cleanup = () => {
+      if (closed) return;
+      closed = true;
+      if (pollTimer) clearInterval(pollTimer);
+      if (emitter) {
+        emitter.removeListener('status', onStatus);
+        emitter.removeListener('token', onToken);
+        emitter.removeListener('complete', onComplete);
+        emitter.removeListener('error', onError);
+        cleanupJobEmitter(jobId);
+      }
       res.end();
-      return;
-    }
+    };
 
-    // Send initial status with image
+    const onStatus = (data) => {
+      sendEvent('status', data);
+    };
+
+    const onToken = (data) => {
+      lastSentLength += data.text.length;
+      sendEvent('token', data);
+    };
+
+    const onComplete = (data) => {
+      sendEvent('complete', data);
+      cleanup();
+    };
+
+    const onError = (data) => {
+      sendEvent('error', data);
+      cleanup();
+    };
+
+    res.on('close', cleanup);
+
     sendEvent('init', {
       jobId: job.id,
       status: job.status,
       imageData: job.imageData,
       mediaType: job.mediaType,
       question: job.question,
-    });
-
-    // Update job status to processing
-    job = await storage.updateJob(jobId, {
-      status: JOB_STATUS.PROCESSING,
-      progress: 10,
-      progressMessage: 'Starting AI analysis...',
+      queue: getQueueSnapshot(jobId),
     });
 
     sendEvent('status', {
-      status: JOB_STATUS.PROCESSING,
-      progress: 10,
-      message: 'Starting AI analysis...',
+      status: job.status,
+      progress: job.progress,
+      message: job.progressMessage,
+      queue: getQueueSnapshot(jobId),
     });
 
-    // Get Anthropic client
-    const anthropic = getAnthropicClient();
+    if (job.streamedText) {
+      sendEvent('token', { text: job.streamedText });
+    }
 
-    // Update progress
-    sendEvent('status', {
-      status: JOB_STATUS.PROCESSING,
-      progress: 30,
-      message: 'Connecting to Claude AI...',
-    });
+    if (job.status === JOB_STATUS.QUEUED) {
+      try {
+        enqueueJob(jobId);
+      } catch (error) {
+        sendEvent('error', { message: error.message || 'Queue is full.' });
+        cleanup();
+        return;
+      }
+    }
 
-    // Build prompt
-    const analysisPrompt = buildAnalysisPrompt(job.question);
+    if (job.status === JOB_STATUS.COMPLETED) {
+      sendEvent('complete', {
+        analysis: job.result?.analysis || job.streamedText,
+        model: job.result?.model,
+        usage: job.result?.usage,
+      });
+      cleanup();
+      return;
+    }
 
-    // Start streaming from Claude
-    sendEvent('status', {
-      status: JOB_STATUS.STREAMING,
-      progress: 50,
-      message: 'Analyzing image...',
-    });
+    if (job.status === JOB_STATUS.FAILED) {
+      sendEvent('error', { message: job.error || 'Analysis failed' });
+      cleanup();
+      return;
+    }
 
-    await storage.updateJob(jobId, {
-      status: JOB_STATUS.STREAMING,
-      progress: 50,
-      progressMessage: 'Analyzing image...',
-    });
+    emitter = getJobEmitter(jobId);
+    emitter.on('status', onStatus);
+    emitter.on('token', onToken);
+    emitter.on('complete', onComplete);
+    emitter.on('error', onError);
 
-    let fullText = '';
+    pollTimer = setInterval(async () => {
+      if (closed) return;
+      try {
+        const current = await storage.getJob(jobId);
+        if (!current) {
+          sendEvent('error', { message: 'Job not found' });
+          cleanup();
+          return;
+        }
 
-    // Use Claude streaming API
-    const stream = anthropic.messages.stream({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: job.mediaType,
-                data: job.imageData,
-              },
-            },
-            {
-              type: 'text',
-              text: analysisPrompt,
-            },
-          ],
-        },
-      ],
-    });
+        if (current.streamedText && current.streamedText.length > lastSentLength) {
+          const delta = current.streamedText.slice(lastSentLength);
+          lastSentLength = current.streamedText.length;
+          if (delta) {
+            sendEvent('token', { text: delta });
+          }
+        }
 
-    // Stream tokens to client
-    stream.on('text', (text) => {
-      fullText += text;
-      sendEvent('token', { text });
-    });
+        if (
+          current.status !== lastStatus ||
+          current.progress !== lastProgress ||
+          current.progressMessage !== lastMessage
+        ) {
+          lastStatus = current.status;
+          lastProgress = current.progress;
+          lastMessage = current.progressMessage;
+          sendEvent('status', {
+            status: current.status,
+            progress: current.progress,
+            message: current.progressMessage,
+            queue: getQueueSnapshot(jobId),
+          });
+        }
 
-    // Wait for stream to complete
-    const finalMessage = await stream.finalMessage();
+        if (current.status === JOB_STATUS.COMPLETED) {
+          sendEvent('complete', {
+            analysis: current.result?.analysis || current.streamedText,
+            model: current.result?.model,
+            usage: current.result?.usage,
+          });
+          cleanup();
+          return;
+        }
 
-    // Update job as completed
-    await storage.updateJob(jobId, {
-      status: JOB_STATUS.COMPLETED,
-      progress: 100,
-      progressMessage: 'Analysis complete!',
-      streamedText: fullText,
-      result: {
-        analysis: fullText,
-        model: finalMessage.model,
-        usage: finalMessage.usage,
-      },
-      imageData: null, // Clear image data to save space
-      completedAt: new Date().toISOString(),
-    });
-
-    // Send completion event
-    sendEvent('complete', {
-      analysis: fullText,
-      model: finalMessage.model,
-      usage: finalMessage.usage,
-    });
-
+        if (current.status === JOB_STATUS.FAILED) {
+          sendEvent('error', { message: current.error || 'Analysis failed' });
+          cleanup();
+        }
+      } catch (error) {
+        sendEvent('error', { message: 'Stream polling failed.' });
+        cleanup();
+      }
+    }, STREAM_POLL_INTERVAL_MS);
   } catch (error) {
     console.error('Stream error:', error);
-    
-    // Update job as failed
-    await storage.updateJob(jobId, {
-      status: JOB_STATUS.FAILED,
-      progress: 0,
-      progressMessage: 'Analysis failed',
-      error: error.message,
-      imageData: null,
-    });
-
     sendEvent('error', {
-      message: error.message || 'An error occurred during analysis',
+      message: error.message || 'An error occurred while streaming updates',
     });
-  } finally {
     res.end();
   }
 });
@@ -387,6 +805,15 @@ app.get('/api/job/:jobId/status', async (req, res) => {
     });
   }
 
+  if (job.status === JOB_STATUS.QUEUED) {
+    try {
+      enqueueJob(jobId);
+    } catch (error) {
+      // Queue full; keep status response but include queue state
+    }
+  }
+  const queue = getQueueSnapshot(jobId);
+
   // Return job status (without image data)
   res.json({
     id: job.id,
@@ -394,11 +821,14 @@ app.get('/api/job/:jobId/status', async (req, res) => {
     progress: job.progress,
     progressMessage: job.progressMessage,
     createdAt: job.createdAt,
+    queuedAt: job.queuedAt || null,
+    startedAt: job.startedAt || null,
     completedAt: job.completedAt || null,
     question: job.question || null,
     result: job.result,
     error: job.error,
     hasImage: !!job.imageData,
+    queue,
   });
 });
 
@@ -425,14 +855,19 @@ app.get('/api/job/:jobId/image', async (req, res) => {
 // Legacy analyze endpoint (synchronous, for backward compatibility)
 app.post('/api/analyze', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image uploaded' });
+    const payload = extractImagePayload(req);
+    if (!payload) {
+      return res.status(400).json({
+        error: 'No image provided',
+        message: 'Upload an image file or send base64 image data.',
+      });
     }
+    const normalized = normalizeImagePayload(payload);
 
     const anthropic = getAnthropicClient();
-    const base64Image = req.file.buffer.toString('base64');
-    const mediaType = req.file.mimetype;
-    const userQuestion = req.body.question || '';
+    const base64Image = normalized.imageData;
+    const mediaType = normalized.mediaType;
+    const userQuestion = typeof req.body.question === 'string' ? req.body.question : '';
     const analysisPrompt = buildAnalysisPrompt(userQuestion);
 
     const response = await anthropic.messages.create({
@@ -479,10 +914,11 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
         message: 'The Claude API key is not configured.',
       });
     }
-
-    res.status(500).json({
-      error: 'Analysis failed',
+    const status = error.status || 500;
+    res.status(status).json({
+      error: error.error || 'Analysis failed',
       message: error.message || 'An unexpected error occurred',
+      details: error.details,
     });
   }
 });
@@ -496,8 +932,17 @@ app.get('/api/jobs', async (req, res) => {
     progress: job.progress,
     createdAt: job.createdAt,
     completedAt: job.completedAt || null,
+    queuePosition: getQueuePosition(job.id),
   }));
-  res.json({ jobs, count: jobs.length });
+  res.json({
+    jobs,
+    count: jobs.length,
+    queue: {
+      length: jobQueue.length,
+      active: activeWorkers,
+      concurrency: JOB_QUEUE_CONCURRENCY,
+    },
+  });
 });
 
 // Error handling middleware for multer
@@ -506,7 +951,7 @@ app.use((error, req, res, next) => {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         error: 'File too large',
-        message: 'Maximum file size is 20MB',
+        message: `Maximum file size is ${formatBytes(MAX_UPLOAD_BYTES)}`,
       });
     }
   }

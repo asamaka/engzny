@@ -32,6 +32,16 @@ The following environment variables **must be configured** in Vercel before depl
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI image analysis (starts with `sk-ant-...`) |
 
+### Optional Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `JOB_QUEUE_CONCURRENCY` | `2` | Number of analysis jobs to run in parallel |
+| `JOB_QUEUE_MAX` | `50` | Max number of queued jobs before rejecting new uploads |
+| `JOB_TTL_SECONDS` | `3600` | How long to keep job data before expiring |
+| `MAX_IMAGE_BYTES` | `5242880` | Max image size accepted for analysis (5MB) |
+| `JOB_STREAM_POLL_INTERVAL_MS` | `1000` | SSE polling interval for cross-instance updates |
+
 ### Setting Up Environment Variables in Vercel
 
 1. Go to **Vercel Dashboard**: https://vercel.com/asamaks-projects/engzny
@@ -325,9 +335,13 @@ git commit --allow-empty -m "Trigger redeploy" && git push origin main
 ### Image Analysis (`/api/analyze`)
 
 - **Method**: POST
-- **Content-Type**: multipart/form-data
-- **Fields**:
-  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 20MB)
+- **Content-Type**: `multipart/form-data` or `application/json`
+- **Fields (multipart)**:
+  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 5MB)
+  - `question` (optional): Specific question about the image
+- **Fields (JSON)**:
+  - `imageBase64` / `imageData` / `dataUrl` (required): Base64 image data
+  - `mediaType` (required for raw base64): e.g. `image/png`
   - `question` (optional): Specific question about the image
 - **Requires**: `ANTHROPIC_API_KEY` environment variable
 - **Returns**: JSON with AI analysis of the image
@@ -337,18 +351,29 @@ git commit --allow-empty -m "Trigger redeploy" && git push origin main
 Upload an image via API and get a job ID to track analysis progress.
 
 - **Method**: POST
-- **Content-Type**: multipart/form-data
-- **Fields**:
-  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 20MB)
+- **Content-Type**: `multipart/form-data` or `application/json`
+- **Fields (multipart)**:
+  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 5MB)
+  - `question` (optional): Specific question about the image
+- **Fields (JSON)**:
+  - `imageBase64` / `imageData` / `dataUrl` (required): Base64 image data
+  - `mediaType` (required for raw base64): e.g. `image/png`
   - `question` (optional): Specific question about the image
 - **Requires**: `ANTHROPIC_API_KEY` environment variable
-- **Returns**: JSON with job ID and URLs
+- **Returns**: JSON with job ID, queue info, and URLs
 
 **Example Request:**
 ```bash
 curl -X POST https://thinx.fun/api/upload \
   -F "image=@screenshot.png" \
   -F "question=What does this show?"
+```
+
+**Example JSON Request:**
+```bash
+curl -X POST https://thinx.fun/api/upload \
+  -H "Content-Type: application/json" \
+  -d '{"imageBase64":"<base64>","mediaType":"image/png","question":"What does this show?"}'
 ```
 
 **Example Response:**

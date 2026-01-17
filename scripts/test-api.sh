@@ -88,8 +88,27 @@ else
 fi
 echo ""
 
-# Test 5: Check non-existent job
-echo "Test 5: Check non-existent job (expect 404)"
+# Test 5: Upload with base64 JSON
+echo "Test 5: Upload base64 image JSON"
+echo "--------------------------------"
+if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
+    BASE64_IMAGE=$(base64 "$TEST_IMAGE_DIR/test-gradient.png" | tr -d '\n')
+    BASE64_UPLOAD_RESPONSE=$(curl -s -X POST "$BASE_URL/api/upload" \
+        -H "Content-Type: application/json" \
+        -d "{\"imageBase64\":\"$BASE64_IMAGE\",\"mediaType\":\"image/png\"}")
+    echo "Response: $BASE64_UPLOAD_RESPONSE"
+    if echo "$BASE64_UPLOAD_RESPONSE" | grep -q '"jobId"'; then
+        echo "PASS: Base64 upload accepted"
+    else
+        echo "FAIL: Base64 upload failed"
+    fi
+else
+    echo "SKIP: Test image not found at $TEST_IMAGE_DIR/test-gradient.png"
+fi
+echo ""
+
+# Test 6: Check non-existent job
+echo "Test 6: Check non-existent job (expect 404)"
 echo "--------------------------------------------"
 FAKE_JOB_RESPONSE=$(curl -s "$BASE_URL/api/job/00000000-0000-0000-0000-000000000000/status")
 echo "Response: $FAKE_JOB_RESPONSE"
@@ -100,8 +119,8 @@ else
 fi
 echo ""
 
-# Test 6: List jobs endpoint
-echo "Test 6: List all jobs"
+# Test 7: List jobs endpoint
+echo "Test 7: List all jobs"
 echo "---------------------"
 JOBS_RESPONSE=$(curl -s "$BASE_URL/api/jobs")
 echo "Response: $JOBS_RESPONSE"
@@ -112,8 +131,8 @@ else
 fi
 echo ""
 
-# Test 7: Direct analyze endpoint (original functionality)
-echo "Test 7: Direct analyze endpoint (original UI flow)"
+# Test 8: Direct analyze endpoint (original UI flow)
+echo "Test 8: Direct analyze endpoint (original UI flow)"
 echo "---------------------------------------------------"
 if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
     ANALYZE_RESPONSE=$(curl -s -X POST "$BASE_URL/api/analyze" \
@@ -133,8 +152,8 @@ else
 fi
 echo ""
 
-# Test 8: Job progress page loads
-echo "Test 8: Job progress page (HTML)"
+# Test 9: Job progress page loads
+echo "Test 9: Job progress page (HTML)"
 echo "---------------------------------"
 PAGE_RESPONSE=$(curl -s "$BASE_URL/12345678-1234-1234-1234-123456789012" | head -5)
 if echo "$PAGE_RESPONSE" | grep -q "<!DOCTYPE html>"; then
