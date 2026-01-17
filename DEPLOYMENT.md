@@ -18,20 +18,71 @@ This document provides instructions for AI agents to deploy changes to thinx.fun
 ├── public/
 │   └── index.html    # Static files served by Express
 ├── package.json      # Node.js dependencies
+├── package-lock.json # Locked dependency versions
 ├── vercel.json       # Vercel build configuration
+├── DEPLOYMENT.md     # This file
 └── README.md
 ```
 
-## Deployment Process
+## Required Environment Variables
 
-### Step 1: Make Changes
+The following environment variables **must be configured** in Vercel before deployment:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `ANTHROPIC_API_KEY` | Yes | Claude API key for AI image analysis (starts with `sk-ant-...`) |
+
+### Setting Up Environment Variables in Vercel
+
+1. Go to **Vercel Dashboard**: https://vercel.com/asamaks-projects/engzny
+2. Navigate to **Settings** → **Environment Variables**
+3. Add each required variable:
+   - Click **Add New**
+   - Enter the variable **Name** (e.g., `ANTHROPIC_API_KEY`)
+   - Enter the **Value** (your API key)
+   - Select environments: **Production**, **Preview**, **Development**
+   - Click **Save**
+
+**Important**: After adding/changing environment variables, you must trigger a new deployment for changes to take effect.
+
+### Getting API Keys
+
+- **Claude API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com), navigate to API Keys, and create a new key.
+
+## Full Deployment Process
+
+### Step 1: Ensure Environment Variables are Set
+
+Before deploying features that require API keys, verify they are configured in Vercel:
+
+```bash
+# Check if the feature requires environment variables by looking at api/index.js
+grep -n "process.env" api/index.js
+```
+
+### Step 2: Make Changes
 
 Edit files as needed. Common changes:
 - **UI changes**: Edit `public/index.html` or add files to `public/`
 - **API routes**: Edit `api/index.js` to add Express routes
-- **Dependencies**: Update `package.json`
+- **Dependencies**: Update `package.json` and run `npm install`
 
-### Step 2: Commit and Push to Main
+### Step 3: Test Locally (Optional but Recommended)
+
+```bash
+# Install dependencies
+npm install
+
+# Set environment variables for local testing
+export ANTHROPIC_API_KEY="your-api-key-here"
+
+# Start the server
+npm start
+
+# Server runs at http://localhost:3000
+```
+
+### Step 4: Commit and Push to Main
 
 ```bash
 git add -A
@@ -41,12 +92,17 @@ git push origin main
 
 **Important**: Pushing to `main` automatically triggers a Vercel deployment.
 
-### Step 3: Verify Deployment Status
+### Step 5: Wait for Deployment (15-60 seconds)
 
-Check deployment status via GitHub API (wait ~15 seconds after push):
+Vercel typically takes 15-60 seconds to build and deploy. Wait before verifying.
+
+### Step 6: Verify Deployment Status
+
+Check deployment status via GitHub API:
 
 ```bash
-gh api repos/asamaka/engzny/commits/main/status --jq '{state: .state, description: .statuses[0].description}'
+# Wait and check status
+sleep 20 && gh api repos/asamaka/engzny/commits/main/status --jq '{state: .state, description: .statuses[0].description}'
 ```
 
 Expected successful response:
@@ -57,40 +113,60 @@ Expected successful response:
 }
 ```
 
-### Step 4: Verify Live Site Content
-
-**Important**: Always verify changes are visible to actual users by fetching the live site.
-
+If status is `pending`, wait longer and check again:
 ```bash
-# Fetch the live site and check it returns HTML
-curl -sL https://thinx.fun | head -20
-
-# Verify specific content exists (replace with your expected content)
-curl -sL https://thinx.fun | grep -i "thinx.fun"
+sleep 30 && gh api repos/asamaka/engzny/commits/main/status --jq '.state'
 ```
 
-Example verification for specific changes:
-```bash
-# Check if a specific text/element exists
-curl -sL https://thinx.fun | grep -q "Expected Text" && echo "✓ Change verified" || echo "✗ Change not found"
+### Step 7: Verify Live Site Content
 
-# Check API endpoint
+**Always verify changes are visible** by fetching the live site:
+
+```bash
+# Fetch the live site and check it returns the updated HTML
+curl -sL https://thinx.fun | head -30
+
+# Verify the page title
+curl -sL https://thinx.fun | grep -i "<title>"
+```
+
+### Step 8: Test API Endpoints
+
+```bash
+# Test health endpoint
 curl -sL https://thinx.fun/api/health
+
+# Expected response:
+# {"status":"ok","timestamp":"2026-01-17T..."}
 ```
 
-**Full E2E verification script**:
+### Step 9: Test Feature-Specific Functionality
+
+For the image analysis feature:
 ```bash
-# Wait for deployment, then verify
-sleep 20 && \
-gh api repos/asamaka/engzny/commits/main/status --jq '.state' | grep -q "success" && \
-curl -sL https://thinx.fun | grep -q "thinx.fun" && \
-echo "✓ Deployment successful and live site verified" || \
-echo "✗ Verification failed"
+# Test the analyze endpoint (should return error without image)
+curl -sL -X POST https://thinx.fun/api/analyze
+
+# Expected: {"error":"No image uploaded"}
 ```
 
-The site is live at:
-- **Production**: https://thinx.fun
-- **Vercel URL**: https://engzny.vercel.app
+## Complete Deployment Script
+
+Run this one-liner for a complete deployment with verification:
+
+```bash
+git add -A && \
+git commit -m "Your commit message" && \
+git push origin main && \
+echo "Waiting for deployment..." && \
+sleep 30 && \
+gh api repos/asamaka/engzny/commits/main/status --jq '.state' && \
+echo "Testing health endpoint:" && \
+curl -sL https://thinx.fun/api/health && \
+echo "" && \
+echo "Checking page loads:" && \
+curl -sL https://thinx.fun | grep -o "<title>.*</title>"
+```
 
 ## Vercel Configuration
 
@@ -145,14 +221,38 @@ npm install <package-name>
 
 Then commit both `package.json` and `package-lock.json`.
 
+### Adding Environment Variables
+
+1. Add the variable to Vercel Dashboard (see above)
+2. Access in code:
+   ```javascript
+   const apiKey = process.env.MY_API_KEY;
+   ```
+3. Document the variable in this file's "Required Environment Variables" section
+
 ## Troubleshooting
 
 ### Deployment Failed
 
-1. Check build logs in Vercel dashboard
-2. Verify `package.json` has valid syntax
-3. Ensure all dependencies are listed
+1. Check build logs: https://vercel.com/asamaks-projects/engzny
+2. Verify `package.json` has valid syntax: `node -e "require('./package.json')"`
+3. Ensure all dependencies are listed in `package.json`
 4. Check `vercel.json` configuration
+
+### API Returns 500 Error
+
+1. Check if required environment variables are set in Vercel
+2. View function logs in Vercel Dashboard → Deployments → Functions tab
+3. Test locally with environment variables set
+
+### "ANTHROPIC_API_KEY not set" Error
+
+1. Verify the key is added in Vercel Dashboard → Settings → Environment Variables
+2. Ensure the key is enabled for the correct environment (Production)
+3. Trigger a redeployment after adding the variable:
+   ```bash
+   git commit --allow-empty -m "Trigger redeploy" && git push origin main
+   ```
 
 ### Common Errors
 
@@ -161,6 +261,8 @@ Then commit both `package.json` and `package-lock.json`.
 | `Cannot read properties of undefined (reading 'fsPath')` | Remove or fix `vercel.json`, ensure Express preset is configured |
 | `Module not found` | Run `npm install` and commit `package-lock.json` |
 | `Build timeout` | Optimize build or increase timeout in Vercel settings |
+| `ANTHROPIC_API_KEY environment variable is not set` | Add the key in Vercel Dashboard → Settings → Environment Variables |
+| `401 Unauthorized` from Claude API | Verify your API key is correct and has available credits |
 
 ### Checking Deployment Status
 
@@ -170,6 +272,9 @@ gh api repos/asamaka/engzny/commits/main/status
 
 # Get recent deployments
 gh api repos/asamaka/engzny/deployments --jq '.[0:3] | .[] | {id, environment, created_at}'
+
+# View Vercel deployment logs (in browser)
+# https://vercel.com/asamaks-projects/engzny/deployments
 ```
 
 ## DNS Configuration (Reference)
@@ -180,18 +285,6 @@ Domain `thinx.fun` is configured in GoDaddy with:
 |------|------|-------|
 | A | @ | 76.76.21.21 |
 | CNAME | www | cname.vercel-dns.com |
-
-## Environment Variables
-
-To add environment variables:
-1. Go to Vercel Dashboard → Project Settings → Environment Variables
-2. Add variables for Production/Preview/Development
-3. Redeploy to apply changes
-
-Access in code:
-```javascript
-const apiKey = process.env.API_KEY;
-```
 
 ## Quick Reference Commands
 
@@ -205,18 +298,39 @@ gh api repos/asamaka/engzny/commits/main/status --jq '.state'
 # Verify live site is serving content
 curl -sL https://thinx.fun | head -10
 
+# Test health endpoint
+curl -sL https://thinx.fun/api/health
+
+# Test image analysis endpoint (error expected without image)
+curl -sL -X POST https://thinx.fun/api/analyze
+
 # Verify specific content on live site
 curl -sL https://thinx.fun | grep -i "expected text"
 
 # Full deployment + verification (one-liner)
-git push origin main && sleep 20 && gh api repos/asamaka/engzny/commits/main/status --jq '.state' && curl -sL https://thinx.fun | head -5
+git push origin main && sleep 30 && gh api repos/asamaka/engzny/commits/main/status --jq '.state' && curl -sL https://thinx.fun/api/health
 
 # View recent commits
 git log --oneline -5
 
-# Test locally
-npm install && npm start
+# Test locally (requires ANTHROPIC_API_KEY env var)
+export ANTHROPIC_API_KEY="sk-ant-..." && npm install && npm start
+
+# Trigger redeploy without changes
+git commit --allow-empty -m "Trigger redeploy" && git push origin main
 ```
+
+## Current Features
+
+### Image Analysis (`/api/analyze`)
+
+- **Method**: POST
+- **Content-Type**: multipart/form-data
+- **Fields**:
+  - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 20MB)
+  - `question` (optional): Specific question about the image
+- **Requires**: `ANTHROPIC_API_KEY` environment variable
+- **Returns**: JSON with AI analysis of the image
 
 ## Contact
 
