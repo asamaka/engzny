@@ -765,7 +765,11 @@
                     throw new Error(data.message || data.error || 'Upload failed');
                 }
                 
+                // Reset loading state
+                setLoading(false);
+                
                 // Show success with link to progress page
+                // API now returns immediately, so user can see progress in real-time
                 showSuccess(data.jobId, data.viewUrl);
                 
             } catch (error) {
@@ -829,8 +833,8 @@
             // Scroll to success section
             successSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
-            // Start countdown for auto-redirect
-            let seconds = 5;
+            // Start countdown for auto-redirect (faster since API returns immediately)
+            let seconds = 2;
             countdown.textContent = seconds;
             
             if (countdownInterval) {
