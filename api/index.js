@@ -165,6 +165,7 @@ Be factual, helpful, and highlight anything the user should be cautious about (m
 });
 
 // API Upload endpoint - Returns a job ID for tracking progress
+// In serverless environments, we process synchronously to ensure completion
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
     // Check if image was uploaded
@@ -194,18 +195,25 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 
     jobStore.set(jobId, job);
 
-    // Return job ID immediately
+    // Process the job synchronously (required for serverless)
+    // This ensures the job completes before the function terminates
+    await processJob(jobId);
+
+    // Get updated job status
+    const completedJob = jobStore.get(jobId);
+
+    // Return job ID and final status
     res.json({
-      success: true,
+      success: completedJob.status === JOB_STATUS.COMPLETED,
       jobId: jobId,
+      status: completedJob.status,
       statusUrl: `/api/job/${jobId}/status`,
       viewUrl: `/${jobId}`,
-      message: 'Job created successfully. Visit viewUrl to track progress.',
-    });
-
-    // Start async processing (don't await - let it run in background)
-    processJob(jobId).catch((err) => {
-      console.error(`Job ${jobId} processing error:`, err);
+      message: completedJob.status === JOB_STATUS.COMPLETED 
+        ? 'Analysis complete! Visit viewUrl to see results.' 
+        : 'Analysis failed. Visit viewUrl for details.',
+      result: completedJob.result,
+      error: completedJob.error,
     });
   } catch (error) {
     console.error('Upload error:', error);
