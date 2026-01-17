@@ -14,5 +14,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "plist": "^3.1.0"
   }
 }
