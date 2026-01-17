@@ -41,9 +41,9 @@ git push origin main
 
 **Important**: Pushing to `main` automatically triggers a Vercel deployment.
 
-### Step 3: Verify Deployment
+### Step 3: Verify Deployment Status
 
-Check deployment status via GitHub API:
+Check deployment status via GitHub API (wait ~15 seconds after push):
 
 ```bash
 gh api repos/asamaka/engzny/commits/main/status --jq '{state: .state, description: .statuses[0].description}'
@@ -57,7 +57,36 @@ Expected successful response:
 }
 ```
 
-### Step 4: Verify Live Site
+### Step 4: Verify Live Site Content
+
+**Important**: Always verify changes are visible to actual users by fetching the live site.
+
+```bash
+# Fetch the live site and check it returns HTML
+curl -sL https://thinx.fun | head -20
+
+# Verify specific content exists (replace with your expected content)
+curl -sL https://thinx.fun | grep -i "thinx.fun"
+```
+
+Example verification for specific changes:
+```bash
+# Check if a specific text/element exists
+curl -sL https://thinx.fun | grep -q "Expected Text" && echo "✓ Change verified" || echo "✗ Change not found"
+
+# Check API endpoint
+curl -sL https://thinx.fun/api/health
+```
+
+**Full E2E verification script**:
+```bash
+# Wait for deployment, then verify
+sleep 20 && \
+gh api repos/asamaka/engzny/commits/main/status --jq '.state' | grep -q "success" && \
+curl -sL https://thinx.fun | grep -q "thinx.fun" && \
+echo "✓ Deployment successful and live site verified" || \
+echo "✗ Verification failed"
+```
 
 The site is live at:
 - **Production**: https://thinx.fun
@@ -172,6 +201,15 @@ git add -A && git commit -m "message" && git push origin main
 
 # Check deployment status
 gh api repos/asamaka/engzny/commits/main/status --jq '.state'
+
+# Verify live site is serving content
+curl -sL https://thinx.fun | head -10
+
+# Verify specific content on live site
+curl -sL https://thinx.fun | grep -i "expected text"
+
+# Full deployment + verification (one-liner)
+git push origin main && sleep 20 && gh api repos/asamaka/engzny/commits/main/status --jq '.state' && curl -sL https://thinx.fun | head -5
 
 # View recent commits
 git log --oneline -5
