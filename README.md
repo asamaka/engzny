@@ -45,7 +45,12 @@ Add these records in GoDaddy DNS Management:
 
 ```
 /
-├── index.html    # Main landing page
+├── api/
+│   └── index.js      # Express server
+├── public/
+│   └── index.html    # Main landing page
+├── package.json      # Dependencies
+├── vercel.json       # Vercel configuration
 └── README.md
 ```
 
@@ -53,5 +58,8 @@ Add these records in GoDaddy DNS Management:
 
 To run locally:
 ```bash
-npx serve public
+npm install
+npm start
 ```
+
+Then visit http://localhost:3000
