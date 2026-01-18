@@ -28,6 +28,17 @@ const JOB_QUEUE_CONCURRENCY = Math.max(
   Number.parseInt(process.env.JOB_QUEUE_CONCURRENCY || '2', 10),
 );
 const JOB_QUEUE_MAX = Math.max(1, Number.parseInt(process.env.JOB_QUEUE_MAX || '50', 10));
+const JOB_PROCESS_ON_UPLOAD = (process.env.JOB_PROCESS_ON_UPLOAD || 'false') === 'true';
+const JOB_PROCESS_ON_STREAM = process.env.JOB_PROCESS_ON_STREAM !== 'false';
+const JOB_PROCESS_ON_STATUS = (process.env.JOB_PROCESS_ON_STATUS || 'false') === 'true';
+const JOB_LOCK_SECONDS = Math.max(
+  60,
+  Number.parseInt(process.env.JOB_LOCK_SECONDS || '900', 10),
+);
+const JOB_LOCK_RENEW_MS = Math.max(
+  15000,
+  Number.parseInt(process.env.JOB_LOCK_RENEW_MS || '30000', 10),
+);
 const STREAM_POLL_INTERVAL_MS = Math.max(
   500,
   Number.parseInt(process.env.JOB_STREAM_POLL_INTERVAL_MS || '1000', 10),
@@ -55,6 +66,44 @@ const getRedis = async () => {
   }
   
   return null;
+};
+
+const acquireJobLock = async (jobId) => {
+  const redisClient = await getRedis();
+  const lockId = crypto.randomUUID();
+  if (redisClient) {
+    const result = await redisClient.set(`joblock:${jobId}`, lockId, {
+      nx: true,
+      ex: JOB_LOCK_SECONDS,
+    });
+    if (!result) {
+      return null;
+    }
+    return {
+      lockId,
+      renew: async () =>
+        redisClient.set(`joblock:${jobId}`, lockId, {
+          xx: true,
+          ex: JOB_LOCK_SECONDS,
+        }),
+    };
+  }
+  return { lockId, renew: null };
+};
+
+const releaseJobLock = async (jobId, lock) => {
+  if (!lock) return;
+  const redisClient = await getRedis();
+  if (redisClient) {
+    try {
+      const current = await redisClient.get(`joblock:${jobId}`);
+      if (current && current === lock.lockId) {
+        await redisClient.del(`joblock:${jobId}`);
+      }
+    } catch (error) {
+      console.error('Failed to release job lock:', error);
+    }
+  }
 };
 
 const queueJobUpdate = (jobId, task) => {
@@ -328,6 +377,7 @@ const getQueueSnapshot = (jobId) => ({
   length: jobQueue.length,
   active: activeWorkers,
   concurrency: JOB_QUEUE_CONCURRENCY,
+  processingMode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
 });
 
 const getJobEmitter = (jobId) => {
@@ -357,6 +407,45 @@ const cleanupJobEmitter = (jobId) => {
   }
 };
 
+const startJobProcessing = async (jobId) => {
+  if (activeJobs.has(jobId)) return { started: false, reason: 'active' };
+  if (activeWorkers >= JOB_QUEUE_CONCURRENCY) {
+    return { started: false, reason: 'concurrency' };
+  }
+  const job = await storage.getJob(jobId);
+  if (!job || job.status !== JOB_STATUS.QUEUED) {
+    return { started: false, reason: 'state' };
+  }
+  const lock = await acquireJobLock(jobId);
+  if (!lock) return { started: false, reason: 'locked' };
+
+  activeJobs.add(jobId);
+  activeWorkers += 1;
+
+  let lockRenewTimer = null;
+  if (lock.renew) {
+    lockRenewTimer = setInterval(() => {
+      lock.renew().catch((error) => {
+        console.error('Failed to renew job lock:', error);
+      });
+    }, JOB_LOCK_RENEW_MS);
+  }
+
+  processJob(jobId, lock)
+    .catch((error) => {
+      console.error('Job processing error:', error);
+    })
+    .finally(async () => {
+      if (lockRenewTimer) clearInterval(lockRenewTimer);
+      activeWorkers -= 1;
+      activeJobs.delete(jobId);
+      await releaseJobLock(jobId, lock);
+      scheduleQueueProcessing();
+    });
+
+  return { started: true, reason: 'started' };
+};
+
 const scheduleQueueProcessing = () => {
   if (queueScheduled) return;
   queueScheduled = true;
@@ -364,33 +453,33 @@ const scheduleQueueProcessing = () => {
     queueScheduled = false;
     while (activeWorkers < JOB_QUEUE_CONCURRENCY && jobQueue.length > 0) {
       const jobId = jobQueue.shift();
-      if (activeJobs.has(jobId)) continue;
-      activeJobs.add(jobId);
-      activeWorkers += 1;
-      processJob(jobId)
-        .catch((error) => {
-          console.error('Job processing error:', error);
-        })
-        .finally(() => {
-          activeWorkers -= 1;
-          activeJobs.delete(jobId);
-          scheduleQueueProcessing();
-        });
+      const result = await startJobProcessing(jobId);
+      if (!result.started) {
+        if (result.reason === 'concurrency') {
+          jobQueue.unshift(jobId);
+          break;
+        }
+      }
     }
   });
 };
 
-const enqueueJob = (jobId) => {
-  if (activeJobs.has(jobId) || jobQueue.includes(jobId)) return;
-  if (jobQueue.length >= JOB_QUEUE_MAX) {
-    throw createHttpError(
-      429,
-      'Queue full',
-      'Too many jobs are queued. Please try again in a moment.',
-    );
+const enqueueJob = (jobId, options = {}) => {
+  if (activeJobs.has(jobId)) return;
+  const alreadyQueued = jobQueue.includes(jobId);
+  if (!alreadyQueued) {
+    if (jobQueue.length >= JOB_QUEUE_MAX) {
+      throw createHttpError(
+        429,
+        'Queue full',
+        'Too many jobs are queued. Please try again in a moment.',
+      );
+    }
+    jobQueue.push(jobId);
   }
-  jobQueue.push(jobId);
-  scheduleQueueProcessing();
+  if (options.start) {
+    scheduleQueueProcessing();
+  }
 };
 
 const updateJobStatus = async (jobId, updates) => {
@@ -404,6 +493,11 @@ const updateJobStatus = async (jobId, updates) => {
       progress: updated.progress,
       message: updated.progressMessage,
       queue: getQueueSnapshot(jobId),
+      processing: {
+        mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+        startOnStream: !JOB_PROCESS_ON_UPLOAD,
+        startOnStatus: JOB_PROCESS_ON_STATUS,
+      },
     });
   }
   return updated;
@@ -551,7 +645,9 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       id: jobId,
       status: JOB_STATUS.QUEUED,
       progress: 0,
-      progressMessage: 'Queued for analysis...',
+      progressMessage: JOB_PROCESS_ON_UPLOAD
+        ? 'Queued for analysis...'
+        : 'Waiting for analysis stream to start...',
       createdAt: new Date().toISOString(),
       queuedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -571,7 +667,7 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
 
     // Enqueue job for processing
     try {
-      enqueueJob(jobId);
+      enqueueJob(jobId, { start: JOB_PROCESS_ON_UPLOAD });
     } catch (queueError) {
       await updateJobStatus(jobId, {
         status: JOB_STATUS.FAILED,
@@ -582,6 +678,18 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       throw queueError;
     }
     const queue = getQueueSnapshot(jobId);
+    const processing = {
+      mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+      startOnStream: !JOB_PROCESS_ON_UPLOAD,
+      startOnStatus: JOB_PROCESS_ON_STATUS,
+    };
+    const next = !JOB_PROCESS_ON_UPLOAD
+      ? {
+          action: 'open_stream',
+          url: `/api/job/${jobId}/stream`,
+          message: 'Open the stream URL to begin processing.',
+        }
+      : null;
 
     // Return immediately with job info
     res.json({
@@ -592,6 +700,8 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       streamUrl: `/api/job/${jobId}/stream`,
       viewUrl: `/${jobId}`,
       queue,
+      processing,
+      next,
       message: 'Image queued for analysis. Open viewUrl to see results.',
     });
     
@@ -684,6 +794,11 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       mediaType: job.mediaType,
       question: job.question,
       queue: getQueueSnapshot(jobId),
+      processing: {
+        mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+        startOnStream: !JOB_PROCESS_ON_UPLOAD,
+        startOnStatus: JOB_PROCESS_ON_STATUS,
+      },
     });
 
     sendEvent('status', {
@@ -691,6 +806,11 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       progress: job.progress,
       message: job.progressMessage,
       queue: getQueueSnapshot(jobId),
+      processing: {
+        mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+        startOnStream: !JOB_PROCESS_ON_UPLOAD,
+        startOnStatus: JOB_PROCESS_ON_STATUS,
+      },
     });
 
     if (job.streamedText) {
@@ -699,7 +819,7 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     if (job.status === JOB_STATUS.QUEUED) {
       try {
-        enqueueJob(jobId);
+        enqueueJob(jobId, { start: JOB_PROCESS_ON_STREAM });
       } catch (error) {
         sendEvent('error', { message: error.message || 'Queue is full.' });
         cleanup();
@@ -760,6 +880,11 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
             progress: current.progress,
             message: current.progressMessage,
             queue: getQueueSnapshot(jobId),
+            processing: {
+              mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+              startOnStream: !JOB_PROCESS_ON_UPLOAD,
+              startOnStatus: JOB_PROCESS_ON_STATUS,
+            },
           });
         }
 
@@ -806,13 +931,27 @@ app.get('/api/job/:jobId/status', async (req, res) => {
   }
 
   if (job.status === JOB_STATUS.QUEUED) {
+    const shouldStart = JOB_PROCESS_ON_STATUS || req.query.start === '1';
     try {
-      enqueueJob(jobId);
+      enqueueJob(jobId, { start: shouldStart });
     } catch (error) {
       // Queue full; keep status response but include queue state
     }
   }
   const queue = getQueueSnapshot(jobId);
+  const processing = {
+    mode: JOB_PROCESS_ON_UPLOAD ? 'background' : 'stream',
+    startOnStream: !JOB_PROCESS_ON_UPLOAD,
+    startOnStatus: JOB_PROCESS_ON_STATUS,
+  };
+  const next =
+    job.status === JOB_STATUS.QUEUED && !JOB_PROCESS_ON_UPLOAD
+      ? {
+          action: 'open_stream',
+          url: `/api/job/${jobId}/stream`,
+          message: 'Open the stream URL to begin processing.',
+        }
+      : null;
 
   // Return job status (without image data)
   res.json({
@@ -829,6 +968,8 @@ app.get('/api/job/:jobId/status', async (req, res) => {
     error: job.error,
     hasImage: !!job.imageData,
     queue,
+    processing,
+    next,
   });
 });
 

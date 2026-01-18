@@ -41,6 +41,11 @@ The following environment variables **must be configured** in Vercel before depl
 | `JOB_TTL_SECONDS` | `3600` | How long to keep job data before expiring |
 | `MAX_IMAGE_BYTES` | `5242880` | Max image size accepted for analysis (5MB) |
 | `JOB_STREAM_POLL_INTERVAL_MS` | `1000` | SSE polling interval for cross-instance updates |
+| `JOB_PROCESS_ON_UPLOAD` | `false` | Start processing during upload request (non-serverless) |
+| `JOB_PROCESS_ON_STREAM` | `true` | Start processing when stream connects |
+| `JOB_PROCESS_ON_STATUS` | `false` | Allow status polling to start processing |
+| `JOB_LOCK_SECONDS` | `900` | Lock duration for processing claims |
+| `JOB_LOCK_RENEW_MS` | `30000` | Lock renewal interval |
 
 ### Setting Up Environment Variables in Vercel
 
@@ -373,6 +378,10 @@ Upload an image via API and get a job ID to track analysis progress.
   - `question` (optional): Specific question about the image
 - **Requires**: `ANTHROPIC_API_KEY` environment variable
 - **Returns**: JSON with job ID, queue info, and URLs
+
+**Processing behavior:**
+- Default (`JOB_PROCESS_ON_UPLOAD=false`): processing starts when a client opens `streamUrl` or visits `viewUrl`.
+- If you want background processing without a stream connection, set `JOB_PROCESS_ON_UPLOAD=true` (best for non-serverless).
 
 **Example Request:**
 ```bash
