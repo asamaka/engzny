@@ -160,6 +160,18 @@ curl -sL -X POST https://thinx.fun/api/analyze
 # Expected: {"error":"No image uploaded"}
 ```
 
+### Step 10: Capture Production Test Logs (Required)
+
+Save production verification output to `/opt/cursor/artifacts/` so it can be reviewed later.
+
+```bash
+# Full API test suite with saved logs
+./scripts/test-api.sh https://thinx.fun | tee "/opt/cursor/artifacts/production-test-$(date +%Y%m%d-%H%M%S).log"
+
+# Optional: single health check log
+curl -sL https://thinx.fun/api/health | tee "/opt/cursor/artifacts/production-health-$(date +%Y%m%d-%H%M%S).log"
+```
+
 ## Complete Deployment Script
 
 Run this one-liner for a complete deployment with verification:
