@@ -195,16 +195,27 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
         mediaType = body.mediaType || body.media_type || 'image/png';
       }
 
-      // Validate base64
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/]+=*$/.test(base64Data)) {
+        return res.status(400).json({ error: 'Invalid base64', message: 'Image data is not valid base64 encoding' });
+      }
+
+      // Decode and validate
       try {
         const buffer = Buffer.from(base64Data, 'base64');
-        if (buffer.length === 0) {
-          return res.status(400).json({ error: 'Invalid image', message: 'Base64 data is empty or invalid' });
+        if (buffer.length < 8) {
+          return res.status(400).json({ error: 'Invalid image', message: 'Image data is too small to be a valid image' });
         }
-        // Detect media type from magic bytes if not specified
-        if (mediaType === 'image/png' && !body.mediaType && !body.media_type) {
-          mediaType = detectMediaType(buffer) || mediaType;
+        
+        // Detect media type from magic bytes
+        const detectedType = detectMediaType(buffer);
+        if (detectedType) {
+          mediaType = detectedType;
+        } else if (!body.mediaType && !body.media_type) {
+          // No valid image magic bytes and no media type specified
+          return res.status(400).json({ error: 'Invalid image', message: 'Could not detect image format. Please provide mediaType.' });
         }
+        
         imageData = base64Data;
       } catch (e) {
         return res.status(400).json({ error: 'Invalid base64', message: 'Could not decode base64 image data' });
