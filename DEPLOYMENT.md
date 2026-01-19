@@ -334,22 +334,46 @@ git commit --allow-empty -m "Trigger redeploy" && git push origin main
 
 ### API Upload with Progress Tracking (`/api/upload`)
 
-Upload an image via API and get a job ID to track analysis progress.
+Upload an image via API and get a job ID to track analysis progress. Returns immediately with job ID before processing starts.
 
-- **Method**: POST
+Supports two upload formats:
+
+#### Option 1: Multipart Form Data (traditional file upload)
 - **Content-Type**: multipart/form-data
 - **Fields**:
   - `image` (required): Image file (JPEG, PNG, GIF, WebP, max 20MB)
   - `question` (optional): Specific question about the image
-- **Requires**: `ANTHROPIC_API_KEY` environment variable
-- **Returns**: JSON with job ID and URLs
 
-**Example Request:**
+**Example:**
 ```bash
 curl -X POST https://thinx.fun/api/upload \
   -F "image=@screenshot.png" \
   -F "question=What does this show?"
 ```
+
+#### Option 2: JSON with Base64 (for Apple Shortcuts)
+- **Content-Type**: application/json
+- **Body**:
+  - `image` (required): Base64 encoded image data (with or without data URL prefix)
+  - `mediaType` or `media_type` (optional): MIME type if not using data URL prefix
+  - `question` or `prompt` (optional): Specific question about the image
+
+**Example with data URL:**
+```bash
+curl -X POST https://thinx.fun/api/upload \
+  -H "Content-Type: application/json" \
+  -d '{"image": "data:image/png;base64,iVBORw0KGgo...", "question": "What is this?"}'
+```
+
+**Example with raw base64:**
+```bash
+curl -X POST https://thinx.fun/api/upload \
+  -H "Content-Type: application/json" \
+  -d '{"image": "iVBORw0KGgo...", "mediaType": "image/png"}'
+```
+
+- **Requires**: `ANTHROPIC_API_KEY` environment variable
+- **Returns**: JSON with job ID and URLs (immediately, before processing starts)
 
 **Example Response:**
 ```json
@@ -374,18 +398,28 @@ Get the current status and results of an analysis job.
 curl https://thinx.fun/api/job/a1b2c3d4-e5f6-7890-abcd-ef1234567890/status
 ```
 
+**Job Status Values:**
+- `queued` - Image uploaded, waiting to process
+- `processing` - Job started, preparing request
+- `waiting_llm` - Waiting for Claude AI response
+- `streaming` - Claude is streaming response tokens
+- `completed` - Analysis complete
+- `failed` - Error occurred
+
 **Example Response (Processing):**
 ```json
 {
   "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "status": "processing",
-  "progress": 50,
-  "progressMessage": "Claude is analyzing the image...",
+  "status": "waiting_llm",
+  "progress": 30,
+  "progressMessage": "Waiting for Claude AI response...",
   "createdAt": "2026-01-17T12:00:00.000Z",
   "completedAt": null,
   "question": "What does this show?",
   "result": null,
-  "error": null
+  "error": null,
+  "hasImage": true,
+  "mediaType": "image/png"
 }
 ```
 
