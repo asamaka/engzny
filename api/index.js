@@ -10,13 +10,24 @@ const app = express();
 // For production, configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
 const jobStore = new Map();
 
-// Job status constants
+// Job status constants with clear progression
 const JOB_STATUS = {
-  QUEUED: 'queued',
-  PROCESSING: 'processing',
-  STREAMING: 'streaming',
-  COMPLETED: 'completed',
-  FAILED: 'failed',
+  QUEUED: 'queued',           // Image uploaded, waiting to start
+  PROCESSING: 'processing',   // Job started, preparing request
+  WAITING_LLM: 'waiting_llm', // Waiting for LLM to start responding
+  STREAMING: 'streaming',     // LLM is streaming tokens
+  COMPLETED: 'completed',     // Analysis complete
+  FAILED: 'failed',           // Error occurred
+};
+
+// Progress messages for each status
+const PROGRESS_MESSAGES = {
+  [JOB_STATUS.QUEUED]: 'Image uploaded, waiting to process...',
+  [JOB_STATUS.PROCESSING]: 'Starting AI analysis...',
+  [JOB_STATUS.WAITING_LLM]: 'Waiting for Claude AI response...',
+  [JOB_STATUS.STREAMING]: 'Claude is analyzing your image...',
+  [JOB_STATUS.COMPLETED]: 'Analysis complete!',
+  [JOB_STATUS.FAILED]: 'Analysis failed',
 };
 
 // Redis client (lazy loaded)
@@ -147,30 +158,94 @@ Be factual, helpful, and highlight anything the user should be cautious about (m
 };
 
 // ============================================
-// NEW: Queue-based upload endpoint
-// Returns immediately with jobId
+// Upload endpoint - supports both:
+// 1. Multipart form-data (traditional file upload)
+// 2. JSON with base64 encoded image (for Apple Shortcuts)
+// Returns immediately with jobId before processing starts
 // ============================================
 app.post('/api/upload', upload.single('image'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No image uploaded' });
+    let imageData = null;
+    let mediaType = null;
+    let question = '';
+
+    // Check if this is a JSON request with base64 image
+    if (req.is('application/json') || (req.body && req.body.image && typeof req.body.image === 'string')) {
+      // JSON body with base64 image
+      const body = req.body;
+      
+      if (!body.image) {
+        return res.status(400).json({ error: 'No image provided', message: 'Please provide an image in base64 format' });
+      }
+
+      // Handle base64 data - might include data URL prefix
+      let base64Data = body.image;
+      
+      // Extract media type and data from data URL if present
+      if (base64Data.startsWith('data:')) {
+        const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mediaType = matches[1];
+          base64Data = matches[2];
+        } else {
+          return res.status(400).json({ error: 'Invalid image format', message: 'Could not parse data URL' });
+        }
+      } else {
+        // Raw base64, assume PNG or detect from magic bytes
+        mediaType = body.mediaType || body.media_type || 'image/png';
+      }
+
+      // Validate base64
+      try {
+        const buffer = Buffer.from(base64Data, 'base64');
+        if (buffer.length === 0) {
+          return res.status(400).json({ error: 'Invalid image', message: 'Base64 data is empty or invalid' });
+        }
+        // Detect media type from magic bytes if not specified
+        if (mediaType === 'image/png' && !body.mediaType && !body.media_type) {
+          mediaType = detectMediaType(buffer) || mediaType;
+        }
+        imageData = base64Data;
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid base64', message: 'Could not decode base64 image data' });
+      }
+
+      question = body.question || body.prompt || '';
+
+    } else if (req.file) {
+      // Traditional multipart file upload
+      imageData = req.file.buffer.toString('base64');
+      mediaType = req.file.mimetype;
+      question = req.body.question || '';
+
+    } else {
+      return res.status(400).json({ 
+        error: 'No image uploaded',
+        message: 'Please provide an image either as multipart form-data or JSON with base64 encoded image'
+      });
+    }
+
+    // Validate media type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(mediaType)) {
+      return res.status(400).json({ 
+        error: 'Invalid image type',
+        message: `Supported formats: JPEG, PNG, GIF, WebP. Got: ${mediaType}`
+      });
     }
 
     // Generate unique job ID
     const jobId = crypto.randomUUID();
-    
-    // Get optional user question
-    const question = req.body.question || '';
 
     // Create job record with image data
     const job = {
       id: jobId,
       status: JOB_STATUS.QUEUED,
       progress: 0,
-      progressMessage: 'Image uploaded, waiting to process...',
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.QUEUED],
       createdAt: new Date().toISOString(),
-      imageData: req.file.buffer.toString('base64'),
-      mediaType: req.file.mimetype,
+      imageData: imageData,
+      mediaType: mediaType,
       question: question,
       result: null,
       streamedText: '',
@@ -200,8 +275,25 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
   }
 });
 
+// Helper to detect image type from buffer magic bytes
+function detectMediaType(buffer) {
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return 'image/jpeg';
+  }
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+    return 'image/png';
+  }
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+    return 'image/gif';
+  }
+  if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+    return 'image/webp';
+  }
+  return null;
+}
+
 // ============================================
-// NEW: Server-Sent Events streaming endpoint
+// Server-Sent Events streaming endpoint
 // Connects to Claude API and streams tokens
 // ============================================
 app.get('/api/job/:jobId/stream', async (req, res) => {
@@ -220,6 +312,10 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Store original image data before processing clears it
+  let originalImageData = null;
+  let originalMediaType = null;
+
   try {
     // Get job from storage
     let job = await storage.getJob(jobId);
@@ -230,8 +326,20 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       return;
     }
 
-    // If job is already completed, send the result
+    // Store image data before any processing
+    originalImageData = job.imageData;
+    originalMediaType = job.mediaType;
+
+    // If job is already completed, send the result with image
     if (job.status === JOB_STATUS.COMPLETED) {
+      // Send init with image first (might be null if cleared, client should handle)
+      sendEvent('init', {
+        jobId: job.id,
+        status: job.status,
+        imageData: originalImageData,
+        mediaType: originalMediaType,
+        question: job.question,
+      });
       sendEvent('complete', {
         analysis: job.result?.analysis || job.streamedText,
         model: job.result?.model,
@@ -240,19 +348,28 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       return;
     }
 
-    // If job failed, send error
+    // If job failed, send error with image
     if (job.status === JOB_STATUS.FAILED) {
+      sendEvent('init', {
+        jobId: job.id,
+        status: job.status,
+        imageData: originalImageData,
+        mediaType: originalMediaType,
+        question: job.question,
+      });
       sendEvent('error', { message: job.error || 'Analysis failed' });
       res.end();
       return;
     }
 
-    // Send initial status with image
+    // Send initial status with image - always include image data
     sendEvent('init', {
       jobId: job.id,
       status: job.status,
-      imageData: job.imageData,
-      mediaType: job.mediaType,
+      progress: job.progress || 0,
+      progressMessage: job.progressMessage || PROGRESS_MESSAGES[job.status],
+      imageData: originalImageData,
+      mediaType: originalMediaType,
       question: job.question,
     });
 
@@ -260,42 +377,36 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     job = await storage.updateJob(jobId, {
       status: JOB_STATUS.PROCESSING,
       progress: 10,
-      progressMessage: 'Starting AI analysis...',
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.PROCESSING],
     });
 
     sendEvent('status', {
       status: JOB_STATUS.PROCESSING,
       progress: 10,
-      message: 'Starting AI analysis...',
+      message: PROGRESS_MESSAGES[JOB_STATUS.PROCESSING],
     });
 
     // Get Anthropic client
     const anthropic = getAnthropicClient();
 
-    // Update progress
+    // Update to waiting for LLM
     sendEvent('status', {
-      status: JOB_STATUS.PROCESSING,
+      status: JOB_STATUS.WAITING_LLM,
       progress: 30,
-      message: 'Connecting to Claude AI...',
+      message: PROGRESS_MESSAGES[JOB_STATUS.WAITING_LLM],
+    });
+
+    await storage.updateJob(jobId, {
+      status: JOB_STATUS.WAITING_LLM,
+      progress: 30,
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.WAITING_LLM],
     });
 
     // Build prompt
     const analysisPrompt = buildAnalysisPrompt(job.question);
 
-    // Start streaming from Claude
-    sendEvent('status', {
-      status: JOB_STATUS.STREAMING,
-      progress: 50,
-      message: 'Analyzing image...',
-    });
-
-    await storage.updateJob(jobId, {
-      status: JOB_STATUS.STREAMING,
-      progress: 50,
-      progressMessage: 'Analyzing image...',
-    });
-
     let fullText = '';
+    let firstTokenReceived = false;
 
     // Use Claude streaming API
     const stream = anthropic.messages.stream({
@@ -309,8 +420,8 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
               type: 'image',
               source: {
                 type: 'base64',
-                media_type: job.mediaType,
-                data: job.imageData,
+                media_type: originalMediaType,
+                data: originalImageData,
               },
             },
             {
@@ -323,7 +434,22 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     });
 
     // Stream tokens to client
-    stream.on('text', (text) => {
+    stream.on('text', async (text) => {
+      // On first token, update status to streaming
+      if (!firstTokenReceived) {
+        firstTokenReceived = true;
+        sendEvent('status', {
+          status: JOB_STATUS.STREAMING,
+          progress: 50,
+          message: PROGRESS_MESSAGES[JOB_STATUS.STREAMING],
+        });
+        await storage.updateJob(jobId, {
+          status: JOB_STATUS.STREAMING,
+          progress: 50,
+          progressMessage: PROGRESS_MESSAGES[JOB_STATUS.STREAMING],
+        });
+      }
+      
       fullText += text;
       sendEvent('token', { text });
     });
@@ -331,18 +457,19 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     // Wait for stream to complete
     const finalMessage = await stream.finalMessage();
 
-    // Update job as completed
+    // Update job as completed - keep image data for a while longer
     await storage.updateJob(jobId, {
       status: JOB_STATUS.COMPLETED,
       progress: 100,
-      progressMessage: 'Analysis complete!',
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.COMPLETED],
       streamedText: fullText,
       result: {
         analysis: fullText,
         model: finalMessage.model,
         usage: finalMessage.usage,
       },
-      imageData: null, // Clear image data to save space
+      // Keep image data for completed jobs so UI can display it
+      // It will be cleared by TTL eventually
       completedAt: new Date().toISOString(),
     });
 
@@ -356,13 +483,12 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
   } catch (error) {
     console.error('Stream error:', error);
     
-    // Update job as failed
+    // Update job as failed but keep image data
     await storage.updateJob(jobId, {
       status: JOB_STATUS.FAILED,
       progress: 0,
-      progressMessage: 'Analysis failed',
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.FAILED],
       error: error.message,
-      imageData: null,
     });
 
     sendEvent('error', {
@@ -387,19 +513,29 @@ app.get('/api/job/:jobId/status', async (req, res) => {
     });
   }
 
-  // Return job status (without image data)
-  res.json({
+  // Return job status (without image data by default for bandwidth)
+  const includeImage = req.query.includeImage === 'true';
+  
+  const response = {
     id: job.id,
     status: job.status,
-    progress: job.progress,
-    progressMessage: job.progressMessage,
+    progress: job.progress || 0,
+    progressMessage: job.progressMessage || PROGRESS_MESSAGES[job.status] || 'Processing...',
     createdAt: job.createdAt,
     completedAt: job.completedAt || null,
     question: job.question || null,
     result: job.result,
     error: job.error,
     hasImage: !!job.imageData,
-  });
+    mediaType: job.mediaType,
+  };
+
+  // Include image data if requested
+  if (includeImage && job.imageData) {
+    response.imageData = job.imageData;
+  }
+
+  res.json(response);
 });
 
 // Get job image (for displaying in UI)
