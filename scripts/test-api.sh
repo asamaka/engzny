@@ -16,7 +16,7 @@ echo ""
 # Test 1: Health Check
 echo "Test 1: Health Check Endpoint"
 echo "-----------------------------"
-HEALTH_RESPONSE=$(curl -s "$BASE_URL/api/health")
+HEALTH_RESPONSE=$(curl -sL "$BASE_URL/api/health")
 echo "Response: $HEALTH_RESPONSE"
 if echo "$HEALTH_RESPONSE" | grep -q '"status":"ok"'; then
     echo "PASS: Health check successful"
@@ -28,7 +28,7 @@ echo ""
 # Test 2: Upload endpoint without image (should fail)
 echo "Test 2: Upload without image (expect error)"
 echo "--------------------------------------------"
-NO_IMAGE_RESPONSE=$(curl -s -X POST "$BASE_URL/api/upload")
+NO_IMAGE_RESPONSE=$(curl -sL -X POST "$BASE_URL/api/upload")
 echo "Response: $NO_IMAGE_RESPONSE"
 if echo "$NO_IMAGE_RESPONSE" | grep -q '"error"'; then
     echo "PASS: Correctly returned error for missing image"
@@ -41,7 +41,7 @@ echo ""
 echo "Test 3: Upload test image via API"
 echo "----------------------------------"
 if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
-    UPLOAD_RESPONSE=$(curl -s -X POST "$BASE_URL/api/upload" \
+    UPLOAD_RESPONSE=$(curl -sL -X POST "$BASE_URL/api/upload" \
         -F "image=@$TEST_IMAGE_DIR/test-gradient.png" \
         -F "question=What colors do you see in this image?")
     echo "Response: $UPLOAD_RESPONSE"
@@ -52,15 +52,26 @@ if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
     if [ -n "$JOB_ID" ]; then
         echo "PASS: Upload successful, Job ID: $JOB_ID"
         
-        # Test 4: Check job status
+        # Trigger stream to start processing
         echo ""
-        echo "Test 4: Check job status"
+        echo "Test 4: Trigger stream processing"
+        echo "---------------------------------"
+        STREAM_OUTPUT=$(curl -sN --max-time 15 "$BASE_URL/api/job/$JOB_ID/stream")
+        if echo "$STREAM_OUTPUT" | grep -q '"progress":[1-9]'; then
+            echo "PASS: Stream reported progress"
+        else
+            echo "WARN: Stream did not report progress (may still be queued)"
+        fi
+
+        # Test 5: Check job status
+        echo ""
+        echo "Test 5: Check job status"
         echo "------------------------"
         echo "Waiting for job to process..."
         
         for i in {1..30}; do
             sleep 2
-            STATUS_RESPONSE=$(curl -s "$BASE_URL/api/job/$JOB_ID/status")
+            STATUS_RESPONSE=$(curl -sL "$BASE_URL/api/job/$JOB_ID/status")
             STATUS=$(echo "$STATUS_RESPONSE" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
             PROGRESS=$(echo "$STATUS_RESPONSE" | grep -o '"progress":[0-9]*' | cut -d':' -f2)
             
@@ -88,10 +99,37 @@ else
 fi
 echo ""
 
-# Test 5: Check non-existent job
-echo "Test 5: Check non-existent job (expect 404)"
+# Test 6: Upload with base64 JSON
+echo "Test 6: Upload base64 image JSON"
+echo "--------------------------------"
+if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
+    BASE64_IMAGE=$(base64 "$TEST_IMAGE_DIR/test-gradient.png" | tr -d '\n')
+    BASE64_UPLOAD_RESPONSE=$(curl -sL -X POST "$BASE_URL/api/upload" \
+        -H "Content-Type: application/json" \
+        -d "{\"imageBase64\":\"$BASE64_IMAGE\",\"mediaType\":\"image/png\"}")
+    echo "Response: $BASE64_UPLOAD_RESPONSE"
+    BASE64_JOB_ID=$(echo "$BASE64_UPLOAD_RESPONSE" | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
+    if [ -n "$BASE64_JOB_ID" ]; then
+        echo "PASS: Base64 upload accepted"
+        echo "Triggering stream for base64 job..."
+        BASE64_STREAM=$(curl -sN --max-time 15 "$BASE_URL/api/job/$BASE64_JOB_ID/stream")
+        if echo "$BASE64_STREAM" | grep -q '"progress":[1-9]'; then
+            echo "PASS: Base64 stream reported progress"
+        else
+            echo "WARN: Base64 stream did not report progress (may still be queued)"
+        fi
+    else
+        echo "FAIL: Base64 upload failed"
+    fi
+else
+    echo "SKIP: Test image not found at $TEST_IMAGE_DIR/test-gradient.png"
+fi
+echo ""
+
+# Test 7: Check non-existent job (expect 404)
+echo "Test 7: Check non-existent job (expect 404)"
 echo "--------------------------------------------"
-FAKE_JOB_RESPONSE=$(curl -s "$BASE_URL/api/job/00000000-0000-0000-0000-000000000000/status")
+FAKE_JOB_RESPONSE=$(curl -sL "$BASE_URL/api/job/00000000-0000-0000-0000-000000000000/status")
 echo "Response: $FAKE_JOB_RESPONSE"
 if echo "$FAKE_JOB_RESPONSE" | grep -q '"error":"Job not found"'; then
     echo "PASS: Correctly returned 404 for non-existent job"
@@ -100,10 +138,10 @@ else
 fi
 echo ""
 
-# Test 6: List jobs endpoint
-echo "Test 6: List all jobs"
+# Test 8: List jobs endpoint
+echo "Test 8: List all jobs"
 echo "---------------------"
-JOBS_RESPONSE=$(curl -s "$BASE_URL/api/jobs")
+JOBS_RESPONSE=$(curl -sL "$BASE_URL/api/jobs")
 echo "Response: $JOBS_RESPONSE"
 if echo "$JOBS_RESPONSE" | grep -q '"jobs"'; then
     echo "PASS: Jobs list endpoint working"
@@ -112,11 +150,11 @@ else
 fi
 echo ""
 
-# Test 7: Direct analyze endpoint (original functionality)
-echo "Test 7: Direct analyze endpoint (original UI flow)"
+# Test 9: Direct analyze endpoint (original UI flow)
+echo "Test 9: Direct analyze endpoint (original UI flow)"
 echo "---------------------------------------------------"
 if [ -f "$TEST_IMAGE_DIR/test-gradient.png" ]; then
-    ANALYZE_RESPONSE=$(curl -s -X POST "$BASE_URL/api/analyze" \
+    ANALYZE_RESPONSE=$(curl -sL -X POST "$BASE_URL/api/analyze" \
         -F "image=@$TEST_IMAGE_DIR/test-gradient.png")
     
     if echo "$ANALYZE_RESPONSE" | grep -q '"success":true'; then
@@ -133,10 +171,10 @@ else
 fi
 echo ""
 
-# Test 8: Job progress page loads
-echo "Test 8: Job progress page (HTML)"
+# Test 10: Job progress page loads
+echo "Test 10: Job progress page (HTML)"
 echo "---------------------------------"
-PAGE_RESPONSE=$(curl -s "$BASE_URL/12345678-1234-1234-1234-123456789012" | head -5)
+PAGE_RESPONSE=$(curl -sL "$BASE_URL/12345678-1234-1234-1234-123456789012" | head -5)
 if echo "$PAGE_RESPONSE" | grep -q "<!DOCTYPE html>"; then
     echo "PASS: Job progress page loads HTML"
 else

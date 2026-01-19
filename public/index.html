@@ -559,7 +559,7 @@
                         <div class="upload-text">
                             <h3>Upload an image to analyze</h3>
                             <p>Drag and drop or click to browse</p>
-                            <p class="formats">Supports JPEG, PNG, GIF, WebP (max 20MB)</p>
+                            <p class="formats">Supports JPEG, PNG, GIF, WebP (max 5MB)</p>
                         </div>
                     </div>
                     
@@ -712,9 +712,9 @@
                 return;
             }
             
-            // Validate file size (20MB)
-            if (file.size > 20 * 1024 * 1024) {
-                showError('File is too large. Maximum size is 20MB.');
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showError('File is too large. Maximum size is 5MB.');
                 return;
             }
             
