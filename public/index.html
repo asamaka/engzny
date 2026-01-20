@@ -667,6 +667,84 @@
         let selectedFile = null;
         let countdownInterval = null;
         
+        // ============================================
+        // Client-side image compression
+        // Compresses large images before upload to stay within server limits
+        // ============================================
+        const MAX_UPLOAD_SIZE = 4 * 1024 * 1024; // 4MB to stay under Vercel's limit
+        const MAX_DIMENSION = 4096;
+        
+        async function compressImage(file) {
+            // If file is small enough, return as-is
+            if (file.size <= MAX_UPLOAD_SIZE) {
+                console.log('Image size OK:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+                return file;
+            }
+            
+            console.log('Compressing image from:', (file.size / 1024 / 1024).toFixed(2), 'MB');
+            
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                img.onload = async () => {
+                    let { width, height } = img;
+                    
+                    // Scale down if dimensions are too large
+                    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+                        const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+                        width = Math.round(width * scale);
+                        height = Math.round(height * scale);
+                    }
+                    
+                    // Progressive compression: try different quality levels and scales
+                    const qualityLevels = [0.85, 0.75, 0.65, 0.55, 0.45];
+                    const scaleLevels = [1.0, 0.85, 0.7, 0.55, 0.4];
+                    
+                    for (const scale of scaleLevels) {
+                        const w = Math.round(width * scale);
+                        const h = Math.round(height * scale);
+                        
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+                        
+                        for (const quality of qualityLevels) {
+                            const blob = await new Promise(res => 
+                                canvas.toBlob(res, 'image/jpeg', quality)
+                            );
+                            
+                            if (blob && blob.size <= MAX_UPLOAD_SIZE) {
+                                console.log(`Compressed to ${(blob.size / 1024 / 1024).toFixed(2)}MB (${w}x${h}, q=${quality})`);
+                                resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+                                return;
+                            }
+                        }
+                    }
+                    
+                    // Last resort: aggressive compression
+                    canvas.width = Math.min(1920, width);
+                    canvas.height = Math.min(1920, height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    const blob = await new Promise(res => 
+                        canvas.toBlob(res, 'image/jpeg', 0.35)
+                    );
+                    
+                    if (blob) {
+                        console.log(`Aggressively compressed to ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
+                        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+                    } else {
+                        reject(new Error('Failed to compress image'));
+                    }
+                };
+                
+                img.onerror = () => reject(new Error('Failed to load image for compression'));
+                img.src = URL.createObjectURL(file);
+            });
+        }
+        
         // Drag and drop handlers
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -746,8 +824,24 @@
             successSection.classList.remove('show');
             
             try {
+                // Compress image if needed (for large iPhone screenshots, etc.)
+                btnText.textContent = 'Preparing image...';
+                let fileToUpload = selectedFile;
+                
+                if (selectedFile.size > MAX_UPLOAD_SIZE) {
+                    try {
+                        fileToUpload = await compressImage(selectedFile);
+                        console.log('Image compressed for upload');
+                    } catch (compressError) {
+                        console.error('Compression failed:', compressError);
+                        // Continue with original file, server will try to handle it
+                    }
+                }
+                
+                btnText.textContent = 'Uploading...';
+                
                 const formData = new FormData();
-                formData.append('image', selectedFile);
+                formData.append('image', fileToUpload);
                 
                 const question = questionInput.value.trim();
                 if (question) {
