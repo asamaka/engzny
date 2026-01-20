@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
+const sharp = require('sharp');
 
 const app = express();
 
@@ -245,6 +246,39 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       });
     }
 
+    // Compress image if it exceeds Claude API's size limit (5MB)
+    // This handles large iPhone screenshots and other high-resolution images
+    let finalImageData = imageData;
+    let finalMediaType = mediaType;
+    let compressionInfo = null;
+
+    try {
+      const imageBuffer = Buffer.from(imageData, 'base64');
+      const compressionResult = await compressImageForAPI(imageBuffer, mediaType);
+      
+      if (compressionResult.wasCompressed) {
+        finalImageData = compressionResult.buffer.toString('base64');
+        finalMediaType = compressionResult.mediaType;
+        compressionInfo = {
+          originalSize: compressionResult.originalSize,
+          finalSize: compressionResult.finalSize,
+          finalDimensions: compressionResult.finalDimensions,
+        };
+        console.log(`Image compressed for job: ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
+      }
+    } catch (compressionError) {
+      console.error('Image compression error:', compressionError);
+      // If compression fails, try to proceed with original image
+      // It might still work if it's under 5MB
+      const originalSize = Buffer.from(imageData, 'base64').length;
+      if (originalSize > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          error: 'Image too large',
+          message: `Image is ${(originalSize / 1024 / 1024).toFixed(1)}MB. Maximum supported size is 5MB after compression. Please try a smaller image.`
+        });
+      }
+    }
+
     // Generate unique job ID
     const jobId = crypto.randomUUID();
 
@@ -255,12 +289,13 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       progress: 0,
       progressMessage: PROGRESS_MESSAGES[JOB_STATUS.QUEUED],
       createdAt: new Date().toISOString(),
-      imageData: imageData,
-      mediaType: mediaType,
+      imageData: finalImageData,
+      mediaType: finalMediaType,
       question: question,
       result: null,
       streamedText: '',
       error: null,
+      compressionInfo: compressionInfo,
     };
 
     // Store job (in Redis or memory)
@@ -301,6 +336,142 @@ function detectMediaType(buffer) {
     return 'image/webp';
   }
   return null;
+}
+
+// ============================================
+// Image compression for Claude API
+// Claude has a 5MB limit, so we compress images that exceed 4.5MB
+// ============================================
+const MAX_IMAGE_SIZE = 4.5 * 1024 * 1024; // 4.5MB to stay safely under 5MB limit
+const MAX_DIMENSION = 4096; // Max width or height for initial resize
+
+/**
+ * Compress an image to fit within Claude API's size limit
+ * @param {Buffer} imageBuffer - Original image buffer
+ * @param {string} mediaType - Original media type (image/jpeg, image/png, etc.)
+ * @returns {Promise<{buffer: Buffer, mediaType: string, wasCompressed: boolean}>}
+ */
+async function compressImageForAPI(imageBuffer, mediaType) {
+  const originalSize = imageBuffer.length;
+  
+  // If already under limit, return as-is
+  if (originalSize <= MAX_IMAGE_SIZE) {
+    return {
+      buffer: imageBuffer,
+      mediaType: mediaType,
+      wasCompressed: false,
+      originalSize,
+      finalSize: originalSize,
+    };
+  }
+
+  console.log(`Image size ${(originalSize / 1024 / 1024).toFixed(2)}MB exceeds limit, compressing...`);
+
+  let sharpInstance = sharp(imageBuffer);
+  const metadata = await sharpInstance.metadata();
+  
+  // Start with the original dimensions
+  let targetWidth = metadata.width;
+  let targetHeight = metadata.height;
+  
+  // If image is very large, start by resizing down
+  if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+    const scale = Math.min(MAX_DIMENSION / targetWidth, MAX_DIMENSION / targetHeight);
+    targetWidth = Math.round(targetWidth * scale);
+    targetHeight = Math.round(targetHeight * scale);
+  }
+
+  // Progressive compression strategy:
+  // 1. Try high quality JPEG first (works well for photos/screenshots)
+  // 2. Reduce quality progressively
+  // 3. Reduce dimensions if quality reduction isn't enough
+
+  const qualityLevels = [85, 75, 65, 55, 45];
+  const scaleLevels = [1.0, 0.85, 0.7, 0.55, 0.4];
+
+  for (const scale of scaleLevels) {
+    const width = Math.round(targetWidth * scale);
+    const height = Math.round(targetHeight * scale);
+    
+    for (const quality of qualityLevels) {
+      sharpInstance = sharp(imageBuffer)
+        .resize(width, height, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        });
+
+      // Convert to JPEG for best compression (unless it's a GIF with animation)
+      // JPEG works well for screenshots and photos
+      let outputBuffer;
+      let outputMediaType;
+
+      if (mediaType === 'image/gif') {
+        // For GIFs, try WebP first (supports animation), fallback to JPEG
+        try {
+          outputBuffer = await sharpInstance
+            .webp({ quality: quality })
+            .toBuffer();
+          outputMediaType = 'image/webp';
+        } catch {
+          // If WebP fails (e.g., animated GIF issues), convert to JPEG
+          outputBuffer = await sharpInstance
+            .jpeg({ quality: quality, mozjpeg: true })
+            .toBuffer();
+          outputMediaType = 'image/jpeg';
+        }
+      } else if (mediaType === 'image/png') {
+        // For PNGs, check if it has transparency
+        // If it does, use WebP. Otherwise, JPEG compresses better.
+        if (metadata.hasAlpha) {
+          outputBuffer = await sharpInstance
+            .webp({ quality: quality })
+            .toBuffer();
+          outputMediaType = 'image/webp';
+        } else {
+          outputBuffer = await sharpInstance
+            .jpeg({ quality: quality, mozjpeg: true })
+            .toBuffer();
+          outputMediaType = 'image/jpeg';
+        }
+      } else {
+        // For JPEG and WebP, output as JPEG for consistent compression
+        outputBuffer = await sharpInstance
+          .jpeg({ quality: quality, mozjpeg: true })
+          .toBuffer();
+        outputMediaType = 'image/jpeg';
+      }
+
+      if (outputBuffer.length <= MAX_IMAGE_SIZE) {
+        console.log(`Compressed: ${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(outputBuffer.length / 1024 / 1024).toFixed(2)}MB (${width}x${height}, quality ${quality})`);
+        return {
+          buffer: outputBuffer,
+          mediaType: outputMediaType,
+          wasCompressed: true,
+          originalSize,
+          finalSize: outputBuffer.length,
+          finalDimensions: { width, height },
+          quality,
+        };
+      }
+    }
+  }
+
+  // Last resort: aggressive compression
+  console.log('Using aggressive compression as last resort');
+  const finalBuffer = await sharp(imageBuffer)
+    .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 35, mozjpeg: true })
+    .toBuffer();
+
+  console.log(`Aggressively compressed: ${(originalSize / 1024 / 1024).toFixed(2)}MB -> ${(finalBuffer.length / 1024 / 1024).toFixed(2)}MB`);
+  
+  return {
+    buffer: finalBuffer,
+    mediaType: 'image/jpeg',
+    wasCompressed: true,
+    originalSize,
+    finalSize: finalBuffer.length,
+  };
 }
 
 // ============================================
@@ -577,10 +748,32 @@ app.post('/api/analyze', upload.single('image'), async (req, res) => {
     }
 
     const anthropic = getAnthropicClient();
-    const base64Image = req.file.buffer.toString('base64');
-    const mediaType = req.file.mimetype;
     const userQuestion = req.body.question || '';
     const analysisPrompt = buildAnalysisPrompt(userQuestion);
+
+    // Compress image if needed
+    let imageBuffer = req.file.buffer;
+    let mediaType = req.file.mimetype;
+
+    try {
+      const compressionResult = await compressImageForAPI(imageBuffer, mediaType);
+      if (compressionResult.wasCompressed) {
+        imageBuffer = compressionResult.buffer;
+        mediaType = compressionResult.mediaType;
+        console.log(`Legacy analyze: Image compressed ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
+      }
+    } catch (compressionError) {
+      console.error('Compression error in legacy analyze:', compressionError);
+      // Continue with original if compression fails and size is acceptable
+      if (imageBuffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({
+          error: 'Image too large',
+          message: `Image is ${(imageBuffer.length / 1024 / 1024).toFixed(1)}MB. Maximum supported size is 5MB.`
+        });
+      }
+    }
+
+    const base64Image = imageBuffer.toString('base64');
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
