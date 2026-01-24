@@ -2,350 +2,474 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         :root {
-            --bg: #111;
-            --bg-card: #191919;
-            --text: #e5e5e5;
-            --text-dim: #666;
-            --border: #333;
-            --accent: #fff;
+            --bg: #0a0a0a;
+            --text: #e0e0e0;
+            --text-dim: #555;
+            --accent: #00ffaa;
+            --accent-dim: rgba(0, 255, 170, 0.15);
+            --scan: rgba(0, 255, 170, 0.4);
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
         
         body {
-            font-family: 'IBM Plex Mono', monospace;
+            font-family: 'JetBrains Mono', monospace;
             background: var(--bg);
-            min-height: 100vh;
-            min-height: 100dvh;
             color: var(--text);
-            display: flex;
-            flex-direction: column;
+        }
+        
+        /* ===== STATES ===== */
+        .state { 
+            display: none; 
+            height: 100%;
+            width: 100%;
+        }
+        .state.active { 
+            display: flex; 
+        }
+        
+        /* ===== PASTE STATE ===== */
+        #pasteState {
             align-items: center;
             justify-content: center;
-            padding: 2rem;
+            flex-direction: column;
         }
         
-        .container {
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
-        }
-        
-        .logo {
-            font-size: 1.25rem;
-            font-weight: 500;
-            color: var(--text-dim);
-            margin-bottom: 3rem;
-        }
-        
-        /* States */
-        .state { display: none; }
-        .state.active { display: block; }
-        
-        /* Ready state - tap to paste */
-        .paste-btn {
-            width: 100%;
-            padding: 4rem 2rem;
-            background: var(--bg-card);
-            border: 1px dashed var(--border);
+        .paste-zone {
+            width: 90%;
+            max-width: 360px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed var(--text-dim);
             border-radius: 8px;
-            color: var(--text);
-            font-family: inherit;
-            font-size: 1rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s ease;
+            position: relative;
         }
         
-        .paste-btn:hover, .paste-btn:active {
-            border-color: var(--text-dim);
-            background: #1a1a1a;
+        .paste-zone:hover, .paste-zone:active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
         }
         
-        .paste-btn:active {
+        .paste-zone:active {
             transform: scale(0.98);
         }
         
+        .paste-text {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            text-transform: lowercase;
+        }
+        
+        .paste-zone:hover .paste-text,
+        .paste-zone:active .paste-text {
+            color: var(--accent);
+        }
+        
         .paste-hint {
-            margin-top: 1rem;
-            font-size: 0.75rem;
+            margin-top: 1.5rem;
+            font-size: 0.7rem;
             color: var(--text-dim);
-        }
-        
-        /* Loading state */
-        .loading-state {
-            padding: 3rem;
-        }
-        
-        .spinner {
-            width: 24px;
-            height: 24px;
-            border: 2px solid var(--border);
-            border-top-color: var(--text-dim);
-            border-radius: 50%;
-            animation: spin 0.7s linear infinite;
-            margin: 0 auto 1rem;
-        }
-        
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        .loading-text {
-            font-size: 0.875rem;
-            color: var(--text-dim);
-        }
-        
-        /* Preview state */
-        .preview-state {
-            width: 100%;
-        }
-        
-        .preview-image {
-            max-width: 100%;
-            max-height: 300px;
-            border-radius: 4px;
-            margin-bottom: 1.5rem;
-        }
-        
-        .question-input {
-            width: 100%;
-            padding: 0.75rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            color: var(--text);
-            font-size: 0.875rem;
-            font-family: inherit;
-            margin-bottom: 1rem;
-            resize: none;
-        }
-        
-        .question-input:focus {
-            outline: none;
-            border-color: var(--text-dim);
-        }
-        
-        .question-input::placeholder {
-            color: var(--text-dim);
-        }
-        
-        .analyze-btn {
-            width: 100%;
-            padding: 0.875rem;
-            background: var(--accent);
-            border: none;
-            border-radius: 4px;
-            color: var(--bg);
-            font-size: 0.875rem;
-            font-weight: 500;
-            font-family: inherit;
-            cursor: pointer;
-        }
-        
-        .analyze-btn:disabled {
             opacity: 0.5;
-            cursor: not-allowed;
         }
         
-        .cancel-link {
+        /* ===== ANALYZING STATE ===== */
+        #analyzeState {
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scan-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .scan-frame {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scan-image {
+            max-width: 100%;
+            max-height: calc(100vh - 100px);
+            max-height: calc(100dvh - 100px);
+            object-fit: contain;
+            border-radius: 4px;
             display: block;
-            margin-top: 1rem;
+        }
+        
+        /* Sci-fi frame corners */
+        .frame-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--accent);
+            border-style: solid;
+            border-width: 0;
+            opacity: 0.8;
+        }
+        .frame-corner.tl { top: -8px; left: -8px; border-top-width: 2px; border-left-width: 2px; }
+        .frame-corner.tr { top: -8px; right: -8px; border-top-width: 2px; border-right-width: 2px; }
+        .frame-corner.bl { bottom: -8px; left: -8px; border-bottom-width: 2px; border-left-width: 2px; }
+        .frame-corner.br { bottom: -8px; right: -8px; border-bottom-width: 2px; border-right-width: 2px; }
+        
+        /* Scan line animation */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--scan), var(--accent), var(--scan), transparent);
+            box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent);
+            animation: scan 2s ease-in-out infinite;
+        }
+        
+        @keyframes scan {
+            0%, 100% { top: 0; opacity: 1; }
+            50% { top: calc(100% - 2px); opacity: 0.7; }
+        }
+        
+        /* Overlay grid */
+        .scan-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(var(--accent-dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--accent-dim) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+            pointer-events: none;
+            animation: grid-pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes grid-pulse {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.4; }
+        }
+        
+        .scan-status {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
             font-size: 0.75rem;
-            color: var(--text-dim);
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: blink 1s ease-in-out infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        /* ===== RESULTS STATE ===== */
+        #resultsState {
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .results-image-container {
+            flex-shrink: 0;
+            padding: 16px 16px 8px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .results-image {
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
+            border-radius: 4px;
+            border: 1px solid #222;
+            opacity: 0.8;
+            transition: all 0.3s ease;
             cursor: pointer;
         }
         
-        .cancel-link:hover {
+        .results-image:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        
+        .results-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 20px 100px;
+            scroll-behavior: auto;
+        }
+        
+        .results-content.auto-scroll {
+            scroll-behavior: smooth;
+        }
+        
+        .results-text {
+            font-size: 0.9rem;
+            line-height: 1.7;
             color: var(--text);
         }
         
-        /* Error state */
-        .error-state {
+        .results-text p { margin-bottom: 1em; }
+        .results-text h1, .results-text h2, .results-text h3 { 
+            margin: 1.5em 0 0.5em; 
+            color: var(--accent);
+            font-weight: 500;
+        }
+        .results-text h1 { font-size: 1.2rem; }
+        .results-text h2 { font-size: 1.1rem; }
+        .results-text h3 { font-size: 1rem; }
+        .results-text code {
+            background: #1a1a1a;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+        .results-text pre {
+            background: #1a1a1a;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+        .results-text pre code {
+            background: none;
+            padding: 0;
+        }
+        .results-text ul, .results-text ol {
+            margin: 0.5em 0 1em 1.5em;
+        }
+        .results-text li {
+            margin-bottom: 0.3em;
+        }
+        .results-text strong {
+            color: #fff;
+        }
+        
+        /* Streaming cursor */
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1em;
+            background: var(--accent);
+            margin-left: 2px;
+            animation: cursor-blink 0.8s ease-in-out infinite;
+            vertical-align: text-bottom;
+        }
+        
+        @keyframes cursor-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .cursor.done {
+            display: none;
+        }
+        
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #222;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .scroll-indicator.visible {
+            opacity: 1;
+        }
+        
+        /* ===== ERROR STATE ===== */
+        #errorState {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
             padding: 2rem;
+            text-align: center;
         }
         
         .error-text {
-            color: #a66;
-            font-size: 0.875rem;
+            color: #ff6b6b;
+            font-size: 0.85rem;
             margin-bottom: 1.5rem;
         }
         
         .retry-btn {
-            padding: 0.75rem 1.5rem;
+            padding: 0.75rem 2rem;
             background: transparent;
-            border: 1px solid var(--border);
+            border: 1px solid #333;
             border-radius: 4px;
             color: var(--text);
             font-family: inherit;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             cursor: pointer;
+            transition: all 0.2s;
         }
         
         .retry-btn:hover {
-            border-color: var(--text-dim);
-        }
-        
-        /* No image state */
-        .no-image-state {
-            padding: 2rem;
-        }
-        
-        .no-image-text {
-            color: var(--text-dim);
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .home-link {
-            color: var(--text);
-            text-decoration: none;
-            font-size: 0.875rem;
-        }
-        
-        .home-link:hover {
-            text-decoration: underline;
+            border-color: var(--accent);
+            color: var(--accent);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="logo">thinx.fun</div>
-        
-        <!-- Ready to paste -->
-        <div class="state active" id="readyState">
-            <button class="paste-btn" id="pasteBtn">
-                tap to paste screenshot
-            </button>
-            <p class="paste-hint">or press ⌘V / Ctrl+V</p>
+    <!-- Paste State -->
+    <div class="state active" id="pasteState">
+        <div class="paste-zone" id="pasteZone">
+            <span class="paste-text">tap to paste</span>
         </div>
-        
-        <!-- Loading clipboard -->
-        <div class="state" id="loadingState">
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <p class="loading-text">reading clipboard...</p>
+        <p class="paste-hint">⌘V</p>
+    </div>
+    
+    <!-- Analyzing State -->
+    <div class="state" id="analyzeState">
+        <div class="scan-container">
+            <div class="scan-frame">
+                <img id="scanImage" class="scan-image" alt="">
+                <div class="frame-corner tl"></div>
+                <div class="frame-corner tr"></div>
+                <div class="frame-corner bl"></div>
+                <div class="frame-corner br"></div>
+                <div class="scan-line"></div>
+                <div class="scan-grid"></div>
             </div>
         </div>
-        
-        <!-- Preview & confirm -->
-        <div class="state" id="previewState">
-            <div class="preview-state">
-                <img id="previewImage" class="preview-image" alt="screenshot">
-                <textarea 
-                    id="questionInput" 
-                    class="question-input" 
-                    placeholder="question (optional)"
-                    rows="2"
-                ></textarea>
-                <button class="analyze-btn" id="analyzeBtn">analyze</button>
-                <span class="cancel-link" id="cancelBtn">cancel</span>
-            </div>
+        <div class="scan-status">analyzing</div>
+    </div>
+    
+    <!-- Results State -->
+    <div class="state" id="resultsState">
+        <div class="results-image-container">
+            <img id="resultsImage" class="results-image" alt="">
         </div>
-        
-        <!-- Uploading -->
-        <div class="state" id="uploadingState">
-            <div class="loading-state">
-                <div class="spinner"></div>
-                <p class="loading-text">uploading...</p>
-            </div>
+        <div class="results-content" id="resultsContent">
+            <div class="results-text" id="resultsText"></div>
+            <span class="cursor" id="cursor"></span>
         </div>
-        
-        <!-- Error -->
-        <div class="state" id="errorState">
-            <div class="error-state">
-                <p class="error-text" id="errorText">couldn't read clipboard</p>
-                <button class="retry-btn" id="retryBtn">try again</button>
-            </div>
-        </div>
-        
-        <!-- No image in clipboard -->
-        <div class="state" id="noImageState">
-            <div class="no-image-state">
-                <p class="no-image-text">no image in clipboard</p>
-                <a href="/" class="home-link">go to thinx.fun →</a>
-            </div>
-        </div>
+        <div class="scroll-indicator" id="scrollIndicator">auto-scroll paused</div>
+    </div>
+    
+    <!-- Error State -->
+    <div class="state" id="errorState">
+        <p class="error-text" id="errorText">something went wrong</p>
+        <button class="retry-btn" id="retryBtn">try again</button>
     </div>
     
     <script>
+        // State management
         const states = {
-            ready: document.getElementById('readyState'),
-            loading: document.getElementById('loadingState'),
-            preview: document.getElementById('previewState'),
-            uploading: document.getElementById('uploadingState'),
+            paste: document.getElementById('pasteState'),
+            analyze: document.getElementById('analyzeState'),
+            results: document.getElementById('resultsState'),
             error: document.getElementById('errorState'),
-            noImage: document.getElementById('noImageState'),
         };
         
-        const pasteBtn = document.getElementById('pasteBtn');
-        const previewImage = document.getElementById('previewImage');
-        const questionInput = document.getElementById('questionInput');
-        const analyzeBtn = document.getElementById('analyzeBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
+        // Elements
+        const pasteZone = document.getElementById('pasteZone');
+        const scanImage = document.getElementById('scanImage');
+        const resultsImage = document.getElementById('resultsImage');
+        const resultsContent = document.getElementById('resultsContent');
+        const resultsText = document.getElementById('resultsText');
+        const cursor = document.getElementById('cursor');
+        const scrollIndicator = document.getElementById('scrollIndicator');
         const errorText = document.getElementById('errorText');
         const retryBtn = document.getElementById('retryBtn');
         
         let currentFile = null;
+        let currentImageUrl = null;
+        let autoScroll = true;
+        let isStreaming = false;
+        let rawText = '';
         
         function showState(name) {
             Object.values(states).forEach(s => s.classList.remove('active'));
             states[name].classList.add('active');
         }
         
+        // Clipboard reading
         async function readClipboard() {
-            showState('loading');
-            
             try {
                 const items = await navigator.clipboard.read();
                 
                 for (const item of items) {
-                    // Look for image types
                     const imageType = item.types.find(t => t.startsWith('image/'));
                     if (imageType) {
                         const blob = await item.getType(imageType);
-                        currentFile = new File([blob], 'screenshot.png', { type: imageType });
-                        
-                        // Show preview
-                        const url = URL.createObjectURL(blob);
-                        previewImage.src = url;
-                        showState('preview');
+                        handleImage(blob, imageType);
                         return;
                     }
                 }
                 
-                // No image found
-                showState('noImage');
+                // No image
+                showError('no image in clipboard');
                 
             } catch (err) {
                 console.error('Clipboard error:', err);
-                
                 if (err.name === 'NotAllowedError') {
-                    errorText.textContent = 'clipboard access denied. tap to try again.';
+                    showError('clipboard access denied');
                 } else {
-                    errorText.textContent = 'couldn\'t read clipboard';
+                    showError('couldn\'t read clipboard');
                 }
-                showState('error');
             }
         }
         
-        async function uploadImage() {
-            if (!currentFile) return;
+        function handleImage(blob, type) {
+            currentFile = new File([blob], 'screenshot.png', { type });
+            currentImageUrl = URL.createObjectURL(blob);
             
-            showState('uploading');
+            // Show full-screen scan
+            scanImage.src = currentImageUrl;
+            resultsImage.src = currentImageUrl;
+            showState('analyze');
             
+            // Start upload and streaming
+            uploadAndStream();
+        }
+        
+        async function uploadAndStream() {
             try {
+                // Upload
                 const formData = new FormData();
                 formData.append('image', currentFile);
-                
-                const question = questionInput.value.trim();
-                if (question) {
-                    formData.append('question', question);
-                }
                 
                 const response = await fetch('/api/upload', {
                     method: 'POST',
@@ -358,30 +482,139 @@
                     throw new Error(data.message || data.error || 'upload failed');
                 }
                 
-                // Redirect to results page
-                window.location.href = data.viewUrl;
+                // Start streaming
+                startStream(data.jobId);
                 
             } catch (err) {
-                errorText.textContent = err.message || 'upload failed';
-                showState('error');
+                showError(err.message || 'upload failed');
             }
+        }
+        
+        function startStream(jobId) {
+            rawText = '';
+            resultsText.innerHTML = '';
+            autoScroll = true;
+            isStreaming = true;
+            cursor.classList.remove('done');
+            resultsContent.classList.add('auto-scroll');
+            
+            const eventSource = new EventSource(`/api/stream/${jobId}`);
+            let transitionedToResults = false;
+            
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'token') {
+                    // Transition to results view on first token
+                    if (!transitionedToResults) {
+                        showState('results');
+                        transitionedToResults = true;
+                    }
+                    
+                    rawText += data.token;
+                    renderMarkdown();
+                    scrollToBottom();
+                }
+                
+                if (data.type === 'complete' || data.type === 'error') {
+                    eventSource.close();
+                    isStreaming = false;
+                    cursor.classList.add('done');
+                    resultsContent.classList.remove('auto-scroll');
+                    
+                    if (data.type === 'error' && !transitionedToResults) {
+                        showError(data.message || 'analysis failed');
+                    }
+                }
+            };
+            
+            eventSource.onerror = () => {
+                eventSource.close();
+                isStreaming = false;
+                cursor.classList.add('done');
+                
+                if (!transitionedToResults) {
+                    showError('connection lost');
+                }
+            };
+        }
+        
+        function renderMarkdown() {
+            const html = marked.parse(rawText);
+            resultsText.innerHTML = html;
+        }
+        
+        function scrollToBottom() {
+            if (autoScroll && isStreaming) {
+                resultsContent.scrollTop = resultsContent.scrollHeight;
+            }
+        }
+        
+        // Auto-scroll control
+        let scrollTimeout;
+        resultsContent.addEventListener('scroll', () => {
+            if (!isStreaming) return;
+            
+            const { scrollTop, scrollHeight, clientHeight } = resultsContent;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+            
+            if (isAtBottom) {
+                // User scrolled back to bottom, resume auto-scroll
+                autoScroll = true;
+                scrollIndicator.classList.remove('visible');
+            } else {
+                // User scrolled up, pause auto-scroll
+                autoScroll = false;
+                scrollIndicator.classList.add('visible');
+                
+                // Hide indicator after a moment
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    if (!autoScroll) {
+                        scrollIndicator.classList.remove('visible');
+                    }
+                }, 2000);
+            }
+        });
+        
+        // Also pause on any touch/click in results area
+        resultsContent.addEventListener('touchstart', () => {
+            if (isStreaming) {
+                autoScroll = false;
+                scrollIndicator.classList.add('visible');
+            }
+        }, { passive: true });
+        
+        function showError(message) {
+            errorText.textContent = message;
+            showState('error');
         }
         
         function reset() {
             currentFile = null;
-            previewImage.src = '';
-            questionInput.value = '';
-            showState('ready');
+            if (currentImageUrl) {
+                URL.revokeObjectURL(currentImageUrl);
+                currentImageUrl = null;
+            }
+            rawText = '';
+            resultsText.innerHTML = '';
+            showState('paste');
         }
         
         // Event listeners
-        pasteBtn.addEventListener('click', readClipboard);
-        analyzeBtn.addEventListener('click', uploadImage);
-        cancelBtn.addEventListener('click', reset);
-        retryBtn.addEventListener('click', () => showState('ready'));
+        pasteZone.addEventListener('click', readClipboard);
+        retryBtn.addEventListener('click', reset);
         
-        // Listen for paste event anywhere on page
-        document.addEventListener('paste', async (e) => {
+        // Image click to view full
+        resultsImage.addEventListener('click', () => {
+            // Could open lightbox, for now just open in new tab
+            if (currentImageUrl) {
+                window.open(currentImageUrl, '_blank');
+            }
+        });
+        
+        // Paste event anywhere
+        document.addEventListener('paste', (e) => {
             const items = e.clipboardData?.items;
             if (!items) return;
             
@@ -389,18 +622,13 @@
                 if (item.type.startsWith('image/')) {
                     e.preventDefault();
                     const blob = item.getAsFile();
-                    currentFile = blob;
-                    
-                    const url = URL.createObjectURL(blob);
-                    previewImage.src = url;
-                    showState('preview');
+                    handleImage(blob, item.type);
                     return;
                 }
             }
         });
         
-        // Try to auto-read clipboard on load (may fail without user gesture)
-        // This works if user has previously granted permission
+        // Auto-read if permission already granted
         if (navigator.clipboard && navigator.clipboard.read) {
             navigator.permissions?.query?.({ name: 'clipboard-read' })
                 .then(result => {
@@ -408,9 +636,7 @@
                         readClipboard();
                     }
                 })
-                .catch(() => {
-                    // Permission API not available, user will need to tap
-                });
+                .catch(() => {});
         }
     </script>
 </body>
