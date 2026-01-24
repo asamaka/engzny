@@ -113,6 +113,11 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// Paste page (for clipboard integration with Shortcuts)
+app.get('/paste', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
+});
+
 // Main route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));

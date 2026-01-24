@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>thinx.fun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #111;
+            --bg-card: #191919;
+            --text: #e5e5e5;
+            --text-dim: #666;
+            --border: #333;
+            --accent: #fff;
+        }
+        
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg);
+            min-height: 100vh;
+            min-height: 100dvh;
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: var(--text-dim);
+            margin-bottom: 3rem;
+        }
+        
+        /* States */
+        .state { display: none; }
+        .state.active { display: block; }
+        
+        /* Ready state - tap to paste */
+        .paste-btn {
+            width: 100%;
+            padding: 4rem 2rem;
+            background: var(--bg-card);
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .paste-btn:hover, .paste-btn:active {
+            border-color: var(--text-dim);
+            background: #1a1a1a;
+        }
+        
+        .paste-btn:active {
+            transform: scale(0.98);
+        }
+        
+        .paste-hint {
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+        
+        /* Loading state */
+        .loading-state {
+            padding: 3rem;
+        }
+        
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--text-dim);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            margin: 0 auto 1rem;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .loading-text {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+        }
+        
+        /* Preview state */
+        .preview-state {
+            width: 100%;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 4px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .question-input {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 0.875rem;
+            font-family: inherit;
+            margin-bottom: 1rem;
+            resize: none;
+        }
+        
+        .question-input:focus {
+            outline: none;
+            border-color: var(--text-dim);
+        }
+        
+        .question-input::placeholder {
+            color: var(--text-dim);
+        }
+        
+        .analyze-btn {
+            width: 100%;
+            padding: 0.875rem;
+            background: var(--accent);
+            border: none;
+            border-radius: 4px;
+            color: var(--bg);
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        
+        .analyze-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .cancel-link {
+            display: block;
+            margin-top: 1rem;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            cursor: pointer;
+        }
+        
+        .cancel-link:hover {
+            color: var(--text);
+        }
+        
+        /* Error state */
+        .error-state {
+            padding: 2rem;
+        }
+        
+        .error-text {
+            color: #a66;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .retry-btn {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+        
+        .retry-btn:hover {
+            border-color: var(--text-dim);
+        }
+        
+        /* No image state */
+        .no-image-state {
+            padding: 2rem;
+        }
+        
+        .no-image-text {
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .home-link {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+        
+        .home-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">thinx.fun</div>
+        
+        <!-- Ready to paste -->
+        <div class="state active" id="readyState">
+            <button class="paste-btn" id="pasteBtn">
+                tap to paste screenshot
+            </button>
+            <p class="paste-hint">or press ⌘V / Ctrl+V</p>
+        </div>
+        
+        <!-- Loading clipboard -->
+        <div class="state" id="loadingState">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p class="loading-text">reading clipboard...</p>
+            </div>
+        </div>
+        
+        <!-- Preview & confirm -->
+        <div class="state" id="previewState">
+            <div class="preview-state">
+                <img id="previewImage" class="preview-image" alt="screenshot">
+                <textarea 
+                    id="questionInput" 
+                    class="question-input" 
+                    placeholder="question (optional)"
+                    rows="2"
+                ></textarea>
+                <button class="analyze-btn" id="analyzeBtn">analyze</button>
+                <span class="cancel-link" id="cancelBtn">cancel</span>
+            </div>
+        </div>
+        
+        <!-- Uploading -->
+        <div class="state" id="uploadingState">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p class="loading-text">uploading...</p>
+            </div>
+        </div>
+        
+        <!-- Error -->
+        <div class="state" id="errorState">
+            <div class="error-state">
+                <p class="error-text" id="errorText">couldn't read clipboard</p>
+                <button class="retry-btn" id="retryBtn">try again</button>
+            </div>
+        </div>
+        
+        <!-- No image in clipboard -->
+        <div class="state" id="noImageState">
+            <div class="no-image-state">
+                <p class="no-image-text">no image in clipboard</p>
+                <a href="/" class="home-link">go to thinx.fun →</a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const states = {
+            ready: document.getElementById('readyState'),
+            loading: document.getElementById('loadingState'),
+            preview: document.getElementById('previewState'),
+            uploading: document.getElementById('uploadingState'),
+            error: document.getElementById('errorState'),
+            noImage: document.getElementById('noImageState'),
+        };
+        
+        const pasteBtn = document.getElementById('pasteBtn');
+        const previewImage = document.getElementById('previewImage');
+        const questionInput = document.getElementById('questionInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const errorText = document.getElementById('errorText');
+        const retryBtn = document.getElementById('retryBtn');
+        
+        let currentFile = null;
+        
+        function showState(name) {
+            Object.values(states).forEach(s => s.classList.remove('active'));
+            states[name].classList.add('active');
+        }
+        
+        async function readClipboard() {
+            showState('loading');
+            
+            try {
+                const items = await navigator.clipboard.read();
+                
+                for (const item of items) {
+                    // Look for image types
+                    const imageType = item.types.find(t => t.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        currentFile = new File([blob], 'screenshot.png', { type: imageType });
+                        
+                        // Show preview
+                        const url = URL.createObjectURL(blob);
+                        previewImage.src = url;
+                        showState('preview');
+                        return;
+                    }
+                }
+                
+                // No image found
+                showState('noImage');
+                
+            } catch (err) {
+                console.error('Clipboard error:', err);
+                
+                if (err.name === 'NotAllowedError') {
+                    errorText.textContent = 'clipboard access denied. tap to try again.';
+                } else {
+                    errorText.textContent = 'couldn\'t read clipboard';
+                }
+                showState('error');
+            }
+        }
+        
+        async function uploadImage() {
+            if (!currentFile) return;
+            
+            showState('uploading');
+            
+            try {
+                const formData = new FormData();
+                formData.append('image', currentFile);
+                
+                const question = questionInput.value.trim();
+                if (question) {
+                    formData.append('question', question);
+                }
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'upload failed');
+                }
+                
+                // Redirect to results page
+                window.location.href = data.viewUrl;
+                
+            } catch (err) {
+                errorText.textContent = err.message || 'upload failed';
+                showState('error');
+            }
+        }
+        
+        function reset() {
+            currentFile = null;
+            previewImage.src = '';
+            questionInput.value = '';
+            showState('ready');
+        }
+        
+        // Event listeners
+        pasteBtn.addEventListener('click', readClipboard);
+        analyzeBtn.addEventListener('click', uploadImage);
+        cancelBtn.addEventListener('click', reset);
+        retryBtn.addEventListener('click', () => showState('ready'));
+        
+        // Listen for paste event anywhere on page
+        document.addEventListener('paste', async (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const blob = item.getAsFile();
+                    currentFile = blob;
+                    
+                    const url = URL.createObjectURL(blob);
+                    previewImage.src = url;
+                    showState('preview');
+                    return;
+                }
+            }
+        });
+        
+        // Try to auto-read clipboard on load (may fail without user gesture)
+        // This works if user has previously granted permission
+        if (navigator.clipboard && navigator.clipboard.read) {
+            navigator.permissions?.query?.({ name: 'clipboard-read' })
+                .then(result => {
+                    if (result.state === 'granted') {
+                        readClipboard();
+                    }
+                })
+                .catch(() => {
+                    // Permission API not available, user will need to tap
+                });
+        }
+    </script>
+</body>
+</html>
