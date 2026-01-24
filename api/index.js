@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const crypto = require('crypto');
@@ -117,10 +118,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Shortcut download page
-app.get('/shortcut', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'shortcut.html'));
-});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -246,56 +243,30 @@ app.post('/api/upload', upload.single('image'), async (req, res) => {
       });
     }
 
-    // Compress image if it exceeds Claude API's size limit (5MB)
-    // This handles large iPhone screenshots and other high-resolution images
-    let finalImageData = imageData;
-    let finalMediaType = mediaType;
-    let compressionInfo = null;
-
-    try {
-      const imageBuffer = Buffer.from(imageData, 'base64');
-      const compressionResult = await compressImageForAPI(imageBuffer, mediaType);
-      
-      if (compressionResult.wasCompressed) {
-        finalImageData = compressionResult.buffer.toString('base64');
-        finalMediaType = compressionResult.mediaType;
-        compressionInfo = {
-          originalSize: compressionResult.originalSize,
-          finalSize: compressionResult.finalSize,
-          finalDimensions: compressionResult.finalDimensions,
-        };
-        console.log(`Image compressed for job: ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
-      }
-    } catch (compressionError) {
-      console.error('Image compression error:', compressionError);
-      // If compression fails, try to proceed with original image
-      // It might still work if it's under 5MB
-      const originalSize = Buffer.from(imageData, 'base64').length;
-      if (originalSize > 5 * 1024 * 1024) {
-        return res.status(400).json({
-          error: 'Image too large',
-          message: `Image is ${(originalSize / 1024 / 1024).toFixed(1)}MB. Maximum supported size is 5MB after compression. Please try a smaller image.`
-        });
-      }
-    }
+    // DON'T compress during upload - this blocks the response and causes timeouts on Vercel
+    // Compression will happen lazily when the stream endpoint is called
+    // Just validate the image size here
+    const originalSize = Buffer.from(imageData, 'base64').length;
+    console.log(`Upload received: ${(originalSize / 1024 / 1024).toFixed(2)}MB image`);
 
     // Generate unique job ID
     const jobId = crypto.randomUUID();
 
-    // Create job record with image data
+    // Create job record with RAW image data (compression happens later)
     const job = {
       id: jobId,
       status: JOB_STATUS.QUEUED,
       progress: 0,
       progressMessage: PROGRESS_MESSAGES[JOB_STATUS.QUEUED],
       createdAt: new Date().toISOString(),
-      imageData: finalImageData,
-      mediaType: finalMediaType,
+      imageData: imageData,  // Store raw, compress later
+      mediaType: mediaType,
       question: question,
       result: null,
       streamedText: '',
       error: null,
-      compressionInfo: compressionInfo,
+      needsCompression: originalSize > 4.5 * 1024 * 1024, // Flag for lazy compression
+      originalSize: originalSize,
     };
 
     // Store job (in Redis or memory)
@@ -494,23 +465,53 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  // Store original image data before processing clears it
-  let originalImageData = null;
-  let originalMediaType = null;
+    // Store original image data before processing clears it
+    let originalImageData = null;
+    let originalMediaType = null;
 
-  try {
-    // Get job from storage
-    let job = await storage.getJob(jobId);
-    
-    if (!job) {
-      sendEvent('error', { message: 'Job not found' });
-      res.end();
-      return;
-    }
+    try {
+      // Get job from storage
+      let job = await storage.getJob(jobId);
+      
+      if (!job) {
+        sendEvent('error', { message: 'Job not found' });
+        res.end();
+        return;
+      }
 
-    // Store image data before any processing
-    originalImageData = job.imageData;
-    originalMediaType = job.mediaType;
+      // LAZY COMPRESSION: If the image needs compression, do it now (not during upload)
+      if (job.needsCompression && job.imageData) {
+        console.log(`Lazy compression starting for job ${jobId}: ${(job.originalSize / 1024 / 1024).toFixed(2)}MB`);
+        try {
+          const imageBuffer = Buffer.from(job.imageData, 'base64');
+          const compressionResult = await compressImageForAPI(imageBuffer, job.mediaType);
+          
+          if (compressionResult.wasCompressed) {
+            job.imageData = compressionResult.buffer.toString('base64');
+            job.mediaType = compressionResult.mediaType;
+            console.log(`Lazy compression complete: ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
+            // Update job in storage with compressed data
+            await storage.updateJob(jobId, {
+              imageData: job.imageData,
+              mediaType: job.mediaType,
+              needsCompression: false,
+            });
+          }
+        } catch (compressionError) {
+          console.error('Lazy compression error:', compressionError);
+          sendEvent('error', { message: 'Failed to process image. It may be too large.' });
+          await storage.updateJob(jobId, {
+            status: JOB_STATUS.FAILED,
+            error: 'Image compression failed: ' + compressionError.message,
+          });
+          res.end();
+          return;
+        }
+      }
+
+      // Store image data before any processing
+      originalImageData = job.imageData;
+      originalMediaType = job.mediaType;
 
     // If job is already completed, send the result with image
     if (job.status === JOB_STATUS.COMPLETED) {

@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>thinx.fun - AI Image Analyzer</title>
+    <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,118 +15,59 @@
         }
         
         :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --primary-light: #818cf8;
-            --bg-dark: #0f0f1a;
-            --bg-card: #1a1a2e;
-            --bg-input: #252540;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0b8;
-            --border: #2d2d4a;
-            --success: #10b981;
-            --error: #ef4444;
-            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-2: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+            --bg: #111;
+            --bg-card: #191919;
+            --bg-input: #222;
+            --text: #e5e5e5;
+            --text-dim: #666;
+            --border: #333;
+            --accent: #fff;
         }
         
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-dark);
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg);
             min-height: 100vh;
-            color: var(--text-primary);
+            color: var(--text);
             line-height: 1.6;
         }
         
         .container {
-            max-width: 900px;
+            max-width: 640px;
             margin: 0 auto;
-            padding: 2rem 1.5rem;
+            padding: 3rem 1.5rem;
         }
         
-        /* Header */
         header {
-            text-align: center;
             margin-bottom: 3rem;
         }
         
         .logo {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: var(--gradient-2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--accent);
+            letter-spacing: -0.02em;
         }
         
         .tagline {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-        
-        .shortcut-banner {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-top: 1.25rem;
-            padding: 0.75rem 1.25rem;
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(99, 102, 241, 0.3);
-            border-radius: 12px;
-            color: var(--primary-light);
-            text-decoration: none;
-            font-size: 0.95rem;
-            transition: all 0.3s ease;
-        }
-        
-        .shortcut-banner:hover {
-            background: rgba(99, 102, 241, 0.25);
-            border-color: var(--primary);
-            transform: translateY(-2px);
-        }
-        
-        .shortcut-banner svg {
-            width: 20px;
-            height: 20px;
-            flex-shrink: 0;
-        }
-        
-        .shortcut-banner .arrow {
-            opacity: 0.7;
-            transition: transform 0.2s ease;
-        }
-        
-        .shortcut-banner:hover .arrow {
-            transform: translateX(4px);
-            opacity: 1;
-        }
-        
-        /* Upload Section */
-        .upload-section {
-            background: var(--bg-card);
-            border-radius: 20px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
         }
         
         .upload-area {
-            border: 2px dashed var(--border);
-            border-radius: 16px;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
             padding: 3rem 2rem;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--bg-input);
-            position: relative;
-            overflow: hidden;
+            transition: border-color 0.2s;
+            background: var(--bg-card);
         }
         
         .upload-area:hover,
         .upload-area.dragover {
-            border-color: var(--primary);
-            background: rgba(99, 102, 241, 0.1);
+            border-color: var(--text-dim);
         }
         
         .upload-area.has-image {
@@ -134,45 +75,26 @@
         }
         
         .upload-icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 1rem;
-            background: var(--gradient-2);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .upload-icon svg {
-            width: 32px;
-            height: 32px;
-            fill: white;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
         }
         
         .upload-text h3 {
-            font-size: 1.25rem;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
         }
         
         .upload-text p {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-        }
-        
-        .upload-text .formats {
-            margin-top: 1rem;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            opacity: 0.7;
+            color: var(--text-dim);
+            font-size: 0.75rem;
         }
         
         #fileInput {
             display: none;
         }
         
-        /* Preview Image */
         .preview-container {
             display: none;
             flex-direction: column;
@@ -184,38 +106,33 @@
             display: flex;
         }
         
-        .upload-content {
-            display: block;
-        }
-        
         .upload-content.hidden {
             display: none;
         }
         
         #imagePreview {
             max-width: 100%;
-            max-height: 400px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            max-height: 300px;
+            border-radius: 4px;
         }
         
         .change-image-btn {
-            background: var(--bg-input);
+            background: transparent;
             border: 1px solid var(--border);
-            color: var(--text-secondary);
+            color: var(--text-dim);
             padding: 0.5rem 1rem;
-            border-radius: 8px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
+            font-family: inherit;
             transition: all 0.2s;
         }
         
         .change-image-btn:hover {
-            border-color: var(--primary);
-            color: var(--text-primary);
+            border-color: var(--text-dim);
+            color: var(--text);
         }
         
-        /* Question Input */
         .question-section {
             margin-top: 1.5rem;
         }
@@ -223,220 +140,154 @@
         .question-label {
             display: block;
             margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-            color: var(--text-secondary);
+            font-size: 0.75rem;
+            color: var(--text-dim);
         }
         
         .question-input {
             width: 100%;
-            padding: 1rem;
+            padding: 0.75rem;
             background: var(--bg-input);
             border: 1px solid var(--border);
-            border-radius: 12px;
-            color: var(--text-primary);
-            font-size: 1rem;
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 0.875rem;
             font-family: inherit;
-            resize: vertical;
-            min-height: 60px;
-            transition: border-color 0.2s;
+            resize: none;
         }
         
         .question-input:focus {
             outline: none;
-            border-color: var(--primary);
+            border-color: var(--text-dim);
         }
         
         .question-input::placeholder {
-            color: var(--text-secondary);
-            opacity: 0.6;
+            color: var(--text-dim);
         }
         
-        /* Analyze Button */
         .analyze-btn {
             width: 100%;
-            padding: 1rem 2rem;
+            padding: 0.875rem;
             margin-top: 1.5rem;
-            background: var(--gradient-2);
+            background: var(--accent);
             border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
+            border-radius: 4px;
+            color: var(--bg);
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: inherit;
             cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
+            transition: opacity 0.2s;
         }
         
         .analyze-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
+            opacity: 0.9;
         }
         
         .analyze-btn:disabled {
-            opacity: 0.6;
+            opacity: 0.3;
             cursor: not-allowed;
-            transform: none;
         }
         
-        .analyze-btn svg {
-            width: 20px;
-            height: 20px;
-        }
-        
-        /* Spinner */
         .spinner {
             display: none;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--bg);
+            border-top-color: transparent;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.6s linear infinite;
+            margin-left: 0.5rem;
         }
         
         .spinner.show {
-            display: block;
+            display: inline-block;
         }
         
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
         
-        /* Success Section */
         .success-section {
             display: none;
-            background: var(--bg-card);
-            border-radius: 20px;
-            padding: 2rem;
-            border: 1px solid var(--border);
-            animation: fadeIn 0.5s ease;
             text-align: center;
+            padding: 2rem 0;
         }
         
         .success-section.show {
             display: block;
         }
         
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .success-icon {
-            width: 80px;
-            height: 80px;
-            margin: 0 auto 1.5rem;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .success-icon svg {
-            width: 40px;
-            height: 40px;
-            stroke: white;
-        }
-        
         .success-section h2 {
-            font-size: 1.5rem;
-            font-weight: 600;
+            font-size: 1rem;
+            font-weight: 500;
             margin-bottom: 0.5rem;
         }
         
         .success-section p {
-            color: var(--text-secondary);
+            color: var(--text-dim);
+            font-size: 0.875rem;
             margin-bottom: 1.5rem;
         }
         
         .success-link {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            padding: 1rem 2rem;
-            background: var(--gradient-2);
-            border: none;
-            border-radius: 12px;
-            color: white;
-            font-size: 1.1rem;
-            font-weight: 600;
+            display: inline-block;
+            padding: 0.875rem 2rem;
+            background: var(--accent);
+            border-radius: 4px;
+            color: var(--bg);
+            font-size: 0.875rem;
+            font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s ease;
-            margin-bottom: 1rem;
+            transition: opacity 0.2s;
         }
         
         .success-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.4);
-        }
-        
-        .success-link svg {
-            width: 20px;
-            height: 20px;
+            opacity: 0.9;
         }
         
         .job-url-container {
             margin-top: 1.5rem;
-            padding: 1rem;
+            padding: 0.75rem;
             background: var(--bg-input);
-            border-radius: 10px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             gap: 0.75rem;
             justify-content: center;
-            flex-wrap: wrap;
         }
         
         .job-url {
-            font-family: 'SF Mono', 'Monaco', monospace;
-            font-size: 0.9rem;
-            color: var(--primary-light);
+            font-size: 0.75rem;
+            color: var(--text-dim);
             word-break: break-all;
         }
         
         .copy-btn {
-            background: var(--bg-dark);
+            background: transparent;
             border: 1px solid var(--border);
-            color: var(--text-secondary);
-            padding: 0.5rem 0.75rem;
-            border-radius: 6px;
+            color: var(--text-dim);
+            padding: 0.375rem 0.75rem;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
+            font-family: inherit;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
         }
         
         .copy-btn:hover {
-            border-color: var(--primary);
-            color: var(--text-primary);
-        }
-        
-        .copy-btn svg {
-            width: 14px;
-            height: 14px;
+            border-color: var(--text-dim);
+            color: var(--text);
         }
         
         .upload-another {
             margin-top: 1.5rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
+            color: var(--text-dim);
+            font-size: 0.75rem;
         }
         
         .upload-another a {
-            color: var(--primary-light);
+            color: var(--text);
             text-decoration: none;
             cursor: pointer;
         }
@@ -445,81 +296,42 @@
             text-decoration: underline;
         }
         
-        /* Auto redirect notice */
         .redirect-notice {
             margin-top: 1rem;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
+            font-size: 0.75rem;
+            color: var(--text-dim);
         }
         
-        .redirect-notice .countdown {
-            color: var(--primary-light);
-            font-weight: 600;
-        }
-        
-        /* Error State */
         .error-message {
             display: none;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
+            background: rgba(255, 100, 100, 0.1);
+            border: 1px solid rgba(255, 100, 100, 0.2);
+            color: #ff6b6b;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
             margin-top: 1rem;
+            font-size: 0.75rem;
         }
         
         .error-message.show {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            display: block;
         }
         
-        .error-message svg {
-            width: 20px;
-            height: 20px;
-            fill: #fca5a5;
-            flex-shrink: 0;
-        }
-        
-        /* Footer */
         footer {
-            text-align: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
+            margin-top: 4rem;
+            padding-top: 1.5rem;
             border-top: 1px solid var(--border);
-            color: var(--text-secondary);
-            font-size: 0.875rem;
+            color: var(--text-dim);
+            font-size: 0.75rem;
         }
         
-        footer a {
-            color: var(--primary-light);
-            text-decoration: none;
-        }
-        
-        footer a:hover {
-            text-decoration: underline;
-        }
-        
-        /* Mobile Responsive */
         @media (max-width: 640px) {
             .container {
-                padding: 1.5rem 1rem;
-            }
-            
-            .logo {
-                font-size: 2rem;
-            }
-            
-            .upload-section {
-                padding: 1.5rem;
+                padding: 2rem 1rem;
             }
             
             .upload-area {
                 padding: 2rem 1rem;
-            }
-            
-            .results-section {
-                padding: 1.5rem;
             }
         }
     </style>
@@ -528,19 +340,7 @@
     <div class="container">
         <header>
             <h1 class="logo">thinx.fun</h1>
-            <p class="tagline">AI-powered image analysis - Understand what you're looking at</p>
-            <a href="/shortcut" class="shortcut-banner">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <path d="M21 15l-5-5L5 21"/>
-                </svg>
-                <span>Get the Apple Shortcut for instant screenshot analysis</span>
-                <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14"/>
-                    <polyline points="12,5 19,12 12,19"/>
-                </svg>
-            </a>
+            <p class="tagline">analyze images with ai</p>
         </header>
         
         <main>
@@ -549,101 +349,66 @@
                     <input type="file" id="fileInput" accept="image/*">
                     
                     <div class="upload-content" id="uploadContent">
-                        <div class="upload-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="17,8 12,3 7,8"/>
-                                <line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                        </div>
+                        <div class="upload-icon">↑</div>
                         <div class="upload-text">
-                            <h3>Upload an image to analyze</h3>
-                            <p>Drag and drop or click to browse</p>
-                            <p class="formats">Supports JPEG, PNG, GIF, WebP (max 20MB)</p>
+                            <h3>drop image or click to upload</h3>
+                            <p>png, jpg, gif, webp · max 20mb</p>
                         </div>
                     </div>
                     
                     <div class="preview-container" id="previewContainer">
                         <img id="imagePreview" alt="Preview">
-                        <button type="button" class="change-image-btn" id="changeImageBtn">Change image</button>
+                        <button type="button" class="change-image-btn" id="changeImageBtn">change</button>
                     </div>
                 </div>
                 
                 <div class="question-section">
-                    <label class="question-label" for="questionInput">Ask a specific question (optional)</label>
+                    <label class="question-label" for="questionInput">question (optional)</label>
                     <textarea 
                         class="question-input" 
                         id="questionInput" 
-                        placeholder="e.g., Is this claim true? What's the price? What brand is this?"
+                        placeholder="what do you want to know about this image?"
                         rows="2"
                     ></textarea>
                 </div>
                 
                 <button class="analyze-btn" id="analyzeBtn" disabled>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                    <span id="btnText">Analyze Image</span>
-                    <div class="spinner" id="spinner"></div>
+                    <span id="btnText">analyze</span>
+                    <span class="spinner" id="spinner"></span>
                 </button>
                 
                 <div class="error-message" id="errorMessage">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="12"/>
-                        <line x1="12" y1="16" x2="12.01" y2="16"/>
-                    </svg>
                     <span id="errorText"></span>
                 </div>
             </section>
             
             <section class="success-section" id="successSection">
-                <div class="success-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 12l2 2 4-4"/>
-                        <circle cx="12" cy="12" r="10"/>
-                    </svg>
-                </div>
-                <h2>Image Uploaded Successfully!</h2>
-                <p>Your image is being analyzed by Claude AI. Click the button below to view the progress and results.</p>
+                <h2>uploaded</h2>
+                <p>your image is being analyzed</p>
                 
-                <a href="#" class="success-link" id="viewResultsLink" target="_blank">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/>
-                        <path d="m21 21-4.35-4.35"/>
-                    </svg>
-                    View Analysis Progress
-                </a>
+                <a href="#" class="success-link" id="viewResultsLink">view results →</a>
                 
                 <div class="job-url-container">
                     <span class="job-url" id="jobUrl"></span>
-                    <button class="copy-btn" id="copyUrlBtn">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
-                        </svg>
-                        Copy
-                    </button>
+                    <button class="copy-btn" id="copyUrlBtn">copy</button>
                 </div>
                 
                 <p class="redirect-notice">
-                    Redirecting in <span class="countdown" id="countdown">5</span> seconds...
+                    redirecting in <span id="countdown">2</span>s
                 </p>
                 
                 <p class="upload-another">
-                    <a id="uploadAnotherLink">Upload another image</a>
+                    <a id="uploadAnotherLink">upload another</a>
                 </p>
             </section>
         </main>
         
         <footer>
-            <p>Powered by Claude AI | Built with care at <a href="https://thinx.fun">thinx.fun</a></p>
+            <p>powered by claude ai</p>
         </footer>
     </div>
     
     <script>
-        // DOM Elements
         const uploadArea = document.getElementById('uploadArea');
         const fileInput = document.getElementById('fileInput');
         const uploadContent = document.getElementById('uploadContent');
@@ -667,85 +432,6 @@
         let selectedFile = null;
         let countdownInterval = null;
         
-        // ============================================
-        // Client-side image compression
-        // Compresses large images before upload to stay within server limits
-        // ============================================
-        const MAX_UPLOAD_SIZE = 4 * 1024 * 1024; // 4MB to stay under Vercel's limit
-        const MAX_DIMENSION = 4096;
-        
-        async function compressImage(file) {
-            // If file is small enough, return as-is
-            if (file.size <= MAX_UPLOAD_SIZE) {
-                console.log('Image size OK:', (file.size / 1024 / 1024).toFixed(2), 'MB');
-                return file;
-            }
-            
-            console.log('Compressing image from:', (file.size / 1024 / 1024).toFixed(2), 'MB');
-            
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                img.onload = async () => {
-                    let { width, height } = img;
-                    
-                    // Scale down if dimensions are too large
-                    if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-                        const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
-                        width = Math.round(width * scale);
-                        height = Math.round(height * scale);
-                    }
-                    
-                    // Progressive compression: try different quality levels and scales
-                    const qualityLevels = [0.85, 0.75, 0.65, 0.55, 0.45];
-                    const scaleLevels = [1.0, 0.85, 0.7, 0.55, 0.4];
-                    
-                    for (const scale of scaleLevels) {
-                        const w = Math.round(width * scale);
-                        const h = Math.round(height * scale);
-                        
-                        canvas.width = w;
-                        canvas.height = h;
-                        ctx.drawImage(img, 0, 0, w, h);
-                        
-                        for (const quality of qualityLevels) {
-                            const blob = await new Promise(res => 
-                                canvas.toBlob(res, 'image/jpeg', quality)
-                            );
-                            
-                            if (blob && blob.size <= MAX_UPLOAD_SIZE) {
-                                console.log(`Compressed to ${(blob.size / 1024 / 1024).toFixed(2)}MB (${w}x${h}, q=${quality})`);
-                                resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-                                return;
-                            }
-                        }
-                    }
-                    
-                    // Last resort: aggressive compression
-                    canvas.width = Math.min(1920, width);
-                    canvas.height = Math.min(1920, height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    const blob = await new Promise(res => 
-                        canvas.toBlob(res, 'image/jpeg', 0.35)
-                    );
-                    
-                    if (blob) {
-                        console.log(`Aggressively compressed to ${(blob.size / 1024 / 1024).toFixed(2)}MB`);
-                        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
-                    } else {
-                        reject(new Error('Failed to compress image'));
-                    }
-                };
-                
-                img.onerror = () => reject(new Error('Failed to load image for compression'));
-                img.src = URL.createObjectURL(file);
-            });
-        }
-        
-        // Drag and drop handlers
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
             uploadArea.classList.add('dragover');
@@ -758,13 +444,11 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
             }
         });
         
-        // Click to upload
         uploadArea.addEventListener('click', (e) => {
             if (e.target !== changeImageBtn) {
                 fileInput.click();
@@ -782,24 +466,20 @@
             fileInput.click();
         });
         
-        // Handle file selection
         function handleFile(file) {
-            // Validate file type
             if (!file.type.startsWith('image/')) {
-                showError('Please upload an image file (JPEG, PNG, GIF, WebP)');
+                showError('please upload an image file');
                 return;
             }
             
-            // Validate file size (20MB)
             if (file.size > 20 * 1024 * 1024) {
-                showError('File is too large. Maximum size is 20MB.');
+                showError('file too large (max 20mb)');
                 return;
             }
             
             selectedFile = file;
             hideError();
             
-            // Show preview
             const reader = new FileReader();
             reader.onload = (e) => {
                 imagePreview.src = e.target.result;
@@ -811,37 +491,15 @@
             reader.readAsDataURL(file);
         }
         
-        // Analyze button handler - now uses /api/upload
         analyzeBtn.addEventListener('click', async () => {
-            if (!selectedFile) {
-                showError('Please select an image first');
-                return;
-            }
+            if (!selectedFile) return;
             
-            // Show loading state
             setLoading(true);
             hideError();
-            successSection.classList.remove('show');
             
             try {
-                // Compress image if needed (for large iPhone screenshots, etc.)
-                btnText.textContent = 'Preparing image...';
-                let fileToUpload = selectedFile;
-                
-                if (selectedFile.size > MAX_UPLOAD_SIZE) {
-                    try {
-                        fileToUpload = await compressImage(selectedFile);
-                        console.log('Image compressed for upload');
-                    } catch (compressError) {
-                        console.error('Compression failed:', compressError);
-                        // Continue with original file, server will try to handle it
-                    }
-                }
-                
-                btnText.textContent = 'Uploading...';
-                
                 const formData = new FormData();
-                formData.append('image', fileToUpload);
+                formData.append('image', selectedFile);
                 
                 const question = questionInput.value.trim();
                 if (question) {
@@ -856,51 +514,36 @@
                 const data = await response.json();
                 
                 if (!response.ok) {
-                    throw new Error(data.message || data.error || 'Upload failed');
+                    throw new Error(data.message || data.error || 'upload failed');
                 }
                 
-                // Reset loading state
                 setLoading(false);
-                
-                // Show success with link to progress page
-                // API now returns immediately, so user can see progress in real-time
                 showSuccess(data.jobId, data.viewUrl);
                 
             } catch (error) {
-                console.error('Error:', error);
-                showError(error.message || 'An error occurred while uploading the image. Please try again.');
+                showError(error.message || 'something went wrong');
                 setLoading(false);
             }
         });
         
-        // Copy URL button handler
         copyUrlBtn.addEventListener('click', () => {
-            const fullUrl = jobUrl.textContent;
-            navigator.clipboard.writeText(fullUrl).then(() => {
-                const originalText = copyUrlBtn.innerHTML;
-                copyUrlBtn.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="20,6 9,17 4,12"/>
-                    </svg>
-                    Copied!
-                `;
+            navigator.clipboard.writeText(jobUrl.textContent).then(() => {
+                copyUrlBtn.textContent = 'copied';
                 setTimeout(() => {
-                    copyUrlBtn.innerHTML = originalText;
+                    copyUrlBtn.textContent = 'copy';
                 }, 2000);
             });
         });
         
-        // Upload another link handler
         uploadAnotherLink.addEventListener('click', (e) => {
             e.preventDefault();
             resetForm();
         });
         
-        // Helper functions
         function setLoading(loading) {
             analyzeBtn.disabled = loading;
             spinner.classList.toggle('show', loading);
-            btnText.textContent = loading ? 'Uploading...' : 'Analyze Image';
+            btnText.textContent = loading ? 'uploading' : 'analyze';
         }
         
         function showError(message) {
@@ -913,73 +556,47 @@
         }
         
         function showSuccess(jobId, viewUrl) {
-            // Build full URL
             const fullUrl = window.location.origin + viewUrl;
             
-            // Update link and display
             viewResultsLink.href = viewUrl;
             jobUrl.textContent = fullUrl;
             
-            // Hide upload section, show success
             uploadSection.style.display = 'none';
             successSection.classList.add('show');
             
-            // Scroll to success section
-            successSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            
-            // Start countdown for auto-redirect (faster since API returns immediately)
             let seconds = 2;
             countdown.textContent = seconds;
             
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
+            if (countdownInterval) clearInterval(countdownInterval);
             
             countdownInterval = setInterval(() => {
                 seconds--;
                 countdown.textContent = seconds;
-                
                 if (seconds <= 0) {
                     clearInterval(countdownInterval);
-                    // Redirect to the progress page
                     window.location.href = viewUrl;
                 }
             }, 1000);
         }
         
         function resetForm() {
-            // Clear countdown
             if (countdownInterval) {
                 clearInterval(countdownInterval);
                 countdownInterval = null;
             }
             
-            // Reset file input
             selectedFile = null;
             fileInput.value = '';
-            
-            // Reset preview
             uploadContent.classList.remove('hidden');
             previewContainer.classList.remove('show');
             uploadArea.classList.remove('has-image');
             imagePreview.src = '';
-            
-            // Reset question
             questionInput.value = '';
-            
-            // Reset button
             analyzeBtn.disabled = true;
             setLoading(false);
-            
-            // Hide success, show upload
             successSection.classList.remove('show');
             uploadSection.style.display = 'block';
-            
-            // Hide errors
             hideError();
-            
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     </script>
 </body>
