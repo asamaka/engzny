@@ -457,17 +457,21 @@ async function compressImageForAPI(imageBuffer, mediaType) {
 app.get('/api/job/:jobId/stream', async (req, res) => {
   const { jobId } = req.params;
   
-  // Set SSE headers
+  // Set SSE headers - including headers to prevent Vercel/nginx buffering
   res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx/Vercel buffering
+  res.setHeader('Transfer-Encoding', 'chunked');
   res.flushHeaders();
 
-  // Helper to send SSE events
+  // Helper to send SSE events with immediate flush
   const sendEvent = (event, data) => {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
+    // Force flush for Vercel
+    if (res.flush) res.flush();
   };
 
     // Store original image data before processing clears it
