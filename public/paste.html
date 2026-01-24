@@ -498,7 +498,7 @@
             cursor.classList.remove('done');
             resultsContent.classList.add('auto-scroll');
             
-            const eventSource = new EventSource(`/api/stream/${jobId}`);
+            const eventSource = new EventSource(`/api/job/${jobId}/stream`);
             let transitionedToResults = false;
             
             eventSource.onmessage = (event) => {
