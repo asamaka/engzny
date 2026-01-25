@@ -146,7 +146,9 @@
         
         .status-dot.processing,
         .status-dot.waiting_llm,
-        .status-dot.streaming {
+        .status-dot.streaming,
+        .status-dot.compressing,
+        .status-dot.compressed {
             background: var(--text);
             animation: pulse 1s infinite;
         }
@@ -484,6 +486,8 @@
         
         const STATUS_NAMES = {
             'queued': 'queued',
+            'compressing': 'optimizing image',
+            'compressed': 'image ready',
             'processing': 'processing',
             'waiting_llm': 'waiting for ai',
             'streaming': 'analyzing',
@@ -506,6 +510,16 @@
         
         function connectToStream() {
             const eventSource = new EventSource(`/api/job/${jobId}/stream`);
+            
+            // Handle immediate connection confirmation
+            eventSource.addEventListener('connected', (e) => {
+                const data = JSON.parse(e.data);
+                updateProgress({
+                    status: 'queued',
+                    progress: 2,
+                    message: 'Connected, loading job...'
+                });
+            });
             
             eventSource.addEventListener('init', (e) => {
                 const data = JSON.parse(e.data);

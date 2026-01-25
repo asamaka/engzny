@@ -474,56 +474,104 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     if (res.flush) res.flush();
   };
 
-    // Store original image data before processing clears it
-    let originalImageData = null;
-    let originalMediaType = null;
+  // Keep-alive interval to prevent connection timeout
+  let keepAliveInterval = null;
+  const startKeepAlive = () => {
+    // Send a comment every 15 seconds to keep connection alive
+    keepAliveInterval = setInterval(() => {
+      res.write(': keep-alive\n\n');
+      if (res.flush) res.flush();
+    }, 15000);
+  };
+  
+  const stopKeepAlive = () => {
+    if (keepAliveInterval) {
+      clearInterval(keepAliveInterval);
+      keepAliveInterval = null;
+    }
+  };
 
-    try {
-      // Get job from storage
-      let job = await storage.getJob(jobId);
+  // Store original image data before processing clears it
+  let originalImageData = null;
+  let originalMediaType = null;
+
+  try {
+    // IMMEDIATELY send a connected event so client knows we're alive
+    sendEvent('connected', { 
+      message: 'Connected to server',
+      timestamp: new Date().toISOString() 
+    });
+    
+    // Start keep-alive pings
+    startKeepAlive();
+
+    // Get job from storage
+    let job = await storage.getJob(jobId);
+    
+    if (!job) {
+      stopKeepAlive();
+      sendEvent('error', { message: 'Job not found' });
+      res.end();
+      return;
+    }
+
+    // LAZY COMPRESSION: If the image needs compression, do it now (not during upload)
+    // But FIRST send a status update so the user knows what's happening
+    if (job.needsCompression && job.imageData) {
+      const sizeMB = (job.originalSize / 1024 / 1024).toFixed(1);
+      console.log(`Lazy compression starting for job ${jobId}: ${sizeMB}MB`);
       
-      if (!job) {
-        sendEvent('error', { message: 'Job not found' });
+      // Tell the client we're compressing - this is why it takes time!
+      sendEvent('status', {
+        status: 'compressing',
+        progress: 5,
+        message: `Optimizing image (${sizeMB}MB) for analysis...`,
+      });
+      
+      try {
+        const imageBuffer = Buffer.from(job.imageData, 'base64');
+        const compressionResult = await compressImageForAPI(imageBuffer, job.mediaType);
+        
+        if (compressionResult.wasCompressed) {
+          job.imageData = compressionResult.buffer.toString('base64');
+          job.mediaType = compressionResult.mediaType;
+          const finalSizeMB = (compressionResult.finalSize / 1024 / 1024).toFixed(1);
+          console.log(`Lazy compression complete: ${sizeMB}MB -> ${finalSizeMB}MB`);
+          
+          // Update job in storage with compressed data
+          await storage.updateJob(jobId, {
+            imageData: job.imageData,
+            mediaType: job.mediaType,
+            needsCompression: false,
+          });
+          
+          // Notify client compression is done
+          sendEvent('status', {
+            status: 'compressed',
+            progress: 15,
+            message: `Image optimized (${sizeMB}MB → ${finalSizeMB}MB)`,
+          });
+        }
+      } catch (compressionError) {
+        console.error('Lazy compression error:', compressionError);
+        stopKeepAlive();
+        sendEvent('error', { message: 'Failed to process image. It may be too large or corrupted.' });
+        await storage.updateJob(jobId, {
+          status: JOB_STATUS.FAILED,
+          error: 'Image compression failed: ' + compressionError.message,
+        });
         res.end();
         return;
       }
+    }
 
-      // LAZY COMPRESSION: If the image needs compression, do it now (not during upload)
-      if (job.needsCompression && job.imageData) {
-        console.log(`Lazy compression starting for job ${jobId}: ${(job.originalSize / 1024 / 1024).toFixed(2)}MB`);
-        try {
-          const imageBuffer = Buffer.from(job.imageData, 'base64');
-          const compressionResult = await compressImageForAPI(imageBuffer, job.mediaType);
-          
-          if (compressionResult.wasCompressed) {
-            job.imageData = compressionResult.buffer.toString('base64');
-            job.mediaType = compressionResult.mediaType;
-            console.log(`Lazy compression complete: ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
-            // Update job in storage with compressed data
-            await storage.updateJob(jobId, {
-              imageData: job.imageData,
-              mediaType: job.mediaType,
-              needsCompression: false,
-            });
-          }
-        } catch (compressionError) {
-          console.error('Lazy compression error:', compressionError);
-          sendEvent('error', { message: 'Failed to process image. It may be too large.' });
-          await storage.updateJob(jobId, {
-            status: JOB_STATUS.FAILED,
-            error: 'Image compression failed: ' + compressionError.message,
-          });
-          res.end();
-          return;
-        }
-      }
-
-      // Store image data before any processing
-      originalImageData = job.imageData;
-      originalMediaType = job.mediaType;
+    // Store image data before any processing
+    originalImageData = job.imageData;
+    originalMediaType = job.mediaType;
 
     // If job is already completed, send the result with image
     if (job.status === JOB_STATUS.COMPLETED) {
+      stopKeepAlive();
       // Send init with image first (might be null if cleared, client should handle)
       sendEvent('init', {
         jobId: job.id,
@@ -542,6 +590,7 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     // If job failed, send error with image
     if (job.status === JOB_STATUS.FAILED) {
+      stopKeepAlive();
       sendEvent('init', {
         jobId: job.id,
         status: job.status,
@@ -585,7 +634,7 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     sendEvent('status', {
       status: JOB_STATUS.WAITING_LLM,
       progress: 30,
-      message: PROGRESS_MESSAGES[JOB_STATUS.WAITING_LLM],
+      message: 'Connecting to Claude AI...',
     });
 
     await storage.updateJob(jobId, {
@@ -599,6 +648,20 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     let fullText = '';
     let firstTokenReceived = false;
+    
+    // Send periodic progress updates while waiting for Claude
+    // This helps the user know the connection is alive
+    let waitingProgress = 30;
+    const waitingInterval = setInterval(() => {
+      if (!firstTokenReceived && waitingProgress < 45) {
+        waitingProgress += 3;
+        sendEvent('status', {
+          status: JOB_STATUS.WAITING_LLM,
+          progress: waitingProgress,
+          message: 'Waiting for Claude AI to respond...',
+        });
+      }
+    }, 2000);
 
     // Use Claude streaming API
     const stream = anthropic.messages.stream({
@@ -630,10 +693,13 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       // On first token, update status to streaming
       if (!firstTokenReceived) {
         firstTokenReceived = true;
+        // Clear the waiting progress interval
+        clearInterval(waitingInterval);
+        
         sendEvent('status', {
           status: JOB_STATUS.STREAMING,
           progress: 50,
-          message: PROGRESS_MESSAGES[JOB_STATUS.STREAMING],
+          message: 'Claude is analyzing your image...',
         });
         await storage.updateJob(jobId, {
           status: JOB_STATUS.STREAMING,
@@ -648,6 +714,10 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     // Wait for stream to complete
     const finalMessage = await stream.finalMessage();
+    
+    // Clean up intervals
+    clearInterval(waitingInterval);
+    stopKeepAlive();
 
     // Update job as completed - keep image data for a while longer
     await storage.updateJob(jobId, {
@@ -675,18 +745,31 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
   } catch (error) {
     console.error('Stream error:', error);
     
+    // Clean up all intervals
+    stopKeepAlive();
+    // waitingInterval may not be defined if error occurred before it was created
+    // but clearInterval(undefined) is a safe no-op in JavaScript
+    if (typeof waitingInterval !== 'undefined') {
+      clearInterval(waitingInterval);
+    }
+    
     // Update job as failed but keep image data
-    await storage.updateJob(jobId, {
-      status: JOB_STATUS.FAILED,
-      progress: 0,
-      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.FAILED],
-      error: error.message,
-    });
+    try {
+      await storage.updateJob(jobId, {
+        status: JOB_STATUS.FAILED,
+        progress: 0,
+        progressMessage: PROGRESS_MESSAGES[JOB_STATUS.FAILED],
+        error: error.message,
+      });
+    } catch (updateError) {
+      console.error('Failed to update job status:', updateError);
+    }
 
     sendEvent('error', {
       message: error.message || 'An error occurred during analysis',
     });
   } finally {
+    stopKeepAlive(); // Ensure keep-alive is always stopped
     res.end();
   }
 });
