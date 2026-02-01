@@ -122,9 +122,86 @@ app.get('/paste', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
 });
 
-// Scan page (for URL image testing)
+// Scan page (for URL image testing - hash fragment method)
 app.get('/scan', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'scan.html'));
+});
+
+// ============================================
+// Scan API - POST image, get code, view with scanning animation
+// ============================================
+
+// Generate short code (6 chars)
+function generateShortCode() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+}
+
+// POST /api/scan - Upload image, get code
+app.post('/api/scan', async (req, res) => {
+  try {
+    const { image, mediaType } = req.body || {};
+    
+    if (!image) {
+      return res.status(400).json({ error: 'No image provided' });
+    }
+    
+    // Parse data URL if provided
+    let base64Data = image;
+    let mimeType = mediaType || 'image/jpeg';
+    
+    if (image.startsWith('data:')) {
+      const matches = image.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mimeType = matches[1];
+        base64Data = matches[2];
+      }
+    }
+    
+    // Generate short code
+    const code = generateShortCode();
+    
+    // Store image with 10 minute TTL
+    await storage.setJob(`scan:${code}`, {
+      imageData: base64Data,
+      mediaType: mimeType,
+      createdAt: new Date().toISOString(),
+    }, 600); // 10 minutes
+    
+    res.json({
+      success: true,
+      code,
+      url: `https://thinx.fun/s/${code}`,
+    });
+  } catch (error) {
+    console.error('Scan upload error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/scan/:code - Get image data
+app.get('/api/scan/:code', async (req, res) => {
+  const { code } = req.params;
+  const data = await storage.getJob(`scan:${code}`);
+  
+  if (!data) {
+    return res.status(404).json({ error: 'Image not found or expired' });
+  }
+  
+  res.json({
+    imageData: data.imageData,
+    mediaType: data.mediaType,
+    dataUrl: `data:${data.mediaType};base64,${data.imageData}`,
+  });
+});
+
+// GET /s/:code - View scan page with code
+app.get('/s/:code', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'scan-view.html'));
 });
 
 // Main route
