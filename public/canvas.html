@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas - thinx.fun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg: #0a0a0a;
+            --bg-card: #151515;
+            --text: #e5e5e5;
+            --text-dim: #666;
+            --accent: #00ffaa;
+            --accent-dim: rgba(0, 255, 170, 0.15);
+            --border: #2a2a2a;
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+        }
+        
+        /* Upload State */
+        .upload-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+        }
+        
+        .upload-state.hidden {
+            display: none;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+        }
+        
+        .tagline {
+            color: var(--text-dim);
+            font-size: 0.75rem;
+            margin-bottom: 3rem;
+            text-transform: lowercase;
+        }
+        
+        .upload-zone {
+            width: 100%;
+            max-width: 400px;
+            aspect-ratio: 4/3;
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-card);
+        }
+        
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+        
+        .upload-zone.has-image {
+            border-style: solid;
+        }
+        
+        .upload-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+        
+        .upload-text {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+            text-align: center;
+        }
+        
+        .upload-text strong {
+            color: var(--text);
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+        
+        .upload-preview {
+            display: none;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+        
+        .upload-zone.has-image .upload-preview {
+            display: block;
+        }
+        
+        .upload-zone.has-image .upload-content {
+            display: none;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .generate-btn {
+            margin-top: 1.5rem;
+            padding: 0.875rem 2.5rem;
+            background: var(--accent);
+            border: none;
+            border-radius: 6px;
+            color: var(--bg);
+            font-family: inherit;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: none;
+        }
+        
+        .generate-btn.visible {
+            display: block;
+        }
+        
+        .generate-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px var(--accent-dim);
+        }
+        
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Loading State */
+        .loading-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+        }
+        
+        .loading-state.active {
+            display: flex;
+        }
+        
+        .loading-visual {
+            position: relative;
+            width: 200px;
+            height: 150px;
+            margin-bottom: 2rem;
+        }
+        
+        .loading-preview {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+            opacity: 0.3;
+        }
+        
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), var(--accent), transparent);
+            box-shadow: 0 0 20px var(--accent);
+            animation: scan 2s ease-in-out infinite;
+        }
+        
+        @keyframes scan {
+            0%, 100% { top: 0; }
+            50% { top: calc(100% - 2px); }
+        }
+        
+        .loading-progress {
+            width: 200px;
+            height: 4px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+        }
+        
+        .loading-progress-bar {
+            height: 100%;
+            background: var(--accent);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+        
+        .loading-status {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: lowercase;
+        }
+        
+        /* Canvas State - The generated UI appears here */
+        .canvas-state {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .canvas-state.active {
+            display: block;
+        }
+        
+        .canvas-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: var(--bg);
+        }
+        
+        /* Error State */
+        .error-state {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .error-state.active {
+            display: flex;
+        }
+        
+        .error-icon {
+            width: 48px;
+            height: 48px;
+            color: #ff6b6b;
+            margin-bottom: 1rem;
+        }
+        
+        .error-message {
+            color: #ff6b6b;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+            max-width: 400px;
+        }
+        
+        .retry-btn {
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .retry-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <!-- Upload State -->
+    <div class="upload-state" id="uploadState">
+        <h1 class="logo">thinx.fun</h1>
+        <p class="tagline">transform screenshots into explorable canvases</p>
+        
+        <div class="upload-zone" id="uploadZone">
+            <input type="file" id="fileInput" accept="image/*">
+            <div class="upload-content">
+                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="upload-text">
+                    <strong>drop screenshot or click to upload</strong>
+                    png, jpg, webp · max 20mb
+                </p>
+            </div>
+            <img id="uploadPreview" class="upload-preview" alt="Preview">
+        </div>
+        
+        <button class="generate-btn" id="generateBtn">generate canvas →</button>
+    </div>
+    
+    <!-- Loading State -->
+    <div class="loading-state" id="loadingState">
+        <div class="loading-visual">
+            <img id="loadingPreview" class="loading-preview" alt="">
+            <div class="scan-line"></div>
+        </div>
+        <div class="loading-progress">
+            <div class="loading-progress-bar" id="progressBar"></div>
+        </div>
+        <p class="loading-status" id="loadingStatus">analyzing screenshot...</p>
+    </div>
+    
+    <!-- Canvas State - Generated UI -->
+    <div class="canvas-state" id="canvasState">
+        <iframe id="canvasFrame" class="canvas-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    
+    <!-- Error State -->
+    <div class="error-state" id="errorState">
+        <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+        <p class="error-message" id="errorMessage">something went wrong</p>
+        <button class="retry-btn" id="retryBtn">try again</button>
+    </div>
+    
+    <script>
+        // State management
+        const states = {
+            upload: document.getElementById('uploadState'),
+            loading: document.getElementById('loadingState'),
+            canvas: document.getElementById('canvasState'),
+            error: document.getElementById('errorState'),
+        };
+        
+        // Elements
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const uploadPreview = document.getElementById('uploadPreview');
+        const generateBtn = document.getElementById('generateBtn');
+        const loadingPreview = document.getElementById('loadingPreview');
+        const progressBar = document.getElementById('progressBar');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const canvasFrame = document.getElementById('canvasFrame');
+        const errorMessage = document.getElementById('errorMessage');
+        const retryBtn = document.getElementById('retryBtn');
+        
+        let selectedFile = null;
+        let currentJobId = null;
+        let htmlBuffer = '';
+        
+        // Show a state
+        function showState(name) {
+            Object.entries(states).forEach(([key, el]) => {
+                if (key === name) {
+                    el.classList.add('active');
+                    el.classList.remove('hidden');
+                } else {
+                    el.classList.remove('active');
+                    if (key === 'upload') {
+                        el.classList.add('hidden');
+                    }
+                }
+            });
+        }
+        
+        // Check for job ID in URL
+        function checkUrlForJob() {
+            const params = new URLSearchParams(window.location.search);
+            const jobId = params.get('job');
+            
+            if (jobId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
+                currentJobId = jobId;
+                showState('loading');
+                loadingStatus.textContent = 'loading canvas...';
+                startStream(jobId);
+                return true;
+            }
+            return false;
+        }
+        
+        // File handling
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                showError('please upload an image file');
+                return;
+            }
+            
+            if (file.size > 20 * 1024 * 1024) {
+                showError('file too large (max 20mb)');
+                return;
+            }
+            
+            selectedFile = file;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                uploadPreview.src = e.target.result;
+                uploadZone.classList.add('has-image');
+                generateBtn.classList.add('visible');
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Upload and stream
+        async function uploadAndGenerate() {
+            if (!selectedFile) return;
+            
+            // Show loading state
+            loadingPreview.src = uploadPreview.src;
+            showState('loading');
+            progressBar.style.width = '5%';
+            loadingStatus.textContent = 'uploading screenshot...';
+            
+            try {
+                // Upload image
+                const formData = new FormData();
+                formData.append('image', selectedFile);
+                
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'upload failed');
+                }
+                
+                // Update URL
+                currentJobId = data.jobId;
+                window.history.pushState({}, '', `/canvas?job=${data.jobId}`);
+                
+                progressBar.style.width = '10%';
+                loadingStatus.textContent = 'analyzing screenshot...';
+                
+                // Start streaming
+                startStream(data.jobId);
+                
+            } catch (err) {
+                showError(err.message || 'upload failed');
+            }
+        }
+        
+        // Stream canvas generation
+        function startStream(jobId) {
+            htmlBuffer = '';
+            let receivedAnyHtml = false;
+            
+            const eventSource = new EventSource(`/api/job/${jobId}/canvas`);
+            
+            eventSource.addEventListener('status', (e) => {
+                const data = JSON.parse(e.data);
+                progressBar.style.width = `${data.progress || 10}%`;
+                loadingStatus.textContent = data.message || 'processing...';
+            });
+            
+            eventSource.addEventListener('html', (e) => {
+                const data = JSON.parse(e.data);
+                htmlBuffer += data.chunk;
+                receivedAnyHtml = true;
+                
+                // Update progress based on content
+                const progress = Math.min(90, 20 + (htmlBuffer.length / 100));
+                progressBar.style.width = `${progress}%`;
+                loadingStatus.textContent = 'generating interface...';
+            });
+            
+            eventSource.addEventListener('complete', (e) => {
+                console.log('Canvas complete, HTML length:', htmlBuffer.length);
+                
+                progressBar.style.width = '100%';
+                loadingStatus.textContent = 'done!';
+                
+                // Render the canvas
+                setTimeout(() => {
+                    if (htmlBuffer.trim()) {
+                        renderCanvas(htmlBuffer);
+                    } else {
+                        showError('No content generated');
+                    }
+                }, 200);
+                
+                eventSource.close();
+            });
+            
+            eventSource.addEventListener('error', (e) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    showError(data.message || 'generation failed');
+                } catch {
+                    if (!receivedAnyHtml) {
+                        showError('connection lost');
+                    }
+                }
+                eventSource.close();
+            });
+            
+            eventSource.onerror = () => {
+                if (!receivedAnyHtml) {
+                    showError('connection lost - please try again');
+                }
+                eventSource.close();
+            };
+        }
+        
+        // Render generated HTML in iframe
+        function renderCanvas(html) {
+            showState('canvas');
+            
+            // Clean up any markdown code fences Claude might have added
+            let cleanHtml = html.trim();
+            if (cleanHtml.startsWith('```html')) {
+                cleanHtml = cleanHtml.slice(7);
+            } else if (cleanHtml.startsWith('```')) {
+                cleanHtml = cleanHtml.slice(3);
+            }
+            if (cleanHtml.endsWith('```')) {
+                cleanHtml = cleanHtml.slice(0, -3);
+            }
+            cleanHtml = cleanHtml.trim();
+            
+            // Write HTML to iframe
+            const doc = canvasFrame.contentDocument || canvasFrame.contentWindow.document;
+            doc.open();
+            doc.write(cleanHtml);
+            doc.close();
+            
+            // Listen for events from the canvas
+            canvasFrame.contentWindow.addEventListener('giue:investigate', (e) => {
+                console.log('Investigate triggered:', e.detail);
+                // Future: Trigger research API
+            });
+        }
+        
+        // Show error
+        function showError(message) {
+            errorMessage.textContent = message;
+            showState('error');
+        }
+        
+        // Reset to initial state
+        function reset() {
+            selectedFile = null;
+            currentJobId = null;
+            htmlBuffer = '';
+            uploadPreview.src = '';
+            uploadZone.classList.remove('has-image');
+            generateBtn.classList.remove('visible');
+            progressBar.style.width = '0%';
+            window.history.pushState({}, '', '/canvas');
+            showState('upload');
+            states.upload.classList.remove('hidden');
+        }
+        
+        // Event listeners
+        uploadZone.addEventListener('click', () => fileInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+        
+        generateBtn.addEventListener('click', uploadAndGenerate);
+        retryBtn.addEventListener('click', reset);
+        
+        // Paste support
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    handleFile(item.getAsFile());
+                    return;
+                }
+            }
+        });
+        
+        // Initialize
+        if (!checkUrlForJob()) {
+            showState('upload');
+            states.upload.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

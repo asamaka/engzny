@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Image Test | thinx.fun</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+      background: #0a0a0a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      color: #00ff88;
+    }
+    
+    .stats {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+    }
+    
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #222;
+    }
+    
+    .stat-row:last-child {
+      border-bottom: none;
+    }
+    
+    .stat-label {
+      color: #888;
+    }
+    
+    .stat-value {
+      color: #00ff88;
+      font-weight: bold;
+    }
+    
+    .stat-value.warning {
+      color: #ffaa00;
+    }
+    
+    .stat-value.error {
+      color: #ff4444;
+    }
+    
+    .image-container {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .image-container img {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 4px;
+      image-rendering: pixelated; /* Show pixels for tiny images */
+    }
+    
+    .no-image {
+      color: #666;
+      font-size: 0.9rem;
+    }
+    
+    .instructions {
+      margin-top: 1.5rem;
+      background: #1a1a2a;
+      border: 1px solid #334;
+      border-radius: 8px;
+      padding: 1rem;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    
+    .instructions h3 {
+      color: #88aaff;
+      margin-bottom: 0.5rem;
+    }
+    
+    code {
+      background: #222;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      color: #ffaa00;
+      font-size: 0.75rem;
+    }
+    
+    .test-buttons {
+      margin-top: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    button {
+      background: #222;
+      border: 1px solid #444;
+      color: #e0e0e0;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+    
+    button:hover {
+      background: #333;
+      border-color: #00ff88;
+    }
+    
+    .drop-zone {
+      margin-top: 1.5rem;
+      border: 2px dashed #444;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    
+    .drop-zone.dragover {
+      border-color: #00ff88;
+      background: #1a2a1a;
+    }
+    
+    .drop-zone p {
+      color: #666;
+      margin-bottom: 1rem;
+    }
+    
+    input[type="file"] {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔬 URL Image Parameter Test</h1>
+    
+    <div class="stats" id="stats">
+      <div class="stat-row">
+        <span class="stat-label">Full URL Length</span>
+        <span class="stat-value" id="url-length">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Image Data Length</span>
+        <span class="stat-value" id="data-length">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Source</span>
+        <span class="stat-value" id="source">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Image Size</span>
+        <span class="stat-value" id="image-size">—</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Status</span>
+        <span class="stat-value" id="status">Waiting for image...</span>
+      </div>
+    </div>
+    
+    <div class="image-container" id="image-container">
+      <div class="no-image" id="placeholder">
+        No image in URL. Add <code>#img=data:image/...</code> or <code>?img=data:image/...</code> to the URL.
+      </div>
+    </div>
+    
+    <div class="drop-zone" id="drop-zone">
+      <p>Drop an image here to test compression & URL encoding</p>
+      <button onclick="document.getElementById('file-input').click()">Choose File</button>
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+    
+    <div class="instructions">
+      <h3>How to test:</h3>
+      <p>1. Run compression script: <code>node scripts/compress-test.js test-images/test-gradient.png</code></p>
+      <p>2. Copy the generated URL and paste it in your browser</p>
+      <p>3. Or drop an image above to test compression live</p>
+      <br>
+      <h3>URL Formats:</h3>
+      <p>Hash (client-side): <code>/url-test.html#img=data:image/webp;base64,...</code></p>
+      <p>Query (server-side): <code>/url-test.html?img=data:image/webp;base64,...</code></p>
+    </div>
+  </div>
+  
+  <script>
+    const stats = {
+      urlLength: document.getElementById('url-length'),
+      dataLength: document.getElementById('data-length'),
+      source: document.getElementById('source'),
+      imageSize: document.getElementById('image-size'),
+      status: document.getElementById('status'),
+    };
+    const container = document.getElementById('image-container');
+    const placeholder = document.getElementById('placeholder');
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    
+    function updateStats(urlLen, dataLen, source, status, statusClass = '') {
+      stats.urlLength.textContent = urlLen ? `${urlLen.toLocaleString()} chars` : '—';
+      stats.dataLength.textContent = dataLen ? `${dataLen.toLocaleString()} chars` : '—';
+      stats.source.textContent = source || '—';
+      stats.status.textContent = status;
+      stats.status.className = 'stat-value ' + statusClass;
+      
+      // Color code URL length
+      if (urlLen) {
+        if (urlLen < 2000) {
+          stats.urlLength.className = 'stat-value';
+        } else if (urlLen < 4000) {
+          stats.urlLength.className = 'stat-value warning';
+        } else {
+          stats.urlLength.className = 'stat-value error';
+        }
+      }
+    }
+    
+    function displayImage(dataUrl, source) {
+      const img = document.createElement('img');
+      img.onload = () => {
+        stats.imageSize.textContent = `${img.naturalWidth}×${img.naturalHeight}`;
+        placeholder.style.display = 'none';
+        container.innerHTML = '';
+        container.appendChild(img);
+        
+        const urlLen = window.location.href.length;
+        const dataLen = dataUrl.length;
+        
+        let status, statusClass;
+        if (urlLen < 2000) {
+          status = '✅ URL-safe (< 2KB)';
+          statusClass = '';
+        } else if (urlLen < 4000) {
+          status = '⚠️ Borderline (2-4KB)';
+          statusClass = 'warning';
+        } else if (urlLen < 8000) {
+          status = '🟡 Large (4-8KB)';
+          statusClass = 'warning';
+        } else {
+          status = '❌ Too large for most URLs';
+          statusClass = 'error';
+        }
+        
+        updateStats(urlLen, dataLen, source, status, statusClass);
+      };
+      img.onerror = () => {
+        updateStats(null, dataUrl.length, source, '❌ Invalid image data', 'error');
+      };
+      img.src = dataUrl;
+    }
+    
+    function parseUrlImage() {
+      // Try hash first (preferred - no server limit)
+      const hash = window.location.hash;
+      if (hash && hash.includes('img=')) {
+        const match = hash.match(/img=([^&]+)/);
+        if (match) {
+          const dataUrl = decodeURIComponent(match[1]);
+          displayImage(dataUrl, 'Hash fragment (#img=)');
+          return;
+        }
+      }
+      
+      // Try query param
+      const params = new URLSearchParams(window.location.search);
+      const imgParam = params.get('img');
+      if (imgParam) {
+        displayImage(imgParam, 'Query param (?img=)');
+        return;
+      }
+      
+      // No image found
+      updateStats(window.location.href.length, null, 'None', 'Waiting for image...', '');
+    }
+    
+    // Compress and display dropped/selected image
+    async function compressAndDisplay(file) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Try different compression levels
+        const configs = [
+          { width: 64, quality: 0.05 },
+          { width: 64, quality: 0.1 },
+          { width: 96, quality: 0.1 },
+          { width: 128, quality: 0.1 },
+          { width: 128, quality: 0.2 },
+          { width: 192, quality: 0.2 },
+          { width: 256, quality: 0.2 },
+        ];
+        
+        let bestDataUrl = null;
+        let bestConfig = null;
+        
+        for (const config of configs) {
+          const scale = Math.min(config.width / img.width, config.width / img.height, 1);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          
+          const dataUrl = canvas.toDataURL('image/webp', config.quality);
+          
+          if (dataUrl.length < 4000) {
+            bestDataUrl = dataUrl;
+            bestConfig = { ...config, actualWidth: w, actualHeight: h };
+          }
+        }
+        
+        if (bestDataUrl) {
+          // Update URL with hash
+          const encoded = encodeURIComponent(bestDataUrl);
+          window.location.hash = `img=${encoded}`;
+          displayImage(bestDataUrl, `Compressed (${bestConfig.actualWidth}×${bestConfig.actualHeight}, q=${bestConfig.quality})`);
+        } else {
+          updateStats(null, null, 'Compression failed', '❌ Image too complex for URL', 'error');
+        }
+      };
+      
+      img.src = URL.createObjectURL(file);
+    }
+    
+    // Drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        compressAndDisplay(file);
+      }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        compressAndDisplay(file);
+      }
+    });
+    
+    // Listen for hash changes
+    window.addEventListener('hashchange', parseUrlImage);
+    
+    // Initial parse
+    parseUrlImage();
+  </script>
+</body>
+</html>

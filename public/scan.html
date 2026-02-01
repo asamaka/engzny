@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>thinx</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      background: #000;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif;
+      overflow: hidden;
+    }
+    
+    .scanner {
+      position: relative;
+      width: 90vw;
+      max-width: 400px;
+      aspect-ratio: 9/16;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #111;
+    }
+    
+    .scanner img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    
+    /* Scanning overlay */
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    
+    /* Scanning line */
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        #00ff88 20%, 
+        #00ffcc 50%, 
+        #00ff88 80%, 
+        transparent 100%
+      );
+      box-shadow: 
+        0 0 20px #00ff88,
+        0 0 40px #00ff8866,
+        0 0 60px #00ff8833;
+      animation: scan 2s ease-in-out infinite;
+    }
+    
+    @keyframes scan {
+      0%, 100% { top: 0; opacity: 1; }
+      50% { top: calc(100% - 3px); opacity: 0.8; }
+    }
+    
+    /* Corner brackets */
+    .corner {
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 2px solid #00ff88;
+    }
+    .corner.tl { top: 12px; left: 12px; border-right: none; border-bottom: none; }
+    .corner.tr { top: 12px; right: 12px; border-left: none; border-bottom: none; }
+    .corner.bl { bottom: 12px; left: 12px; border-right: none; border-top: none; }
+    .corner.br { bottom: 12px; right: 12px; border-left: none; border-top: none; }
+    
+    /* Subtle grid overlay */
+    .grid {
+      position: absolute;
+      inset: 0;
+      background-image: 
+        linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    
+    /* Status text */
+    .status {
+      position: absolute;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #00ff88;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px #00ff88;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    /* Error state */
+    .error {
+      color: #ff4444;
+      text-align: center;
+      padding: 2rem;
+    }
+    
+    .error h2 {
+      margin-bottom: 1rem;
+    }
+    
+    .error code {
+      display: block;
+      background: #1a1a1a;
+      padding: 1rem;
+      border-radius: 8px;
+      margin-top: 1rem;
+      font-size: 11px;
+      word-break: break-all;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="scanner" id="scanner">
+    <div class="error" id="error" style="display: none;">
+      <h2>No image</h2>
+      <p>Add image data to URL hash</p>
+      <code id="example"></code>
+    </div>
+    <img id="image" style="display: none;" alt="Screenshot">
+    <div class="scan-overlay" id="overlay" style="display: none;">
+      <div class="grid"></div>
+      <div class="scan-line"></div>
+      <div class="corner tl"></div>
+      <div class="corner tr"></div>
+      <div class="corner bl"></div>
+      <div class="corner br"></div>
+      <div class="status">Analyzing</div>
+    </div>
+  </div>
+
+  <script>
+    const image = document.getElementById('image');
+    const overlay = document.getElementById('overlay');
+    const error = document.getElementById('error');
+    const example = document.getElementById('example');
+    
+    function showError(msg) {
+      error.style.display = 'block';
+      error.querySelector('p').textContent = msg;
+      example.textContent = window.location.origin + '/scan#img=' + encodeURIComponent('data:image/webp;base64,...');
+    }
+    
+    function showImage(dataUrl) {
+      image.onload = () => {
+        image.style.display = 'block';
+        overlay.style.display = 'block';
+        error.style.display = 'none';
+      };
+      image.onerror = () => showError('Invalid image data');
+      image.src = dataUrl;
+    }
+    
+    function parseUrl() {
+      const hash = window.location.hash;
+      
+      if (hash && hash.includes('img=')) {
+        const match = hash.match(/img=([^&]+)/);
+        if (match) {
+          try {
+            const dataUrl = decodeURIComponent(match[1]);
+            showImage(dataUrl);
+            return;
+          } catch (e) {
+            showError('Failed to decode image: ' + e.message);
+            return;
+          }
+        }
+      }
+      
+      // Also try query param
+      const params = new URLSearchParams(window.location.search);
+      const imgParam = params.get('img');
+      if (imgParam) {
+        showImage(imgParam);
+        return;
+      }
+      
+      showError('No image in URL');
+    }
+    
+    window.addEventListener('hashchange', parseUrl);
+    parseUrl();
+  </script>
+</body>
+</html>

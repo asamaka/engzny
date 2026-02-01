@@ -1,12 +1,10 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const sharp = require('sharp');
-const { GeminiAdapter } = require('./llm/gemini');
 
 const app = express();
 
@@ -114,8 +112,6 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// Deprecated v1 snapshot
-app.use('/v1', express.static(path.join(__dirname, '..', 'v1', 'public')));
 
 // Paste page (for clipboard integration with Shortcuts)
 app.get('/paste', (req, res) => {
@@ -127,293 +123,10 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Deprecated v1 route
-app.get('/v1', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'v1', 'public', 'index.html'));
-});
-
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// ============================================
-// Screenshot Intelligence Hub (v2) Routes
-// ============================================
-const buildHubPrompt = (question) => {
-  return `You are a helpful AI assistant that analyzes images to help users understand what they're looking at. 
-
-Your first action must always be to call render_hero to define the context and stop the scanner.
-
-Analyze this image thoroughly and provide your findings by calling the appropriate tools from the library:
-
-1. **What You See**: A clear description of the main content in the image.
-2. **Key Information**: Extract and highlight any important information visible (Text, Product names, News claims, Data, People/Places).
-3. **Fact Check & Context**: Assess credibility for news, share details for products, explain statistics, and identify ad fine print.
-4. **Helpful Insights**: Provide background info, things to be aware of, or related useful information.
-${question ? `5. **User's Question**: The user specifically asked: "${question}". Address this question directly.\n` : ''}
-
-Operational Rule: Be factual, helpful, and highlight anything the user should be cautious about (misleading claims, too-good-to-be-true offers, etc.). Translate these insights into tool calls to populate the user's dashboard.
-
-Tool Library (return tool calls only):
-- render_hero: { title, subtitle, badge, icon, hero_image }
-- render_metric: { title, label, value, color, subtext }
-- render_list: { title, items: [{ label, value, icon, active }] }
-- render_grid: { cells: [{ label, value, icon, dark_mode }] }
-- render_footer: { primary_btn: { label, icon }, secondary_btn: { icon } }
-
-Return ONLY raw JSON (no markdown fences, no commentary) with this shape and no extra keys:
-{
-  "toolCalls": [
-    { "tool": "render_hero", "args": { "title": "...", "subtitle": "...", "badge": "...", "icon": "...", "hero_image": "..." } },
-    { "tool": "render_metric", "args": { "title": "...", "label": "...", "value": "...", "color": "...", "subtext": "..." } }
-  ]
-}
-
-The first toolCalls entry must be render_hero.`;
-};
-
-const extractJsonPayload = (text) => {
-  if (!text) return null;
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = match ? match[1] : text;
-  let trimmed = candidate.trim();
-
-  trimmed = trimmed.replace(/^\uFEFF/, '');
-  trimmed = trimmed.replace(/```/g, '');
-  trimmed = trimmed.replace(/^json\s*/i, '').trim();
-
-  const tryParse = (value) => {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  };
-
-  let parsed = tryParse(trimmed);
-  if (parsed) return parsed;
-
-  const firstBrace = trimmed.indexOf('{');
-  const lastBrace = trimmed.lastIndexOf('}');
-  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
-    return null;
-  }
-
-  const sliced = trimmed.slice(firstBrace, lastBrace + 1);
-  const stripComments = (value) =>
-    value.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
-
-  parsed = tryParse(stripComments(sliced));
-  if (parsed) return parsed;
-
-  const withoutTrailingCommas = stripComments(sliced).replace(/,\s*([}\]])/g, '$1');
-  parsed = tryParse(withoutTrailingCommas);
-  if (parsed) return parsed;
-
-  const withoutControlChars = withoutTrailingCommas.replace(/[\u0000-\u001F]+/g, ' ');
-  return tryParse(withoutControlChars);
-};
-
-const normalizeImagePayload = ({ image, mediaType }) => {
-  if (!image || typeof image !== 'string') {
-    throw new Error('No image provided');
-  }
-
-  let base64Data = image.trim();
-  let mimeType = mediaType || 'image/png';
-
-  if (base64Data.startsWith('data:')) {
-    const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
-    if (!matches) {
-      throw new Error('Invalid data URL format');
-    }
-    mimeType = matches[1];
-    base64Data = matches[2];
-  }
-
-  base64Data = base64Data.replace(/\s/g, '');
-  if (!/^[A-Za-z0-9+/]+=*$/.test(base64Data)) {
-    throw new Error('Invalid base64 image data');
-  }
-
-  const buffer = Buffer.from(base64Data, 'base64');
-  if (buffer.length > 20 * 1024 * 1024) {
-    throw new Error('Image too large (max 20MB)');
-  }
-
-  const detectedType = detectMediaType(buffer);
-  if (detectedType) {
-    mimeType = detectedType;
-  }
-
-  return { imageData: base64Data, mediaType: mimeType };
-};
-
-app.post('/api/hub/analyze', async (req, res) => {
-  try {
-    const { image, question, mediaType } = req.body || {};
-    const normalized = normalizeImagePayload({ image, mediaType });
-    const adapter = new GeminiAdapter();
-    const prompt = buildHubPrompt(question);
-    const responseFormat = {
-      type: 'object',
-      properties: {
-        toolCalls: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              tool: { type: 'string' },
-              args: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  subtitle: { type: 'string' },
-                  badge: { type: 'string' },
-                  icon: { type: 'string' },
-                  hero_image: { type: 'string' },
-                  label: { type: 'string' },
-                  value: { type: 'string' },
-                  color: { type: 'string' },
-                  subtext: { type: 'string' },
-                  items: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        label: { type: 'string' },
-                        value: { type: 'string' },
-                        icon: { type: 'string' },
-                        active: { type: 'boolean' },
-                      },
-                    },
-                  },
-                  cells: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        label: { type: 'string' },
-                        value: { type: 'string' },
-                        icon: { type: 'string' },
-                        dark_mode: { type: 'boolean' },
-                      },
-                    },
-                  },
-                  primary_btn: {
-                    type: 'object',
-                    properties: {
-                      label: { type: 'string' },
-                      icon: { type: 'string' },
-                    },
-                  },
-                  secondary_btn: {
-                    type: 'object',
-                    properties: {
-                      icon: { type: 'string' },
-                    },
-                  },
-                },
-              },
-            },
-            required: ['tool', 'args'],
-          },
-        },
-      },
-      required: ['toolCalls'],
-    };
-
-    const result = await adapter.analyzeImage({
-      imageData: normalized.imageData,
-      mediaType: normalized.mediaType,
-      prompt,
-      responseFormat,
-    });
-
-    const parsed = extractJsonPayload(result.text);
-    const toolCalls = Array.isArray(parsed?.toolCalls)
-      ? parsed.toolCalls
-      : [
-          {
-            tool: 'render_hero',
-            args: {
-              title: 'Analysis incomplete',
-              subtitle: 'Gemini response could not be parsed',
-              badge: 'Fallback',
-              icon: '⚠️',
-              hero_image: null,
-            },
-          },
-          {
-            tool: 'render_list',
-            args: {
-              title: 'Raw response',
-              items: [
-                {
-                  label: 'Output',
-                  value: (result.text || 'No output').slice(0, 140) + '...',
-                  icon: '📝',
-                  active: false,
-                },
-              ],
-            },
-          },
-        ];
-
-    res.json({
-      success: true,
-      toolCalls,
-      model: result.model,
-      usage: result.usage,
-    });
-  } catch (error) {
-    console.error('Hub analyze error:', error);
-    res.status(500).json({
-      error: 'Analysis failed',
-      message: error.message || 'An unexpected error occurred',
-    });
-  }
-});
-
-const getHubSampleFiles = () => {
-  const sampleDir = path.join(__dirname, '..', 'screens');
-  try {
-    return fs.readdirSync(sampleDir)
-      .filter((file) => /\.(png|jpe?g|webp|gif)$/i.test(file))
-      .slice(0, 5);
-  } catch {
-    return [];
-  }
-};
-
-app.get('/api/hub/samples', (req, res) => {
-  const samples = getHubSampleFiles();
-  res.json({ samples });
-});
-
-app.get('/api/hub/sample', (req, res) => {
-  const samples = getHubSampleFiles();
-  const requested = req.query.name;
-  const file = requested && samples.includes(requested) ? requested : samples[0];
-
-  if (!file) {
-    return res.status(404).json({
-      error: 'No samples available',
-      message: 'No screenshot samples found in /screens.',
-    });
-  }
-
-  const sampleDir = path.join(__dirname, '..', 'screens');
-  const filePath = path.join(sampleDir, file);
-  const buffer = fs.readFileSync(filePath);
-  const mediaType = detectMediaType(buffer) || 'image/jpeg';
-
-  res.json({
-    name: file,
-    dataUrl: `data:${mediaType};base64,${buffer.toString('base64')}`,
-  });
 });
 
 // ============================================
@@ -1033,104 +746,56 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     if (res.flush) res.flush();
   };
 
-  // Keep-alive interval to prevent connection timeout
-  let keepAliveInterval = null;
-  const startKeepAlive = () => {
-    // Send a comment every 15 seconds to keep connection alive
-    keepAliveInterval = setInterval(() => {
-      res.write(': keep-alive\n\n');
-      if (res.flush) res.flush();
-    }, 15000);
-  };
-  
-  const stopKeepAlive = () => {
-    if (keepAliveInterval) {
-      clearInterval(keepAliveInterval);
-      keepAliveInterval = null;
-    }
-  };
+    // Store original image data before processing clears it
+    let originalImageData = null;
+    let originalMediaType = null;
 
-  // Store original image data before processing clears it
-  let originalImageData = null;
-  let originalMediaType = null;
-
-  try {
-    // IMMEDIATELY send a connected event so client knows we're alive
-    sendEvent('connected', { 
-      message: 'Connected to server',
-      timestamp: new Date().toISOString() 
-    });
-    
-    // Start keep-alive pings
-    startKeepAlive();
-
-    // Get job from storage
-    let job = await storage.getJob(jobId);
-    
-    if (!job) {
-      stopKeepAlive();
-      sendEvent('error', { message: 'Job not found' });
-      res.end();
-      return;
-    }
-
-    // LAZY COMPRESSION: If the image needs compression, do it now (not during upload)
-    // But FIRST send a status update so the user knows what's happening
-    if (job.needsCompression && job.imageData) {
-      const sizeMB = (job.originalSize / 1024 / 1024).toFixed(1);
-      console.log(`Lazy compression starting for job ${jobId}: ${sizeMB}MB`);
+    try {
+      // Get job from storage
+      let job = await storage.getJob(jobId);
       
-      // Tell the client we're compressing - this is why it takes time!
-      sendEvent('status', {
-        status: 'compressing',
-        progress: 5,
-        message: `Optimizing image (${sizeMB}MB) for analysis...`,
-      });
-      
-      try {
-        const imageBuffer = Buffer.from(job.imageData, 'base64');
-        const compressionResult = await compressImageForAPI(imageBuffer, job.mediaType);
-        
-        if (compressionResult.wasCompressed) {
-          job.imageData = compressionResult.buffer.toString('base64');
-          job.mediaType = compressionResult.mediaType;
-          const finalSizeMB = (compressionResult.finalSize / 1024 / 1024).toFixed(1);
-          console.log(`Lazy compression complete: ${sizeMB}MB -> ${finalSizeMB}MB`);
-          
-          // Update job in storage with compressed data
-          await storage.updateJob(jobId, {
-            imageData: job.imageData,
-            mediaType: job.mediaType,
-            needsCompression: false,
-          });
-          
-          // Notify client compression is done
-          sendEvent('status', {
-            status: 'compressed',
-            progress: 15,
-            message: `Image optimized (${sizeMB}MB → ${finalSizeMB}MB)`,
-          });
-        }
-      } catch (compressionError) {
-        console.error('Lazy compression error:', compressionError);
-        stopKeepAlive();
-        sendEvent('error', { message: 'Failed to process image. It may be too large or corrupted.' });
-        await storage.updateJob(jobId, {
-          status: JOB_STATUS.FAILED,
-          error: 'Image compression failed: ' + compressionError.message,
-        });
+      if (!job) {
+        sendEvent('error', { message: 'Job not found' });
         res.end();
         return;
       }
-    }
 
-    // Store image data before any processing
-    originalImageData = job.imageData;
-    originalMediaType = job.mediaType;
+      // LAZY COMPRESSION: If the image needs compression, do it now (not during upload)
+      if (job.needsCompression && job.imageData) {
+        console.log(`Lazy compression starting for job ${jobId}: ${(job.originalSize / 1024 / 1024).toFixed(2)}MB`);
+        try {
+          const imageBuffer = Buffer.from(job.imageData, 'base64');
+          const compressionResult = await compressImageForAPI(imageBuffer, job.mediaType);
+          
+          if (compressionResult.wasCompressed) {
+            job.imageData = compressionResult.buffer.toString('base64');
+            job.mediaType = compressionResult.mediaType;
+            console.log(`Lazy compression complete: ${(compressionResult.originalSize / 1024 / 1024).toFixed(2)}MB -> ${(compressionResult.finalSize / 1024 / 1024).toFixed(2)}MB`);
+            // Update job in storage with compressed data
+            await storage.updateJob(jobId, {
+              imageData: job.imageData,
+              mediaType: job.mediaType,
+              needsCompression: false,
+            });
+          }
+        } catch (compressionError) {
+          console.error('Lazy compression error:', compressionError);
+          sendEvent('error', { message: 'Failed to process image. It may be too large.' });
+          await storage.updateJob(jobId, {
+            status: JOB_STATUS.FAILED,
+            error: 'Image compression failed: ' + compressionError.message,
+          });
+          res.end();
+          return;
+        }
+      }
+
+      // Store image data before any processing
+      originalImageData = job.imageData;
+      originalMediaType = job.mediaType;
 
     // If job is already completed, send the result with image
     if (job.status === JOB_STATUS.COMPLETED) {
-      stopKeepAlive();
       // Send init with image first (might be null if cleared, client should handle)
       sendEvent('init', {
         jobId: job.id,
@@ -1149,7 +814,6 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     // If job failed, send error with image
     if (job.status === JOB_STATUS.FAILED) {
-      stopKeepAlive();
       sendEvent('init', {
         jobId: job.id,
         status: job.status,
@@ -1193,7 +857,7 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
     sendEvent('status', {
       status: JOB_STATUS.WAITING_LLM,
       progress: 30,
-      message: 'Connecting to Claude AI...',
+      message: PROGRESS_MESSAGES[JOB_STATUS.WAITING_LLM],
     });
 
     await storage.updateJob(jobId, {
@@ -1207,20 +871,6 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     let fullText = '';
     let firstTokenReceived = false;
-    
-    // Send periodic progress updates while waiting for Claude
-    // This helps the user know the connection is alive
-    let waitingProgress = 30;
-    const waitingInterval = setInterval(() => {
-      if (!firstTokenReceived && waitingProgress < 45) {
-        waitingProgress += 3;
-        sendEvent('status', {
-          status: JOB_STATUS.WAITING_LLM,
-          progress: waitingProgress,
-          message: 'Waiting for Claude AI to respond...',
-        });
-      }
-    }, 2000);
 
     // Use Claude streaming API
     const stream = anthropic.messages.stream({
@@ -1252,13 +902,10 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
       // On first token, update status to streaming
       if (!firstTokenReceived) {
         firstTokenReceived = true;
-        // Clear the waiting progress interval
-        clearInterval(waitingInterval);
-        
         sendEvent('status', {
           status: JOB_STATUS.STREAMING,
           progress: 50,
-          message: 'Claude is analyzing your image...',
+          message: PROGRESS_MESSAGES[JOB_STATUS.STREAMING],
         });
         await storage.updateJob(jobId, {
           status: JOB_STATUS.STREAMING,
@@ -1273,10 +920,6 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
 
     // Wait for stream to complete
     const finalMessage = await stream.finalMessage();
-    
-    // Clean up intervals
-    clearInterval(waitingInterval);
-    stopKeepAlive();
 
     // Update job as completed - keep image data for a while longer
     await storage.updateJob(jobId, {
@@ -1304,31 +947,18 @@ app.get('/api/job/:jobId/stream', async (req, res) => {
   } catch (error) {
     console.error('Stream error:', error);
     
-    // Clean up all intervals
-    stopKeepAlive();
-    // waitingInterval may not be defined if error occurred before it was created
-    // but clearInterval(undefined) is a safe no-op in JavaScript
-    if (typeof waitingInterval !== 'undefined') {
-      clearInterval(waitingInterval);
-    }
-    
     // Update job as failed but keep image data
-    try {
-      await storage.updateJob(jobId, {
-        status: JOB_STATUS.FAILED,
-        progress: 0,
-        progressMessage: PROGRESS_MESSAGES[JOB_STATUS.FAILED],
-        error: error.message,
-      });
-    } catch (updateError) {
-      console.error('Failed to update job status:', updateError);
-    }
+    await storage.updateJob(jobId, {
+      status: JOB_STATUS.FAILED,
+      progress: 0,
+      progressMessage: PROGRESS_MESSAGES[JOB_STATUS.FAILED],
+      error: error.message,
+    });
 
     sendEvent('error', {
       message: error.message || 'An error occurred during analysis',
     });
   } finally {
-    stopKeepAlive(); // Ensure keep-alive is always stopped
     res.end();
   }
 });

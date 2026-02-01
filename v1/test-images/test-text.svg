@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <rect width="600" height="400" fill="#ffffff"/>
+  
+  <!-- Header -->
+  <rect x="0" y="0" width="600" height="60" fill="#1a1a2e"/>
+  <text x="20" y="40" font-family="Georgia, serif" font-size="24" font-weight="bold" fill="#ffffff">The Daily News</text>
+  <text x="500" y="40" font-family="Arial" font-size="12" fill="#a0a0b8">Jan 17, 2026</text>
+  
+  <!-- Main Headline -->
+  <text x="20" y="100" font-family="Georgia, serif" font-size="28" font-weight="bold" fill="#1a1a2e">Breaking: Scientists Discover New</text>
+  <text x="20" y="135" font-family="Georgia, serif" font-size="28" font-weight="bold" fill="#1a1a2e">Species in Deep Ocean Trench</text>
+  
+  <!-- Subheadline -->
+  <text x="20" y="170" font-family="Arial" font-size="14" fill="#666">Research team finds bioluminescent creatures at record depths</text>
+  
+  <!-- Article preview -->
+  <rect x="20" y="190" width="560" height="1" fill="#ddd"/>
+  <text x="20" y="220" font-family="Arial" font-size="12" fill="#333">A team of marine biologists from the International Ocean Research</text>
+  <text x="20" y="240" font-family="Arial" font-size="12" fill="#333">Institute announced today the discovery of three new species of deep-sea</text>
+  <text x="20" y="260" font-family="Arial" font-size="12" fill="#333">creatures living at depths exceeding 10,000 meters. The findings were</text>
+  <text x="20" y="280" font-family="Arial" font-size="12" fill="#333">published in the journal Nature Marine Science.</text>
+  
+  <!-- Quote box -->
+  <rect x="20" y="300" width="560" height="60" fill="#f5f5f5" rx="5"/>
+  <text x="35" y="325" font-family="Georgia, serif" font-size="13" font-style="italic" fill="#444">"This discovery changes our understanding of life in extreme environments"</text>
+  <text x="35" y="345" font-family="Arial" font-size="11" fill="#666">- Dr. Sarah Chen, Lead Researcher</text>
+  
+  <!-- Footer -->
+  <rect x="0" y="370" width="600" height="30" fill="#f0f0f0"/>
+  <text x="20" y="390" font-family="Arial" font-size="10" fill="#888">Page A1 | World News | More coverage on page A4-A5</text>
+</svg>

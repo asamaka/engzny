@@ -1,0 +1,419 @@
+{
+  "version": "2.0",
+  "generated": "2026-01-25T18:30:00.000Z",
+  "project": "engzny",
+  "buildPasses": [
+    {"pass": 1, "name": "skeleton", "timestamp": "2026-01-25T18:30:00.000Z"},
+    {"pass": 2, "name": "understand", "timestamp": "2026-01-25T18:30:01.000Z"},
+    {"pass": 3, "name": "connect", "timestamp": "2026-01-25T18:30:02.000Z"},
+    {"pass": 4, "name": "concepts", "timestamp": "2026-01-25T18:30:03.000Z"},
+    {"pass": 5, "name": "questions", "timestamp": "2026-01-25T18:30:04.000Z"}
+  ],
+  
+  "nodes": {
+    "project:engzny": {
+      "id": "project:engzny",
+      "type": "project",
+      "name": "Engzny (thinx.fun)",
+      "purpose": "Transform screenshots into interactive, explorable canvases using AI vision analysis",
+      "businessPurpose": "Allow users to upload any screenshot and get back a clickable interface where each interesting region can be investigated further",
+      "children": ["dir:api", "dir:public"]
+    },
+    
+    "dir:api": {
+      "id": "dir:api",
+      "type": "directory",
+      "name": "Backend (api/)",
+      "purpose": "Server-side code handling uploads, AI communication, and canvas generation",
+      "children": ["file:api/index.js", "dir:api/agents", "dir:api/generators", "dir:api/llm"]
+    },
+    
+    "dir:api/agents": {
+      "id": "dir:api/agents",
+      "type": "directory", 
+      "name": "Agents",
+      "purpose": "Coordination logic for the processing pipeline",
+      "children": ["file:api/agents/orchestrator.js"]
+    },
+    
+    "dir:api/generators": {
+      "id": "dir:api/generators",
+      "type": "directory",
+      "name": "Generators", 
+      "purpose": "Modules that analyze images and generate HTML output",
+      "children": ["file:api/generators/vision-analyzer.js", "file:api/generators/html-generator.js", "file:api/generators/style-manager.js"]
+    },
+    
+    "dir:api/llm": {
+      "id": "dir:api/llm",
+      "type": "directory",
+      "name": "LLM Integration",
+      "purpose": "Abstraction layer for AI provider communication",
+      "children": ["file:api/llm/adapter.js", "file:api/llm/claude.js", "file:api/llm/index.js"]
+    },
+    
+    "dir:public": {
+      "id": "dir:public",
+      "type": "directory",
+      "name": "Frontend (public/)",
+      "purpose": "User-facing HTML pages with embedded JavaScript",
+      "children": ["file:public/index.html", "file:public/canvas.html", "file:public/job.html", "file:public/paste.html"]
+    },
+
+    "file:api/index.js": {
+      "id": "file:api/index.js",
+      "type": "file",
+      "path": "api/index.js",
+      "name": "Main Server",
+      "lineCount": 1130,
+      "purpose": "Express.js server that handles HTTP requests, file uploads, job management, and SSE streaming",
+      "businessPurpose": "The central hub that receives user uploads, coordinates processing, and delivers results back to browsers",
+      "exports": ["app", "handler"],
+      "keyElements": [
+        {"name": "processImage", "type": "function", "lines": [50, 75], "description": "Compresses uploaded images using Sharp"},
+        {"name": "POST /api/upload", "type": "endpoint", "lines": [85, 130], "description": "Receives image uploads, creates jobs"},
+        {"name": "POST /api/generate", "type": "endpoint", "lines": [135, 175], "description": "Alternative upload for canvas generation"},
+        {"name": "GET /api/job/:id/status", "type": "endpoint", "lines": [180, 220], "description": "SSE endpoint for job progress"},
+        {"name": "GET /api/job/:id/canvas", "type": "endpoint", "lines": [225, 290], "description": "SSE endpoint streaming generated HTML"}
+      ],
+      "questions": [
+        {"q": "How do I add a new API endpoint?", "answer": "Add app.get/post() handler following existing patterns", "lines": [85, 290]},
+        {"q": "Where is image compression configured?", "answer": "processImage function uses Sharp to resize to 1920x1080 max", "lines": [50, 75]},
+        {"q": "How does real-time progress work?", "answer": "SSE endpoints send events via res.write() with event: and data: format", "lines": [180, 220]},
+        {"q": "What happens when a user uploads an image?", "answer": "Multer receives file, Sharp compresses it, job is created, orchestrator processes async", "lines": [85, 130]}
+      ]
+    },
+
+    "file:api/agents/orchestrator.js": {
+      "id": "file:api/agents/orchestrator.js",
+      "type": "file",
+      "path": "api/agents/orchestrator.js",
+      "name": "Orchestrator",
+      "lineCount": 272,
+      "purpose": "Central coordinator for the GIUE pipeline - sequences vision analysis, style creation, and HTML generation",
+      "businessPurpose": "Acts as a project manager that doesn't do work itself but ensures all steps happen in the right order with proper data flow",
+      "exports": ["Orchestrator", "GlobalContextManifest", "createOrchestrator"],
+      "keyElements": [
+        {"name": "GlobalContextManifest", "type": "class", "lines": [22, 63], "description": "Stores shared styling and layout info extracted from analysis"},
+        {"name": "Orchestrator", "type": "class", "lines": [69, 256], "description": "Main coordinator class with process() and processStream() methods"},
+        {"name": "process", "type": "method", "lines": [91, 142], "description": "Non-streaming pipeline: analyze → manifest → generate"},
+        {"name": "processStream", "type": "method", "lines": [154, 229], "description": "Streaming pipeline with chunk callbacks"}
+      ],
+      "questions": [
+        {"q": "How do I change the processing pipeline order?", "answer": "Modify process() or processStream() methods - they call analyzeScreenshot, then create manifest, then generateHTML", "lines": [91, 142]},
+        {"q": "How do I add a new processing step?", "answer": "Add step between existing ones in process()/processStream(), update onProgress percentages", "lines": [91, 229]},
+        {"q": "What is the GlobalContextManifest?", "answer": "Container for viewport, layout type, colors, and CSS variables - passed to HTML generator", "lines": [22, 63]}
+      ]
+    },
+
+    "file:api/generators/vision-analyzer.js": {
+      "id": "file:api/generators/vision-analyzer.js",
+      "type": "file",
+      "path": "api/generators/vision-analyzer.js",
+      "name": "Vision Analyzer",
+      "lineCount": 274,
+      "purpose": "Sends images to Claude AI with structured prompts to detect 'Intent Hotspots' - regions of interest",
+      "businessPurpose": "The AI brain that looks at a screenshot and identifies what's interesting - headlines, charts, images, data tables - and predicts what questions users might have",
+      "exports": ["analyzeScreenshot", "getInvestigatableHotspots", "getTopHotspots", "ANALYSIS_SCHEMA"],
+      "keyElements": [
+        {"name": "ANALYSIS_SCHEMA", "type": "constant", "lines": [17, 92], "description": "JSON schema defining expected AI response structure"},
+        {"name": "VISION_ANALYSIS_PROMPT", "type": "constant", "lines": [95, 121], "description": "Instructions telling Claude what to look for"},
+        {"name": "analyzeScreenshot", "type": "function", "lines": [130, 144], "description": "Main entry point - sends image to AI, returns structured hotspots"},
+        {"name": "normalizeAnalysis", "type": "function", "lines": [180, 221], "description": "Cleans up and validates AI response"}
+      ],
+      "questions": [
+        {"q": "How do I change what the AI looks for in screenshots?", "answer": "Modify VISION_ANALYSIS_PROMPT - it tells Claude what types of regions to identify", "lines": [95, 121]},
+        {"q": "What data comes back from image analysis?", "answer": "ANALYSIS_SCHEMA defines it: viewport, dominantColors, hotspots array, noiseRegions, layoutType", "lines": [17, 92]},
+        {"q": "How do I add a new hotspot type?", "answer": "Add to the type enum in ANALYSIS_SCHEMA and update the prompt to describe it", "lines": [49, 51]}
+      ]
+    },
+
+    "file:api/generators/html-generator.js": {
+      "id": "file:api/generators/html-generator.js",
+      "type": "file",
+      "path": "api/generators/html-generator.js",
+      "name": "HTML Generator",
+      "lineCount": 557,
+      "purpose": "Transforms hotspot analysis into complete HTML documents with positioned interactive cards",
+      "businessPurpose": "Takes the AI's findings and builds the actual clickable canvas - original image as backdrop, floating cards for each hotspot",
+      "exports": ["generateHTML", "generateHTMLStream", "generateHotspotHTML", "escapeHtml"],
+      "keyElements": [
+        {"name": "generateHotspotHTML", "type": "function", "lines": [32, 82], "description": "Creates HTML for a single hotspot card"},
+        {"name": "generateContextBar", "type": "function", "lines": [115, 124], "description": "Creates the top navigation bar"},
+        {"name": "generateClientScript", "type": "function", "lines": [130, 226], "description": "Embedded JavaScript for interactivity"},
+        {"name": "generateHTML", "type": "function", "lines": [312, 410], "description": "Assembles complete HTML document"},
+        {"name": "generateHTMLStream", "type": "function", "lines": [423, 539], "description": "Streams HTML in chunks for real-time updates"}
+      ],
+      "questions": [
+        {"q": "How do I change the hotspot card appearance?", "answer": "Modify generateHotspotHTML - it builds the div with type badge, content, question, and CTA button", "lines": [32, 82]},
+        {"q": "How do I add new interactive features to the canvas?", "answer": "Add to generateClientScript - it's embedded JS handling clicks, hover, investigate actions", "lines": [130, 226]},
+        {"q": "Why does HTML stream instead of return all at once?", "answer": "generateHTMLStream sends chunks with delays for visual feedback - user sees progress", "lines": [423, 539]}
+      ]
+    },
+
+    "file:api/generators/style-manager.js": {
+      "id": "file:api/generators/style-manager.js",
+      "type": "file",
+      "path": "api/generators/style-manager.js",
+      "name": "Style Manager",
+      "lineCount": 419,
+      "purpose": "Creates CSS themes from screenshot colors - analyzes luminance/saturation to pick backgrounds and accents",
+      "businessPurpose": "Makes generated canvases visually match the original screenshot's color scheme instead of using generic styles",
+      "exports": ["createStyleManifest", "generateCSSString", "generateBaseCSS", "analyzeColor"],
+      "keyElements": [
+        {"name": "DEFAULT_STYLES", "type": "constant", "lines": [12, 60], "description": "Fallback values for all CSS variables"},
+        {"name": "analyzeColor", "type": "function", "lines": [82, 105], "description": "Converts hex to RGB, calculates luminance and saturation"},
+        {"name": "createStyleManifest", "type": "function", "lines": [152, 224], "description": "Main function - picks bg/accent/text colors from dominants"},
+        {"name": "generateBaseCSS", "type": "function", "lines": [244, 408], "description": "Generates complete CSS with variables and component styles"}
+      ],
+      "questions": [
+        {"q": "How do I change the default colors?", "answer": "Modify DEFAULT_STYLES object - it has bgPrimary, accentPrimary, textPrimary, etc.", "lines": [12, 60]},
+        {"q": "How does color selection work?", "answer": "createStyleManifest finds darkest color for bg, most vibrant for accent, lightest for text", "lines": [152, 224]},
+        {"q": "How do I add new CSS variables?", "answer": "Add to cssVariables object in createStyleManifest, then use in generateBaseCSS", "lines": [168, 213]}
+      ]
+    },
+
+    "file:api/llm/adapter.js": {
+      "id": "file:api/llm/adapter.js",
+      "type": "file",
+      "path": "api/llm/adapter.js",
+      "name": "LLM Adapter Interface",
+      "lineCount": 105,
+      "purpose": "Abstract base class defining what any AI provider must implement",
+      "businessPurpose": "Allows swapping AI providers (Claude → OpenAI → Perplexity) without changing application code",
+      "exports": ["LLMAdapter"],
+      "keyElements": [
+        {"name": "LLMAdapter", "type": "class", "lines": [8, 102], "description": "Abstract class with methods that throw errors - subclasses must override"},
+        {"name": "analyzeImage", "type": "method", "lines": [33, 35], "description": "Contract for vision analysis"},
+        {"name": "generateText", "type": "method", "lines": [45, 47], "description": "Contract for text generation"},
+        {"name": "streamText", "type": "method", "lines": [60, 62], "description": "Contract for streaming responses"}
+      ],
+      "questions": [
+        {"q": "How do I add support for a new AI provider?", "answer": "Create new class extending LLMAdapter, implement all abstract methods, register in index.js", "lines": [8, 102]},
+        {"q": "What methods must an AI adapter implement?", "answer": "analyzeImage, generateText, streamText, plus capability checks like supportsVision()", "lines": [33, 100]}
+      ]
+    },
+
+    "file:api/llm/claude.js": {
+      "id": "file:api/llm/claude.js",
+      "type": "file",
+      "path": "api/llm/claude.js",
+      "name": "Claude Adapter",
+      "lineCount": 235,
+      "purpose": "Anthropic Claude implementation of LLMAdapter - handles vision, text, and streaming",
+      "businessPurpose": "The actual code that talks to Claude API - converts our abstract calls into Anthropic's specific format",
+      "exports": ["ClaudeAdapter"],
+      "keyElements": [
+        {"name": "ClaudeAdapter", "type": "class", "lines": [11, 232], "description": "Full implementation of LLMAdapter for Claude"},
+        {"name": "analyzeImage", "type": "method", "lines": [44, 96], "description": "Sends image+prompt to Claude, parses JSON response"},
+        {"name": "streamText", "type": "method", "lines": [138, 179], "description": "Uses client.messages.stream() for token-by-token output"},
+        {"name": "streamImageAnalysis", "type": "method", "lines": [184, 231], "description": "Streams vision analysis results"}
+      ],
+      "questions": [
+        {"q": "How do I change which Claude model is used?", "answer": "Modify this.model in constructor - currently 'claude-sonnet-4-20250514'", "lines": [21, 21]},
+        {"q": "How does image analysis work with Claude?", "answer": "Image sent as base64 in content array with type:'image', prompt as type:'text'", "lines": [45, 65]},
+        {"q": "How do I increase the response length?", "answer": "Increase this.maxTokens in constructor - currently 4096", "lines": [22, 22]}
+      ]
+    },
+
+    "file:api/llm/index.js": {
+      "id": "file:api/llm/index.js",
+      "type": "file",
+      "path": "api/llm/index.js",
+      "name": "LLM Factory",
+      "lineCount": 122,
+      "purpose": "Factory pattern for creating and caching LLM adapter instances",
+      "businessPurpose": "Single place to get AI adapters - handles which provider to use based on config/environment",
+      "exports": ["getAdapter", "getDefaultAdapter", "getVisionAdapter", "getResearchAdapter", "registerProvider"],
+      "keyElements": [
+        {"name": "providers", "type": "constant", "lines": [12, 17], "description": "Registry mapping names to adapter classes"},
+        {"name": "instances", "type": "constant", "lines": [20, 20], "description": "Cache of created adapters (singleton pattern)"},
+        {"name": "getAdapter", "type": "function", "lines": [28, 44], "description": "Creates or retrieves adapter by provider name"},
+        {"name": "getVisionAdapter", "type": "function", "lines": [61, 71], "description": "Returns adapter that supports vision, throws if not"},
+        {"name": "registerProvider", "type": "function", "lines": [89, 94], "description": "Add new provider at runtime"}
+      ],
+      "questions": [
+        {"q": "How do I register a new AI provider?", "answer": "Call registerProvider('name', AdapterClass) or add to providers object", "lines": [12, 17]},
+        {"q": "How do I switch the default AI provider?", "answer": "Set DEFAULT_LLM_PROVIDER environment variable", "lines": [51, 54]},
+        {"q": "Why are adapters cached?", "answer": "instances Map reuses adapters to avoid recreating API clients repeatedly", "lines": [20, 20]}
+      ]
+    },
+
+    "file:public/index.html": {
+      "id": "file:public/index.html",
+      "type": "file",
+      "path": "public/index.html",
+      "name": "Main Upload Page",
+      "lineCount": 607,
+      "purpose": "Homepage with drag-and-drop upload zone, file validation, and server communication",
+      "businessPurpose": "The first thing users see - simple interface to get their screenshot into the system",
+      "exports": [],
+      "keyElements": [
+        {"name": "handleFile", "type": "function", "lines": [90, 102], "description": "Validates file type and size"},
+        {"name": "uploadImage", "type": "function", "lines": [105, 125], "description": "Sends FormData to /api/upload"},
+        {"name": "drag events", "type": "handler", "lines": [137, 146], "description": "Drag-and-drop visual feedback"},
+        {"name": "paste event", "type": "handler", "lines": [160, 172], "description": "Clipboard paste handling"}
+      ],
+      "questions": [
+        {"q": "How do I change the file size limit?", "answer": "Modify the 20 * 1024 * 1024 check in handleFile", "lines": [96, 96]},
+        {"q": "How do I add support for new file types?", "answer": "Change file.type.startsWith('image/') check to include other types", "lines": [92, 92]},
+        {"q": "What happens after successful upload?", "answer": "Redirects to /job?id={jobId} to show progress", "lines": [120, 120]}
+      ]
+    },
+
+    "file:public/canvas.html": {
+      "id": "file:public/canvas.html",
+      "type": "file",
+      "path": "public/canvas.html",
+      "name": "Canvas Generator Page",
+      "lineCount": 625,
+      "purpose": "All-in-one page: upload, progress animation, and canvas display via iframe",
+      "businessPurpose": "Seamless experience where user uploads and sees result without page navigation",
+      "exports": [],
+      "keyElements": [
+        {"name": "states", "type": "object", "lines": [344, 351], "description": "Four UI states: upload, loading, canvas, error"},
+        {"name": "showState", "type": "function", "lines": [370, 382], "description": "Switches visible state"},
+        {"name": "startStream", "type": "function", "lines": [464, 523], "description": "SSE connection receiving HTML chunks"},
+        {"name": "renderCanvas", "type": "function", "lines": [526, 540], "description": "Writes HTML to sandboxed iframe"}
+      ],
+      "questions": [
+        {"q": "How do I add a new UI state?", "answer": "Add element to states object, create HTML section with matching ID", "lines": [344, 351]},
+        {"q": "How does the scanning animation work?", "answer": "CSS animation on .scan-line moves top:0 to top:100% with glow effect", "lines": [188, 203]},
+        {"q": "Why use an iframe for the canvas?", "answer": "Security isolation - generated HTML can't access parent page", "lines": [330, 330]}
+      ]
+    },
+
+    "file:public/job.html": {
+      "id": "file:public/job.html",
+      "type": "file",
+      "path": "public/job.html",
+      "name": "Job Status Page",
+      "lineCount": 684,
+      "purpose": "Displays real-time job progress via SSE connection to /api/job/:id/status",
+      "businessPurpose": "Keeps users informed while AI analysis runs - shows progress bar and status messages",
+      "exports": [],
+      "keyElements": [
+        {"name": "EventSource connection", "type": "code", "lines": [85, 110], "description": "SSE setup and event handlers"},
+        {"name": "status event", "type": "handler", "lines": [92, 96], "description": "Updates progress bar and message"},
+        {"name": "complete event", "type": "handler", "lines": [98, 102], "description": "Shows results, closes connection"}
+      ],
+      "questions": [
+        {"q": "How do I customize the progress display?", "answer": "Modify CSS for .progress-bar and JS in status event handler", "lines": [92, 96]},
+        {"q": "What events can the server send?", "answer": "status (progress updates), complete (final result), error (failure)", "lines": [85, 110]}
+      ]
+    },
+
+    "file:public/paste.html": {
+      "id": "file:public/paste.html",
+      "type": "file",
+      "path": "public/paste.html",
+      "name": "Paste Integration Page",
+      "lineCount": 683,
+      "purpose": "Streamlined page that auto-detects clipboard images on load",
+      "businessPurpose": "Enables Apple Shortcuts and mobile workflows - take screenshot, run shortcut, get canvas",
+      "exports": [],
+      "keyElements": [
+        {"name": "checkClipboard", "type": "function", "lines": [75, 95], "description": "Uses Clipboard API to read images on page load"},
+        {"name": "handleImageBlob", "type": "function", "lines": [100, 120], "description": "Processes detected clipboard image"}
+      ],
+      "questions": [
+        {"q": "Why does clipboard access sometimes fail?", "answer": "Requires user permission and secure context (HTTPS) - falls back to manual paste", "lines": [88, 92]},
+        {"q": "How do I create an Apple Shortcut for this?", "answer": "Shortcut: Take Screenshot → Copy to Clipboard → Open URL to /paste", "lines": [75, 95]}
+      ]
+    },
+
+    "concept:image-upload-flow": {
+      "id": "concept:image-upload-flow",
+      "type": "concept",
+      "name": "Image Upload Flow",
+      "description": "The complete journey of an image from user's device to stored job. Handles drag-drop, file picker, and clipboard paste. Validates type and size, compresses with Sharp, creates job with UUID.",
+      "involvedFiles": ["file:public/index.html", "file:public/canvas.html", "file:public/paste.html", "file:api/index.js"],
+      "keyQuestions": ["How does a user upload an image?", "What file types are supported?", "How big can files be?"]
+    },
+
+    "concept:ai-vision-analysis": {
+      "id": "concept:ai-vision-analysis",
+      "type": "concept",
+      "name": "AI Vision Analysis",
+      "description": "Using Claude's vision capability to understand screenshot contents. Sends structured prompts requesting hotspot detection, returns JSON with regions, types, and predicted questions.",
+      "involvedFiles": ["file:api/generators/vision-analyzer.js", "file:api/llm/claude.js", "file:api/llm/adapter.js"],
+      "keyQuestions": ["How does AI understand images?", "What does the AI look for?", "How do I change what AI detects?"]
+    },
+
+    "concept:real-time-streaming": {
+      "id": "concept:real-time-streaming",
+      "type": "concept",
+      "name": "Real-time Streaming",
+      "description": "Server-Sent Events (SSE) pushing updates to browsers as processing happens. Avoids polling, enables progressive HTML rendering, shows live progress.",
+      "involvedFiles": ["file:api/index.js", "file:public/canvas.html", "file:public/job.html"],
+      "keyQuestions": ["How do real-time updates work?", "What is SSE?", "How does progress get sent to browser?"]
+    },
+
+    "concept:canvas-generation": {
+      "id": "concept:canvas-generation",
+      "type": "concept",
+      "name": "Canvas Generation",
+      "description": "Transforming AI analysis into interactive HTML. Original image becomes backdrop, hotspots become positioned cards with investigate buttons. Styles extracted from image colors.",
+      "involvedFiles": ["file:api/generators/html-generator.js", "file:api/generators/style-manager.js", "file:api/agents/orchestrator.js"],
+      "keyQuestions": ["How is the canvas built?", "How are hotspots positioned?", "How does theming work?"]
+    },
+
+    "concept:provider-abstraction": {
+      "id": "concept:provider-abstraction",
+      "type": "concept",
+      "name": "AI Provider Abstraction",
+      "description": "Adapter pattern allowing different AI providers to be swapped without changing application code. Base class defines contract, Claude implements it, factory creates instances.",
+      "involvedFiles": ["file:api/llm/adapter.js", "file:api/llm/claude.js", "file:api/llm/index.js"],
+      "keyQuestions": ["How do I add a new AI provider?", "How do I switch providers?", "Why use an adapter pattern?"]
+    },
+
+    "concept:processing-pipeline": {
+      "id": "concept:processing-pipeline",
+      "type": "concept",
+      "name": "Processing Pipeline",
+      "description": "The orchestrated sequence: Upload → Compress → Analyze → Manifest → Generate → Stream. Orchestrator coordinates, each generator handles its part.",
+      "involvedFiles": ["file:api/agents/orchestrator.js", "file:api/index.js"],
+      "keyQuestions": ["What is the processing order?", "How do I add a processing step?", "How do components communicate?"]
+    }
+  },
+
+  "edges": [
+    {"from": "file:public/index.html", "to": "file:api/index.js", "type": "calls", "via": "POST /api/upload"},
+    {"from": "file:public/canvas.html", "to": "file:api/index.js", "type": "calls", "via": "POST /api/generate"},
+    {"from": "file:public/canvas.html", "to": "file:api/index.js", "type": "streams_from", "via": "GET /api/job/:id/canvas"},
+    {"from": "file:public/job.html", "to": "file:api/index.js", "type": "streams_from", "via": "GET /api/job/:id/status"},
+    {"from": "file:public/paste.html", "to": "file:api/index.js", "type": "calls", "via": "POST /api/upload"},
+    
+    {"from": "file:api/index.js", "to": "file:api/agents/orchestrator.js", "type": "imports", "reason": "Creates orchestrator instances to process jobs"},
+    {"from": "file:api/agents/orchestrator.js", "to": "file:api/generators/vision-analyzer.js", "type": "calls", "reason": "Step 1: Analyze screenshot"},
+    {"from": "file:api/agents/orchestrator.js", "to": "file:api/generators/style-manager.js", "type": "calls", "reason": "Step 2: Create style manifest"},
+    {"from": "file:api/agents/orchestrator.js", "to": "file:api/generators/html-generator.js", "type": "calls", "reason": "Step 3: Generate HTML"},
+    
+    {"from": "file:api/generators/vision-analyzer.js", "to": "file:api/llm/index.js", "type": "imports", "reason": "Gets vision adapter for AI calls"},
+    {"from": "file:api/generators/html-generator.js", "to": "file:api/generators/style-manager.js", "type": "imports", "reason": "Uses generateBaseCSS for styling"},
+    
+    {"from": "file:api/llm/index.js", "to": "file:api/llm/claude.js", "type": "imports", "reason": "Registers Claude as provider"},
+    {"from": "file:api/llm/claude.js", "to": "file:api/llm/adapter.js", "type": "extends", "reason": "Implements LLMAdapter interface"},
+    
+    {"from": "concept:image-upload-flow", "to": "file:public/index.html", "type": "implemented_in"},
+    {"from": "concept:image-upload-flow", "to": "file:public/canvas.html", "type": "implemented_in"},
+    {"from": "concept:image-upload-flow", "to": "file:api/index.js", "type": "implemented_in"},
+    
+    {"from": "concept:ai-vision-analysis", "to": "file:api/generators/vision-analyzer.js", "type": "implemented_in"},
+    {"from": "concept:ai-vision-analysis", "to": "file:api/llm/claude.js", "type": "implemented_in"},
+    
+    {"from": "concept:real-time-streaming", "to": "file:api/index.js", "type": "implemented_in"},
+    {"from": "concept:real-time-streaming", "to": "file:public/canvas.html", "type": "implemented_in"},
+    {"from": "concept:real-time-streaming", "to": "file:public/job.html", "type": "implemented_in"},
+    
+    {"from": "concept:canvas-generation", "to": "file:api/generators/html-generator.js", "type": "implemented_in"},
+    {"from": "concept:canvas-generation", "to": "file:api/generators/style-manager.js", "type": "implemented_in"},
+    
+    {"from": "concept:provider-abstraction", "to": "file:api/llm/adapter.js", "type": "implemented_in"},
+    {"from": "concept:provider-abstraction", "to": "file:api/llm/claude.js", "type": "implemented_in"},
+    {"from": "concept:provider-abstraction", "to": "file:api/llm/index.js", "type": "implemented_in"},
+    
+    {"from": "concept:processing-pipeline", "to": "file:api/agents/orchestrator.js", "type": "implemented_in"},
+    {"from": "concept:processing-pipeline", "to": "file:api/index.js", "type": "implemented_in"}
+  ]
+}

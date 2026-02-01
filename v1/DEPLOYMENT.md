@@ -30,8 +30,7 @@ The following environment variables **must be configured** in Vercel before depl
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API key for v1 image analysis (starts with `sk-ant-...`) |
-| `GEMINI_API_KEY` | Yes | Gemini API key for v2 Screenshot Intelligence Hub |
+| `ANTHROPIC_API_KEY` | Yes | Claude API key for AI image analysis (starts with `sk-ant-...`) |
 
 ### Setting Up Environment Variables in Vercel
 
@@ -49,7 +48,6 @@ The following environment variables **must be configured** in Vercel before depl
 ### Getting API Keys
 
 - **Claude API Key**: Sign up at [console.anthropic.com](https://console.anthropic.com), navigate to API Keys, and create a new key.
-- **Gemini API Key**: Sign up at [makersuite.google.com](https://makersuite.google.com) or Google AI Studio, create an API key, and enable Generative Language API.
 
 ## Full Deployment Process
 
@@ -333,19 +331,6 @@ git commit --allow-empty -m "Trigger redeploy" && git push origin main
   - `question` (optional): Specific question about the image
 - **Requires**: `ANTHROPIC_API_KEY` environment variable
 - **Returns**: JSON with AI analysis of the image
-
-### Screenshot Intelligence Hub (`/api/hub/analyze`)
-
-Analyze an image with the v2 tool-injected dashboard flow.
-
-- **Method**: POST
-- **Content-Type**: application/json
-- **Body**:
-  - `image` (required): Base64 encoded image data or data URL
-  - `question` (optional): Specific question about the image
-  - `mediaType` (optional): MIME type if not using data URL
-- **Requires**: `GEMINI_API_KEY` environment variable
-- **Returns**: JSON tool calls for the hub UI
 
 ### API Upload with Progress Tracking (`/api/upload`)
 

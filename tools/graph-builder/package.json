@@ -1,0 +1,23 @@
+{
+  "name": "code-knowledge-graph",
+  "version": "1.0.0",
+  "description": "Neo4j-backed code intelligence system for thinx.fun",
+  "type": "module",
+  "main": "ingest.js",
+  "scripts": {
+    "ingest": "node ingest.js",
+    "query": "node query.js",
+    "schema": "cat schema.cypher"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@babel/parser": "^7.23.0",
+    "@babel/traverse": "^7.23.0",
+    "cheerio": "^1.0.0-rc.12",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.2.3",
+    "neo4j-driver": "^5.15.0",
+    "ora": "^8.0.1",
+    "chalk": "^5.3.0"
+  }
+}

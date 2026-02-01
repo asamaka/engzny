@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thinx Widget System - Theme Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0f12;
+            --card-bg: rgba(25, 28, 32, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f0f2f5;
+            --text-dim: #9ba3af;
+            --accent: #00ffaa;
+            --accent-soft: rgba(0, 255, 170, 0.1);
+            --danger: #ff5f5f;
+            --danger-soft: rgba(255, 95, 95, 0.1);
+            --warning: #ffb347;
+            --info: #4facfe;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --radius-lg: 24px;
+            --radius-md: 16px;
+            --radius-sm: 8px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(0, 255, 170, 0.03) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(79, 172, 254, 0.03) 0%, transparent 40%);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 60px 20px;
+            min-height: 100vh;
+        }
+
+        .gallery {
+            max-width: 1100px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 80px;
+        }
+
+        .example-block {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 40px;
+            align-items: start;
+        }
+
+        .intent-sidebar {
+            position: sticky;
+            top: 40px;
+        }
+
+        .intent-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-radius: 100px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .intent-title {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        .intent-desc {
+            font-size: 13px;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+
+        .next-steps-list {
+            list-style: none;
+        }
+
+        .next-step-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            font-size: 12px;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .next-step-item:hover {
+            color: var(--accent);
+        }
+
+        .next-step-item svg {
+            width: 16px;
+            height: 16px;
+            opacity: 0.5;
+        }
+
+        /* Widget System */
+        .canvas-preview {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            background: var(--glass-bg);
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(20px);
+        }
+
+        .widget {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+
+        .widget-header {
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .widget-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--glass-bg);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+        }
+
+        .widget-title-group {
+            flex: 1;
+        }
+
+        .widget-category {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 2px;
+        }
+
+        .widget-title {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        /* Relaxing Alert */
+        .alert-bar {
+            padding: 14px 24px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 500;
+        }
+
+        .alert-danger {
+            background: var(--danger-soft);
+            color: var(--danger);
+            border: 1px solid rgba(255, 95, 95, 0.2);
+        }
+
+        /* Stats Row */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            padding: 0 24px 24px;
+            gap: 16px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        /* Large Action Button */
+        .action-cta {
+            width: 100%;
+            padding: 16px;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .action-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 255, 170, 0.3);
+        }
+
+        /* Viz */
+        .viz-box {
+            height: 120px;
+            display: flex;
+            align-items: flex-end;
+            gap: 6px;
+            padding: 0 24px 24px;
+        }
+
+        .bar-pill {
+            flex: 1;
+            background: var(--accent);
+            opacity: 0.15;
+            border-radius: 100px;
+            min-height: 10px;
+            transition: opacity 0.3s;
+        }
+
+        .bar-pill.active {
+            opacity: 1;
+            background: linear-gradient(to top, var(--accent), var(--info));
+        }
+
+        .content-box {
+            padding: 0 24px 24px;
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        .quote-text {
+            border-left: 2px solid var(--accent);
+            padding-left: 20px;
+            color: var(--text);
+            font-style: italic;
+            margin-bottom: 24px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="gallery">
+        
+        <!-- Example 1 -->
+        <div class="example-block">
+            <div class="intent-sidebar">
+                <div class="intent-tag">Detected Intent</div>
+                <h3 class="intent-title">Fact-Check Verification</h3>
+                <p class="intent-desc">User wants to verify the credibility of a social media claim regarding technical infrastructure in Egypt.</p>
+                <ul class="next-steps-list">
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a4 4 0 0 0-4-4H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a4 4 0 0 1 4-4h6z"></path></svg>
+                        Read official telecommunication report
+                    </li>
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        View related community notes
+                    </li>
+                </ul>
+            </div>
+
+            <div class="canvas-preview">
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-icon" style="color: var(--accent)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                        </div>
+                        <div class="widget-title-group">
+                            <div class="widget-category">Platform: Facebook • 4h ago</div>
+                            <div class="widget-title">Al-Masry Al-Youm Post</div>
+                        </div>
+                    </div>
+                    <div class="content-box">
+                        <div class="quote-text" dir="rtl">
+                            "السياح اللي في مصر لقوا موبايلاتهم وقفت ومش شغالة.. دي فضيحة"
+                        </div>
+                        <div class="alert-bar alert-danger">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            High Misinformation Risk: Unverified Source
+                        </div>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <span class="stat-val">11.5K</span>
+                            <span class="stat-lbl">Reach</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">1.4K</span>
+                            <span class="stat-lbl">Debates</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">771</span>
+                            <span class="stat-lbl">Virality</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 24px 24px">
+                        <button class="action-cta">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            Verify with Fact-Check Engine
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 2 -->
+        <div class="example-block">
+            <div class="intent-sidebar">
+                <div class="intent-tag">Detected Intent</div>
+                <h3 class="intent-title">Performance Audit</h3>
+                <p class="intent-desc">User is reviewing Q4 sales data to identify growth trends and top-performing regions.</p>
+                <ul class="next-steps-list">
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
+                        Export detailed CSV report
+                    </li>
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        Compare with Q3 benchmarks
+                    </li>
+                </ul>
+            </div>
+
+            <div class="canvas-preview">
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-icon" style="color: var(--info)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10"></path><path d="M18 20V4"></path><path d="M6 20v-4"></path></svg>
+                        </div>
+                        <div class="widget-title-group">
+                            <div class="widget-category">Q4 Fiscal Dashboard</div>
+                            <div class="widget-title">Sales Momentum Overview</div>
+                        </div>
+                    </div>
+                    <div class="viz-box">
+                        <div class="bar-pill" style="height: 30%"></div>
+                        <div class="bar-pill active" style="height: 50%"></div>
+                        <div class="bar-pill" style="height: 45%"></div>
+                        <div class="bar-pill active" style="height: 80%"></div>
+                        <div class="bar-pill" style="height: 60%"></div>
+                        <div class="bar-pill active" style="height: 95%"></div>
+                        <div class="bar-pill" style="height: 70%"></div>
+                    </div>
+                    <div class="stats-row">
+                        <div class="stat-card" style="border-color: var(--accent-soft)">
+                            <span class="stat-val" style="color: var(--accent)">+12.4%</span>
+                            <span class="stat-lbl">Growth</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">$142.5K</span>
+                            <span class="stat-lbl">Net Revenue</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">2,841</span>
+                            <span class="stat-lbl">Orders</span>
+                        </div>
+                    </div>
+                    <div style="padding: 0 24px 24px">
+                        <button class="action-cta" style="background: var(--info); color: #fff">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                            Generate Forecast Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 3: Real Estate / Property -->
+        <div class="example-block">
+            <div class="intent-sidebar">
+                <div class="intent-tag" style="background: rgba(255, 170, 0, 0.1); color: var(--warning);">Detected Intent</div>
+                <h3 class="intent-title">Property Evaluation</h3>
+                <p class="intent-desc">User is considering a rental property in Alexandria. Intent is to verify value and contact the lister.</p>
+                <ul class="next-steps-list">
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        See neighborhood safety score
+                    </li>
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        Call Agent (Alexandria Realty)
+                    </li>
+                </ul>
+            </div>
+
+            <div class="canvas-preview">
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-icon" style="color: var(--warning)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        </div>
+                        <div class="widget-title-group">
+                            <div class="widget-category">Dubizzle • Alexandria</div>
+                            <div class="widget-title">Luxury Seafront Apartment</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <span class="stat-val" style="font-size: 16px;">EGP 3,500</span>
+                            <span class="stat-lbl">Daily Rent</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">125m²</span>
+                            <span class="stat-lbl">Area</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-val">High</span>
+                            <span class="stat-lbl">Demand</span>
+                        </div>
+                    </div>
+
+                    <div class="content-box">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; font-size: 11px;">
+                            <div style="background: var(--glass-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                                <span style="display: block; color: var(--text-dim); margin-bottom: 4px;">Type</span>
+                                <span style="color: var(--text);">Hotel Apartment</span>
+                            </div>
+                            <div style="background: var(--glass-bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border);">
+                                <span style="display: block; color: var(--text-dim); margin-bottom: 4px;">Location</span>
+                                <span style="color: var(--text);">Laurent, Alex</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 0 24px 24px; display: flex; gap: 12px;">
+                        <button class="action-cta" style="background: transparent; border: 1px solid var(--border); color: var(--text); flex: 1;">
+                            Save for Later
+                        </button>
+                        <button class="action-cta" style="background: var(--warning); color: #000; flex: 2;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                            Call Agent
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Example 4: Internal Communications / Slack -->
+        <div class="example-block">
+            <div class="intent-sidebar">
+                <div class="intent-tag" style="background: rgba(79, 172, 254, 0.1); color: var(--info);">Detected Intent</div>
+                <h3 class="intent-title">Information Extraction</h3>
+                <p class="intent-desc">User is tracking company updates regarding layoffs. Goal is to extract hard data and sentiment.</p>
+                <ul class="next-steps-list">
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                        Open FAQ Document
+                    </li>
+                    <li class="next-step-item">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        Add Townhall to Calendar
+                    </li>
+                </ul>
+            </div>
+
+            <div class="canvas-preview">
+                <div class="widget">
+                    <div class="widget-header">
+                        <div class="widget-icon" style="color: var(--info)">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                        </div>
+                        <div class="widget-title-group">
+                            <div class="widget-category">Slack • #general</div>
+                            <div class="widget-title">Layoff Update Discussion</div>
+                        </div>
+                    </div>
+
+                    <div class="content-box">
+                        <div style="background: rgba(255, 95, 95, 0.05); padding: 16px; border-radius: 12px; border: 1px solid rgba(255, 95, 95, 0.1); margin-bottom: 20px;">
+                            <span style="display: block; font-size: 10px; color: var(--danger); text-transform: uppercase; margin-bottom: 4px;">Key Data Points</span>
+                            <div style="font-size: 14px; color: var(--text);">Affected: <strong>150 - 200 people</strong></div>
+                            <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Reason: Strategy shifts & reprioritization</div>
+                        </div>
+
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div style="width: 24px; height: 24px; border-radius: 50%; background: #4facfe; font-size: 10px; display: flex; align-items: center; justify-content: center; color: #fff;">RG</div>
+                                <div style="font-size: 12px; color: var(--text-dim); flex: 1;">Rami: "Egypt/India won't make a dent..."</div>
+                            </div>
+                            <div style="display: flex; gap: 12px; align-items: center;">
+                                <div style="width: 24px; height: 24px; border-radius: 50%; background: #ffb347; font-size: 10px; display: flex; align-items: center; justify-content: center; color: #fff;">AE</div>
+                                <div style="font-size: 12px; color: var(--text-dim); flex: 1;">Amr: "I hope none of the engineers in Cairo are affected"</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 0 24px 24px;">
+                        <button class="action-cta" style="background: var(--accent-soft); border: 1px solid var(--accent); color: var(--accent);">
+                            View Impact Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</body>
+</html>
+
+
+</body>
+</html>

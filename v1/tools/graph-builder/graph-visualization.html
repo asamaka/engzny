@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Code Intelligence - thinx.fun</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: 'JetBrains Mono', 'Monaco', monospace;
+      margin: 0;
+      padding: 0;
+      background: #0f172a;
+      color: #94a3b8;
+    }
+    .header {
+      background: #1e293b;
+      padding: 20px 40px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h1 { color: #f8fafc; margin: 0; font-size: 20px; }
+    .stats {
+      display: flex;
+      gap: 20px;
+    }
+    .stat-box {
+      background: #334155;
+      padding: 5px 15px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .stat-val { color: #22d3ee; font-weight: bold; }
+    
+    .view-container {
+      display: flex;
+      height: calc(100vh - 65px);
+    }
+    
+    .sidebar {
+      width: 300px;
+      background: #1e293b;
+      border-right: 1px solid #334155;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    
+    .graph-viewport {
+      flex: 1;
+      overflow: auto;
+      background: #0f172a;
+      padding: 40px;
+      position: relative;
+    }
+    
+    .mermaid-wrapper {
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 8px;
+      min-width: fit-content;
+    }
+    
+    h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-top: 25px; }
+    .item-list { font-size: 12px; margin-top: 10px; }
+    .item { margin-bottom: 5px; cursor: pointer; }
+    .item:hover { color: #22d3ee; }
+    
+    .controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      background: #334155;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover { background: #475569; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🔍 Code Knowledge Graph</h1>
+    <div class="stats">
+      <div class="stat-box">Files <span class="stat-val">12</span></div>
+      <div class="stat-box">Functions <span class="stat-val">72</span></div>
+      <div class="stat-box">Endpoints <span class="stat-val">19</span></div>
+    </div>
+  </div>
+  
+  <div class="view-container">
+    <div class="sidebar">
+      <h2>Endpoints</h2>
+      <div class="item-list">
+        <div class="item"><b>USE</b> </div><div class="item"><b>USE</b> </div><div class="item"><b>USE</b> </div><div class="item"><b>GET</b> /paste</div><div class="item"><b>GET</b> /</div><div class="item"><b>GET</b> /api/health</div><div class="item"><b>GET</b> /canvas</div><div class="item"><b>POST</b> /api/generate</div><div class="item"><b>GET</b> /api/job/:jobId/canvas</div><div class="item"><b>POST</b> /api/investigate/:hotspotId</div><div class="item"><b>POST</b> /api/upload</div><div class="item"><b>GET</b> /api/job/:jobId/stream</div><div class="item"><b>GET</b> /api/job/:jobId/status</div><div class="item"><b>GET</b> /api/job/:jobId/image</div><div class="item"><b>POST</b> /api/analyze</div><div class="item"><b>GET</b> /api/jobs</div><div class="item"><b>USE</b> </div><div class="item"><b>GET</b> [UUID_REGEX]</div><div class="item"><b>GET</b> *</div>
+      </div>
+      
+      <h2>Core Logic</h2>
+      <div class="item-list">
+        <div class="item">storage.setJob</div><div class="item">storage.getJob</div><div class="item">storage.updateJob</div><div class="item">compressImageForAPI</div>
+      </div>
+    </div>
+    
+    <div class="graph-viewport" id="viewport">
+      <div class="controls">
+        <button onclick="zoom(1.2)">+</button>
+        <button onclick="zoom(0.8)">-</button>
+        <button onclick="resetZoom()">Reset</button>
+      </div>
+      <div class="mermaid-wrapper" id="mermaid-wrapper">
+        <div class="mermaid">
+graph LR
+  subgraph cluster_api_agents_orchestrator_js ["api/agents/orchestrator.js"]
+    func_api_agents_orchestrator_js_createOrchestrator_263["⚙️ createOrchestrator"]
+  end
+
+  subgraph cluster_api_generators_html_generator_js ["api/generators/html-generator.js"]
+    func_api_generators_html_generator_js_escapeHtml_16["⚙️ escapeHtml"]
+    func_api_generators_html_generator_js_generateHotspotHTML_32["⚙️ generateHotspotHTML"]
+    func_api_generators_html_generator_js_generateNoiseRegionHTML_78["⚙️ generateNoiseRegionHTML"]
+    func_api_generators_html_generator_js_generateContextBar_104["⚙️ generateContextBar"]
+    func_api_generators_html_generator_js_generateClientScript_119["⚙️ generateClientScript"]
+    func_api_generators_html_generator_js_generateResearchPanelCSS_221["⚙️ generateResearchPanelCSS"]
+    func_api_generators_html_generator_js_generateHTML_301["⚙️ generateHTML"]
+    func_api_generators_html_generator_js_generateHTMLStream_356["⚙️ generateHTMLStream"]
+    func_api_generators_html_generator_js_delay_420["⚙️ delay"]
+  end
+
+  subgraph cluster_api_generators_style_manager_js ["api/generators/style-manager.js"]
+    func_api_generators_style_manager_js_analyzeColor_82["⚙️ analyzeColor"]
+    func_api_generators_style_manager_js_adjustColor_113["⚙️ adjustColor"]
+    func_api_generators_style_manager_js_adjust_119["⚙️ adjust"]
+    func_api_generators_style_manager_js_hexToRgba_139["⚙️ hexToRgba"]
+    func_api_generators_style_manager_js_createStyleManifest_152["⚙️ createStyleManifest"]
+    func_api_generators_style_manager_js_generateCSSString_231["⚙️ generateCSSString"]
+    func_api_generators_style_manager_js_generateBaseCSS_244["⚙️ generateBaseCSS"]
+  end
+
+  subgraph cluster_api_generators_vision_analyzer_js ["api/generators/vision-analyzer.js"]
+    func_api_generators_vision_analyzer_js_analyzeScreenshot_130["⚙️ analyzeScreenshot"]
+    func_api_generators_vision_analyzer_js_parseAnalysisFromText_151["⚙️ parseAnalysisFromText"]
+    func_api_generators_vision_analyzer_js_normalizeAnalysis_180["⚙️ normalizeAnalysis"]
+    func_api_generators_vision_analyzer_js_normalizeBounds_228["⚙️ normalizeBounds"]
+    func_api_generators_vision_analyzer_js_clamp_244["⚙️ clamp"]
+    func_api_generators_vision_analyzer_js_getInvestigatableHotspots_253["⚙️ getInvestigatableHotspots"]
+    func_api_generators_vision_analyzer_js_getTopHotspots_263["⚙️ getTopHotspots"]
+  end
+
+  subgraph cluster_api_index_js ["api/index.js"]
+    endpoint_USE_["🌐 USE "]
+    endpoint_USE_["🌐 USE "]
+    endpoint_USE_["🌐 USE "]
+    endpoint_GET__paste["🌐 GET /paste"]
+    endpoint_GET__["🌐 GET /"]
+    endpoint_GET__api_health["🌐 GET /api/health"]
+    endpoint_GET__canvas["🌐 GET /canvas"]
+    endpoint_POST__api_generate["🌐 POST /api/generate"]
+    endpoint_GET__api_job__jobId_canvas["🌐 GET /api/job/:jobId/canvas"]
+    endpoint_POST__api_investigate__hotspotId["🌐 POST /api/investigate/:hotspotId"]
+    endpoint_POST__api_upload["🌐 POST /api/upload"]
+    endpoint_GET__api_job__jobId_stream["🌐 GET /api/job/:jobId/stream"]
+    endpoint_GET__api_job__jobId_status["🌐 GET /api/job/:jobId/status"]
+    endpoint_GET__api_job__jobId_image["🌐 GET /api/job/:jobId/image"]
+    endpoint_POST__api_analyze["🌐 POST /api/analyze"]
+    endpoint_GET__api_jobs["🌐 GET /api/jobs"]
+    endpoint_USE_["🌐 USE "]
+    endpoint_GET__UUID_REGEX_["🌐 GET [UUID_REGEX]"]
+    endpoint_GET__["🌐 GET *"]
+    func_api_index_js_getRedis_37["⚙️ getRedis"]
+    func_api_index_js_storage_setJob_54["⚙️ storage.setJob"]
+    func_api_index_js_storage_getJob_63["⚙️ storage.getJob"]
+    func_api_index_js_storage_updateJob_73["⚙️ storage.updateJob"]
+    func_api_index_js_getAnthropicClient_100["⚙️ getAnthropicClient"]
+    func_api_index_js_sendEvent_255["⚙️ sendEvent"]
+    func_api_index_js_buildAnalysisPrompt_380["⚙️ buildAnalysisPrompt"]
+    func_api_index_js_detectMediaType_548["⚙️ detectMediaType"]
+    func_api_index_js_compressImageForAPI_577["⚙️ compressImageForAPI"]
+    func_api_index_js_sendEvent_717["⚙️ sendEvent"]
+  end
+
+  subgraph cluster_api_llm_adapter_js ["api/llm/adapter.js"]
+  end
+
+  subgraph cluster_api_llm_claude_js ["api/llm/claude.js"]
+  end
+
+  subgraph cluster_api_llm_index_js ["api/llm/index.js"]
+    func_api_llm_index_js_getAdapter_28["⚙️ getAdapter"]
+    func_api_llm_index_js_getDefaultAdapter_51["⚙️ getDefaultAdapter"]
+    func_api_llm_index_js_getVisionAdapter_61["⚙️ getVisionAdapter"]
+    func_api_llm_index_js_getResearchAdapter_79["⚙️ getResearchAdapter"]
+    func_api_llm_index_js_registerProvider_89["⚙️ registerProvider"]
+    func_api_llm_index_js_listProviders_100["⚙️ listProviders"]
+    func_api_llm_index_js_clearCache_107["⚙️ clearCache"]
+  end
+
+  subgraph cluster_public_canvas_html ["public/canvas.html"]
+    ui_public_canvas_html_uploadState_state_0["🎨 uploadState"]
+    ui_public_canvas_html_loadingState_state_1["🎨 loadingState"]
+    ui_public_canvas_html_canvasState_state_2["🎨 canvasState"]
+    ui_public_canvas_html_errorState_state_3["🎨 errorState"]
+  end
+
+  subgraph cluster_public_index_html ["public/index.html"]
+    ui_public_index_html_upload_section_section_0["🎨 upload-section"]
+    ui_public_index_html_successSection_section_1["🎨 successSection"]
+    ui_public_index_html_container_container_0["🎨 container"]
+    ui_public_index_html_previewContainer_container_1["🎨 previewContainer"]
+    ui_public_index_html_job_url_container_container_2["🎨 job-url-container"]
+    ui_public_index_html_upload_section_section_0["🎨 upload-section"]
+    ui_public_index_html_question_section_section_1["🎨 question-section"]
+    ui_public_index_html_successSection_section_2["🎨 successSection"]
+  end
+
+  subgraph cluster_public_job_html ["public/job.html"]
+    ui_public_job_html_imageSection_section_0["🎨 imageSection"]
+    ui_public_job_html_progressSection_section_1["🎨 progressSection"]
+    ui_public_job_html_analysisSection_section_2["🎨 analysisSection"]
+    ui_public_job_html_errorSection_section_3["🎨 errorSection"]
+    ui_public_job_html_container_container_0["🎨 container"]
+    ui_public_job_html_imageSection_section_0["🎨 imageSection"]
+    ui_public_job_html_progressSection_section_1["🎨 progressSection"]
+    ui_public_job_html_analysisSection_section_2["🎨 analysisSection"]
+    ui_public_job_html_errorSection_section_3["🎨 errorSection"]
+  end
+
+  subgraph cluster_public_paste_html ["public/paste.html"]
+    ui_public_paste_html_pasteState_state_0["🎨 pasteState"]
+    ui_public_paste_html_analyzeState_state_1["🎨 analyzeState"]
+    ui_public_paste_html_resultsState_state_2["🎨 resultsState"]
+    ui_public_paste_html_errorState_state_3["🎨 errorState"]
+    ui_public_paste_html_scan_container_container_0["🎨 scan-container"]
+    ui_public_paste_html_results_image_container_container_1["🎨 results-image-container"]
+  end
+
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHotspotHTML_32 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateNoiseRegionHTML_78 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateNoiseRegionHTML_78 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateNoiseRegionHTML_78 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateContextBar_104 -.->|calls| func_api_generators_html_generator_js_escapeHtml_16
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_style_manager_js_generateBaseCSS_244
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_html_generator_js_generateContextBar_104
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_html_generator_js_generateHotspotHTML_32
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_html_generator_js_generateNoiseRegionHTML_78
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_html_generator_js_generateResearchPanelCSS_221
+  func_api_generators_html_generator_js_generateHTML_301 -.->|calls| func_api_generators_html_generator_js_generateClientScript_119
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_style_manager_js_generateBaseCSS_244
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_generateContextBar_104
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_generateResearchPanelCSS_221
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_generateNoiseRegionHTML_78
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_delay_420
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_generateHotspotHTML_32
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_delay_420
+  func_api_generators_html_generator_js_generateHTMLStream_356 -.->|calls| func_api_generators_html_generator_js_generateClientScript_119
+  func_api_generators_style_manager_js_generateBaseCSS_244 -.->|calls| func_api_generators_style_manager_js_generateCSSString_231
+  func_public_canvas_html_script_0_uploadAndGenerate_80 -.->|calls| func_public_canvas_html_script_0_showState_27
+  func_public_canvas_html_script_0_uploadAndGenerate_80 -.->|calls| func_public_canvas_html_script_0_startStream_121
+  func_public_canvas_html_script_0_uploadAndGenerate_80 -.->|calls| func_public_canvas_html_script_0_showError_193
+  func_public_paste_html_script_1_handleImage_59 -.->|calls| func_public_paste_html_script_1_uploadAndStream_72
+  func_public_paste_html_script_1_uploadAndStream_72 -.->|calls| func_public_canvas_html_script_0_startStream_121
+  func_public_paste_html_script_1_uploadAndStream_72 -.->|calls| func_public_canvas_html_script_0_showError_193
+
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script>
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'default',
+      securityLevel: 'loose',
+      flowchart: {
+        useMaxWidth: false,
+        htmlLabels: true,
+        curve: 'basis'
+      }
+    });
+
+    let currentZoom = 1;
+    const wrapper = document.getElementById('mermaid-wrapper');
+    
+    function zoom(factor) {
+      currentZoom *= factor;
+      wrapper.style.transform = 'scale(' + currentZoom + ')';
+      wrapper.style.transformOrigin = '0 0';
+    }
+    
+    function resetZoom() {
+      currentZoom = 1;
+      wrapper.style.transform = 'scale(1)';
+    }
+
+    // Auto-scroll to center after render
+    setTimeout(() => {
+      const viewport = document.getElementById('viewport');
+      viewport.scrollLeft = (wrapper.offsetWidth - viewport.offsetWidth) / 2;
+    }, 1000);
+  </script>
+</body>
+</html>

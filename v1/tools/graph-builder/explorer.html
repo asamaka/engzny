@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engzny Codebase Explorer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #fffcf7;
+            --text: #2c2c2c;
+            --text-light: #5a5a5a;
+            --accent: #1a5f4a;
+            --accent-light: #e8f4f0;
+            --border: #e0dcd4;
+            --code-bg: #1e1e2e;
+            --code-text: #cdd6f4;
+        }
+        
+        body {
+            font-family: 'Source Serif 4', Georgia, serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            font-size: 18px;
+        }
+        
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px 120px;
+        }
+        
+        /* Typography */
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5em;
+            color: var(--accent);
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 2em 0 0.75em;
+            padding-top: 1.5em;
+            border-top: 1px solid var(--border);
+        }
+        
+        h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin: 1.5em 0 0.5em;
+        }
+        
+        p {
+            margin-bottom: 1em;
+        }
+        
+        .lead {
+            font-size: 1.15rem;
+            color: var(--text-light);
+            margin-bottom: 2em;
+        }
+        
+        /* File/Folder indicators */
+        .path {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+            background: var(--accent-light);
+            color: var(--accent);
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-bottom: 0.5em;
+        }
+        
+        .folder-icon::before { content: '📁 '; }
+        .file-icon::before { content: '📄 '; }
+        
+        /* Expandable sections */
+        .expandable {
+            margin: 1em 0;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: white;
+        }
+        
+        .expandable-header {
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .expandable-header:hover {
+            background: var(--accent-light);
+        }
+        
+        .expandable-header h4 {
+            font-size: 1rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .expandable-toggle {
+            font-size: 1.2rem;
+            color: var(--text-light);
+            transition: transform 0.2s;
+        }
+        
+        .expandable.open .expandable-toggle {
+            transform: rotate(90deg);
+        }
+        
+        .expandable-content {
+            display: none;
+            padding: 0 20px 20px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .expandable.open .expandable-content {
+            display: block;
+        }
+        
+        /* Nested expandables */
+        .expandable .expandable {
+            margin: 0.75em 0;
+            border-color: #e8e4dc;
+        }
+        
+        .expandable .expandable .expandable-header {
+            padding: 12px 16px;
+            background: #faf8f5;
+        }
+        
+        .expandable .expandable .expandable-header h4 {
+            font-size: 0.95rem;
+        }
+        
+        /* Code blocks */
+        .code-block {
+            background: var(--code-bg);
+            border-radius: 8px;
+            margin: 1em 0;
+            overflow: hidden;
+        }
+        
+        .code-header {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.05);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        pre {
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--code-text);
+        }
+        
+        .code-comment { color: #6c7086; }
+        .code-keyword { color: #cba6f7; }
+        .code-string { color: #a6e3a1; }
+        .code-function { color: #89b4fa; }
+        
+        /* Summary boxes */
+        .summary {
+            background: var(--accent-light);
+            border-left: 4px solid var(--accent);
+            padding: 16px 20px;
+            margin: 1em 0;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .summary strong {
+            color: var(--accent);
+        }
+        
+        /* Lists */
+        ul, ol {
+            margin: 1em 0 1em 1.5em;
+        }
+        
+        li {
+            margin-bottom: 0.5em;
+        }
+        
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin: 1.5em 0;
+        }
+        
+        .stat {
+            text-align: center;
+            padding: 16px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+        
+        /* Navigation breadcrumb */
+        .breadcrumb {
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            padding: 12px 0;
+            margin-bottom: 2em;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+            z-index: 100;
+        }
+        
+        .breadcrumb a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        
+        /* Divider */
+        hr {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 2em 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <nav class="breadcrumb">
+            <a href="#top">← Back to top</a>
+        </nav>
+
+        <!-- ============================================ -->
+        <!-- LEVEL 0: THE PROJECT -->
+        <!-- ============================================ -->
+        
+        <section id="top">
+            <h1>Engzny (thinx.fun)</h1>
+            <p class="lead">
+                A web application that transforms screenshots into interactive, explorable canvases. 
+                You upload an image, artificial intelligence identifies the important parts, 
+                and you get back a clickable version where each area can be investigated further.
+            </p>
+            
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">11</div>
+                    <div class="stat-label">Files</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">~2,100</div>
+                    <div class="stat-label">Lines of Code</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Main Folders</div>
+                </div>
+            </div>
+            
+            <p>
+                Think of it like this: you take a screenshot of a news article, product page, or social media post. 
+                The system "reads" your image, figures out where the headlines are, where the images are, 
+                where the data is, and creates an interactive version where you can click on any part to learn more about it.
+            </p>
+            
+            <div class="summary">
+                <strong>The key technology:</strong> Claude AI (from Anthropic) can "see" images and understand what's in them. 
+                This project sends your screenshot to Claude, asks it to identify interesting regions, 
+                then builds a webpage based on what Claude found.
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- LEVEL 1: PROJECT STRUCTURE -->
+        <!-- ============================================ -->
+        
+        <h2 id="structure">Project Structure</h2>
+        
+        <p>
+            The codebase is organized into two main folders, each with a clear purpose:
+        </p>
+        
+        <div class="expandable open" id="folder-overview">
+            <div class="expandable-header" onclick="toggle('folder-overview')">
+                <h4><span class="folder-icon"></span>engzny/</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>The root folder contains everything. Inside, you'll find:</p>
+                
+                <ul>
+                    <li>
+                        <strong>api/</strong> — The backend. This is where the "brain" of the application lives. 
+                        It receives images, talks to AI, and generates the interactive canvases. 
+                        Contains <strong>7 JavaScript files</strong> organized into subfolders.
+                    </li>
+                    <li>
+                        <strong>public/</strong> — The frontend. These are the pages users actually see and interact with. 
+                        Contains <strong>4 HTML files</strong>, each serving a different purpose.
+                    </li>
+                </ul>
+                
+                <p>
+                    When a user visits the website, they see pages from <code>public/</code>. 
+                    When they upload an image, it goes to code in <code>api/</code>. 
+                    The results come back and display in the browser.
+                </p>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- LEVEL 2: PUBLIC FOLDER -->
+        <!-- ============================================ -->
+        
+        <h2 id="public">The Frontend: public/</h2>
+        
+        <p class="path folder-icon">public/</p>
+        
+        <p>
+            This folder contains the pages users see. Each HTML file is a complete webpage 
+            with its own styling and interactive behavior built in. There are four pages, 
+            and together they handle everything from uploading images to viewing results.
+        </p>
+
+        <!-- index.html -->
+        <div class="expandable" id="public-index">
+            <div class="expandable-header" onclick="toggle('public-index')">
+                <h4><span class="file-icon"></span>index.html — Main Upload Page</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    This is the homepage—the first thing users see when they visit thinx.fun. 
+                    It presents a simple interface: a large drop zone where you can drag and drop an image, 
+                    click to browse files, or paste from your clipboard.
+                </p>
+                
+                <p>
+                    The page is self-contained: all the styling and JavaScript are embedded directly in this one file. 
+                    When you drop an image, it shows a preview, validates that it's not too large (20MB limit), 
+                    then sends it to the server and redirects you to watch the processing.
+                </p>
+                
+                <div class="expandable" id="index-upload">
+                    <div class="expandable-header" onclick="toggle('index-upload')">
+                        <h4>How file upload works</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>The page listens for three types of input: drag-and-drop, file selection, and clipboard paste.</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/index.html</span>
+                                <span>Lines 137-172</span>
+                            </div>
+                            <pre><span class="code-comment">// When user drags a file over the drop zone</span>
+dropZone.<span class="code-function">addEventListener</span>(<span class="code-string">'dragover'</span>, (e) => {
+    e.preventDefault();
+    dropZone.classList.add(<span class="code-string">'drag-over'</span>);
+});
+
+<span class="code-comment">// When user drops a file</span>
+dropZone.<span class="code-function">addEventListener</span>(<span class="code-string">'drop'</span>, (e) => {
+    e.preventDefault();
+    <span class="code-keyword">const</span> file = e.dataTransfer.files[0];
+    <span class="code-keyword">if</span> (file) handleFile(file);
+});
+
+<span class="code-comment">// When user pastes from clipboard (Cmd+V)</span>
+document.<span class="code-function">addEventListener</span>(<span class="code-string">'paste'</span>, (e) => {
+    <span class="code-keyword">const</span> items = e.clipboardData?.items;
+    <span class="code-keyword">for</span> (<span class="code-keyword">const</span> item <span class="code-keyword">of</span> items) {
+        <span class="code-keyword">if</span> (item.type.startsWith(<span class="code-string">'image/'</span>)) {
+            handleFile(item.getAsFile());
+            <span class="code-keyword">return</span>;
+        }
+    }
+});</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="index-validate">
+                    <div class="expandable-header" onclick="toggle('index-validate')">
+                        <h4>File validation</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>Before uploading, the file is checked to make sure it's actually an image and isn't too large.</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/index.html</span>
+                                <span>Lines 90-102</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">handleFile</span>(file) {
+    <span class="code-comment">// Must be an image type</span>
+    <span class="code-keyword">if</span> (!file.type.startsWith(<span class="code-string">'image/'</span>)) {
+        showError(<span class="code-string">'Please upload an image file'</span>);
+        <span class="code-keyword">return</span>;
+    }
+    
+    <span class="code-comment">// Maximum 20 megabytes</span>
+    <span class="code-keyword">if</span> (file.size > 20 * 1024 * 1024) {
+        showError(<span class="code-string">'File too large. Maximum is 20MB.'</span>);
+        <span class="code-keyword">return</span>;
+    }
+    
+    <span class="code-comment">// Passed validation - show preview and enable upload</span>
+    showPreview(file);
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="index-send">
+                    <div class="expandable-header" onclick="toggle('index-send')">
+                        <h4>Sending to server</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>When the user clicks "Upload", the image is packaged and sent to the backend.</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/index.html</span>
+                                <span>Lines 105-125</span>
+                            </div>
+                            <pre><span class="code-keyword">async function</span> <span class="code-function">uploadImage</span>(file) {
+    <span class="code-comment">// Package file for sending</span>
+    <span class="code-keyword">const</span> formData = <span class="code-keyword">new</span> FormData();
+    formData.append(<span class="code-string">'image'</span>, file);
+    
+    <span class="code-comment">// Send to server</span>
+    <span class="code-keyword">const</span> response = <span class="code-keyword">await</span> fetch(<span class="code-string">'/api/upload'</span>, {
+        method: <span class="code-string">'POST'</span>,
+        body: formData
+    });
+    
+    <span class="code-keyword">const</span> data = <span class="code-keyword">await</span> response.json();
+    
+    <span class="code-comment">// Server returns a job ID - redirect to status page</span>
+    <span class="code-keyword">if</span> (data.jobId) {
+        window.location.href = <span class="code-string">`/job?id=</span>${data.jobId}<span class="code-string">`</span>;
+    }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- canvas.html -->
+        <div class="expandable" id="public-canvas">
+            <div class="expandable-header" onclick="toggle('public-canvas')">
+                <h4><span class="file-icon"></span>canvas.html — Canvas Generator & Viewer</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    This is the most sophisticated page. It handles the entire flow from upload to viewing the result, 
+                    all without leaving the page. You upload an image, watch a scanning animation while AI analyzes it, 
+                    and then see the interactive canvas appear.
+                </p>
+                
+                <p>
+                    The page manages four different "states": upload (waiting for image), loading (showing progress), 
+                    canvas (displaying result), and error (showing what went wrong). Only one state is visible at a time.
+                </p>
+                
+                <div class="expandable" id="canvas-states">
+                    <div class="expandable-header" onclick="toggle('canvas-states')">
+                        <h4>State management</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>The page tracks which "mode" it's in and shows the appropriate interface:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/canvas.html</span>
+                                <span>Lines 344-382</span>
+                            </div>
+                            <pre><span class="code-comment">// The four possible states</span>
+<span class="code-keyword">const</span> states = {
+    upload:  document.getElementById(<span class="code-string">'uploadState'</span>),
+    loading: document.getElementById(<span class="code-string">'loadingState'</span>),
+    canvas:  document.getElementById(<span class="code-string">'canvasState'</span>),
+    error:   document.getElementById(<span class="code-string">'errorState'</span>),
+};
+
+<span class="code-comment">// Switch to a specific state</span>
+<span class="code-keyword">function</span> <span class="code-function">showState</span>(name) {
+    <span class="code-comment">// Hide all states</span>
+    Object.entries(states).forEach(([key, element]) => {
+        <span class="code-keyword">if</span> (key === name) {
+            element.classList.add(<span class="code-string">'active'</span>);
+        } <span class="code-keyword">else</span> {
+            element.classList.remove(<span class="code-string">'active'</span>);
+        }
+    });
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="canvas-stream">
+                    <div class="expandable-header" onclick="toggle('canvas-stream')">
+                        <h4>Real-time streaming</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Instead of waiting for the entire result, this page receives updates as they happen. 
+                            The server sends small pieces of HTML as they're generated, and the page assembles them.
+                            This uses a technology called "Server-Sent Events" (SSE)—like a one-way live stream from server to browser.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/canvas.html</span>
+                                <span>Lines 464-523</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">startStream</span>(jobId) {
+    <span class="code-keyword">let</span> htmlBuffer = <span class="code-string">''</span>;  <span class="code-comment">// Collect HTML pieces here</span>
+    
+    <span class="code-comment">// Open connection to server</span>
+    <span class="code-keyword">const</span> eventSource = <span class="code-keyword">new</span> EventSource(
+        <span class="code-string">`/api/job/</span>${jobId}<span class="code-string">/canvas`</span>
+    );
+    
+    <span class="code-comment">// Receive progress updates</span>
+    eventSource.addEventListener(<span class="code-string">'status'</span>, (e) => {
+        <span class="code-keyword">const</span> data = JSON.parse(e.data);
+        progressBar.style.width = data.progress + <span class="code-string">'%'</span>;
+        loadingStatus.textContent = data.message;
+    });
+    
+    <span class="code-comment">// Receive HTML chunks as they're generated</span>
+    eventSource.addEventListener(<span class="code-string">'html'</span>, (e) => {
+        <span class="code-keyword">const</span> data = JSON.parse(e.data);
+        htmlBuffer += data.chunk;
+    });
+    
+    <span class="code-comment">// Generation complete - display result</span>
+    eventSource.addEventListener(<span class="code-string">'complete'</span>, () => {
+        renderCanvas(htmlBuffer);
+        eventSource.close();
+    });
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="canvas-render">
+                    <div class="expandable-header" onclick="toggle('canvas-render')">
+                        <h4>Displaying the canvas</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            The generated HTML is placed inside an iframe—essentially a webpage within the webpage. 
+                            This keeps the generated canvas isolated and secure.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>public/canvas.html</span>
+                                <span>Lines 526-540</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">renderCanvas</span>(html) {
+    showState(<span class="code-string">'canvas'</span>);
+    
+    <span class="code-comment">// Get the iframe element</span>
+    <span class="code-keyword">const</span> frame = document.getElementById(<span class="code-string">'canvasFrame'</span>);
+    
+    <span class="code-comment">// Write HTML directly into it</span>
+    <span class="code-keyword">const</span> doc = frame.contentDocument;
+    doc.open();
+    doc.write(html);
+    doc.close();
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- job.html and paste.html bundled -->
+        <div class="expandable" id="public-others">
+            <div class="expandable-header" onclick="toggle('public-others')">
+                <h4><span class="file-icon"></span>job.html & paste.html — Supporting Pages</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    Two additional pages handle specific use cases:
+                </p>
+                
+                <h4 style="margin-top: 1em;">job.html — Progress Tracking</h4>
+                <p>
+                    After uploading from the main page, users land here to watch their image being analyzed. 
+                    It connects to the server and receives real-time status updates (similar to canvas.html's streaming).
+                    Shows a progress bar and status messages like "Analyzing screenshot..." and "Detecting regions..."
+                </p>
+                
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>public/job.html</span>
+                        <span>Lines 85-110</span>
+                    </div>
+                    <pre><span class="code-comment">// Connect to job status stream</span>
+<span class="code-keyword">const</span> eventSource = <span class="code-keyword">new</span> EventSource(<span class="code-string">`/api/job/</span>${jobId}<span class="code-string">/status`</span>);
+
+eventSource.addEventListener(<span class="code-string">'status'</span>, (e) => {
+    <span class="code-keyword">const</span> { progress, message } = JSON.parse(e.data);
+    updateProgressBar(progress);
+    updateStatusText(message);
+});
+
+eventSource.addEventListener(<span class="code-string">'complete'</span>, (e) => {
+    <span class="code-keyword">const</span> result = JSON.parse(e.data);
+    displayResults(result);
+    eventSource.close();
+});</pre>
+                </div>
+                
+                <hr>
+                
+                <h4>paste.html — Mobile/Shortcut Integration</h4>
+                <p>
+                    A streamlined page designed for Apple Shortcuts and mobile use. 
+                    When you take a screenshot on your phone, you can use a Shortcut to copy it and open this page—
+                    it automatically detects the image in your clipboard and starts processing.
+                </p>
+                
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>public/paste.html</span>
+                        <span>Lines 75-95</span>
+                    </div>
+                    <pre><span class="code-comment">// When page loads, check if there's an image in clipboard</span>
+<span class="code-keyword">async function</span> <span class="code-function">checkClipboard</span>() {
+    <span class="code-keyword">try</span> {
+        <span class="code-keyword">const</span> items = <span class="code-keyword">await</span> navigator.clipboard.read();
+        
+        <span class="code-keyword">for</span> (<span class="code-keyword">const</span> item <span class="code-keyword">of</span> items) {
+            <span class="code-keyword">for</span> (<span class="code-keyword">const</span> type <span class="code-keyword">of</span> item.types) {
+                <span class="code-keyword">if</span> (type.startsWith(<span class="code-string">'image/'</span>)) {
+                    <span class="code-comment">// Found an image! Process it automatically</span>
+                    <span class="code-keyword">const</span> blob = <span class="code-keyword">await</span> item.getType(type);
+                    handleImage(blob);
+                    <span class="code-keyword">return</span>;
+                }
+            }
+        }
+    } <span class="code-keyword">catch</span> (err) {
+        <span class="code-comment">// No clipboard access - wait for manual paste</span>
+    }
+}</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- LEVEL 2: API FOLDER -->
+        <!-- ============================================ -->
+        
+        <h2 id="api">The Backend: api/</h2>
+        
+        <p class="path folder-icon">api/</p>
+        
+        <p>
+            This is where the real work happens. When you upload an image, code in this folder receives it, 
+            shrinks it to a reasonable size, sends it to AI for analysis, and generates the interactive HTML. 
+            The folder contains one main file and three subfolders:
+        </p>
+        
+        <ul>
+            <li><strong>index.js</strong> — The main server that handles web requests</li>
+            <li><strong>agents/</strong> — Contains the "orchestrator" that coordinates everything</li>
+            <li><strong>generators/</strong> — Three files that analyze images and generate HTML</li>
+            <li><strong>llm/</strong> — Three files that handle communication with AI</li>
+        </ul>
+
+        <!-- api/index.js -->
+        <div class="expandable" id="api-index">
+            <div class="expandable-header" onclick="toggle('api-index')">
+                <h4><span class="file-icon"></span>index.js — The Main Server</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    This file is the entry point for all backend operations. It creates a web server using a 
+                    popular framework called Express, defines what happens when users visit different URLs 
+                    (called "routes" or "endpoints"), and coordinates image processing.
+                </p>
+                
+                <p>
+                    When deployed, this is the code that runs 24/7, waiting for requests from users' browsers.
+                </p>
+                
+                <div class="expandable" id="api-setup">
+                    <div class="expandable-header" onclick="toggle('api-setup')">
+                        <h4>Server setup</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>The file starts by loading the tools it needs:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/index.js</span>
+                                <span>Lines 1-20</span>
+                            </div>
+                            <pre><span class="code-keyword">const</span> express = require(<span class="code-string">'express'</span>);       <span class="code-comment">// Web server framework</span>
+<span class="code-keyword">const</span> multer = require(<span class="code-string">'multer'</span>);         <span class="code-comment">// File upload handling</span>
+<span class="code-keyword">const</span> sharp = require(<span class="code-string">'sharp'</span>);           <span class="code-comment">// Image resizing</span>
+<span class="code-keyword">const</span> { v4: uuid } = require(<span class="code-string">'uuid'</span>);    <span class="code-comment">// Unique ID generator</span>
+
+<span class="code-comment">// Load the orchestrator (coordinates AI analysis)</span>
+<span class="code-keyword">const</span> { createOrchestrator } = require(<span class="code-string">'./agents/orchestrator'</span>);
+
+<span class="code-comment">// Create the server</span>
+<span class="code-keyword">const</span> app = express();
+app.use(express.json());
+app.use(express.static(<span class="code-string">'public'</span>));  <span class="code-comment">// Serve HTML files</span></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="api-compress">
+                    <div class="expandable-header" onclick="toggle('api-compress')">
+                        <h4>Image compression</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Before sending images to AI, they're resized and compressed. 
+                            This reduces costs (AI charges per image size) and speeds up processing.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/index.js</span>
+                                <span>Lines 50-75</span>
+                            </div>
+                            <pre><span class="code-keyword">async function</span> <span class="code-function">processImage</span>(buffer) {
+    <span class="code-comment">// Get image dimensions</span>
+    <span class="code-keyword">const</span> metadata = <span class="code-keyword">await</span> sharp(buffer).metadata();
+    
+    <span class="code-keyword">let</span> processed = sharp(buffer);
+    
+    <span class="code-comment">// If larger than 1920x1080, shrink it</span>
+    <span class="code-keyword">if</span> (metadata.width > 1920 || metadata.height > 1080) {
+        processed = processed.resize(1920, 1080, {
+            fit: <span class="code-string">'inside'</span>,              <span class="code-comment">// Keep proportions</span>
+            withoutEnlargement: <span class="code-keyword">true</span>   <span class="code-comment">// Don't make small images bigger</span>
+        });
+    }
+    
+    <span class="code-comment">// Convert to JPEG at 85% quality</span>
+    <span class="code-keyword">const</span> output = <span class="code-keyword">await</span> processed.jpeg({ quality: 85 }).toBuffer();
+    
+    <span class="code-keyword">return</span> {
+        base64: output.toString(<span class="code-string">'base64'</span>),  <span class="code-comment">// Text format for sending</span>
+        mediaType: <span class="code-string">'image/jpeg'</span>
+    };
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="api-upload-route">
+                    <div class="expandable-header" onclick="toggle('api-upload-route')">
+                        <h4>Upload endpoint</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            When a browser sends an image to <code>/api/upload</code>, this code runs. 
+                            It creates a unique "job" to track the work and starts processing in the background.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/index.js</span>
+                                <span>Lines 85-130</span>
+                            </div>
+                            <pre>app.<span class="code-function">post</span>(<span class="code-string">'/api/upload'</span>, upload.single(<span class="code-string">'image'</span>), 
+  <span class="code-keyword">async</span> (req, res) => {
+    <span class="code-comment">// Create unique identifier for this job</span>
+    <span class="code-keyword">const</span> jobId = uuid();
+    
+    <span class="code-comment">// Compress the uploaded image</span>
+    <span class="code-keyword">const</span> processed = <span class="code-keyword">await</span> processImage(req.file.buffer);
+    
+    <span class="code-comment">// Store job information</span>
+    jobs.set(jobId, {
+        id: jobId,
+        status: <span class="code-string">'processing'</span>,
+        imageData: processed.base64,
+        mediaType: processed.mediaType,
+        createdAt: <span class="code-keyword">new</span> Date()
+    });
+    
+    <span class="code-comment">// Start AI analysis (runs in background)</span>
+    processJob(jobId);
+    
+    <span class="code-comment">// Immediately tell browser the job ID</span>
+    res.json({ jobId, status: <span class="code-string">'processing'</span> });
+});</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="api-sse">
+                    <div class="expandable-header" onclick="toggle('api-sse')">
+                        <h4>Streaming status updates</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Instead of the browser repeatedly asking "is it done yet?", the server opens a 
+                            persistent connection and pushes updates as they happen. This is Server-Sent Events (SSE).
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/index.js</span>
+                                <span>Lines 180-220</span>
+                            </div>
+                            <pre>app.<span class="code-function">get</span>(<span class="code-string">'/api/job/:id/status'</span>, (req, res) => {
+    <span class="code-keyword">const</span> job = jobs.get(req.params.id);
+    <span class="code-keyword">if</span> (!job) <span class="code-keyword">return</span> res.status(404).end();
+    
+    <span class="code-comment">// Configure for streaming (SSE)</span>
+    res.setHeader(<span class="code-string">'Content-Type'</span>, <span class="code-string">'text/event-stream'</span>);
+    res.setHeader(<span class="code-string">'Cache-Control'</span>, <span class="code-string">'no-cache'</span>);
+    res.setHeader(<span class="code-string">'Connection'</span>, <span class="code-string">'keep-alive'</span>);
+    
+    <span class="code-comment">// Send current status immediately</span>
+    sendEvent(res, <span class="code-string">'status'</span>, {
+        progress: job.progress || 0,
+        message: job.statusMessage
+    });
+    
+    <span class="code-comment">// Register this connection to receive future updates</span>
+    job.clients.push(res);
+    
+    <span class="code-comment">// Clean up when browser disconnects</span>
+    req.on(<span class="code-string">'close'</span>, () => {
+        job.clients = job.clients.filter(c => c !== res);
+    });
+});</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- api/agents/ -->
+        <div class="expandable" id="api-agents">
+            <div class="expandable-header" onclick="toggle('api-agents')">
+                <h4><span class="folder-icon"></span>agents/ — The Orchestrator</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p class="path file-icon">agents/orchestrator.js</p>
+                
+                <p>
+                    This folder contains just one file, but it's important: the Orchestrator. 
+                    Think of it as a project manager—it doesn't do the work itself, but coordinates 
+                    all the other parts. When an image needs processing, the orchestrator:
+                </p>
+                
+                <ol>
+                    <li>Sends the image to the Vision Analyzer to detect interesting regions</li>
+                    <li>Takes the results and creates a Style Manifest (color scheme, fonts, etc.)</li>
+                    <li>Passes everything to the HTML Generator to build the interactive canvas</li>
+                    <li>Reports progress along the way</li>
+                </ol>
+                
+                <div class="expandable" id="orch-class">
+                    <div class="expandable-header" onclick="toggle('orch-class')">
+                        <h4>The Orchestrator class</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>A "class" in programming is like a blueprint. This defines what an Orchestrator can do:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/agents/orchestrator.js</span>
+                                <span>Lines 69-81</span>
+                            </div>
+                            <pre><span class="code-keyword">class</span> <span class="code-function">Orchestrator</span> {
+    constructor(config = {}) {
+        <span class="code-comment">// Settings</span>
+        <span class="code-keyword">this</span>.config = {
+            maxHotspots: config.maxHotspots || 10,  <span class="code-comment">// Limit regions detected</span>
+            streamHTML: config.streamHTML !== <span class="code-keyword">false</span>,
+            ...config,
+        };
+        
+        <span class="code-comment">// State tracking</span>
+        <span class="code-keyword">this</span>.manifest = <span class="code-keyword">null</span>;   <span class="code-comment">// Style information</span>
+        <span class="code-keyword">this</span>.analysis = <span class="code-keyword">null</span>;  <span class="code-comment">// AI findings</span>
+        <span class="code-keyword">this</span>.status = <span class="code-string">'idle'</span>;  <span class="code-comment">// Current phase</span>
+    }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="orch-process">
+                    <div class="expandable-header" onclick="toggle('orch-process')">
+                        <h4>The processing pipeline</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>This is the main workflow. It shows exactly how the pieces fit together:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/agents/orchestrator.js</span>
+                                <span>Lines 91-142</span>
+                            </div>
+                            <pre><span class="code-keyword">async</span> <span class="code-function">process</span>({ imageData, mediaType, onProgress }) {
+    <span class="code-keyword">this</span>.status = <span class="code-string">'analyzing'</span>;
+    
+    <span class="code-comment">// STEP 1: Send image to AI for analysis</span>
+    onProgress?.({ stage: <span class="code-string">'analyzing'</span>, progress: 10 });
+    <span class="code-keyword">this</span>.analysis = <span class="code-keyword">await</span> analyzeScreenshot({
+        imageData,
+        mediaType,
+    });
+    
+    <span class="code-comment">// STEP 2: Create style manifest from detected colors</span>
+    <span class="code-keyword">this</span>.manifest = <span class="code-keyword">new</span> GlobalContextManifest(<span class="code-keyword">this</span>.analysis);
+    onProgress?.({ stage: <span class="code-string">'generating'</span>, progress: 50 });
+    
+    <span class="code-comment">// STEP 3: Generate HTML from hotspots + styles</span>
+    <span class="code-keyword">this</span>.status = <span class="code-string">'generating'</span>;
+    <span class="code-keyword">const</span> hotspots = <span class="code-keyword">this</span>.analysis.hotspots.slice(0, 10);
+    
+    <span class="code-keyword">const</span> html = <span class="code-keyword">await</span> generateHTML({
+        manifest: <span class="code-keyword">this</span>.manifest,
+        hotspots,
+        originalImage: { data: imageData, mediaType },
+    });
+    
+    <span class="code-keyword">this</span>.status = <span class="code-string">'complete'</span>;
+    <span class="code-keyword">return</span> { html, manifest: <span class="code-keyword">this</span>.manifest.toJSON() };
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="expandable" id="orch-manifest">
+                    <div class="expandable-header" onclick="toggle('orch-manifest')">
+                        <h4>The Style Manifest</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            When AI analyzes an image, it extracts colors used in the screenshot. 
+                            The GlobalContextManifest takes those colors and creates a consistent "theme" 
+                            for the generated canvas.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/agents/orchestrator.js</span>
+                                <span>Lines 22-63</span>
+                            </div>
+                            <pre><span class="code-keyword">class</span> <span class="code-function">GlobalContextManifest</span> {
+    constructor(analysis) {
+        <span class="code-keyword">this</span>.viewport = analysis.viewport;        <span class="code-comment">// Image dimensions</span>
+        <span class="code-keyword">this</span>.layoutType = analysis.layoutType;    <span class="code-comment">// "grid", "article", etc.</span>
+        <span class="code-keyword">this</span>.dominantColors = analysis.dominantColors;
+        
+        <span class="code-comment">// Convert colors into CSS variables</span>
+        <span class="code-keyword">this</span>.styles = createStyleManifest(analysis);
+    }
+    
+    <span class="code-comment">// Get CSS variables like --bg-color, --text-color</span>
+    getCSSVariables() {
+        <span class="code-keyword">return this</span>.styles.cssVariables;
+    }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- api/generators/ -->
+        <div class="expandable" id="api-generators">
+            <div class="expandable-header" onclick="toggle('api-generators')">
+                <h4><span class="folder-icon"></span>generators/ — Analysis & HTML Creation</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    This folder contains three files that do the heavy lifting: 
+                    analyzing images with AI and turning results into HTML.
+                </p>
+                
+                <!-- vision-analyzer.js -->
+                <div class="expandable" id="gen-vision">
+                    <div class="expandable-header" onclick="toggle('gen-vision')">
+                        <h4><span class="file-icon"></span>vision-analyzer.js — AI Image Analysis</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            This file talks to Claude AI and asks it to "look at" your screenshot. 
+                            It sends very specific instructions about what to find: headlines, images, 
+                            charts, data tables, etc. Claude returns structured data describing each 
+                            region it found.
+                        </p>
+                        
+                        <p>
+                            The key concept is "hotspots"—areas in the image where a user would likely 
+                            want to learn more, verify information, or take action.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/generators/vision-analyzer.js</span>
+                                <span>Lines 95-121</span>
+                            </div>
+                            <pre><span class="code-keyword">const</span> VISION_PROMPT = <span class="code-string">`
+You are a UI analyst. Analyze this screenshot and identify 
+"Intent Hotspots" - regions where a user would want to:
+
+1. Learn more about the content
+2. Verify claims or facts
+3. Explore related information
+4. Take action
+
+For each hotspot, provide:
+- Bounding box as percentages (where is it on screen)
+- Type: headline, image, chart, data_table, etc.
+- Summary of what's there
+- What question would a user ask about this?
+
+Also identify dominant colors for theming.
+Return your analysis as JSON.
+`</span>;</pre>
+                        </div>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/generators/vision-analyzer.js</span>
+                                <span>Lines 130-144</span>
+                            </div>
+                            <pre><span class="code-keyword">async function</span> <span class="code-function">analyzeScreenshot</span>({ imageData, mediaType }) {
+    <span class="code-comment">// Get the AI adapter (connects to Claude)</span>
+    <span class="code-keyword">const</span> adapter = getVisionAdapter();
+    
+    <span class="code-comment">// Send image + prompt to AI</span>
+    <span class="code-keyword">const</span> result = <span class="code-keyword">await</span> adapter.analyzeImage({
+        imageData,
+        mediaType,
+        prompt: VISION_PROMPT,
+    });
+    
+    <span class="code-comment">// Clean up and validate AI's response</span>
+    <span class="code-keyword">return</span> normalizeAnalysis(result.structured);
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- html-generator.js -->
+                <div class="expandable" id="gen-html">
+                    <div class="expandable-header" onclick="toggle('gen-html')">
+                        <h4><span class="file-icon"></span>html-generator.js — Building the Canvas</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Takes the hotspots from AI analysis and builds a complete HTML page. 
+                            The original screenshot becomes a faded background, and each hotspot 
+                            becomes a clickable card positioned over the relevant area.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/generators/html-generator.js</span>
+                                <span>Lines 32-82</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">generateHotspotHTML</span>(hotspot, index) {
+    <span class="code-keyword">const</span> { id, bounds, type, contentSummary, 
+           predictedQuestion, investigatable } = hotspot;
+    
+    <span class="code-comment">// Position card at center of detected region</span>
+    <span class="code-keyword">const</span> centerX = bounds.x + (bounds.width / 2);
+    
+    <span class="code-keyword">const</span> style = <span class="code-string">`
+        left: </span>${Math.min(centerX, 70)}<span class="code-string">%;
+        top: </span>${bounds.y}<span class="code-string">%;
+        animation-delay: </span>${index * 0.1}<span class="code-string">s;
+    `</span>;
+    
+    <span class="code-keyword">return</span> <span class="code-string">`
+    &lt;div class="hotspot" style="</span>${style}<span class="code-string">"&gt;
+        &lt;span class="type"&gt;</span>${type}<span class="code-string">&lt;/span&gt;
+        &lt;p&gt;</span>${contentSummary}<span class="code-string">&lt;/p&gt;
+        &lt;p class="question"&gt;"</span>${predictedQuestion}<span class="code-string">"&lt;/p&gt;
+        </span>${investigatable ? <span class="code-string">'&lt;button&gt;investigate&lt;/button&gt;'</span> : <span class="code-string">''</span>}<span class="code-string">
+    &lt;/div&gt;`</span>;
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- style-manager.js -->
+                <div class="expandable" id="gen-style">
+                    <div class="expandable-header" onclick="toggle('gen-style')">
+                        <h4><span class="file-icon"></span>style-manager.js — Theming</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Takes the colors extracted from the screenshot and creates a 
+                            complete CSS theme. Analyzes which colors are dark (good for backgrounds), 
+                            which are vibrant (good for accents), and generates CSS variables.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/generators/style-manager.js</span>
+                                <span>Lines 82-105</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">analyzeColor</span>(hexColor) {
+    <span class="code-comment">// Convert "#ff5500" to red, green, blue numbers</span>
+    <span class="code-keyword">const</span> r = parseInt(hexColor.substr(1, 2), 16);
+    <span class="code-keyword">const</span> g = parseInt(hexColor.substr(3, 2), 16);
+    <span class="code-keyword">const</span> b = parseInt(hexColor.substr(5, 2), 16);
+    
+    <span class="code-comment">// Calculate brightness (0 = black, 1 = white)</span>
+    <span class="code-keyword">const</span> luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    
+    <span class="code-keyword">return</span> {
+        hex: hexColor,
+        isDark: luminance < 0.5,     <span class="code-comment">// Good for backgrounds</span>
+        isVibrant: saturation > 0.5, <span class="code-comment">// Good for accents</span>
+    };
+}</pre>
+                        </div>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/generators/style-manager.js</span>
+                                <span>Lines 152-180</span>
+                            </div>
+                            <pre><span class="code-keyword">function</span> <span class="code-function">createStyleManifest</span>(analysis) {
+    <span class="code-keyword">const</span> colors = analysis.dominantColors.map(analyzeColor);
+    
+    <span class="code-comment">// Pick the most vibrant color for accents</span>
+    <span class="code-keyword">const</span> accentColor = colors.find(c => c.isVibrant);
+    
+    <span class="code-comment">// Pick the darkest color for background</span>
+    <span class="code-keyword">const</span> bgColor = colors.reduce((darkest, c) => 
+        c.luminance < darkest.luminance ? c : darkest
+    );
+    
+    <span class="code-comment">// Generate CSS variables</span>
+    <span class="code-keyword">return</span> {
+        cssVariables: {
+            <span class="code-string">'--bg-primary'</span>: bgColor.hex,
+            <span class="code-string">'--accent'</span>: accentColor.hex,
+            <span class="code-comment">// ... 20+ more variables</span>
+        }
+    };
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- api/llm/ -->
+        <div class="expandable" id="api-llm">
+            <div class="expandable-header" onclick="toggle('api-llm')">
+                <h4><span class="folder-icon"></span>llm/ — AI Communication</h4>
+                <span class="expandable-toggle">›</span>
+            </div>
+            <div class="expandable-content">
+                <p>
+                    "LLM" stands for Large Language Model—the type of AI that powers Claude, ChatGPT, etc. 
+                    This folder contains three files that handle all communication with AI services.
+                </p>
+                
+                <p>
+                    The code is designed so you could easily switch from Claude to another AI 
+                    (like OpenAI's GPT) without changing the rest of the application. 
+                    This is called the "adapter pattern."
+                </p>
+                
+                <!-- adapter.js -->
+                <div class="expandable" id="llm-adapter">
+                    <div class="expandable-header" onclick="toggle('llm-adapter')">
+                        <h4><span class="file-icon"></span>adapter.js — The Interface Contract</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            Defines what any AI adapter must be able to do. It's a template—
+                            actual implementations fill in the details.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/llm/adapter.js</span>
+                                <span>Lines 8-65</span>
+                            </div>
+                            <pre><span class="code-keyword">class</span> <span class="code-function">LLMAdapter</span> {
+    <span class="code-comment">// Every adapter must implement these methods:</span>
+    
+    <span class="code-comment">// What AI provider is this?</span>
+    <span class="code-keyword">get</span> providerName() { 
+        <span class="code-keyword">throw</span> Error(<span class="code-string">'Must be implemented'</span>); 
+    }
+    
+    <span class="code-comment">// Analyze an image</span>
+    <span class="code-keyword">async</span> analyzeImage({ imageData, prompt }) {
+        <span class="code-keyword">throw</span> Error(<span class="code-string">'Must be implemented'</span>);
+    }
+    
+    <span class="code-comment">// Generate text from a prompt</span>
+    <span class="code-keyword">async</span> generateText({ prompt }) {
+        <span class="code-keyword">throw</span> Error(<span class="code-string">'Must be implemented'</span>);
+    }
+    
+    <span class="code-comment">// Can this AI see images?</span>
+    supportsVision() { <span class="code-keyword">return false</span>; }
+    
+    <span class="code-comment">// Can it stream responses token by token?</span>
+    supportsStreaming() { <span class="code-keyword">return false</span>; }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- claude.js -->
+                <div class="expandable" id="llm-claude">
+                    <div class="expandable-header" onclick="toggle('llm-claude')">
+                        <h4><span class="file-icon"></span>claude.js — Anthropic Claude Implementation</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            The actual code that talks to Claude. Implements everything 
+                            defined in adapter.js, but specifically for Anthropic's API.
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/llm/claude.js</span>
+                                <span>Lines 11-40</span>
+                            </div>
+                            <pre><span class="code-keyword">class</span> <span class="code-function">ClaudeAdapter</span> <span class="code-keyword">extends</span> LLMAdapter {
+    constructor(config = {}) {
+        <span class="code-keyword">super</span>(config);
+        
+        <span class="code-comment">// Get API key from environment</span>
+        <span class="code-keyword">this</span>.apiKey = process.env.ANTHROPIC_API_KEY;
+        
+        <span class="code-comment">// Create connection to Claude</span>
+        <span class="code-keyword">this</span>.client = <span class="code-keyword">new</span> Anthropic({ apiKey: <span class="code-keyword">this</span>.apiKey });
+        
+        <span class="code-comment">// Which Claude model to use</span>
+        <span class="code-keyword">this</span>.model = <span class="code-string">'claude-sonnet-4-20250514'</span>;
+    }
+    
+    <span class="code-keyword">get</span> providerName() { <span class="code-keyword">return</span> <span class="code-string">'claude'</span>; }
+    supportsVision() { <span class="code-keyword">return true</span>; }
+    supportsStreaming() { <span class="code-keyword">return true</span>; }
+}</pre>
+                        </div>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/llm/claude.js</span>
+                                <span>Lines 44-96</span>
+                            </div>
+                            <pre><span class="code-keyword">async</span> <span class="code-function">analyzeImage</span>({ imageData, mediaType, prompt }) {
+    <span class="code-comment">// Build message with image + text</span>
+    <span class="code-keyword">const</span> messages = [{
+        role: <span class="code-string">'user'</span>,
+        content: [
+            {
+                type: <span class="code-string">'image'</span>,
+                source: {
+                    type: <span class="code-string">'base64'</span>,
+                    media_type: mediaType,
+                    data: imageData,
+                },
+            },
+            {
+                type: <span class="code-string">'text'</span>,
+                text: prompt,
+            },
+        ],
+    }];
+
+    <span class="code-comment">// Send to Claude</span>
+    <span class="code-keyword">const</span> response = <span class="code-keyword">await this</span>.client.messages.create({
+        model: <span class="code-keyword">this</span>.model,
+        max_tokens: 4096,
+        messages,
+    });
+
+    <span class="code-keyword">return</span> { text: response.content[0].text };
+}</pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- index.js -->
+                <div class="expandable" id="llm-factory">
+                    <div class="expandable-header" onclick="toggle('llm-factory')">
+                        <h4><span class="file-icon"></span>index.js — Provider Factory</h4>
+                        <span class="expandable-toggle">›</span>
+                    </div>
+                    <div class="expandable-content">
+                        <p>
+                            A "factory" that creates the right adapter when needed. 
+                            Other code just asks for "a vision adapter" and this file 
+                            figures out which one to use (currently Claude).
+                        </p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span>api/llm/index.js</span>
+                                <span>Lines 12-71</span>
+                            </div>
+                            <pre><span class="code-comment">// Available AI providers</span>
+<span class="code-keyword">const</span> providers = {
+    claude: ClaudeAdapter,
+    <span class="code-comment">// Future: openai: OpenAIAdapter</span>
+    <span class="code-comment">// Future: perplexity: PerplexityAdapter</span>
+};
+
+<span class="code-comment">// Cache created adapters (reuse instead of recreating)</span>
+<span class="code-keyword">const</span> instances = <span class="code-keyword">new</span> Map();
+
+<span class="code-comment">// Get an adapter that can analyze images</span>
+<span class="code-keyword">function</span> <span class="code-function">getVisionAdapter</span>(config = {}) {
+    <span class="code-keyword">const</span> adapter = getAdapter(<span class="code-string">'claude'</span>, config);
+    
+    <span class="code-keyword">if</span> (!adapter.supportsVision()) {
+        <span class="code-keyword">throw</span> Error(<span class="code-string">'Selected provider cannot see images'</span>);
+    }
+    
+    <span class="code-keyword">return</span> adapter;
+}
+
+<span class="code-comment">// Get the default adapter for text generation</span>
+<span class="code-keyword">function</span> <span class="code-function">getDefaultAdapter</span>() {
+    <span class="code-keyword">return</span> getAdapter(
+        process.env.DEFAULT_LLM_PROVIDER || <span class="code-string">'claude'</span>
+    );
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SUMMARY -->
+        <!-- ============================================ -->
+        
+        <h2 id="summary">Summary</h2>
+        
+        <p>
+            The entire codebase works together like this:
+        </p>
+        
+        <ol>
+            <li><strong>User uploads image</strong> via <code>public/index.html</code> or <code>public/canvas.html</code></li>
+            <li><strong>Server receives it</strong> in <code>api/index.js</code>, compresses it, creates a job</li>
+            <li><strong>Orchestrator coordinates</strong> from <code>api/agents/orchestrator.js</code></li>
+            <li><strong>Vision Analyzer</strong> (<code>api/generators/vision-analyzer.js</code>) sends image to Claude</li>
+            <li><strong>Claude adapter</strong> (<code>api/llm/claude.js</code>) handles the actual API call</li>
+            <li><strong>Style Manager</strong> (<code>api/generators/style-manager.js</code>) creates theme from colors</li>
+            <li><strong>HTML Generator</strong> (<code>api/generators/html-generator.js</code>) builds the canvas</li>
+            <li><strong>Result streams back</strong> to browser and displays in the UI</li>
+        </ol>
+        
+        <div class="summary">
+            <strong>11 files, one purpose:</strong> Take a screenshot, understand what's in it using AI, 
+            and create an interactive version where users can explore each part.
+        </div>
+        
+    </div>
+    
+    <script>
+        function toggle(id) {
+            document.getElementById(id).classList.toggle('open');
+        }
+    </script>
+</body>
+</html>

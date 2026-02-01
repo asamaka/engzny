@@ -1,0 +1,24 @@
+{
+  "name": "thinx-fun",
+  "version": "1.0.0",
+  "description": "thinx.fun Express app",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "node api/index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
+    "@upstash/redis": "^1.36.1",
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "multer": "^2.0.2",
+    "sharp": "^0.34.5"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "plist": "^3.1.0"
+  }
+}
