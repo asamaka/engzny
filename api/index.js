@@ -122,6 +122,11 @@ app.get('/paste', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
 });
 
+// Scan page (for URL image testing)
+app.get('/scan', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'scan.html'));
+});
+
 // Main route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
