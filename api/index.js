@@ -142,8 +142,25 @@ function generateShortCode() {
 }
 
 // POST /api/scan - Upload image, get code
+// Simple test endpoint for debugging
+app.post('/api/test', (req, res) => {
+  console.log('[TEST] Headers:', req.headers);
+  console.log('[TEST] Body type:', typeof req.body);
+  console.log('[TEST] Body keys:', Object.keys(req.body || {}));
+  res.json({ 
+    received: true, 
+    bodyType: typeof req.body,
+    hasImage: !!req.body?.image,
+    imageLength: req.body?.image?.length || 0,
+    headers: req.headers['content-type']
+  });
+});
+
 app.post('/api/scan', async (req, res) => {
-  console.log('[SCAN] Request received, body size:', JSON.stringify(req.body || {}).length);
+  console.log('[SCAN] Request received');
+  console.log('[SCAN] Content-Type:', req.headers['content-type']);
+  console.log('[SCAN] Body type:', typeof req.body);
+  console.log('[SCAN] Body keys:', Object.keys(req.body || {}));
   
   try {
     const { image, mediaType } = req.body || {};
