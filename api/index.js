@@ -246,6 +246,55 @@ app.get('/s/:code', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'scan-view.html'));
 });
 
+// GET /api/scan?img=base64 - Simple GET endpoint for iOS Shortcuts
+app.get('/api/scan', async (req, res) => {
+  console.log('[SCAN-GET] Request received');
+  
+  try {
+    const img = req.query.img || req.query.image;
+    
+    if (!img) {
+      return res.status(400).json({ error: 'No image. Use ?img=base64data' });
+    }
+    
+    // Decode if URL encoded
+    let base64Data = decodeURIComponent(img);
+    let mimeType = 'image/jpeg';
+    
+    // Handle data URL format
+    if (base64Data.startsWith('data:')) {
+      const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+      if (matches) {
+        mimeType = matches[1];
+        base64Data = matches[2];
+      }
+    }
+    
+    const code = generateShortCode();
+    console.log('[SCAN-GET] Code:', code, 'size:', base64Data.length);
+    
+    await storage.setJob(`scan:${code}`, {
+      imageData: base64Data,
+      mediaType: mimeType,
+      createdAt: new Date().toISOString(),
+    }, 600);
+    
+    // Return redirect URL or JSON based on Accept header
+    if (req.headers.accept?.includes('text/html')) {
+      return res.redirect(`/s/${code}`);
+    }
+    
+    res.json({
+      success: true,
+      code,
+      url: `https://thinx.fun/s/${code}`,
+    });
+  } catch (error) {
+    console.error('[SCAN-GET] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Main route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
