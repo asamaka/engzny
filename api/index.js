@@ -143,11 +143,23 @@ function generateShortCode() {
 
 // POST /api/scan - Upload image, get code
 app.post('/api/scan', async (req, res) => {
+  console.log('[SCAN] Request received, body size:', JSON.stringify(req.body || {}).length);
+  
   try {
     const { image, mediaType } = req.body || {};
     
     if (!image) {
+      console.log('[SCAN] Error: No image provided');
       return res.status(400).json({ error: 'No image provided' });
+    }
+    
+    // Check size - limit to 100KB base64 (~75KB image)
+    if (image.length > 150000) {
+      console.log('[SCAN] Error: Image too large:', image.length);
+      return res.status(400).json({ 
+        error: 'Image too large', 
+        message: `Image is ${Math.round(image.length/1024)}KB, max is 100KB. Please compress more.`
+      });
     }
     
     // Parse data URL if provided
@@ -164,6 +176,7 @@ app.post('/api/scan', async (req, res) => {
     
     // Generate short code
     const code = generateShortCode();
+    console.log('[SCAN] Generated code:', code, 'image size:', base64Data.length);
     
     // Store image with 10 minute TTL
     await storage.setJob(`scan:${code}`, {
@@ -172,13 +185,15 @@ app.post('/api/scan', async (req, res) => {
       createdAt: new Date().toISOString(),
     }, 600); // 10 minutes
     
+    console.log('[SCAN] Stored successfully');
+    
     res.json({
       success: true,
       code,
       url: `https://thinx.fun/s/${code}`,
     });
   } catch (error) {
-    console.error('Scan upload error:', error);
+    console.error('[SCAN] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
