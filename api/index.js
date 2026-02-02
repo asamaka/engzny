@@ -111,6 +111,7 @@ const getAnthropicClient = () => {
 // Middleware
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+app.use(express.raw({ type: 'image/*', limit: '20mb' }));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -156,39 +157,48 @@ app.post('/api/test', (req, res) => {
   });
 });
 
-app.post('/api/scan', async (req, res) => {
+app.post('/api/scan', upload.single('image'), async (req, res) => {
   console.log('[SCAN] Request received');
   console.log('[SCAN] Content-Type:', req.headers['content-type']);
-  console.log('[SCAN] Body type:', typeof req.body);
+  console.log('[SCAN] Has file:', !!req.file);
   console.log('[SCAN] Body keys:', Object.keys(req.body || {}));
   
   try {
-    const { image, mediaType } = req.body || {};
+    let base64Data = null;
+    let mimeType = 'image/jpeg';
     
-    if (!image) {
+    // Method 1: File upload (multipart/form-data)
+    if (req.file) {
+      console.log('[SCAN] Processing file upload, size:', req.file.size);
+      base64Data = req.file.buffer.toString('base64');
+      mimeType = req.file.mimetype;
+    }
+    // Method 2: JSON/Form body with base64 string
+    else if (req.body?.image) {
+      const image = req.body.image;
+      console.log('[SCAN] Processing body image, length:', image.length);
+      
+      if (image.startsWith('data:')) {
+        const matches = image.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mimeType = matches[1];
+          base64Data = matches[2];
+        }
+      } else {
+        base64Data = image;
+        mimeType = req.body.mediaType || 'image/jpeg';
+      }
+    }
+    // Method 3: Raw body (for iOS Shortcuts "File" mode)
+    else if (req.body && Buffer.isBuffer(req.body)) {
+      console.log('[SCAN] Processing raw buffer, size:', req.body.length);
+      base64Data = req.body.toString('base64');
+      mimeType = req.headers['content-type'] || 'image/jpeg';
+    }
+    
+    if (!base64Data) {
       console.log('[SCAN] Error: No image provided');
       return res.status(400).json({ error: 'No image provided' });
-    }
-    
-    // Check size - limit to 100KB base64 (~75KB image)
-    if (image.length > 150000) {
-      console.log('[SCAN] Error: Image too large:', image.length);
-      return res.status(400).json({ 
-        error: 'Image too large', 
-        message: `Image is ${Math.round(image.length/1024)}KB, max is 100KB. Please compress more.`
-      });
-    }
-    
-    // Parse data URL if provided
-    let base64Data = image;
-    let mimeType = mediaType || 'image/jpeg';
-    
-    if (image.startsWith('data:')) {
-      const matches = image.match(/^data:([^;]+);base64,(.+)$/);
-      if (matches) {
-        mimeType = matches[1];
-        base64Data = matches[2];
-      }
     }
     
     // Generate short code
