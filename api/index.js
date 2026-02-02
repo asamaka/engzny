@@ -160,59 +160,55 @@ app.post('/api/test', (req, res) => {
 app.post('/api/scan', upload.single('image'), async (req, res) => {
   console.log('[SCAN] Request received');
   console.log('[SCAN] Content-Type:', req.headers['content-type']);
-  console.log('[SCAN] Has file:', !!req.file);
-  console.log('[SCAN] Body keys:', Object.keys(req.body || {}));
   
   try {
     let base64Data = null;
     let mimeType = 'image/jpeg';
     
-    // Method 1: File upload (multipart/form-data)
+    // Method 1: File upload (multipart/form-data) - for iOS Shortcuts
     if (req.file) {
-      console.log('[SCAN] Processing file upload, size:', req.file.size);
+      console.log('[SCAN] File upload, size:', req.file.size);
       base64Data = req.file.buffer.toString('base64');
       mimeType = req.file.mimetype;
     }
-    // Method 2: JSON/Form body with base64 string
+    // Method 2: JSON body with image field
     else if (req.body?.image) {
       const image = req.body.image;
-      console.log('[SCAN] Processing body image, length:', image.length);
+      console.log('[SCAN] JSON body, image length:', image.length);
       
       if (image.startsWith('data:')) {
         const matches = image.match(/^data:([^;]+);base64,(.+)$/);
         if (matches) {
           mimeType = matches[1];
           base64Data = matches[2];
+        } else {
+          base64Data = image;
         }
       } else {
+        // Raw base64 without data URL prefix
         base64Data = image;
         mimeType = req.body.mediaType || 'image/jpeg';
       }
     }
-    // Method 3: Raw body (for iOS Shortcuts "File" mode)
-    else if (req.body && Buffer.isBuffer(req.body)) {
-      console.log('[SCAN] Processing raw buffer, size:', req.body.length);
+    // Method 3: Raw image body
+    else if (Buffer.isBuffer(req.body)) {
+      console.log('[SCAN] Raw buffer, size:', req.body.length);
       base64Data = req.body.toString('base64');
-      mimeType = req.headers['content-type'] || 'image/jpeg';
+      mimeType = req.headers['content-type']?.split(';')[0] || 'image/jpeg';
     }
     
     if (!base64Data) {
-      console.log('[SCAN] Error: No image provided');
       return res.status(400).json({ error: 'No image provided' });
     }
     
-    // Generate short code
     const code = generateShortCode();
-    console.log('[SCAN] Generated code:', code, 'image size:', base64Data.length);
+    console.log('[SCAN] Generated code:', code);
     
-    // Store image with 10 minute TTL
     await storage.setJob(`scan:${code}`, {
       imageData: base64Data,
       mediaType: mimeType,
       createdAt: new Date().toISOString(),
-    }, 600); // 10 minutes
-    
-    console.log('[SCAN] Stored successfully');
+    }, 600);
     
     res.json({
       success: true,
