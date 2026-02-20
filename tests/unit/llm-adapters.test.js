@@ -82,15 +82,15 @@ describe('LLM Adapters', () => {
 
       it('should use default model if not specified', () => {
         const adapter = new ClaudeAdapter({ apiKey: 'sk-ant-test123' });
-        expect(adapter.model).toBe('claude-sonnet-4-20250514');
+        expect(adapter.model).toBe('claude-opus-4-6');
       });
 
       it('should allow custom model configuration', () => {
         const adapter = new ClaudeAdapter({
           apiKey: 'sk-ant-test123',
-          model: 'claude-opus-4-6'
+          model: 'claude-sonnet-4-20250514'
         });
-        expect(adapter.model).toBe('claude-opus-4-6');
+        expect(adapter.model).toBe('claude-sonnet-4-20250514');
       });
 
       it('should use default maxTokens if not specified', () => {
@@ -135,7 +135,7 @@ describe('LLM Adapters', () => {
         mockClient.messages.create.mockResolvedValue({
           content: [{ type: 'text', text: 'Test analysis result' }],
           usage: { input_tokens: 100, output_tokens: 50 },
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-opus-4-6',
         });
       });
 
@@ -148,10 +148,10 @@ describe('LLM Adapters', () => {
 
         expect(result.text).toBe('Test analysis result');
         expect(result.usage).toBeDefined();
-        expect(result.model).toBe('claude-sonnet-4-20250514');
+        expect(result.model).toBe('claude-opus-4-6');
         expect(mockClient.messages.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            model: 'claude-sonnet-4-20250514',
+            model: 'claude-opus-4-6',
             max_tokens: 4096,
           })
         );
