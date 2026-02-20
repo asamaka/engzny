@@ -107,11 +107,11 @@ case 'my_new_card':
 3. Use `normalizeImagePayload()` for image endpoints
 4. Add SSE headers if streaming
 
-### Modifying the v2 Pipeline
+### Modifying the Pipeline
 1. Layout designer: `api/agents/layout-designer.js` (prompt + parsing)
 2. Card researcher: `api/agents/card-researcher.js` (per-card prompts)
 3. Orchestrator: `api/agents/orchestrator-v2.js` (pipeline flow)
-4. Frontend: `public/hub-v2.html` (rendering + SSE handling)
+4. Frontend: `public/hub-v2.html` (rendering + SSE handling, served at `/`)
 
 ### Adding a New LLM Provider
 1. Create adapter in `api/llm/<provider>.js` extending `LLMAdapter`

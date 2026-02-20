@@ -116,9 +116,9 @@ app.use(express.raw({ type: 'image/*', limit: '20mb' }));
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Paste page (for clipboard integration with Shortcuts)
+// Legacy /paste route - redirect to main page
 app.get('/paste', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
+  res.redirect('/');
 });
 
 // Scan page (for URL image testing - hash fragment method)
@@ -289,9 +289,14 @@ app.get('/api/scan', async (req, res) => {
   }
 });
 
-// Main route
+// Main route - v2 dynamic layout hub
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
+});
+
+// Legacy /hub route
+app.get('/hub', (req, res) => {
+  res.redirect('/');
 });
 
 
@@ -392,41 +397,8 @@ app.post('/api/keypoints', upload.single('image'), async (req, res) => {
 });
 
 // ============================================
-// Screenshot Intelligence Hub (v2) Routes
+// Shared Utilities
 // ============================================
-const buildHubPrompt = (question) => {
-  return `You are a helpful AI assistant that analyzes images to help users understand what they're looking at. 
-
-Your first action must always be to call render_hero to define the context and stop the scanner.
-
-Analyze this image thoroughly and provide your findings by calling the appropriate tools from the library:
-
-1. **What You See**: A clear description of the main content in the image.
-2. **Key Information**: Extract and highlight any important information visible (Text, Product names, News claims, Data, People/Places).
-3. **Fact Check & Context**: Assess credibility for news, share details for products, explain statistics, and identify ad fine print.
-4. **Helpful Insights**: Provide background info, things to be aware of, or related useful information.
-${question ? `5. **User's Question**: The user specifically asked: "${question}". Address this question directly.\n` : ''}
-
-Operational Rule: Be factual, helpful, and highlight anything the user should be cautious about (misleading claims, too-good-to-be-true offers, etc.). Translate these insights into tool calls to populate the user's dashboard.
-
-Tool Library (return tool calls only):
-- render_hero: { title, subtitle, badge, icon, hero_image }
-- render_metric: { title, label, value, color, subtext }
-- render_list: { title, items: [{ label, value, icon, active }] }
-- render_grid: { cells: [{ label, value, icon, dark_mode }] }
-- render_footer: { primary_btn: { label, icon }, secondary_btn: { icon } }
-
-Return ONLY raw JSON (no markdown fences, no commentary) with this shape and no extra keys:
-{
-  "toolCalls": [
-    { "tool": "render_hero", "args": { "title": "...", "subtitle": "...", "badge": "...", "icon": "...", "hero_image": "..." } },
-    { "tool": "render_metric", "args": { "title": "...", "label": "...", "value": "...", "color": "...", "subtext": "..." } }
-  ]
-}
-
-The first toolCalls entry must be render_hero.`;
-};
-
 const extractJsonPayload = (text) => {
   if (!text) return null;
   const match = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -504,207 +476,14 @@ const normalizeImagePayload = ({ image, mediaType }) => {
   return { imageData: base64Data, mediaType: mimeType };
 };
 
-app.post('/api/hub/analyze', async (req, res) => {
-  try {
-    const { image, question, mediaType } = req.body || {};
-    const normalized = normalizeImagePayload({ image, mediaType });
-
-    // Check for API key before creating adapter
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({
-        error: 'API Configuration Missing',
-        message: 'ANTHROPIC_API_KEY is not configured. Please set up your API key in the .env file.',
-        hint: 'Get your API key from https://console.anthropic.com/',
-      });
-    }
-
-    const adapter = new ClaudeAdapter();
-    const prompt = buildHubPrompt(question);
-    const responseFormat = {
-      type: 'object',
-      properties: {
-        toolCalls: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              tool: { type: 'string' },
-              args: {
-                type: 'object',
-                properties: {
-                  title: { type: 'string' },
-                  subtitle: { type: 'string' },
-                  badge: { type: 'string' },
-                  icon: { type: 'string' },
-                  hero_image: { type: 'string' },
-                  label: { type: 'string' },
-                  value: { type: 'string' },
-                  color: { type: 'string' },
-                  subtext: { type: 'string' },
-                  items: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        label: { type: 'string' },
-                        value: { type: 'string' },
-                        icon: { type: 'string' },
-                        active: { type: 'boolean' },
-                      },
-                    },
-                  },
-                  cells: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        label: { type: 'string' },
-                        value: { type: 'string' },
-                        icon: { type: 'string' },
-                        dark_mode: { type: 'boolean' },
-                      },
-                    },
-                  },
-                  primary_btn: {
-                    type: 'object',
-                    properties: {
-                      label: { type: 'string' },
-                      icon: { type: 'string' },
-                    },
-                  },
-                  secondary_btn: {
-                    type: 'object',
-                    properties: {
-                      icon: { type: 'string' },
-                    },
-                  },
-                },
-              },
-            },
-            required: ['tool', 'args'],
-          },
-        },
-      },
-      required: ['toolCalls'],
-    };
-
-    const result = await adapter.analyzeImage({
-      imageData: normalized.imageData,
-      mediaType: normalized.mediaType,
-      prompt,
-      responseFormat,
-    });
-
-    const parsed = extractJsonPayload(result.text);
-    const toolCalls = Array.isArray(parsed?.toolCalls)
-      ? parsed.toolCalls
-      : [
-          {
-            tool: 'render_hero',
-            args: {
-              title: 'Analysis incomplete',
-              subtitle: 'Claude response could not be parsed',
-              badge: 'Fallback',
-              icon: '⚠️',
-              hero_image: null,
-            },
-          },
-          {
-            tool: 'render_list',
-            args: {
-              title: 'Raw response',
-              items: [
-                {
-                  label: 'Output',
-                  value: (result.text || 'No output').slice(0, 140) + '...',
-                  icon: '📝',
-                  active: false,
-                },
-              ],
-            },
-          },
-        ];
-
-    res.json({
-      success: true,
-      toolCalls,
-      model: result.model,
-      usage: result.usage,
-    });
-  } catch (error) {
-    console.error('Hub analyze error:', error);
-
-    // Provide better error messages for common issues
-    let errorMessage = error.message || 'An unexpected error occurred';
-    let errorHint = null;
-
-    if (error.message?.includes('ANTHROPIC_API_KEY')) {
-      errorMessage = 'API key not configured';
-      errorHint = 'Please set ANTHROPIC_API_KEY in your .env file. Get a key from https://console.anthropic.com/';
-    } else if (error.message?.includes('API key not valid')) {
-      errorMessage = 'Invalid API key';
-      errorHint = 'Please check your ANTHROPIC_API_KEY in the .env file.';
-    }
-
-    res.status(500).json({
-      error: 'Analysis failed',
-      message: errorMessage,
-      hint: errorHint,
-    });
-  }
-});
-
-const getHubSampleFiles = () => {
-  const sampleDir = path.join(__dirname, '..', 'screens');
-  try {
-    return fs.readdirSync(sampleDir)
-      .filter((file) => /\.(png|jpe?g|webp|gif)$/i.test(file))
-      .slice(0, 5);
-  } catch {
-    return [];
-  }
-};
-
-app.get('/api/hub/samples', (req, res) => {
-  const samples = getHubSampleFiles();
-  res.json({ samples });
-});
-
-app.get('/api/hub/sample', (req, res) => {
-  const samples = getHubSampleFiles();
-  const requested = req.query.name;
-  const file = requested && samples.includes(requested) ? requested : samples[0];
-
-  if (!file) {
-    return res.status(404).json({
-      error: 'No samples available',
-      message: 'No screenshot samples found in /screens.',
-    });
-  }
-
-  const sampleDir = path.join(__dirname, '..', 'screens');
-  const filePath = path.join(sampleDir, file);
-  const buffer = fs.readFileSync(filePath);
-  const mediaType = detectMediaType(buffer) || 'image/jpeg';
-
-  res.json({
-    name: file,
-    dataUrl: `data:${mediaType};base64,${buffer.toString('base64')}`,
-  });
-});
-
 // ============================================
-// Hub v2: Enhanced Content Layout Pipeline
+// Content Layout Pipeline
 // Screenshot → Layout Designer → Parallel Card Research → Populated Layout
 // ============================================
 const { runPipeline } = require('./agents/orchestrator-v2');
 
-// Hub v2 page route
-app.get('/hub', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
-});
-
 // Hub v2 analyze - SSE endpoint for progressive card population
+// Primary analysis endpoint - v2 pipeline with SSE
 app.post('/api/hub/v2/analyze', async (req, res) => {
   try {
     const { image, question, mediaType: rawMediaType } = req.body || {};
@@ -1917,9 +1696,9 @@ app.get(UUID_REGEX, async (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'job.html'));
 });
 
-// Catch-all route for SPA
+// Catch-all route
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
 });
 
 // For local development

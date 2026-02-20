@@ -254,16 +254,14 @@ Response:
 ├── api/
 │   ├── index.js                  # Express server + all API routes
 │   ├── agents/
-│   │   ├── orchestrator.js       # v1 GIUE pipeline
-│   │   ├── orchestrator-v2.js    # v2 layout pipeline coordinator
+│   │   ├── orchestrator-v2.js    # Pipeline coordinator
 │   │   ├── layout-designer.js    # Vision LLM: designs card layouts
 │   │   └── card-researcher.js    # Research LLM: populates cards in parallel
 │   ├── contracts/
 │   │   └── card-types.js         # Card type schemas + layout definitions
 │   ├── generators/
 │   │   ├── vision-analyzer.js    # Screenshot hotspot detection
-│   │   ├── html-generator.js     # GIUE canvas HTML generation
-│   │   ├── canvas-generator.js   # Direct LLM-to-HTML generation
+│   │   ├── canvas-generator.js   # GIUE canvas generation
 │   │   ├── keypoint-extractor.js # Structured keypoint extraction
 │   │   └── style-manager.js      # Theme/color extraction
 │   └── llm/
@@ -272,11 +270,8 @@ Response:
 │       ├── gemini.js             # Gemini adapter (fallback)
 │       └── index.js              # Provider factory
 ├── public/
-│   ├── paste.html                # Mobile paste interface (home)
-│   ├── hub-v2.html               # Dynamic layout page (/hub)
-│   ├── index.html                # Desktop version
-│   ├── analyze.html              # v1 analysis page
-│   └── keypoints.html            # Card-based keypoints view
+│   ├── hub-v2.html               # Main page (served at /)
+│   └── keypoints.html            # Keypoint card navigation
 ├── tests/
 │   ├── unit/                     # 49 unit tests (mocked)
 │   └── integration/              # 3 health checks (real API)

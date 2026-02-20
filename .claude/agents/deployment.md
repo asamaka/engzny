@@ -4,6 +4,8 @@
 
 You are the **sole agent authorized to push code to production**. No other agent should push, merge to main, or trigger deployments. If another agent asks you to deploy, verify their changes first.
 
+You are also responsible for **monitoring deployment success** and **recovering from failures**.
+
 ## Pre-Deployment Checklist
 
 Before ANY push, you MUST complete every step:
@@ -51,34 +53,53 @@ git push -u origin claude/<branch-name>
 
 ## Post-Deployment Monitoring
 
-After push, the GitHub Actions workflow `auto-deploy-production.yml` triggers automatically.
+After push, TWO GitHub Actions workflows trigger:
 
-### What the Workflow Does
+### Workflow 1: `auto-deploy-production.yml` (auto-merge + deploy)
+Triggers on `claude/**` push when `api/**`, `public/**`, or `.claude/**` changed.
+
+Steps:
 1. Checks out `main`
-2. Merges your feature branch into `main`
+2. Merges feature branch into `main`
 3. Pushes merged `main`
 4. Installs Vercel CLI
-5. Configures environment variables
-6. Builds the project
-7. Deploys to Vercel production
+5. Configures ANTHROPIC_API_KEY on Vercel
+6. Builds project with `vercel build --prod`
+7. Deploys with `vercel deploy --prebuilt --prod`
 8. Waits 30 seconds
 9. Verifies health check at `/api/health`
 
+### Workflow 2: `deploy.yml` (test + deploy)
+Triggers on all `claude/**` pushes.
+
+Steps:
+1. Runs `npm test` (Node 20.x)
+2. If push to main/develop: deploys to production
+3. If PR: deploys preview
+
 ### Monitor for Failures
 
-After pushing, you should:
+After pushing, you MUST:
 
-1. **Wait ~3 minutes** for the workflow to complete
-2. **Check workflow status** (if `gh` CLI available):
+1. **Wait ~3 minutes** for the workflows to complete
+2. **Check workflow status**:
    ```bash
-   gh run list --branch <your-branch> --limit 3
+   gh run list --branch <your-branch> --limit 5
    ```
-3. **If workflow fails**, investigate:
-   - **Merge conflict**: Your branch diverged from main. Pull latest main, resolve conflicts, push again.
-   - **Test failure**: A test is failing in CI. Run `npm test` locally, fix, push again.
-   - **Build failure**: Vercel build error. Check if `vercel.json` routes are correct.
-   - **Deploy failure**: Vercel deploy error. Check secrets are configured.
-   - **Health check failure**: App deployed but unhealthy. Check Vercel function logs.
+   If `gh` is not available, check: `https://github.com/asamaka/engzny/actions`
+
+3. **If either workflow fails**, diagnose using this table:
+
+| Failure | Symptom | Fix |
+|---------|---------|-----|
+| **Merge conflict** | `auto-deploy` fails at merge step | `git fetch origin main && git merge origin/main`, resolve conflicts, push again |
+| **Test failure** | `deploy.yml` test job fails | Run `npm test` locally, fix failing tests, push again |
+| **Build failure** | Vercel build step fails | Check `vercel.json` routes, verify all imports resolve |
+| **Deploy failure** | Vercel deploy step fails | Verify VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID secrets exist |
+| **Health check failure** | Verification step fails | Check Vercel function logs, verify ANTHROPIC_API_KEY is set |
+| **Env var failure** | `ANTHROPIC_API_KEY` missing | Verify CLAUDE_API_KEY secret exists in GitHub repo settings |
+
+4. **Fix and re-push** - each new push triggers both workflows again
 
 ### Verify Production
 
@@ -88,14 +109,21 @@ After successful deployment:
    ```bash
    curl -s https://thinx.fun/api/health
    ```
-   Should return 200 with status info.
+   Should return 200 with JSON status.
 
-2. **Test the actual feature** that was changed:
-   - If UI change: visit https://thinx.fun/ and test
-   - If API change: curl the endpoint
-   - If v2 hub: visit https://thinx.fun/hub
+2. **Test the main page**:
+   - Visit https://thinx.fun/
+   - Paste a screenshot
+   - Verify cards load progressively
 
-3. **Check Vercel logs** for runtime errors (via Vercel dashboard)
+3. **Test the API**:
+   ```bash
+   curl -s -X POST https://thinx.fun/api/hub/v2/analyze \
+     -H "Content-Type: application/json" \
+     -d '{"image":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="}' \
+     --max-time 30
+   ```
+   Should return SSE events (not a 500 error).
 
 ## Failure Recovery
 
@@ -115,7 +143,7 @@ After successful deployment:
 ### Deployment Verification Failed
 1. Check Vercel function logs for errors
 2. Verify environment variables are set in Vercel
-3. If critical failure: the previous deployment is still live (Vercel keeps it)
+3. If critical: the previous deployment is still live (Vercel keeps it)
 4. Fix the issue, push a new commit
 
 ### Rollback
@@ -133,32 +161,28 @@ If a deployment causes production issues:
 | `VERCEL_TOKEN` | Vercel deployment token |
 | `VERCEL_ORG_ID` | Vercel organization ID |
 | `VERCEL_PROJECT_ID` | Vercel project ID |
-| `CLAUDE_API_KEY` | Anthropic API key (maps to ANTHROPIC_API_KEY) |
+| `CLAUDE_API_KEY` | Anthropic API key (maps to ANTHROPIC_API_KEY in Vercel) |
 
 ### Vercel Environment Variables (for runtime)
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Claude API key (synced from CLAUDE_API_KEY) |
-
-The auto-deploy workflow syncs `CLAUDE_API_KEY` -> `ANTHROPIC_API_KEY` on Vercel.
+| `ANTHROPIC_API_KEY` | Claude API key (auto-synced from CLAUDE_API_KEY by deploy workflow) |
 
 ## Deployment Triggers
 
-The `auto-deploy-production.yml` workflow triggers on:
-- Push to `claude/**` branches
-- When files in `api/**`, `public/**`, or `.claude/**` change
-- Manual workflow dispatch
-
-The `deploy.yml` workflow triggers on:
-- Push to `main`, `develop`, `claude/**`
-- PRs to `main`
+| Workflow | Triggers On | What It Does |
+|----------|-------------|--------------|
+| `auto-deploy-production.yml` | Push to `claude/**` (api/public/.claude changes) | Merge to main + Vercel prod deploy |
+| `deploy.yml` | Push to `main`/`develop`/`claude/**`, PRs to `main` | Test + deploy (prod for main/develop, preview for PRs) |
+| `tests.yml` | Push to `main`/`develop`/`claude/**`, PRs | Run test suite |
 
 ## Critical Rules
 
 1. **NEVER skip tests** - Tests are the last safety check
 2. **NEVER push to main directly** - Always use `claude/*` branches
 3. **NEVER use --force push** - Risk of losing others' work
-4. **NEVER deploy without verifying** - Always check production after deploy
+4. **NEVER deploy without monitoring** - Always check workflows after push
 5. **ALWAYS fix failing tests** - Don't work around them
 6. **ALWAYS use specific file staging** - Not `git add .`
 7. **ALWAYS include session URL** in commit messages for traceability
+8. **ALWAYS verify production** after successful deployment

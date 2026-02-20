@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-thinx.fun is a mobile-first screenshot intelligence app powered by Claude AI. Users paste screenshots and get structured, card-based analysis with dynamic layouts.
+thinx.fun is a mobile-first screenshot intelligence app powered by Claude AI. Users paste screenshots and get structured, card-based analysis with dynamic layouts chosen by the LLM.
 
 **Stack:** Node.js + Express + Vercel + Claude API
 **Production:** https://thinx.fun/
@@ -20,8 +20,8 @@ This project uses specialized agents with clear responsibilities. Each agent has
 **Responsibilities:**
 - Run tests before any push (`npm test` must pass)
 - Push to `claude/*` branches (triggers auto-deploy via GitHub Actions)
-- Monitor deployment status after push
-- Handle deployment failures (fix tests, resolve merge conflicts)
+- Monitor deployment status after push (check GitHub Actions)
+- Handle deployment failures (fix tests, resolve merge conflicts, verify Vercel)
 - Verify production health after deployment (`/api/health`)
 - Roll back if deployment verification fails
 
@@ -61,16 +61,15 @@ This project uses specialized agents with clear responsibilities. Each agent has
 api/
   index.js                    # Express server, all API routes
   agents/
-    orchestrator.js           # v1 GIUE pipeline coordinator
-    orchestrator-v2.js        # v2 layout pipeline (screenshot -> layout -> parallel research)
+    orchestrator-v2.js        # Pipeline coordinator (screenshot -> layout -> parallel research)
     layout-designer.js        # Vision LLM: analyzes screenshot, designs card layout
     card-researcher.js        # Research LLM: populates individual cards in parallel
   contracts/
     card-types.js             # Card type schemas + layout type definitions
   generators/
-    vision-analyzer.js        # Screenshot hotspot detection
-    html-generator.js         # HTML generation for GIUE canvas
-    canvas-generator.js       # Direct LLM-to-HTML generation
+    vision-analyzer.js        # Screenshot hotspot detection (GIUE canvas)
+    html-generator.js         # HTML generation (GIUE canvas)
+    canvas-generator.js       # Direct LLM-to-HTML generation (GIUE canvas)
     keypoint-extractor.js     # Structured keypoint extraction
     style-manager.js          # Theme/color extraction
   llm/
@@ -80,11 +79,9 @@ api/
     index.js                  # Provider factory
 
 public/
-  paste.html                  # Mobile home (clipboard paste)
-  hub-v2.html                 # New dynamic layout page (/hub)
-  analyze.html                # v1 analysis page
-  keypoints.html              # Card-based keypoints view
-  index.html                  # Desktop landing page
+  hub-v2.html                 # Main page (served at /)
+  keypoints.html              # Keypoint card navigation view
+  canvas.html                 # GIUE canvas view
 
 tests/
   unit/                       # 49 unit tests (mocked)
@@ -95,14 +92,41 @@ tests/
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/` | GET | Mobile paste page |
-| `/hub` | GET | New v2 dynamic layout page |
-| `/api/upload` | POST | Upload image, get jobId |
-| `/api/job/:id/stream` | GET | SSE stream for v1 analysis |
-| `/api/hub/analyze` | POST | v1 hub analysis (tool calls) |
-| `/api/hub/v2/analyze` | POST | v2 pipeline SSE (layout + parallel research) |
+| `/` | GET | Main page - dynamic layout hub |
+| `/api/hub/v2/analyze` | POST | Primary analysis SSE (layout + parallel research) |
 | `/api/keypoints` | POST | Keypoint extraction |
+| `/api/upload` | POST | Upload image, get jobId |
+| `/api/job/:id/stream` | GET | SSE stream for raw markdown analysis |
 | `/api/health` | GET | Health check |
+
+## Pipeline
+
+```
+Screenshot
+    |
+    v
+[Layout Designer LLM] -- Vision analysis
+    |                     - Content type, intent, top questions
+    |                     - Best layout selection
+    |                     - Placeholder card blueprint with research briefs
+    v
+[SSE: blueprint] -- Client renders placeholder cards immediately
+    |
+    v
+[Card Researcher LLMs] -- Run in PARALLEL (one per card)
+    |   |   |   |          - Each follows card type contract
+    v   v   v   v          - Populates card with researched data
+[SSE: card events] -- Each card animates in as it completes
+    |
+    v
+[Complete] -- All cards populated
+```
+
+### Card Types
+hero_summary, key_metric, info_list, fact_check, person_card, product_card, timeline_card, quote_card, comparison_card, warning_card, action_card, text_extract, location_card
+
+### Layout Types
+editorial, dashboard, product_showcase, social_feed, investigation, simple
 
 ## Deployment Pipeline
 
@@ -113,7 +137,6 @@ Push to claude/* branch
 GitHub Actions: auto-deploy-production.yml
         |
         +--> Merge feature branch -> main
-        +--> Install Vercel CLI
         +--> Configure env vars (ANTHROPIC_API_KEY)
         +--> Build project
         +--> Deploy to Vercel (production)
@@ -134,24 +157,3 @@ npm run test:health   # Integration health checks (real API)
 ```
 
 Tests MUST pass before any deployment. The Deployment Agent is responsible for this.
-
-## v2 Pipeline (New)
-
-The enhanced content layout pipeline:
-
-1. **Screenshot** -> Layout Designer LLM (vision analysis)
-   - Identifies content type, intent, top user questions
-   - Chooses the best layout (editorial, dashboard, product, social, investigation, simple)
-   - Creates placeholder cards with research briefs
-
-2. **Blueprint** -> Client via SSE (cards render as placeholders immediately)
-
-3. **Blueprint** -> Parallel Card Researchers (multiple LLM calls)
-   - Each card gets its own researcher
-   - Researchers populate cards per the card type contract
-   - As each completes -> SSE card event -> card animates in
-
-4. **Complete** -> All cards populated
-
-### Card Types Available
-hero_summary, key_metric, info_list, fact_check, person_card, product_card, timeline_card, quote_card, comparison_card, warning_card, action_card, text_extract, location_card
