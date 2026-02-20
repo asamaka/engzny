@@ -60,14 +60,9 @@ jobs:
           git fetch origin $BRANCH
 
           # Merge it
-          git merge origin/$BRANCH -m "Auto-merge: Deploy Claude Opus 4.6 to production
+          git merge origin/$BRANCH -m "Auto-merge: Deploy $BRANCH to production
 
           Automated merge from $BRANCH
-
-          Changes:
-          - Switch to Claude Opus 4.6
-          - Update API key to ANTHROPIC_API_KEY
-          - Add secret sync automation
 
           Triggered by: ${{ github.actor }}
           Workflow: ${{ github.workflow }}"
@@ -76,6 +71,15 @@ jobs:
           git push origin main
 
           echo "✅ Merged successfully!"
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
 
       - name: 📦 Install Vercel CLI
         run: npm install -g vercel@latest
@@ -98,12 +102,6 @@ jobs:
           echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY development --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in development"
 
           echo "✅ ANTHROPIC_API_KEY configured for all environments!"
-
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
 
       - name: 🔗 Pull Vercel Environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
@@ -142,19 +140,15 @@ jobs:
             exit 1
           fi
 
-          # Test that analyze endpoint doesn't return Gemini error
-          TEST_RESPONSE=$(curl -s -X POST "$PROD_URL/api/hub/analyze" \
-            -H "Content-Type: application/json" \
-            -d '{"image":"invalid"}')
+          # Test that the v2 hub page is served
+          PAGE=$(curl -s -w "\n%{http_code}" "$PROD_URL/")
+          PAGE_CODE=$(echo "$PAGE" | tail -n 1)
 
-          if echo "$TEST_RESPONSE" | grep -q "GEMINI"; then
-            echo "❌ Still showing Gemini errors!"
-            echo "$TEST_RESPONSE"
+          if [ "$PAGE_CODE" = "200" ]; then
+            echo "✅ Hub page loaded!"
+          else
+            echo "❌ Hub page failed with code: $PAGE_CODE"
             exit 1
-          fi
-
-          if echo "$TEST_RESPONSE" | grep -q "ANTHROPIC_API_KEY"; then
-            echo "✅ Correctly using ANTHROPIC_API_KEY!"
           fi
 
           echo "✅ All verification checks passed!"
@@ -165,10 +159,8 @@ jobs:
           echo "🎉 DEPLOYMENT SUCCESSFUL!"
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
-          echo "✅ Merged: ${{ github.event.inputs.branch }} → main"
-          echo "✅ Added: ANTHROPIC_API_KEY to Vercel"
+          echo "✅ Merged: ${{ steps.branch.outputs.branch }} → main"
           echo "✅ Deployed: ${{ steps.deploy.outputs.url }}"
-          echo "✅ Using: Claude Opus 4.6"
           echo ""
           echo "🌐 Production: https://thinx.fun/"
           echo ""
@@ -178,21 +170,21 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const branch = '${{ steps.branch.outputs.branch }}';
+            const deployUrl = '${{ steps.deploy.outputs.url }}';
             const output = `## 🚀 Production Deployment Successful!
 
             ### ✅ Changes Deployed
-            - Switched to **Claude Opus 4.6**
-            - Updated API key to \`ANTHROPIC_API_KEY\`
-            - Added automated secret sync
+            - Merged \`${branch}\` to main
+            - Deployed to production
 
             ### 🔗 Links
             - **Production**: https://thinx.fun/
-            - **Deployment**: ${{ steps.deploy.outputs.url }}
+            - **Deployment**: ${deployUrl}
 
             ### ✅ Verification
             - Health check: ✅ Passed
-            - API endpoint: ✅ Using Claude
-            - Environment: ✅ Configured
+            - Hub page: ✅ Loaded
 
             ---
             🤖 Automated deployment by GitHub Actions
@@ -202,7 +194,7 @@ jobs:
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              head: 'asamaka:${{ github.event.inputs.branch }}',
+              head: `asamaka:${branch}`,
               state: 'open'
             });
 
