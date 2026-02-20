@@ -20,6 +20,11 @@ env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
 jobs:
   merge-and-deploy:
     name: Merge, Configure & Deploy
