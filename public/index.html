@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Screenshot Intelligence Hub</title>
+  <title>thinx.fun – Screenshot Intelligence</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -16,551 +16,684 @@
 
     :root {
       color-scheme: dark;
-      --bg: #0b0f16;
-      --panel: rgba(18, 24, 36, 0.8);
-      --panel-solid: #121824;
-      --border: rgba(255, 255, 255, 0.08);
-      --text: #e8edf7;
-      --text-dim: #a2aec2;
-      --accent: #7bdcff;
-      --accent-strong: #5ed1ff;
-      --glow: rgba(123, 220, 255, 0.3);
-      --success: #8ee89d;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-shadow: rgba(0, 0, 0, 0.3);
+      --text-primary: rgba(255, 255, 255, 0.95);
+      --text-secondary: rgba(255, 255, 255, 0.6);
+      --text-tertiary: rgba(255, 255, 255, 0.4);
+      --accent: #0A84FF;
+      --accent-glow: rgba(10, 132, 255, 0.5);
+      --success: #30D158;
     }
 
     body {
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
-      background: radial-gradient(circle at top, #131a2b 0%, #0b0f16 60%);
-      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 50%, #16213e 100%);
+      background-attachment: fixed;
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Animated background orbs */
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 50%, rgba(10, 132, 255, 0.15) 0%, transparent 50%),
+                  radial-gradient(circle at 70% 50%, rgba(48, 209, 88, 0.1) 0%, transparent 50%),
+                  radial-gradient(circle at 50% 30%, rgba(255, 45, 85, 0.1) 0%, transparent 50%);
+      animation: drift 30s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes drift {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      33% { transform: translate(5%, -5%) rotate(120deg); }
+      66% { transform: translate(-5%, 5%) rotate(240deg); }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1e 50%, #16213e 100%);
+      background-attachment: fixed;
+      color: var(--text-primary);
       min-height: 100vh;
     }
 
     .app {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
       display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-      padding: 1.25rem;
-      width: 100%;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
     }
 
-    .stage {
+    /* Main glass container */
+    .glass-container {
+      width: 100%;
+      max-width: 800px;
+      min-height: 600px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+      border-radius: 32px;
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 8px 32px var(--glass-shadow),
+                  0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      padding: 4rem 3rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2.5rem;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
+      overflow: hidden;
+    }
+
+    .glass-container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%);
+    }
+
+    .glass-container.has-image {
+      max-width: 1200px;
+      min-height: 700px;
+      padding: 2rem;
+    }
+
+    /* Paste zone styling */
+    .paste-zone {
+      width: 100%;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .paste-zone.pasting {
+      transform: scale(0.98);
+      opacity: 0.8;
+    }
+
+    /* Icon */
+    .icon-container {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 1.5rem;
+    }
+
+    .icon-circle {
+      width: 120px;
+      height: 120px;
+      background: linear-gradient(135deg, var(--accent) 0%, #0066CC 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 32px var(--accent-glow),
+                  0 0 0 1px rgba(10, 132, 255, 0.3) inset;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      animation: float 6s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) scale(1); }
+      50% { transform: translateY(-10px) scale(1.02); }
+    }
+
+    .icon-circle:hover {
+      transform: scale(1.05) translateY(-5px);
+      box-shadow: 0 12px 48px var(--accent-glow),
+                  0 0 0 1px rgba(10, 132, 255, 0.5) inset;
+    }
+
+    .icon-circle svg {
+      width: 56px;
+      height: 56px;
+      filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+    }
+
+    /* Typography */
+    .heading {
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      background: linear-gradient(135deg, #ffffff 0%, rgba(255, 255, 255, 0.7) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+      line-height: 1.1;
+    }
+
+    .subheading {
+      font-size: 1.25rem;
+      font-weight: 400;
+      color: var(--text-secondary);
+      margin-bottom: 3rem;
+      line-height: 1.6;
+      max-width: 500px;
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      width: 100%;
+      min-height: 280px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 2px dashed var(--glass-border);
+      border-radius: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 3rem 2rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .drop-zone::before {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 24px;
+      padding: 2px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--success) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .drop-zone:hover::before,
+    .drop-zone.drag-over::before {
+      opacity: 1;
+    }
+
+    .drop-zone:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .drop-zone.drag-over {
+      background: rgba(10, 132, 255, 0.1);
+      border-color: var(--accent);
+      transform: scale(1.02);
+      box-shadow: 0 0 40px var(--accent-glow);
+    }
+
+    .drop-icon {
+      font-size: 4rem;
+      opacity: 0.3;
+      transition: all 0.3s ease;
+    }
+
+    .drop-zone:hover .drop-icon,
+    .drop-zone.drag-over .drop-icon {
+      opacity: 0.6;
+      transform: scale(1.1);
+    }
+
+    .drop-text {
+      font-size: 1.125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-hint {
+      font-size: 0.875rem;
+      color: var(--text-tertiary);
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin: 0 0.25rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+                  0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+    }
+
+    /* Screenshot preview */
+    .screenshot-preview {
+      display: none;
+      width: 100%;
+      max-width: 900px;
       border-radius: 24px;
       overflow: hidden;
-      background: #0f1522;
-      border: 1px solid var(--border);
-      min-height: 60vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      animation: slideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    .stage img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
+    .screenshot-preview.visible {
       display: block;
     }
 
-    .stage .placeholder {
-      color: var(--text-dim);
-      font-size: 0.95rem;
-      text-align: center;
-      padding: 2rem;
-      max-width: 320px;
+    .screenshot-preview img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 600px;
+      object-fit: contain;
     }
 
-    .scanning-overlay {
-      position: absolute;
-      inset: 0;
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    /* Buttons */
+    .button-group {
       display: flex;
-      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
       justify-content: center;
-      background: linear-gradient(180deg, rgba(9, 13, 22, 0.15) 0%, rgba(9, 13, 22, 0.6) 100%);
-      backdrop-filter: blur(6px);
-      transition: opacity 0.4s ease;
     }
 
-    .scanning-overlay.fade-out {
-      opacity: 0;
-      pointer-events: none;
-    }
-
-    .scanner-bar {
-      position: absolute;
-      left: 5%;
-      right: 5%;
-      height: 6px;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      box-shadow: 0 0 20px var(--glow);
-      border-radius: 999px;
-      animation: scan 3s ease-in-out infinite;
-    }
-
-    @keyframes scan {
-      0% { top: 10%; opacity: 0.2; }
-      50% { top: 80%; opacity: 0.8; }
-      100% { top: 10%; opacity: 0.2; }
-    }
-
-    .scan-status {
-      padding: 1rem 1.5rem;
-      background: rgba(14, 19, 30, 0.7);
-      border: 1px solid rgba(123, 220, 255, 0.2);
-      border-radius: 16px;
-      text-align: center;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-    }
-
-    .scan-status h2 {
+    .btn {
+      padding: 0.875rem 2rem;
       font-size: 1rem;
       font-weight: 600;
-      color: var(--accent-strong);
-      margin-bottom: 0.25rem;
-    }
-
-    .scan-status p {
-      font-size: 0.85rem;
-      color: var(--text-dim);
-    }
-
-    .intel-panel {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .glass {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 1.25rem;
-      backdrop-filter: blur(14px);
-    }
-
-    .hero {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--accent-strong);
-    }
-
-    .hero-title {
-      font-size: 1.4rem;
-      font-weight: 600;
-    }
-
-    .hero-subtitle {
-      font-size: 0.9rem;
-      color: var(--text-dim);
-    }
-
-    .hero-image {
-      width: 100%;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      background: #0b101c;
-    }
-
-    .hero-image img {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      display: block;
-    }
-
-    #intel-feed {
-      display: flex;
-      flex-direction: column;
-      gap: 0.85rem;
-    }
-
-    .intel-card {
-      background: var(--panel-solid);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 1rem;
-      animation: slideUp 0.45s ease;
-    }
-
-    @keyframes slideUp {
-      from { transform: translateY(12px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .metric-value {
-      font-size: 1.4rem;
-      font-weight: 600;
-      margin-top: 0.25rem;
-    }
-
-    .metric-subtext {
-      color: var(--text-dim);
-      font-size: 0.8rem;
-      margin-top: 0.5rem;
-    }
-
-    .list-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.4rem 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      font-size: 0.85rem;
-    }
-
-    .list-item:last-child {
-      border-bottom: none;
-    }
-
-    .list-item.active {
-      color: var(--success);
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.5rem;
-    }
-
-    .grid-cell {
-      padding: 0.75rem;
       border-radius: 12px;
-      background: rgba(17, 24, 38, 0.8);
-      border: 1px solid var(--border);
-    }
-
-    .grid-cell.dark {
-      background: #0b111b;
-    }
-
-    .footer-actions {
-      display: flex;
-      gap: 0.75rem;
-    }
-
-    .footer-actions button {
-      flex: 1;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text);
-      padding: 0.7rem 1rem;
-      font-size: 0.85rem;
-      cursor: pointer;
-      transition: border 0.2s ease, background 0.2s ease;
-    }
-
-    .footer-actions button.primary {
-      background: var(--accent-strong);
-      color: #05121c;
       border: none;
-      font-weight: 600;
-    }
-
-    .footer-actions button:hover {
-      border-color: rgba(123, 220, 255, 0.4);
-    }
-
-    .footer-note {
-      font-size: 0.7rem;
-      color: var(--text-dim);
-      margin-top: 0.5rem;
-    }
-
-    .upload-fallback {
-      margin-top: 1rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-
-    .upload-fallback input,
-    .upload-fallback button {
-      width: 100%;
-    }
-
-    .upload-fallback input {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 0.6rem 0.75rem;
-      color: var(--text);
-      font-size: 0.85rem;
-    }
-
-    .upload-fallback button {
-      border-radius: 10px;
-      border: none;
-      padding: 0.6rem 0.75rem;
-      background: rgba(123, 220, 255, 0.2);
-      color: var(--accent-strong);
       cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      font-family: inherit;
     }
 
-    @media (min-width: 980px) {
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent) 0%, #0066CC 100%);
+      color: white;
+      box-shadow: 0 4px 16px var(--accent-glow),
+                  0 0 0 1px rgba(10, 132, 255, 0.3) inset;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--accent-glow),
+                  0 0 0 1px rgba(10, 132, 255, 0.5) inset;
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border: 1px solid var(--glass-border);
+      backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary:active {
+      transform: translateY(0);
+    }
+
+    /* Loading state */
+    .loading {
+      display: none;
+      align-items: center;
+      gap: 1rem;
+      color: var(--text-secondary);
+      font-size: 1rem;
+    }
+
+    .loading.visible {
+      display: flex;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Hidden input */
+    input[type="file"] {
+      display: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .glass-container {
+        padding: 2.5rem 1.5rem;
+        border-radius: 24px;
+        min-height: 500px;
+      }
+
+      .heading {
+        font-size: 2rem;
+      }
+
+      .subheading {
+        font-size: 1rem;
+      }
+
+      .icon-container {
+        width: 90px;
+        height: 90px;
+      }
+
+      .icon-circle {
+        width: 90px;
+        height: 90px;
+      }
+
+      .icon-circle svg {
+        width: 42px;
+        height: 42px;
+      }
+
+      .drop-zone {
+        min-height: 220px;
+        padding: 2rem 1.5rem;
+      }
+
+      .drop-icon {
+        font-size: 3rem;
+      }
+
+      .button-group {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+
+    @media (max-width: 480px) {
       .app {
-        display: grid;
-        grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.6fr);
-        gap: 1.5rem;
-        padding: 2rem;
+        padding: 1rem;
       }
 
-      .intel-panel {
-        height: calc(100vh - 4rem);
-        position: sticky;
-        top: 2rem;
+      .glass-container {
+        padding: 2rem 1rem;
       }
 
-      #intel-feed {
-        overflow-y: auto;
-        padding-right: 0.25rem;
-        flex: 1;
+      .heading {
+        font-size: 1.75rem;
+      }
+
+      .subheading {
+        font-size: 0.9375rem;
       }
     }
   </style>
 </head>
 <body>
   <div class="app">
-    <section class="stage" id="stage">
-      <div class="placeholder" id="placeholder">
-        Share a screenshot via the iOS Intelligence Hub shortcut to begin analysis.
-        <div class="upload-fallback">
-          <input type="file" id="imageInput" accept="image/*">
-          <button id="loadSample">Use sample screenshot</button>
+    <div class="glass-container" id="glassContainer">
+      <!-- Icon -->
+      <div class="icon-container" id="iconContainer">
+        <div class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M17 8L12 3L7 8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12 3V15" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
         </div>
       </div>
-      <img id="screenshot" alt="Screenshot" hidden>
-      <div class="scanning-overlay" id="scanningOverlay">
-        <div class="scanner-bar" id="scannerBar"></div>
-        <div class="scan-status">
-          <h2>Analyzing Intent...</h2>
-          <p>Hydrating intelligence feed</p>
+
+      <!-- Content -->
+      <div class="paste-zone" id="pasteZone">
+        <h1 class="heading">Paste Your Screenshot</h1>
+        <p class="subheading">
+          Press <span class="kbd">⌘</span> <span class="kbd">V</span> or <span class="kbd">Ctrl</span> <span class="kbd">V</span> to paste from clipboard
+        </p>
+
+        <!-- Drop zone -->
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon">📋</div>
+          <div class="drop-text">Drop your screenshot here</div>
+          <div class="drop-hint">or click to browse files</div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="button-group">
+          <button class="btn btn-secondary" id="loadSampleBtn">
+            Try Sample Screenshot
+          </button>
         </div>
       </div>
-    </section>
 
-    <aside class="intel-panel">
-      <div id="hero-slot" class="glass hero">
-        <div class="hero-badge">Intelligence Hub</div>
-        <div class="hero-title">Awaiting screenshot</div>
-        <div class="hero-subtitle">Share an image to generate the dashboard.</div>
+      <!-- Loading state -->
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <span>Analyzing screenshot...</span>
       </div>
 
-      <div id="intel-feed"></div>
-
-      <div id="footer-slot" class="glass">
-        <div class="footer-actions">
-          <button class="primary">Ask a follow-up</button>
-          <button>Save report</button>
-        </div>
-        <div class="footer-note">Deprecated v1 experience available at /v1</div>
+      <!-- Screenshot preview (hidden initially) -->
+      <div class="screenshot-preview" id="screenshotPreview">
+        <img id="screenshotImage" alt="Screenshot">
       </div>
-    </aside>
+
+      <!-- Hidden file input -->
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
   </div>
 
   <script>
-    const screenshot = document.getElementById('screenshot');
-    const placeholder = document.getElementById('placeholder');
-    const scanningOverlay = document.getElementById('scanningOverlay');
-    const scannerBar = document.getElementById('scannerBar');
-    const heroSlot = document.getElementById('hero-slot');
-    const intelFeed = document.getElementById('intel-feed');
-    const footerSlot = document.getElementById('footer-slot');
-    const imageInput = document.getElementById('imageInput');
-    const loadSample = document.getElementById('loadSample');
+    // DOM Elements
+    const glassContainer = document.getElementById('glassContainer');
+    const pasteZone = document.getElementById('pasteZone');
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const loadSampleBtn = document.getElementById('loadSampleBtn');
+    const loading = document.getElementById('loading');
+    const screenshotPreview = document.getElementById('screenshotPreview');
+    const screenshotImage = document.getElementById('screenshotImage');
+    const iconContainer = document.getElementById('iconContainer');
 
-    const stopScanner = () => {
-      if (scannerBar) scannerBar.style.display = 'none';
-      if (scanningOverlay) scanningOverlay.classList.add('fade-out');
-    };
+    // State
+    let currentImageData = null;
 
-    const resetScanner = () => {
-      if (scannerBar) scannerBar.style.display = 'block';
-      if (scanningOverlay) scanningOverlay.classList.remove('fade-out');
-    };
+    // Handle paste event
+    document.addEventListener('paste', async (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
 
-    const toolLibrary = {
-      render_hero: (args) => {
-        stopScanner();
-        heroSlot.innerHTML = `
-          <div class="hero-badge">${args.badge || 'Intent Detected'}</div>
-          <div class="hero-title">${args.title || 'Screenshot Insight'}</div>
-          <div class="hero-subtitle">${args.subtitle || 'AI analysis ready'}</div>
-          ${args.hero_image ? `
-            <div class="hero-image"><img src="${args.hero_image}" alt="Hero image"></div>
-          ` : ''}
-        `;
-      },
-      render_metric: (args) => {
-        const card = document.createElement('div');
-        card.className = 'intel-card';
-        card.innerHTML = `
-          <div style="font-size:0.8rem; color: var(--text-dim);">${args.label || ''}</div>
-          <div class="metric-value" style="color:${args.color || 'var(--text)'};">${args.value || ''}</div>
-          <div style="font-size:0.9rem; margin-top:0.5rem;">${args.title || ''}</div>
-          ${args.subtext ? `<div class="metric-subtext">${args.subtext}</div>` : ''}
-        `;
-        intelFeed.appendChild(card);
-      },
-      render_list: (args) => {
-        const card = document.createElement('div');
-        card.className = 'intel-card';
-        card.innerHTML = `
-          <div style="font-weight:600; margin-bottom:0.5rem;">${args.title || ''}</div>
-          ${Array.isArray(args.items) ? args.items.map(item => `
-            <div class="list-item ${item.active ? 'active' : ''}">
-              <span>${item.icon ? item.icon + ' ' : ''}${item.label || ''}</span>
-              <span>${item.value || ''}</span>
-            </div>
-          `).join('') : ''}
-        `;
-        intelFeed.appendChild(card);
-      },
-      render_grid: (args) => {
-        const card = document.createElement('div');
-        card.className = 'intel-card';
-        card.innerHTML = `
-          <div class="grid">
-            ${Array.isArray(args.cells) ? args.cells.map(cell => `
-              <div class="grid-cell ${cell.dark_mode ? 'dark' : ''}">
-                <div style="font-size:0.75rem; color: var(--text-dim);">${cell.label || ''}</div>
-                <div style="margin-top:0.35rem; font-weight:600;">${cell.value || ''}</div>
-              </div>
-            `).join('') : ''}
-          </div>
-        `;
-        intelFeed.appendChild(card);
-      },
-      render_footer: (args) => {
-        footerSlot.innerHTML = `
-          <div class="footer-actions">
-            <button class="primary">${args.primary_btn?.icon ? args.primary_btn.icon + ' ' : ''}${args.primary_btn?.label || 'Continue'}</button>
-            <button>${args.secondary_btn?.icon || '⋯'}</button>
-          </div>
-          <div class="footer-note">${args.note || 'Dashboard hydrated from screenshot intelligence.'}</div>
-        `;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (file) {
+            pasteZone.classList.add('pasting');
+            setTimeout(() => pasteZone.classList.remove('pasting'), 300);
+            await handleImage(file);
+          }
+          break;
+        }
       }
-    };
+    });
 
-    const applyToolCalls = (toolCalls = []) => {
-      let delay = 0;
-      toolCalls.forEach((call, index) => {
-        const toolFn = toolLibrary[call.tool];
-        if (!toolFn) return;
-        const schedule = index === 0 ? 0 : (delay += 350);
-        setTimeout(() => toolFn(call.args || {}), schedule);
+    // Handle drag and drop
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+
+      const file = e.dataTransfer?.files?.[0];
+      if (file && file.type.startsWith('image/')) {
+        await handleImage(file);
+      }
+    });
+
+    // Handle click to browse
+    dropZone.addEventListener('click', () => {
+      fileInput.click();
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await handleImage(file);
+      }
+    });
+
+    // Load sample screenshot
+    loadSampleBtn.addEventListener('click', async () => {
+      try {
+        showLoading();
+        const response = await fetch('/api/hub/sample');
+        const data = await response.json();
+
+        if (response.ok && data.dataUrl) {
+          currentImageData = data.dataUrl;
+          showScreenshot(data.dataUrl);
+          await analyzeScreenshot(data.dataUrl);
+        } else {
+          throw new Error(data.message || 'No sample available');
+        }
+      } catch (error) {
+        hideLoading();
+        alert('Failed to load sample: ' + error.message);
+      }
+    });
+
+    // Handle image file
+    async function handleImage(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const dataUrl = e.target.result;
+          currentImageData = dataUrl;
+          showScreenshot(dataUrl);
+          await analyzeScreenshot(dataUrl);
+          resolve();
+        };
+        reader.readAsDataURL(file);
       });
-    };
+    }
 
-    const decodeImageFromQuery = () => {
-      const params = new URLSearchParams(window.location.search);
-      const encoded = params.get('image');
-      if (!encoded) return null;
+    // Show screenshot preview
+    function showScreenshot(dataUrl) {
+      screenshotImage.src = dataUrl;
+      screenshotPreview.classList.add('visible');
+      pasteZone.style.display = 'none';
+      iconContainer.style.display = 'none';
+      glassContainer.classList.add('has-image');
+    }
+
+    // Show loading
+    function showLoading() {
+      loading.classList.add('visible');
+      pasteZone.style.display = 'none';
+      iconContainer.style.display = 'none';
+    }
+
+    // Hide loading
+    function hideLoading() {
+      loading.classList.remove('visible');
+    }
+
+    // Analyze screenshot
+    async function analyzeScreenshot(dataUrl) {
       try {
-        return decodeURIComponent(encoded.replace(/ /g, '+'));
-      } catch (err) {
-        return encoded.replace(/ /g, '+');
-      }
-    };
+        showLoading();
 
-    const setUrlImageParam = (dataUrl) => {
-      if (!dataUrl) return;
-      const encoded = encodeURIComponent(dataUrl);
-      const newUrl = `${window.location.pathname}?image=${encoded}`;
-      window.history.replaceState({}, '', newUrl);
-    };
-
-    const setScreenshot = (dataUrl) => {
-      if (!dataUrl) return;
-      screenshot.src = dataUrl.startsWith('data:') ? dataUrl : `data:image/png;base64,${dataUrl}`;
-      screenshot.hidden = false;
-      placeholder.style.display = 'none';
-    };
-
-    const analyzeScreenshot = async (payload) => {
-      try {
         const response = await fetch('/api/hub/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ image: dataUrl }),
         });
+
         const data = await response.json();
+        hideLoading();
+
         if (!response.ok) {
           throw new Error(data.message || 'Analysis failed');
         }
-        intelFeed.innerHTML = '';
-        applyToolCalls(data.toolCalls || []);
+
+        // Redirect to results page or show inline results
+        // For now, we'll just show the image
+        console.log('Analysis result:', data);
+
       } catch (error) {
-        stopScanner();
-        heroSlot.innerHTML = `
-          <div class="hero-badge">Analysis unavailable</div>
-          <div class="hero-title">${error.message || 'Unable to analyze screenshot'}</div>
-          <div class="hero-subtitle">Check API configuration and try again.</div>
-        `;
+        hideLoading();
+        alert('Analysis failed: ' + error.message);
       }
-    };
+    }
 
-    const loadSampleImage = async () => {
-      const response = await fetch('/api/hub/sample');
-      const data = await response.json();
-      if (response.ok && data.dataUrl) {
-        return data.dataUrl;
+    // Check URL for existing image
+    function checkUrlForImage() {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get('image');
+
+      if (encoded) {
+        try {
+          const dataUrl = decodeURIComponent(encoded.replace(/ /g, '+'));
+          currentImageData = dataUrl;
+          showScreenshot(dataUrl);
+          analyzeScreenshot(dataUrl);
+        } catch (error) {
+          console.error('Failed to load image from URL:', error);
+        }
       }
-      throw new Error('No sample image available');
-    };
+    }
 
-    const bootstrap = async () => {
-      const imageParam = decodeImageFromQuery();
-      if (imageParam) {
-        setScreenshot(imageParam);
-        resetScanner();
-        analyzeScreenshot({ image: imageParam });
-        return;
-      }
-      stopScanner();
-    };
-
-    imageInput.addEventListener('change', () => {
-      const file = imageInput.files && imageInput.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        setScreenshot(reader.result);
-        setUrlImageParam(reader.result);
-        resetScanner();
-        analyzeScreenshot({ image: reader.result });
-      };
-      reader.readAsDataURL(file);
-    });
-
-    loadSample.addEventListener('click', async () => {
-      try {
-        const dataUrl = await loadSampleImage();
-        setScreenshot(dataUrl);
-        setUrlImageParam(dataUrl);
-        resetScanner();
-        analyzeScreenshot({ image: dataUrl });
-      } catch (error) {
-        heroSlot.innerHTML = `
-          <div class="hero-badge">Sample error</div>
-          <div class="hero-title">${error.message}</div>
-          <div class="hero-subtitle">Check /screens for sample files.</div>
-        `;
-      }
-    });
-
-    bootstrap();
+    // Initialize
+    checkUrlForImage();
   </script>
 </body>
 </html>
