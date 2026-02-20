@@ -115,8 +115,6 @@ app.use(express.raw({ type: 'image/*', limit: '20mb' }));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// Deprecated v1 snapshot
-app.use('/v1', express.static(path.join(__dirname, '..', 'v1', 'public')));
 
 // Paste page (for clipboard integration with Shortcuts)
 app.get('/paste', (req, res) => {
@@ -296,15 +294,101 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Deprecated v1 route
-app.get('/v1', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'v1', 'public', 'index.html'));
-});
-
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// Keypoints Extraction API
+// Extract structured keypoints from screenshots with card-based navigation
+// ============================================
+const { extractKeypoints } = require('./generators/keypoint-extractor');
+
+app.post('/api/keypoints', upload.single('image'), async (req, res) => {
+  try {
+    let imageData = null;
+    let mediaType = null;
+
+    // Handle JSON request with base64 image (from Apple Shortcuts)
+    if (req.is('application/json') || (req.body && req.body.image && typeof req.body.image === 'string')) {
+      const body = req.body;
+
+      if (!body.image) {
+        return res.status(400).json({ error: 'No image provided' });
+      }
+
+      let base64Data = body.image;
+
+      // Extract media type and data from data URL if present
+      if (base64Data.startsWith('data:')) {
+        const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mediaType = matches[1];
+          base64Data = matches[2];
+        } else {
+          return res.status(400).json({ error: 'Invalid image format' });
+        }
+      } else {
+        mediaType = body.mediaType || body.media_type || 'image/png';
+      }
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/]+=*$/.test(base64Data)) {
+        return res.status(400).json({ error: 'Invalid base64 data' });
+      }
+
+      imageData = base64Data;
+
+    } else if (req.file) {
+      // Traditional multipart file upload
+      imageData = req.file.buffer.toString('base64');
+      mediaType = req.file.mimetype;
+    } else {
+      return res.status(400).json({
+        error: 'No image provided',
+        message: 'Provide image as multipart form-data or JSON with base64'
+      });
+    }
+
+    // Validate media type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(mediaType)) {
+      return res.status(400).json({
+        error: 'Invalid image type',
+        message: `Supported: JPEG, PNG, GIF, WebP. Got: ${mediaType}`
+      });
+    }
+
+    console.log('[KEYPOINTS] Extracting keypoints from image...');
+
+    // Extract keypoints using Claude Vision
+    const result = await extractKeypoints({
+      imageData,
+      mediaType,
+      adapterConfig: {
+        provider: 'claude', // Use Claude for best vision analysis
+      },
+    });
+
+    console.log('[KEYPOINTS] Extraction complete:', result.keypoints.length, 'keypoints found');
+
+    res.json({
+      success: true,
+      overview: result.overview,
+      keypoints: result.keypoints,
+      trails: result.trails,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    console.error('[KEYPOINTS] Error:', error);
+    res.status(500).json({
+      error: 'Keypoint extraction failed',
+      message: error.message
+    });
+  }
 });
 
 // ============================================
@@ -424,6 +508,16 @@ app.post('/api/hub/analyze', async (req, res) => {
   try {
     const { image, question, mediaType } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType });
+
+    // Check for API key before creating adapter
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: 'API Configuration Missing',
+        message: 'GEMINI_API_KEY is not configured. Please set up your API key in the .env file.',
+        hint: 'Get your API key from https://ai.google.dev/',
+      });
+    }
+
     const adapter = new GeminiAdapter();
     const prompt = buildHubPrompt(question);
     const responseFormat = {
@@ -539,9 +633,23 @@ app.post('/api/hub/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('Hub analyze error:', error);
+
+    // Provide better error messages for common issues
+    let errorMessage = error.message || 'An unexpected error occurred';
+    let errorHint = null;
+
+    if (error.message?.includes('GEMINI_API_KEY')) {
+      errorMessage = 'API key not configured';
+      errorHint = 'Please set GEMINI_API_KEY in your .env file. Get a key from https://ai.google.dev/';
+    } else if (error.message?.includes('API key not valid')) {
+      errorMessage = 'Invalid API key';
+      errorHint = 'Please check your GEMINI_API_KEY in the .env file.';
+    }
+
     res.status(500).json({
       error: 'Analysis failed',
-      message: error.message || 'An unexpected error occurred',
+      message: errorMessage,
+      hint: errorHint,
     });
   }
 });

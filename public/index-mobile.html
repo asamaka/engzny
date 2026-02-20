@@ -218,43 +218,10 @@
             transition: all 0.3s ease;
             cursor: pointer;
         }
-
+        
         .results-image:hover {
             opacity: 1;
             transform: scale(1.05);
-        }
-
-        .keypoints-btn {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 14px 20px;
-            background: var(--accent);
-            color: #000;
-            border: none;
-            border-radius: 25px;
-            font-family: inherit;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0, 255, 170, 0.3);
-            transition: all 0.3s ease;
-            z-index: 1000;
-            display: none;
-        }
-
-        .keypoints-btn.visible {
-            display: block;
-        }
-
-        .keypoints-btn:hover {
-            background: var(--accent-hover);
-            box-shadow: 0 6px 16px rgba(0, 255, 170, 0.4);
-            transform: translateY(-2px);
-        }
-
-        .keypoints-btn:active {
-            transform: translateY(0);
         }
         
         .results-content {
@@ -419,7 +386,6 @@
             <span class="cursor" id="cursor"></span>
         </div>
         <div class="scroll-indicator" id="scrollIndicator">auto-scroll paused</div>
-        <button class="keypoints-btn" id="keypointsBtn">🔍 View Keypoints</button>
     </div>
     
     <!-- Error State -->
@@ -578,10 +544,9 @@
                                     isStreaming = false;
                                     cursor.classList.add('done');
                                     resultsContent.classList.remove('auto-scroll');
-                                    keypointsBtn.classList.add('visible');
                                     return;
                                 }
-
+                                
                                 if (data.type === 'error') {
                                     if (!transitionedToResults) {
                                         showError(data.message || 'analysis failed');
@@ -601,15 +566,12 @@
                 isStreaming = false;
                 cursor.classList.add('done');
                 resultsContent.classList.remove('auto-scroll');
-
-                // Show keypoints button when analysis is complete
-                keypointsBtn.classList.add('visible');
-
+                
             } catch (err) {
                 console.error('Stream error:', err);
                 isStreaming = false;
                 cursor.classList.add('done');
-
+                
                 if (!transitionedToResults) {
                     showError('connection lost');
                 }
@@ -675,39 +637,18 @@
             }
             rawText = '';
             resultsText.innerHTML = '';
-            keypointsBtn.classList.remove('visible');
             showState('paste');
         }
         
-        // Keypoints button
-        const keypointsBtn = document.getElementById('keypointsBtn');
-
         // Event listeners
         pasteZone.addEventListener('click', readClipboard);
         retryBtn.addEventListener('click', reset);
-
+        
         // Image click to view full
         resultsImage.addEventListener('click', () => {
             // Could open lightbox, for now just open in new tab
             if (currentImageUrl) {
                 window.open(currentImageUrl, '_blank');
-            }
-        });
-
-        // Keypoints button click
-        keypointsBtn.addEventListener('click', () => {
-            if (currentImageUrl) {
-                // Convert blob URL to base64 and store in sessionStorage
-                fetch(currentImageUrl)
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            sessionStorage.setItem('currentImage', reader.result);
-                            window.location.href = '/keypoints.html';
-                        };
-                        reader.readAsDataURL(blob);
-                    });
             }
         });
         
