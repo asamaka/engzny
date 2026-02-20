@@ -1,0 +1,14 @@
+This is a placeholder for test images.
+
+For actual testing with real images, you can:
+1. Add PNG/JPG screenshots to this directory
+2. Use base64-encoded test images
+3. Generate small test images programmatically
+
+Example test images to add:
+- sample-screenshot.png (Mobile app screenshot)
+- test-dashboard.png (Dashboard view)
+- error-screen.png (Error message screenshot)
+- ui-mockup.png (UI design mockup)
+
+The tests will use these images to validate vision analysis functionality.
