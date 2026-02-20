@@ -18,7 +18,7 @@ class ClaudeAdapter extends LLMAdapter {
     }
     
     this.client = new Anthropic({ apiKey: this.apiKey });
-    this.model = config.model || 'claude-sonnet-4-20250514';
+    this.model = config.model || 'claude-opus-4-6';
     this.maxTokens = config.maxTokens || 4096;
   }
 

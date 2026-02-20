@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const sharp = require('sharp');
-const { GeminiAdapter } = require('./llm/gemini');
+const { ClaudeAdapter } = require('./llm/claude');
 
 const app = express();
 
@@ -510,15 +510,15 @@ app.post('/api/hub/analyze', async (req, res) => {
     const normalized = normalizeImagePayload({ image, mediaType });
 
     // Check for API key before creating adapter
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.ANTHROPIC_API_KEY) {
       return res.status(500).json({
         error: 'API Configuration Missing',
-        message: 'GEMINI_API_KEY is not configured. Please set up your API key in the .env file.',
-        hint: 'Get your API key from https://ai.google.dev/',
+        message: 'ANTHROPIC_API_KEY is not configured. Please set up your API key in the .env file.',
+        hint: 'Get your API key from https://console.anthropic.com/',
       });
     }
 
-    const adapter = new GeminiAdapter();
+    const adapter = new ClaudeAdapter();
     const prompt = buildHubPrompt(question);
     const responseFormat = {
       type: 'object',
@@ -603,7 +603,7 @@ app.post('/api/hub/analyze', async (req, res) => {
             tool: 'render_hero',
             args: {
               title: 'Analysis incomplete',
-              subtitle: 'Gemini response could not be parsed',
+              subtitle: 'Claude response could not be parsed',
               badge: 'Fallback',
               icon: '⚠️',
               hero_image: null,
@@ -638,12 +638,12 @@ app.post('/api/hub/analyze', async (req, res) => {
     let errorMessage = error.message || 'An unexpected error occurred';
     let errorHint = null;
 
-    if (error.message?.includes('GEMINI_API_KEY')) {
+    if (error.message?.includes('ANTHROPIC_API_KEY')) {
       errorMessage = 'API key not configured';
-      errorHint = 'Please set GEMINI_API_KEY in your .env file. Get a key from https://ai.google.dev/';
+      errorHint = 'Please set ANTHROPIC_API_KEY in your .env file. Get a key from https://console.anthropic.com/';
     } else if (error.message?.includes('API key not valid')) {
       errorMessage = 'Invalid API key';
-      errorHint = 'Please check your GEMINI_API_KEY in the .env file.';
+      errorHint = 'Please check your ANTHROPIC_API_KEY in the .env file.';
     }
 
     res.status(500).json({
