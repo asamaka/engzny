@@ -291,7 +291,7 @@ app.get('/api/scan', async (req, res) => {
 
 // Main route
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, '..', 'public', 'paste.html'));
 });
 
 
