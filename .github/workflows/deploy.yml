@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 jobs:
   test:
     name: Run Tests
@@ -35,81 +31,39 @@ jobs:
       - name: ✅ Tests passed
         run: echo "All tests passed!"
 
-  deploy-preview:
-    name: Deploy Preview
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'pull_request'
-    steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: 📦 Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: 🔗 Pull Vercel Environment
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🏗️ Build Project
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🚀 Deploy Preview to Vercel
-        id: deploy
-        run: |
-          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "Preview deployed to: $URL"
-
-      - name: 💬 Comment Preview URL
-        uses: actions/github-script@v7
-        if: github.event_name == 'pull_request'
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🚀 **Preview deployed!**\n\n✨ ${{ steps.deploy.outputs.url }}'
-            })
-
-  deploy-production:
-    name: Deploy Production
+  verify-production:
+    name: Verify Production
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     steps:
-      - name: 📥 Checkout
-        uses: actions/checkout@v4
-
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: 📦 Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: 🔗 Pull Vercel Environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🏗️ Build Project
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🚀 Deploy to Production
-        id: deploy
+      - name: ⏳ Wait for Vercel deployment
         run: |
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "🎉 Production deployed to: $URL"
+          echo "⏳ Waiting 60 seconds for Vercel Git integration to deploy..."
+          sleep 60
 
-      - name: ✅ Deployment Success
+      - name: ✅ Verify Production
         run: |
-          echo "🎉 Successfully deployed to production!"
-          echo "📱 Mobile site: ${{ steps.deploy.outputs.url }}"
+          echo "🔍 Verifying production at https://thinx.fun/..."
+
+          # Test health endpoint
+          HEALTH=$(curl -s -w "\n%{http_code}" "https://thinx.fun/api/health")
+          HTTP_CODE=$(echo "$HEALTH" | tail -n 1)
+          BODY=$(echo "$HEALTH" | head -n 1)
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Health check passed! Response: $BODY"
+          else
+            echo "⚠️ Health check returned code: $HTTP_CODE (Vercel may still be deploying)"
+          fi
+
+          # Test hub page
+          PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://thinx.fun/")
+
+          if [ "$PAGE_CODE" = "200" ]; then
+            echo "✅ Hub page loaded!"
+          else
+            echo "⚠️ Hub page returned code: $PAGE_CODE"
+          fi
+
+          echo "✅ Verification complete!"

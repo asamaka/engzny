@@ -16,10 +16,6 @@ on:
         required: false
         default: ''
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
 permissions:
   contents: write
   pull-requests: write
@@ -27,7 +23,7 @@ permissions:
 
 jobs:
   merge-and-deploy:
-    name: Merge, Configure & Deploy
+    name: Merge & Deploy
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout
@@ -48,6 +44,20 @@ jobs:
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "Using branch: $BRANCH"
 
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🧪 Run tests
+        run: npm test
+        env:
+          NODE_ENV: test
+
       - name: 🔀 Merge feature branch to main
         run: |
           BRANCH="${{ steps.branch.outputs.branch }}"
@@ -67,82 +77,35 @@ jobs:
           Triggered by: ${{ github.actor }}
           Workflow: ${{ github.workflow }}"
 
-          # Push to main
+          # Push to main (triggers Vercel's native Git integration deploy)
           git push origin main
 
-          echo "✅ Merged successfully!"
+          echo "✅ Merged and pushed to main!"
 
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20.x'
-          cache: 'npm'
-
-      - name: 📦 Install dependencies
-        run: npm ci
-
-      - name: 📦 Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: 🔐 Configure Vercel Environment Variables
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+      - name: ⏳ Wait for Vercel deployment
         run: |
-          echo "🔐 Adding ANTHROPIC_API_KEY to Vercel..."
-
-          # Use Vercel CLI to add environment variable
-          # Add to production
-          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY production --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in production"
-
-          # Add to preview
-          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY preview --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in preview"
-
-          # Add to development
-          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY development --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in development"
-
-          echo "✅ ANTHROPIC_API_KEY configured for all environments!"
-
-      - name: 🔗 Pull Vercel Environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🏗️ Build Project
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: 🚀 Deploy to Production
-        id: deploy
-        run: |
-          echo "🚀 Deploying to production..."
-          URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "url=$URL" >> $GITHUB_OUTPUT
-          echo "✅ Deployed to: $URL"
-
-      - name: ⏳ Wait for deployment to be ready
-        run: |
-          echo "⏳ Waiting 30 seconds for deployment to be live..."
-          sleep 30
+          echo "⏳ Waiting 60 seconds for Vercel to deploy from main..."
+          sleep 60
 
       - name: ✅ Verify Deployment
-        id: verify
         run: |
           echo "🔍 Verifying production deployment..."
 
-          PROD_URL="${{ steps.deploy.outputs.url }}"
-
           # Test health endpoint
-          HEALTH=$(curl -s -w "\n%{http_code}" "$PROD_URL/api/health")
+          HEALTH=$(curl -s -w "\n%{http_code}" "https://thinx.fun/api/health")
           HTTP_CODE=$(echo "$HEALTH" | tail -n 1)
+          BODY=$(echo "$HEALTH" | head -n 1)
 
           if [ "$HTTP_CODE" = "200" ]; then
-            echo "✅ Health check passed!"
+            echo "✅ Health check passed! Response: $BODY"
           else
             echo "❌ Health check failed with code: $HTTP_CODE"
+            echo "Response: $BODY"
             exit 1
           fi
 
-          # Test that the v2 hub page is served
-          PAGE=$(curl -s -w "\n%{http_code}" "$PROD_URL/")
-          PAGE_CODE=$(echo "$PAGE" | tail -n 1)
+          # Test that the hub page loads
+          PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://thinx.fun/")
 
           if [ "$PAGE_CODE" = "200" ]; then
             echo "✅ Hub page loaded!"
@@ -160,50 +123,8 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           echo ""
           echo "✅ Merged: ${{ steps.branch.outputs.branch }} → main"
-          echo "✅ Deployed: ${{ steps.deploy.outputs.url }}"
+          echo "✅ Deployed via Vercel Git integration"
           echo ""
           echo "🌐 Production: https://thinx.fun/"
           echo ""
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-      - name: 📝 Post deployment comment
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const branch = '${{ steps.branch.outputs.branch }}';
-            const deployUrl = '${{ steps.deploy.outputs.url }}';
-            const output = `## 🚀 Production Deployment Successful!
-
-            ### ✅ Changes Deployed
-            - Merged \`${branch}\` to main
-            - Deployed to production
-
-            ### 🔗 Links
-            - **Production**: https://thinx.fun/
-            - **Deployment**: ${deployUrl}
-
-            ### ✅ Verification
-            - Health check: ✅ Passed
-            - Hub page: ✅ Loaded
-
-            ---
-            🤖 Automated deployment by GitHub Actions
-            `;
-
-            // Find open PRs from the branch
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              head: `asamaka:${branch}`,
-              state: 'open'
-            });
-
-            // Comment on the PR if it exists
-            if (prs.length > 0) {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prs[0].number,
-                body: output
-              });
-            }
