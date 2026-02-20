@@ -8,8 +8,19 @@
   ],
   "routes": [
     {
+      "src": "/",
+      "dest": "/public/paste.html"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "api/index.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "api/index.js"
     }
-  ]
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 }

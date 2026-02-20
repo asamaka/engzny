@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>thinx.fun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0a0a0a;
+            --text: #e0e0e0;
+            --text-dim: #555;
+            --accent: #00ffaa;
+            --accent-dim: rgba(0, 255, 170, 0.15);
+            --scan: rgba(0, 255, 170, 0.4);
+        }
+        
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+        }
+        
+        /* ===== STATES ===== */
+        .state { 
+            display: none; 
+            height: 100%;
+            width: 100%;
+        }
+        .state.active { 
+            display: flex; 
+        }
+        
+        /* ===== PASTE STATE ===== */
+        #pasteState {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        .paste-zone {
+            width: 90%;
+            max-width: 360px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed var(--text-dim);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .paste-zone:hover, .paste-zone:active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+        
+        .paste-zone:active {
+            transform: scale(0.98);
+        }
+        
+        .paste-text {
+            font-size: 0.9rem;
+            color: var(--text-dim);
+            text-transform: lowercase;
+        }
+        
+        .paste-zone:hover .paste-text,
+        .paste-zone:active .paste-text {
+            color: var(--accent);
+        }
+        
+        .paste-hint {
+            margin-top: 1.5rem;
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            opacity: 0.5;
+        }
+        
+        /* ===== ANALYZING STATE ===== */
+        #analyzeState {
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .scan-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .scan-frame {
+            position: relative;
+            max-width: 100%;
+            max-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .scan-image {
+            max-width: 100%;
+            max-height: calc(100vh - 100px);
+            max-height: calc(100dvh - 100px);
+            object-fit: contain;
+            border-radius: 4px;
+            display: block;
+        }
+        
+        /* Sci-fi frame corners */
+        .frame-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--accent);
+            border-style: solid;
+            border-width: 0;
+            opacity: 0.8;
+        }
+        .frame-corner.tl { top: -8px; left: -8px; border-top-width: 2px; border-left-width: 2px; }
+        .frame-corner.tr { top: -8px; right: -8px; border-top-width: 2px; border-right-width: 2px; }
+        .frame-corner.bl { bottom: -8px; left: -8px; border-bottom-width: 2px; border-left-width: 2px; }
+        .frame-corner.br { bottom: -8px; right: -8px; border-bottom-width: 2px; border-right-width: 2px; }
+        
+        /* Scan line animation */
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--scan), var(--accent), var(--scan), transparent);
+            box-shadow: 0 0 20px var(--accent), 0 0 40px var(--accent);
+            animation: scan 2s ease-in-out infinite;
+        }
+        
+        @keyframes scan {
+            0%, 100% { top: 0; opacity: 1; }
+            50% { top: calc(100% - 2px); opacity: 0.7; }
+        }
+        
+        /* Overlay grid */
+        .scan-grid {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(var(--accent-dim) 1px, transparent 1px),
+                linear-gradient(90deg, var(--accent-dim) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+            pointer-events: none;
+            animation: grid-pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes grid-pulse {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.4; }
+        }
+        
+        .scan-status {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: blink 1s ease-in-out infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
+        /* ===== RESULTS STATE ===== */
+        #resultsState {
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .results-image-container {
+            flex-shrink: 0;
+            padding: 16px 16px 8px;
+            display: flex;
+            justify-content: center;
+            background: linear-gradient(to bottom, var(--bg) 0%, transparent 100%);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .results-image {
+            max-width: 120px;
+            max-height: 80px;
+            object-fit: contain;
+            border-radius: 4px;
+            border: 1px solid #222;
+            opacity: 0.8;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .results-image:hover {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+        
+        .results-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 20px 100px;
+            scroll-behavior: auto;
+        }
+        
+        .results-content.auto-scroll {
+            scroll-behavior: smooth;
+        }
+        
+        .results-text {
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text);
+        }
+        
+        .results-text p { margin-bottom: 1em; }
+        .results-text h1, .results-text h2, .results-text h3 { 
+            margin: 1.5em 0 0.5em; 
+            color: var(--accent);
+            font-weight: 500;
+        }
+        .results-text h1 { font-size: 1.2rem; }
+        .results-text h2 { font-size: 1.1rem; }
+        .results-text h3 { font-size: 1rem; }
+        .results-text code {
+            background: #1a1a1a;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-size: 0.85em;
+        }
+        .results-text pre {
+            background: #1a1a1a;
+            padding: 1em;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1em 0;
+        }
+        .results-text pre code {
+            background: none;
+            padding: 0;
+        }
+        .results-text ul, .results-text ol {
+            margin: 0.5em 0 1em 1.5em;
+        }
+        .results-text li {
+            margin-bottom: 0.3em;
+        }
+        .results-text strong {
+            color: #fff;
+        }
+        
+        /* Streaming cursor */
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 1em;
+            background: var(--accent);
+            margin-left: 2px;
+            animation: cursor-blink 0.8s ease-in-out infinite;
+            vertical-align: text-bottom;
+        }
+        
+        @keyframes cursor-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        .cursor.done {
+            display: none;
+        }
+        
+        /* Scroll indicator */
+        .scroll-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            background: var(--bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+            border: 1px solid #222;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        
+        .scroll-indicator.visible {
+            opacity: 1;
+        }
+        
+        /* ===== ERROR STATE ===== */
+        #errorState {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .error-text {
+            color: #ff6b6b;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .retry-btn {
+            padding: 0.75rem 2rem;
+            background: transparent;
+            border: 1px solid #333;
+            border-radius: 4px;
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .retry-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <!-- Paste State -->
+    <div class="state active" id="pasteState">
+        <div class="paste-zone" id="pasteZone">
+            <span class="paste-text">tap to paste</span>
+        </div>
+        <p class="paste-hint">⌘V</p>
+    </div>
+    
+    <!-- Analyzing State -->
+    <div class="state" id="analyzeState">
+        <div class="scan-container">
+            <div class="scan-frame">
+                <img id="scanImage" class="scan-image" alt="">
+                <div class="frame-corner tl"></div>
+                <div class="frame-corner tr"></div>
+                <div class="frame-corner bl"></div>
+                <div class="frame-corner br"></div>
+                <div class="scan-line"></div>
+                <div class="scan-grid"></div>
+            </div>
+        </div>
+        <div class="scan-status">analyzing</div>
+    </div>
+    
+    <!-- Results State -->
+    <div class="state" id="resultsState">
+        <div class="results-image-container">
+            <img id="resultsImage" class="results-image" alt="">
+        </div>
+        <div class="results-content" id="resultsContent">
+            <div class="results-text" id="resultsText"></div>
+            <span class="cursor" id="cursor"></span>
+        </div>
+        <div class="scroll-indicator" id="scrollIndicator">auto-scroll paused</div>
+    </div>
+    
+    <!-- Error State -->
+    <div class="state" id="errorState">
+        <p class="error-text" id="errorText">something went wrong</p>
+        <button class="retry-btn" id="retryBtn">try again</button>
+    </div>
+    
+    <script>
+        // State management
+        const states = {
+            paste: document.getElementById('pasteState'),
+            analyze: document.getElementById('analyzeState'),
+            results: document.getElementById('resultsState'),
+            error: document.getElementById('errorState'),
+        };
+        
+        // Elements
+        const pasteZone = document.getElementById('pasteZone');
+        const scanImage = document.getElementById('scanImage');
+        const resultsImage = document.getElementById('resultsImage');
+        const resultsContent = document.getElementById('resultsContent');
+        const resultsText = document.getElementById('resultsText');
+        const cursor = document.getElementById('cursor');
+        const scrollIndicator = document.getElementById('scrollIndicator');
+        const errorText = document.getElementById('errorText');
+        const retryBtn = document.getElementById('retryBtn');
+        
+        let currentFile = null;
+        let currentImageUrl = null;
+        let autoScroll = true;
+        let isStreaming = false;
+        let rawText = '';
+        
+        function showState(name) {
+            Object.values(states).forEach(s => s.classList.remove('active'));
+            states[name].classList.add('active');
+        }
+        
+        // Clipboard reading
+        async function readClipboard() {
+            try {
+                const items = await navigator.clipboard.read();
+                
+                for (const item of items) {
+                    const imageType = item.types.find(t => t.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        handleImage(blob, imageType);
+                        return;
+                    }
+                }
+                
+                // No image
+                showError('no image in clipboard');
+                
+            } catch (err) {
+                console.error('Clipboard error:', err);
+                if (err.name === 'NotAllowedError') {
+                    showError('clipboard access denied');
+                } else {
+                    showError('couldn\'t read clipboard');
+                }
+            }
+        }
+        
+        function handleImage(blob, type) {
+            currentFile = new File([blob], 'screenshot.png', { type });
+            currentImageUrl = URL.createObjectURL(blob);
+            
+            // Show full-screen scan
+            scanImage.src = currentImageUrl;
+            resultsImage.src = currentImageUrl;
+            showState('analyze');
+            
+            // Start upload and streaming
+            uploadAndStream();
+        }
+        
+        async function uploadAndStream() {
+            try {
+                // Upload
+                const formData = new FormData();
+                formData.append('image', currentFile);
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.message || data.error || 'upload failed');
+                }
+                
+                // Start streaming
+                startStream(data.jobId);
+                
+            } catch (err) {
+                showError(err.message || 'upload failed');
+            }
+        }
+        
+        async function startStream(jobId) {
+            rawText = '';
+            resultsText.innerHTML = '';
+            autoScroll = true;
+            isStreaming = true;
+            cursor.classList.remove('done');
+            resultsContent.classList.add('auto-scroll');
+            
+            let transitionedToResults = false;
+            
+            try {
+                // Use fetch with ReadableStream instead of EventSource
+                // This often works better with Vercel's edge network
+                const response = await fetch(`/api/job/${jobId}/stream`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // Parse SSE events from buffer
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'token' || data.text) {
+                                    if (!transitionedToResults) {
+                                        showState('results');
+                                        transitionedToResults = true;
+                                    }
+                                    
+                                    rawText += data.token || data.text || '';
+                                    renderMarkdown();
+                                    scrollToBottom();
+                                }
+                                
+                                if (data.type === 'complete') {
+                                    isStreaming = false;
+                                    cursor.classList.add('done');
+                                    resultsContent.classList.remove('auto-scroll');
+                                    return;
+                                }
+                                
+                                if (data.type === 'error') {
+                                    if (!transitionedToResults) {
+                                        showError(data.message || 'analysis failed');
+                                    }
+                                    isStreaming = false;
+                                    cursor.classList.add('done');
+                                    return;
+                                }
+                            } catch (e) {
+                                // Ignore parse errors for non-JSON lines
+                            }
+                        }
+                    }
+                }
+                
+                // Stream ended
+                isStreaming = false;
+                cursor.classList.add('done');
+                resultsContent.classList.remove('auto-scroll');
+                
+            } catch (err) {
+                console.error('Stream error:', err);
+                isStreaming = false;
+                cursor.classList.add('done');
+                
+                if (!transitionedToResults) {
+                    showError('connection lost');
+                }
+            }
+        }
+        
+        function renderMarkdown() {
+            const html = marked.parse(rawText);
+            resultsText.innerHTML = html;
+        }
+        
+        function scrollToBottom() {
+            if (autoScroll && isStreaming) {
+                resultsContent.scrollTop = resultsContent.scrollHeight;
+            }
+        }
+        
+        // Auto-scroll control
+        let scrollTimeout;
+        resultsContent.addEventListener('scroll', () => {
+            if (!isStreaming) return;
+            
+            const { scrollTop, scrollHeight, clientHeight } = resultsContent;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+            
+            if (isAtBottom) {
+                // User scrolled back to bottom, resume auto-scroll
+                autoScroll = true;
+                scrollIndicator.classList.remove('visible');
+            } else {
+                // User scrolled up, pause auto-scroll
+                autoScroll = false;
+                scrollIndicator.classList.add('visible');
+                
+                // Hide indicator after a moment
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    if (!autoScroll) {
+                        scrollIndicator.classList.remove('visible');
+                    }
+                }, 2000);
+            }
+        });
+        
+        // Also pause on any touch/click in results area
+        resultsContent.addEventListener('touchstart', () => {
+            if (isStreaming) {
+                autoScroll = false;
+                scrollIndicator.classList.add('visible');
+            }
+        }, { passive: true });
+        
+        function showError(message) {
+            errorText.textContent = message;
+            showState('error');
+        }
+        
+        function reset() {
+            currentFile = null;
+            if (currentImageUrl) {
+                URL.revokeObjectURL(currentImageUrl);
+                currentImageUrl = null;
+            }
+            rawText = '';
+            resultsText.innerHTML = '';
+            showState('paste');
+        }
+        
+        // Event listeners
+        pasteZone.addEventListener('click', readClipboard);
+        retryBtn.addEventListener('click', reset);
+        
+        // Image click to view full
+        resultsImage.addEventListener('click', () => {
+            // Could open lightbox, for now just open in new tab
+            if (currentImageUrl) {
+                window.open(currentImageUrl, '_blank');
+            }
+        });
+        
+        // Paste event anywhere
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    const blob = item.getAsFile();
+                    handleImage(blob, item.type);
+                    return;
+                }
+            }
+        });
+        
+        // Auto-read if permission already granted
+        if (navigator.clipboard && navigator.clipboard.read) {
+            navigator.permissions?.query?.({ name: 'clipboard-read' })
+                .then(result => {
+                    if (result.state === 'granted') {
+                        readClipboard();
+                    }
+                })
+                .catch(() => {});
+        }
+    </script>
+</body>
+</html>
