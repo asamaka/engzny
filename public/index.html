@@ -652,22 +652,9 @@
       try {
         showLoading();
 
-        const response = await fetch('/api/hub/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: dataUrl }),
-        });
-
-        const data = await response.json();
-        hideLoading();
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Analysis failed');
-        }
-
-        // Redirect to results page or show inline results
-        // For now, we'll just show the image
-        console.log('Analysis result:', data);
+        // Redirect to analysis page with the image
+        const encodedImage = encodeURIComponent(dataUrl);
+        window.location.href = `/analyze.html?image=${encodedImage}`;
 
       } catch (error) {
         hideLoading();

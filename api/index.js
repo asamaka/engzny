@@ -115,8 +115,6 @@ app.use(express.raw({ type: 'image/*', limit: '20mb' }));
 
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// Deprecated v1 snapshot
-app.use('/v1', express.static(path.join(__dirname, '..', 'v1', 'public')));
 
 // Paste page (for clipboard integration with Shortcuts)
 app.get('/paste', (req, res) => {
@@ -296,11 +294,6 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Deprecated v1 route
-app.get('/v1', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'v1', 'public', 'index.html'));
-});
-
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -424,6 +417,16 @@ app.post('/api/hub/analyze', async (req, res) => {
   try {
     const { image, question, mediaType } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType });
+
+    // Check for API key before creating adapter
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: 'API Configuration Missing',
+        message: 'GEMINI_API_KEY is not configured. Please set up your API key in the .env file.',
+        hint: 'Get your API key from https://ai.google.dev/',
+      });
+    }
+
     const adapter = new GeminiAdapter();
     const prompt = buildHubPrompt(question);
     const responseFormat = {
@@ -539,9 +542,23 @@ app.post('/api/hub/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('Hub analyze error:', error);
+
+    // Provide better error messages for common issues
+    let errorMessage = error.message || 'An unexpected error occurred';
+    let errorHint = null;
+
+    if (error.message?.includes('GEMINI_API_KEY')) {
+      errorMessage = 'API key not configured';
+      errorHint = 'Please set GEMINI_API_KEY in your .env file. Get a key from https://ai.google.dev/';
+    } else if (error.message?.includes('API key not valid')) {
+      errorMessage = 'Invalid API key';
+      errorHint = 'Please check your GEMINI_API_KEY in the .env file.';
+    }
+
     res.status(500).json({
       error: 'Analysis failed',
-      message: error.message || 'An unexpected error occurred',
+      message: errorMessage,
+      hint: errorHint,
     });
   }
 });
