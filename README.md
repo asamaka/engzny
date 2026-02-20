@@ -41,8 +41,49 @@ Mobile-first screenshot analyzer powered by Claude AI:
 - ✅ **Real-time streaming** - See Claude think
 - ✅ **Auto-scroll** - Smart scrolling with manual control
 - ✅ **Mobile-optimized** - Perfect for phones
-- ✨ **Keypoints Extraction** - Get structured insights with card-based navigation
-- 🎯 **Trail Navigation** - Explore people, events, facts, products, and more
+- ✨ **Dynamic Layouts** - LLM-chosen layout types (editorial, dashboard, product, social, investigation)
+- 🎯 **Parallel Research** - Multiple LLMs research different cards simultaneously
+- 📊 **13 Card Types** - hero, metric, fact-check, person, product, timeline, quote, comparison, warning, action, list, extract, location
+- 🔄 **Progressive Loading** - Cards appear as placeholders, animate in as research completes
+
+---
+
+## 🏗️ Architecture: Multi-Agent Pipeline
+
+```
+Screenshot
+    |
+    v
+[Layout Designer LLM] ─── Vision analysis
+    |                      - Content type detection
+    |                      - Intent identification
+    |                      - Best layout selection
+    |                      - Placeholder card blueprint
+    v
+[SSE: blueprint] ─── Client renders placeholder cards immediately
+    |
+    v
+[Card Researcher LLMs] ─── Run in PARALLEL (one per card)
+    |   |   |   |           - Each follows card type contract
+    |   |   |   |           - Populates card with researched data
+    v   v   v   v
+[SSE: card events] ─── Each card animates in as it completes
+    |
+    v
+[Complete] ─── All cards populated
+```
+
+### Agent Specifications
+
+This project uses specialized Claude Code agents with clear responsibilities:
+
+| Agent | Spec | Responsibility |
+|-------|------|---------------|
+| **Deployment Agent** | [`.claude/agents/deployment.md`](.claude/agents/deployment.md) | SOLE agent for production pushes. Runs tests, pushes, monitors deploys, handles failures. |
+| **Feature Development Agent** | [`.claude/agents/feature-development.md`](.claude/agents/feature-development.md) | Implements features and fixes. Does NOT deploy. |
+| **Research Agent** | [`.claude/agents/research.md`](.claude/agents/research.md) | Investigates issues, debugs failures, analyzes code. Does NOT modify or deploy. |
+
+See [`CLAUDE.md`](CLAUDE.md) for the full agent routing document and architecture overview.
 
 ---
 
@@ -126,7 +167,7 @@ npm start
 ### Run Tests
 
 ```bash
-# All tests (40 tests)
+# All tests (52 tests)
 npm test
 
 # Health check only (real API calls)
@@ -211,21 +252,46 @@ Response:
 
 ```
 ├── api/
-│   ├── index.js           # Express server + API endpoints
-│   └── llm/               # LLM adapters (Claude, Gemini)
+│   ├── index.js                  # Express server + all API routes
+│   ├── agents/
+│   │   ├── orchestrator.js       # v1 GIUE pipeline
+│   │   ├── orchestrator-v2.js    # v2 layout pipeline coordinator
+│   │   ├── layout-designer.js    # Vision LLM: designs card layouts
+│   │   └── card-researcher.js    # Research LLM: populates cards in parallel
+│   ├── contracts/
+│   │   └── card-types.js         # Card type schemas + layout definitions
+│   ├── generators/
+│   │   ├── vision-analyzer.js    # Screenshot hotspot detection
+│   │   ├── html-generator.js     # GIUE canvas HTML generation
+│   │   ├── canvas-generator.js   # Direct LLM-to-HTML generation
+│   │   ├── keypoint-extractor.js # Structured keypoint extraction
+│   │   └── style-manager.js      # Theme/color extraction
+│   └── llm/
+│       ├── adapter.js            # Base LLM interface
+│       ├── claude.js             # Claude adapter (claude-opus-4-6)
+│       ├── gemini.js             # Gemini adapter (fallback)
+│       └── index.js              # Provider factory
 ├── public/
-│   ├── paste.html         # Mobile paste interface (home)
-│   ├── index.html         # Desktop version
-│   └── analyze.html       # Analysis page
+│   ├── paste.html                # Mobile paste interface (home)
+│   ├── hub-v2.html               # Dynamic layout page (/hub)
+│   ├── index.html                # Desktop version
+│   ├── analyze.html              # v1 analysis page
+│   └── keypoints.html            # Card-based keypoints view
 ├── tests/
-│   ├── unit/              # Unit tests (37 tests)
-│   └── integration/       # API health checks (3 tests)
-├── .github/
-│   └── workflows/
-│       ├── deploy.yml     # Auto-deploy to Vercel
-│       └── tests.yml      # Run tests on push
-├── vercel.json            # Vercel configuration
-└── package.json           # Dependencies & scripts
+│   ├── unit/                     # 49 unit tests (mocked)
+│   └── integration/              # 3 health checks (real API)
+├── .claude/
+│   └── agents/
+│       ├── deployment.md         # Deployment Agent spec
+│       ├── feature-development.md # Feature Dev Agent spec
+│       └── research.md           # Research Agent spec
+├── CLAUDE.md                     # Agent routing + architecture overview
+├── .github/workflows/
+│   ├── deploy.yml                # CI/CD deploy to Vercel
+│   ├── auto-deploy-production.yml # Auto-deploy on claude/* push
+│   └── tests.yml                 # Test runner
+├── vercel.json                   # Vercel configuration
+└── package.json                  # Dependencies & scripts
 ```
 
 ---
@@ -263,8 +329,8 @@ vercel --prod
 
 ### Test Suite
 
-- **40 tests total**
-  - 37 unit tests (API validation, LLM adapters)
+- **52 tests total**
+  - 49 unit tests (API validation, LLM adapters, keypoint extraction)
   - 3 health checks (real API calls)
 
 ### CI/CD
@@ -311,27 +377,30 @@ Verifies:
 - Sci-fi scanning animation
 
 ### AI Analysis
-- Claude Sonnet 4.5 (latest)
+- Claude Opus 4.6 (latest)
 - Vision + text analysis
 - Real-time streaming
-- Markdown formatting
+- Multi-agent parallel research
+- 13 card types with typed contracts
+- 6 layout types (LLM-selected)
 
 ### Developer Experience
-- Auto-deploy on push
+- Auto-deploy on push to `claude/*` branches
 - Preview deployments for PRs
-- Test suite (40 tests)
-- Type checking
-- Linting
+- Test suite (52 tests)
+- Agent specifications for clear task delegation
 
 ---
 
 ## 📚 Documentation
 
+- **[CLAUDE.md](CLAUDE.md)** - Agent routing + architecture overview
+- **[.claude/agents/deployment.md](.claude/agents/deployment.md)** - Deployment Agent spec
+- **[.claude/agents/feature-development.md](.claude/agents/feature-development.md)** - Feature Dev Agent spec
+- **[.claude/agents/research.md](.claude/agents/research.md)** - Research Agent spec
 - **[QUICKSTART.md](QUICKSTART.md)** - 2-minute deploy guide
 - **[DEPLOY.md](DEPLOY.md)** - Full deployment docs
-- **[READY_TO_DEPLOY.md](READY_TO_DEPLOY.md)** - Pre-deployment checklist
 - **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)** - Test documentation
-- **[HEALTH_CHECK.md](HEALTH_CHECK.md)** - API health checks
 
 ---
 
