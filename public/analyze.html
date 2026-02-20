@@ -561,7 +561,7 @@
       error.innerHTML = `
         <div class="error-title">${title}</div>
         <div class="error-message">${message}</div>
-        ${message.includes('API') ? '<div class="error-hint">💡 Add your GEMINI_API_KEY to the .env file</div>' : ''}
+        ${message.includes('API') ? '<div class="error-hint">💡 Add your ANTHROPIC_API_KEY to the .env file</div>' : ''}
       `;
       resultsContainer.appendChild(error);
     }
