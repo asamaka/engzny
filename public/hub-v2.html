@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>thinx.fun</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface-2: #1c1c1c;
+            --surface-3: #242424;
+            --text: #e0e0e0;
+            --text-dim: #666;
+            --text-bright: #ffffff;
+            --accent: #00ffaa;
+            --accent-dim: rgba(0, 255, 170, 0.12);
+            --accent-glow: rgba(0, 255, 170, 0.25);
+            --border: #2a2a2a;
+            --border-subtle: #1e1e1e;
+            --danger: #ff4466;
+            --warning: #ffaa00;
+            --info: #44aaff;
+            --success: #00ff88;
+            --purple: #aa88ff;
+            --pink: #ff4499;
+            --radius: 10px;
+            --radius-sm: 6px;
+        }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            overflow-x: hidden;
+        }
+
+        /* === STATES === */
+        .state { display: none; min-height: 100%; width: 100%; }
+        .state.active { display: flex; }
+
+        /* === PASTE STATE === */
+        #pasteState {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .paste-zone {
+            width: 85%;
+            max-width: 320px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            border: 1px dashed var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .paste-zone:hover, .paste-zone:active {
+            border-color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .paste-icon { font-size: 2rem; opacity: 0.4; }
+        .paste-text { font-size: 0.85rem; color: var(--text-dim); }
+        .paste-zone:hover .paste-text { color: var(--accent); }
+        .paste-hint { margin-top: 1.5rem; font-size: 0.65rem; color: var(--text-dim); opacity: 0.4; }
+
+        /* === SCANNING STATE === */
+        #scanState {
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            position: relative;
+        }
+
+        .scan-preview {
+            max-width: 80%;
+            max-height: 50vh;
+            object-fit: contain;
+            border-radius: var(--radius-sm);
+            opacity: 0.5;
+            filter: brightness(0.7);
+        }
+
+        .scan-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .scan-bar {
+            width: 200px;
+            height: 3px;
+            background: var(--surface-2);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .scan-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 3px;
+            width: 5%;
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        .scan-label {
+            font-size: 0.7rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* === LAYOUT STATE (Results) === */
+        #layoutState {
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header bar */
+        .layout-header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .layout-header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .layout-back {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            cursor: pointer;
+            font-family: inherit;
+            padding: 4px 0;
+        }
+
+        .layout-back:hover { color: var(--accent); }
+
+        .layout-badge {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            background: var(--accent-dim);
+            color: var(--accent);
+        }
+
+        .layout-progress {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .layout-progress-bar {
+            width: 80px;
+            height: 2px;
+            background: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .layout-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .layout-progress-text {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+        }
+
+        /* Content analysis banner */
+        .content-analysis {
+            padding: 16px;
+            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .content-analysis-intent {
+            font-size: 0.8rem;
+            color: var(--text);
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .top-questions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .top-question {
+            font-size: 0.65rem;
+            padding: 4px 10px;
+            background: var(--surface-3);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            color: var(--text-dim);
+            cursor: default;
+        }
+
+        /* Card grid container */
+        .card-grid {
+            padding: 16px;
+            display: grid;
+            gap: 12px;
+            grid-template-columns: 1fr;
+        }
+
+        .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+        .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+        @media (max-width: 640px) {
+            .card-grid.cols-2, .card-grid.cols-3 { grid-template-columns: 1fr; }
+        }
+
+        @media (min-width: 641px) and (max-width: 900px) {
+            .card-grid.cols-3 { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .card-grid .span-full { grid-column: 1 / -1; }
+        .card-grid .span-2 { grid-column: span 2; }
+        @media (max-width: 640px) {
+            .card-grid .span-2 { grid-column: span 1; }
+        }
+
+        /* === CARD BASE === */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .card:hover {
+            border-color: var(--border);
+        }
+
+        .card.loading {
+            min-height: 100px;
+        }
+
+        .card.loading::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent 0%, var(--surface-2) 50%, transparent 100%);
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .card.populated {
+            animation: card-in 0.3s ease;
+        }
+
+        @keyframes card-in {
+            from { opacity: 0.6; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .card-inner {
+            padding: 16px;
+        }
+
+        .card-type-label {
+            font-size: 0.55rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-type-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* === HERO SUMMARY CARD === */
+        .card-hero .card-inner {
+            padding: 20px;
+        }
+
+        .card-hero .hero-badge {
+            display: inline-block;
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 3px 10px;
+            border-radius: 3px;
+            background: var(--accent-dim);
+            color: var(--accent);
+            margin-bottom: 10px;
+        }
+
+        .card-hero .hero-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .card-hero .hero-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .card-hero .hero-takeaway {
+            font-size: 0.8rem;
+            color: var(--text);
+            line-height: 1.6;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--accent);
+        }
+
+        /* === KEY METRIC CARD === */
+        .card-metric .metric-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--accent);
+            line-height: 1.1;
+        }
+
+        .card-metric .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        .card-metric .metric-context {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+            opacity: 0.7;
+        }
+
+        .card-metric .metric-trend {
+            display: inline-block;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-top: 6px;
+        }
+
+        .card-metric .metric-trend.up { background: rgba(0,255,136,0.15); color: var(--success); }
+        .card-metric .metric-trend.down { background: rgba(255,68,102,0.15); color: var(--danger); }
+        .card-metric .metric-trend.stable { background: rgba(68,170,255,0.15); color: var(--info); }
+
+        /* === INFO LIST CARD === */
+        .card-list .list-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 12px;
+        }
+
+        .card-list .list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.78rem;
+            gap: 8px;
+        }
+
+        .card-list .list-item:last-child { border-bottom: none; }
+
+        .card-list .list-item-label {
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .card-list .list-item-value {
+            color: var(--text);
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .card-list .list-item.highlight .list-item-value {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .card-list .list-item-icon {
+            margin-right: 6px;
+        }
+
+        /* === FACT CHECK CARD === */
+        .card-fact-check .fact-claim {
+            font-size: 0.8rem;
+            color: var(--text);
+            line-height: 1.5;
+            padding: 10px 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            margin-bottom: 12px;
+            border-left: 3px solid var(--border);
+            font-style: italic;
+        }
+
+        .card-fact-check .fact-verdict {
+            display: inline-block;
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .fact-verdict.verified { background: rgba(0,255,136,0.15); color: var(--success); }
+        .fact-verdict.misleading { background: rgba(255,170,0,0.15); color: var(--warning); }
+        .fact-verdict.false { background: rgba(255,68,102,0.15); color: var(--danger); }
+        .fact-verdict.unverified { background: rgba(68,170,255,0.15); color: var(--info); }
+        .fact-verdict.partially_true { background: rgba(255,170,0,0.15); color: var(--warning); }
+        .fact-verdict.needs_context { background: rgba(170,136,255,0.15); color: var(--purple); }
+
+        .card-fact-check .fact-explanation {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .card-fact-check .fact-confidence {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+        }
+
+        /* === PERSON CARD === */
+        .card-person .person-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .card-person .person-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--surface-3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .card-person .person-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-bright);
+        }
+
+        .card-person .person-role {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+        }
+
+        .card-person .person-handle {
+            font-size: 0.7rem;
+            color: var(--accent);
+        }
+
+        .card-person .person-context {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        /* === PRODUCT CARD === */
+        .card-product .product-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 6px;
+        }
+
+        .card-product .product-price {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .card-product .product-rating {
+            font-size: 0.75rem;
+            color: var(--warning);
+            margin-bottom: 10px;
+        }
+
+        .card-product .product-features {
+            list-style: none;
+            margin-bottom: 10px;
+        }
+
+        .card-product .product-features li {
+            font-size: 0.75rem;
+            color: var(--text);
+            padding: 4px 0;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .card-product .product-features li::before {
+            content: '+';
+            position: absolute;
+            left: 0;
+            color: var(--accent);
+        }
+
+        .card-product .product-warnings {
+            list-style: none;
+            margin-top: 8px;
+        }
+
+        .card-product .product-warnings li {
+            font-size: 0.7rem;
+            color: var(--warning);
+            padding: 3px 0;
+        }
+
+        .card-product .product-warnings li::before {
+            content: '! ';
+            font-weight: 600;
+        }
+
+        /* === TIMELINE CARD === */
+        .card-timeline .timeline-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 12px;
+        }
+
+        .card-timeline .timeline-event {
+            display: flex;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 0.75rem;
+            position: relative;
+        }
+
+        .card-timeline .timeline-event::before {
+            content: '';
+            position: absolute;
+            left: 55px;
+            top: 24px;
+            bottom: -8px;
+            width: 1px;
+            background: var(--border);
+        }
+
+        .card-timeline .timeline-event:last-child::before { display: none; }
+
+        .card-timeline .timeline-date {
+            color: var(--accent);
+            min-width: 50px;
+            flex-shrink: 0;
+            text-align: right;
+        }
+
+        .card-timeline .timeline-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--border);
+            margin-top: 4px;
+            flex-shrink: 0;
+            z-index: 1;
+        }
+
+        .card-timeline .timeline-event.highlight .timeline-dot {
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent-glow);
+        }
+
+        .card-timeline .timeline-text {
+            color: var(--text);
+            line-height: 1.4;
+        }
+
+        /* === QUOTE CARD === */
+        .card-quote .quote-text {
+            font-size: 0.9rem;
+            color: var(--text);
+            line-height: 1.6;
+            font-style: italic;
+            padding: 12px 16px;
+            border-left: 3px solid var(--accent);
+            background: var(--bg);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        }
+
+        .card-quote .quote-attribution {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 8px;
+        }
+
+        .card-quote .quote-context {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+            line-height: 1.4;
+        }
+
+        /* === COMPARISON CARD === */
+        .card-comparison .comparison-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 12px;
+        }
+
+        .card-comparison table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.72rem;
+        }
+
+        .card-comparison th {
+            text-align: left;
+            padding: 6px 8px;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            font-weight: 500;
+        }
+
+        .card-comparison td {
+            padding: 6px 8px;
+            color: var(--text);
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-comparison tr:last-child td { border-bottom: none; }
+
+        /* === WARNING CARD === */
+        .card-warning {
+            border-color: var(--warning) !important;
+        }
+
+        .card-warning.level-critical {
+            border-color: var(--danger) !important;
+        }
+
+        .card-warning .warning-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card-warning .warning-icon {
+            font-size: 1.2rem;
+        }
+
+        .card-warning .warning-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--warning);
+        }
+
+        .card-warning.level-critical .warning-title { color: var(--danger); }
+
+        .card-warning .warning-details {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 8px;
+        }
+
+        .card-warning .warning-advice {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            padding: 8px 10px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+        }
+
+        /* === ACTION CARD === */
+        .card-action .action-title {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 12px;
+        }
+
+        .card-action .action-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .card-action .action-item:last-child { border-bottom: none; }
+
+        .card-action .action-bullet {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent-dim);
+            color: var(--accent);
+            font-size: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .card-action .action-label {
+            font-size: 0.78rem;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .card-action .action-desc {
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        /* === TEXT EXTRACT CARD === */
+        .card-extract .extract-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 8px;
+        }
+
+        .card-extract .extract-text {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.6;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            border-left: 2px solid var(--border);
+            white-space: pre-wrap;
+        }
+
+        .card-extract .extract-source {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: 6px;
+        }
+
+        /* === LOCATION CARD === */
+        .card-location .location-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-bright);
+            margin-bottom: 4px;
+        }
+
+        .card-location .location-address {
+            font-size: 0.72rem;
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .card-location .location-context {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        /* === ERROR STATE === */
+        #errorState {
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .error-text { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .retry-btn {
+            padding: 0.7rem 2rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-family: inherit;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .retry-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* === PLACEHOLDER CONTENT === */
+        .placeholder-line {
+            height: 12px;
+            background: var(--surface-2);
+            border-radius: 3px;
+            margin-bottom: 8px;
+        }
+        .placeholder-line.short { width: 60%; }
+        .placeholder-line.medium { width: 80%; }
+    </style>
+</head>
+<body>
+    <!-- Paste State -->
+    <div class="state active" id="pasteState">
+        <div class="paste-zone" id="pasteZone">
+            <div class="paste-icon">[ ]</div>
+            <span class="paste-text">tap to paste screenshot</span>
+        </div>
+        <p class="paste-hint">or press Ctrl+V / Cmd+V</p>
+    </div>
+
+    <!-- Scanning State -->
+    <div class="state" id="scanState">
+        <img class="scan-preview" id="scanPreview" alt="">
+        <div class="scan-overlay">
+            <div class="scan-bar">
+                <div class="scan-bar-fill" id="scanBarFill"></div>
+            </div>
+            <div class="scan-label" id="scanLabel">analyzing</div>
+        </div>
+    </div>
+
+    <!-- Layout State (Results) -->
+    <div class="state" id="layoutState">
+        <div class="layout-header">
+            <div class="layout-header-left">
+                <button class="layout-back" id="layoutBack">&#8592; new</button>
+                <span class="layout-badge" id="layoutBadge"></span>
+            </div>
+            <div class="layout-progress" id="layoutProgress">
+                <div class="layout-progress-bar">
+                    <div class="layout-progress-fill" id="layoutProgressFill"></div>
+                </div>
+                <span class="layout-progress-text" id="layoutProgressText"></span>
+            </div>
+        </div>
+        <div class="content-analysis" id="contentAnalysis" style="display:none;">
+            <div class="content-analysis-intent" id="analysisIntent"></div>
+            <div class="top-questions" id="topQuestions"></div>
+        </div>
+        <div class="card-grid" id="cardGrid"></div>
+    </div>
+
+    <!-- Error State -->
+    <div class="state" id="errorState">
+        <p class="error-text" id="errorText">something went wrong</p>
+        <button class="retry-btn" id="retryBtn">try again</button>
+    </div>
+
+    <script>
+        // === State Management ===
+        const states = {
+            paste: document.getElementById('pasteState'),
+            scan: document.getElementById('scanState'),
+            layout: document.getElementById('layoutState'),
+            error: document.getElementById('errorState'),
+        };
+
+        function showState(name) {
+            Object.values(states).forEach(s => s.classList.remove('active'));
+            states[name].classList.add('active');
+        }
+
+        // === Elements ===
+        const pasteZone = document.getElementById('pasteZone');
+        const scanPreview = document.getElementById('scanPreview');
+        const scanBarFill = document.getElementById('scanBarFill');
+        const scanLabel = document.getElementById('scanLabel');
+        const layoutBadge = document.getElementById('layoutBadge');
+        const layoutProgressFill = document.getElementById('layoutProgressFill');
+        const layoutProgressText = document.getElementById('layoutProgressText');
+        const contentAnalysisEl = document.getElementById('contentAnalysis');
+        const analysisIntent = document.getElementById('analysisIntent');
+        const topQuestionsEl = document.getElementById('topQuestions');
+        const cardGrid = document.getElementById('cardGrid');
+        const errorText = document.getElementById('errorText');
+        const retryBtn = document.getElementById('retryBtn');
+        const layoutBack = document.getElementById('layoutBack');
+        const layoutProgress = document.getElementById('layoutProgress');
+
+        let currentImageUrl = null;
+        let currentImageBase64 = null;
+
+        // === Image Handling ===
+        async function readClipboard() {
+            try {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    const imageType = item.types.find(t => t.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        handleImage(blob);
+                        return;
+                    }
+                }
+                showError('no image in clipboard');
+            } catch (err) {
+                if (err.name === 'NotAllowedError') {
+                    showError('clipboard access denied');
+                } else {
+                    showError('couldn\'t read clipboard');
+                }
+            }
+        }
+
+        function handleImage(blob) {
+            currentImageUrl = URL.createObjectURL(blob);
+            scanPreview.src = currentImageUrl;
+            showState('scan');
+
+            // Convert to base64 and start pipeline
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                currentImageBase64 = reader.result;
+                startPipeline(currentImageBase64);
+            };
+            reader.readAsDataURL(blob);
+        }
+
+        // === Pipeline ===
+        async function startPipeline(imageDataUrl) {
+            scanBarFill.style.width = '5%';
+            scanLabel.textContent = 'analyzing';
+
+            try {
+                const response = await fetch('/api/hub/v2/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageDataUrl }),
+                });
+
+                if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
+                    const err = await response.json().catch(() => ({ message: 'request failed' }));
+                    throw new Error(err.message || 'request failed');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    let currentEvent = null;
+
+                    for (const line of lines) {
+                        if (line.startsWith('event: ')) {
+                            currentEvent = line.slice(7).trim();
+                        } else if (line.startsWith('data: ') && currentEvent) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                handleSSEEvent(currentEvent, data);
+                            } catch (e) {}
+                            currentEvent = null;
+                        }
+                    }
+                }
+            } catch (err) {
+                showError(err.message || 'connection failed');
+            }
+        }
+
+        function handleSSEEvent(event, data) {
+            switch (event) {
+                case 'connected':
+                    scanBarFill.style.width = '10%';
+                    break;
+
+                case 'progress':
+                    scanBarFill.style.width = Math.min(data.progress, 95) + '%';
+                    scanLabel.textContent = data.message || 'processing';
+                    if (data.phase === 'researching') {
+                        layoutProgressFill.style.width = data.progress + '%';
+                        layoutProgressText.textContent = data.message || '';
+                    }
+                    break;
+
+                case 'blueprint':
+                    renderBlueprint(data);
+                    showState('layout');
+                    break;
+
+                case 'card':
+                    populateCard(data.cardId, data.cardType, data.data);
+                    break;
+
+                case 'complete':
+                    layoutProgress.style.display = 'none';
+                    break;
+
+                case 'error':
+                    showError(data.message || 'analysis failed');
+                    break;
+            }
+        }
+
+        // === Rendering ===
+        function renderBlueprint(blueprint) {
+            // Set header badge
+            const ct = blueprint.contentAnalysis?.contentType || 'general';
+            layoutBadge.textContent = ct.replace(/_/g, ' ');
+
+            // Set content analysis
+            if (blueprint.contentAnalysis) {
+                contentAnalysisEl.style.display = '';
+                analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
+
+                topQuestionsEl.innerHTML = '';
+                (blueprint.contentAnalysis.topQuestions || []).forEach(q => {
+                    const span = document.createElement('span');
+                    span.className = 'top-question';
+                    span.textContent = q;
+                    topQuestionsEl.appendChild(span);
+                });
+            }
+
+            // Set grid columns
+            const cols = blueprint.layout?.columns || 1;
+            cardGrid.className = 'card-grid' + (cols > 1 ? ` cols-${Math.min(cols, 3)}` : '');
+
+            // Render placeholder cards
+            cardGrid.innerHTML = '';
+            (blueprint.cards || []).forEach(card => {
+                const el = createCardElement(card);
+                cardGrid.appendChild(el);
+            });
+
+            // Show progress
+            layoutProgressFill.style.width = '30%';
+            layoutProgressText.textContent = 'researching cards...';
+        }
+
+        function createCardElement(card) {
+            const el = document.createElement('div');
+            el.id = `card-${card.id}`;
+            el.className = `card card-${card.cardType.replace(/_/g, '-')} loading`;
+            el.dataset.cardType = card.cardType;
+
+            // Grid spanning
+            const span = card.gridPosition?.columnSpan || 1;
+            if (span >= 3 || card.cardType === 'hero_summary' || card.cardType === 'comparison_card' || card.cardType === 'warning_card') {
+                el.classList.add('span-full');
+            } else if (span === 2) {
+                el.classList.add('span-2');
+            }
+
+            // Render placeholder content based on card type
+            el.innerHTML = renderPlaceholder(card);
+
+            return el;
+        }
+
+        function renderPlaceholder(card) {
+            const pd = card.placeholderData || {};
+            const type = card.cardType;
+
+            if (type === 'hero_summary') {
+                return `<div class="card-inner">
+                    ${pd.badge ? `<span class="hero-badge">${esc(pd.badge)}</span>` : ''}
+                    <div class="hero-title">${esc(pd.title || 'Analyzing...')}</div>
+                    <div class="hero-subtitle">${esc(pd.subtitle || 'Determining content...')}</div>
+                    <div class="placeholder-line medium"></div>
+                </div>`;
+            }
+
+            // Generic placeholder
+            return `<div class="card-inner">
+                <div class="card-type-label"><span class="card-type-dot"></span>${type.replace(/_/g, ' ')}</div>
+                <div class="placeholder-line medium"></div>
+                <div class="placeholder-line short"></div>
+                <div class="placeholder-line"></div>
+            </div>`;
+        }
+
+        function populateCard(cardId, cardType, data) {
+            const el = document.getElementById(`card-${cardId}`);
+            if (!el) return;
+
+            el.classList.remove('loading');
+            el.classList.add('populated');
+            el.innerHTML = renderCardContent(cardType, data);
+        }
+
+        function renderCardContent(cardType, data) {
+            const d = data || {};
+
+            switch (cardType) {
+                case 'hero_summary':
+                    return `<div class="card-inner">
+                        ${d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}22;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
+                        ${d.icon ? `<span style="font-size:1.4rem;margin-bottom:6px;display:inline-block">${esc(d.icon)}</span>` : ''}
+                        <div class="hero-title">${esc(d.title || 'Analysis')}</div>
+                        <div class="hero-subtitle">${esc(d.subtitle || '')}</div>
+                        ${d.takeaway ? `<div class="hero-takeaway">${esc(d.takeaway)}</div>` : ''}
+                    </div>`;
+
+                case 'key_metric':
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot"></span>metric</div>
+                        <div class="metric-value" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
+                        <div class="metric-label">${esc(d.label || '')}</div>
+                        ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">${d.trend === 'up' ? '&#x25B2;' : d.trend === 'down' ? '&#x25BC;' : '&#x25CF;'} ${esc(d.trend)}</span>` : ''}
+                        ${d.context ? `<div class="metric-context">${esc(d.context)}</div>` : ''}
+                    </div>`;
+
+                case 'info_list':
+                    return `<div class="card-inner">
+                        <div class="list-title">${esc(d.title || 'Details')}</div>
+                        ${(d.items || []).map(item => `
+                            <div class="list-item${item.highlight ? ' highlight' : ''}">
+                                <span class="list-item-label">${item.icon ? `<span class="list-item-icon">${esc(item.icon)}</span>` : ''}${esc(item.label || '')}</span>
+                                <span class="list-item-value">${esc(item.value || '')}</span>
+                            </div>
+                        `).join('')}
+                    </div>`;
+
+                case 'fact_check':
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--warning)"></span>fact check</div>
+                        <div class="fact-claim">${esc(d.claim || '')}</div>
+                        <div class="fact-verdict ${esc(d.verdict || 'unverified')}">${esc(d.verdict || 'unverified')}</div>
+                        <div class="fact-explanation">${esc(d.explanation || '')}</div>
+                        ${d.source ? `<div class="fact-confidence">Source: ${esc(d.source)}</div>` : ''}
+                        ${d.confidence ? `<div class="fact-confidence">Confidence: ${esc(d.confidence)}</div>` : ''}
+                    </div>`;
+
+                case 'person_card':
+                    return `<div class="card-inner">
+                        <div class="person-header">
+                            <div class="person-avatar">${esc(d.name ? d.name[0] : '?')}</div>
+                            <div>
+                                <div class="person-name">${esc(d.name || 'Unknown')}</div>
+                                ${d.role ? `<div class="person-role">${esc(d.role)}</div>` : ''}
+                                ${d.handle ? `<div class="person-handle">${esc(d.handle)}</div>` : ''}
+                            </div>
+                        </div>
+                        <div class="person-context">${esc(d.context || '')}</div>
+                        ${(d.details || []).length ? `<div style="margin-top:8px">${d.details.map(det => `<div style="font-size:0.72rem;color:var(--text-dim);padding:2px 0">- ${esc(det)}</div>`).join('')}</div>` : ''}
+                    </div>`;
+
+                case 'product_card':
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--success)"></span>product</div>
+                        <div class="product-name">${esc(d.name || 'Product')}</div>
+                        ${d.price ? `<div class="product-price">${esc(d.price)}</div>` : ''}
+                        ${d.rating ? `<div class="product-rating">${esc(d.rating)}</div>` : ''}
+                        ${(d.features || []).length ? `<ul class="product-features">${d.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+                        ${d.verdict ? `<div style="font-size:0.78rem;color:var(--text);margin-top:8px">${esc(d.verdict)}</div>` : ''}
+                        ${(d.warnings || []).length ? `<ul class="product-warnings">${d.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+                    </div>`;
+
+                case 'timeline_card':
+                    return `<div class="card-inner">
+                        <div class="timeline-title">${esc(d.title || 'Timeline')}</div>
+                        ${(d.events || []).map(ev => `
+                            <div class="timeline-event${ev.highlight ? ' highlight' : ''}">
+                                <div class="timeline-date">${esc(ev.date || '')}</div>
+                                <div class="timeline-dot"></div>
+                                <div class="timeline-text">${esc(ev.event || '')}</div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+
+                case 'quote_card':
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--purple)"></span>quote</div>
+                        <div class="quote-text">"${esc(d.quote || '')}"</div>
+                        ${d.attribution ? `<div class="quote-attribution">— ${esc(d.attribution)}</div>` : ''}
+                        ${d.context ? `<div class="quote-context">${esc(d.context)}</div>` : ''}
+                    </div>`;
+
+                case 'comparison_card':
+                    if (!d.columns || !d.columns.length) {
+                        return `<div class="card-inner"><div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-dim);font-size:0.75rem">No data available</div></div>`;
+                    }
+                    const maxRows = Math.max(...d.columns.map(c => (c.values || []).length));
+                    return `<div class="card-inner">
+                        <div class="comparison-title">${esc(d.title || 'Comparison')}</div>
+                        <table>
+                            <thead><tr>
+                                ${d.rows ? '<th></th>' : ''}
+                                ${d.columns.map(c => `<th>${esc(c.header || '')}</th>`).join('')}
+                            </tr></thead>
+                            <tbody>${Array.from({ length: maxRows }, (_, i) => `<tr>
+                                ${d.rows ? `<td style="color:var(--text-dim)">${esc(d.rows[i] || '')}</td>` : ''}
+                                ${d.columns.map(c => `<td>${esc((c.values || [])[i] || '')}</td>`).join('')}
+                            </tr>`).join('')}</tbody>
+                        </table>
+                    </div>`;
+
+                case 'warning_card':
+                    return `<div class="card-inner level-${esc(d.level || 'warning')}">
+                        <div class="warning-header">
+                            <span class="warning-icon">${d.level === 'critical' ? '&#x26A0;' : d.level === 'info' ? 'i' : '!'}</span>
+                            <span class="warning-title">${esc(d.title || 'Warning')}</span>
+                        </div>
+                        <div class="warning-details">${esc(d.details || '')}</div>
+                        ${d.advice ? `<div class="warning-advice">${esc(d.advice)}</div>` : ''}
+                    </div>`;
+
+                case 'action_card':
+                    return `<div class="card-inner">
+                        <div class="action-title">${esc(d.title || 'Actions')}</div>
+                        ${(d.actions || []).map((a, i) => `
+                            <div class="action-item">
+                                <span class="action-bullet">${i + 1}</span>
+                                <div>
+                                    <div class="action-label">${esc(a.label || '')}</div>
+                                    ${a.description ? `<div class="action-desc">${esc(a.description)}</div>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>`;
+
+                case 'text_extract':
+                    return `<div class="card-inner">
+                        <div class="extract-title">${esc(d.title || 'Extracted Text')}</div>
+                        <div class="extract-text">${esc(d.text || '')}</div>
+                        ${d.source ? `<div class="extract-source">${esc(d.source)}</div>` : ''}
+                    </div>`;
+
+                case 'location_card':
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--info)"></span>location</div>
+                        <div class="location-name">${esc(d.name || 'Location')}</div>
+                        ${d.address ? `<div class="location-address">${esc(d.address)}</div>` : ''}
+                        <div class="location-context">${esc(d.context || '')}</div>
+                        ${(d.details || []).length ? `<div style="margin-top:8px">${d.details.map(det => `<div style="font-size:0.72rem;color:var(--text-dim);padding:2px 0">- ${esc(det)}</div>`).join('')}</div>` : ''}
+                    </div>`;
+
+                default:
+                    // Fallback: render as JSON
+                    return `<div class="card-inner">
+                        <div class="card-type-label"><span class="card-type-dot"></span>${cardType.replace(/_/g, ' ')}</div>
+                        <pre style="font-size:0.7rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(d, null, 2))}</pre>
+                    </div>`;
+            }
+        }
+
+        // === Utilities ===
+        function esc(str) {
+            if (!str) return '';
+            const d = document.createElement('div');
+            d.textContent = String(str);
+            return d.innerHTML;
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            showState('error');
+        }
+
+        function reset() {
+            if (currentImageUrl) {
+                URL.revokeObjectURL(currentImageUrl);
+                currentImageUrl = null;
+            }
+            currentImageBase64 = null;
+            cardGrid.innerHTML = '';
+            contentAnalysisEl.style.display = 'none';
+            layoutProgress.style.display = '';
+            layoutProgressFill.style.width = '0%';
+            showState('paste');
+        }
+
+        // === Event Listeners ===
+        pasteZone.addEventListener('click', readClipboard);
+        retryBtn.addEventListener('click', reset);
+        layoutBack.addEventListener('click', reset);
+
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                    e.preventDefault();
+                    handleImage(item.getAsFile());
+                    return;
+                }
+            }
+        });
+
+        // Also support drag and drop
+        document.addEventListener('dragover', (e) => { e.preventDefault(); });
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const file = e.dataTransfer?.files?.[0];
+            if (file && file.type.startsWith('image/')) {
+                handleImage(file);
+            }
+        });
+
+        // Auto-read clipboard if permission already granted
+        if (navigator.clipboard?.read) {
+            navigator.permissions?.query?.({ name: 'clipboard-read' })
+                .then(r => { if (r.state === 'granted') readClipboard(); })
+                .catch(() => {});
+        }
+    </script>
+</body>
+</html>

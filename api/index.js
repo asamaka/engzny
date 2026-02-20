@@ -694,6 +694,115 @@ app.get('/api/hub/sample', (req, res) => {
 });
 
 // ============================================
+// Hub v2: Enhanced Content Layout Pipeline
+// Screenshot → Layout Designer → Parallel Card Research → Populated Layout
+// ============================================
+const { runPipeline } = require('./agents/orchestrator-v2');
+
+// Hub v2 page route
+app.get('/hub', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
+});
+
+// Hub v2 analyze - SSE endpoint for progressive card population
+app.post('/api/hub/v2/analyze', async (req, res) => {
+  try {
+    const { image, question, mediaType: rawMediaType } = req.body || {};
+    const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({
+        error: 'API Configuration Missing',
+        message: 'ANTHROPIC_API_KEY is not configured.',
+      });
+    }
+
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.flushHeaders();
+
+    let streamEnded = false;
+    const endStream = () => {
+      if (streamEnded) return;
+      streamEnded = true;
+      if (!res.writableEnded && !res.destroyed) {
+        res.end();
+      }
+    };
+
+    const sendEvent = (event, data) => {
+      if (streamEnded || res.closed || res.destroyed || res.writableEnded) return;
+      try {
+        res.write(`event: ${event}\n`);
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (res.flush) res.flush();
+      } catch (err) {
+        console.error(`[HubV2] Error sending ${event}:`, err.message);
+        endStream();
+      }
+    };
+
+    res.on('close', () => { streamEnded = true; });
+
+    // Keep-alive during long operations
+    const keepAlive = setInterval(() => {
+      if (!streamEnded) {
+        try { res.write(': keep-alive\n\n'); if (res.flush) res.flush(); } catch {}
+      }
+    }, 15000);
+
+    sendEvent('connected', { message: 'Pipeline started', timestamp: new Date().toISOString() });
+
+    await runPipeline({
+      imageData: normalized.imageData,
+      mediaType: normalized.mediaType,
+      question,
+
+      onProgress: (progress) => {
+        sendEvent('progress', progress);
+      },
+
+      onBlueprint: (blueprint) => {
+        // Client receives the layout blueprint with placeholder cards
+        sendEvent('blueprint', blueprint);
+      },
+
+      onCardPopulated: (cardUpdate) => {
+        // Client receives populated data for a single card
+        sendEvent('card', cardUpdate);
+      },
+
+      onComplete: (populatedLayout) => {
+        clearInterval(keepAlive);
+        sendEvent('complete', {
+          layout: populatedLayout.layout,
+          contentAnalysis: populatedLayout.contentAnalysis,
+          meta: populatedLayout._meta,
+        });
+        endStream();
+      },
+
+      onError: (error) => {
+        clearInterval(keepAlive);
+        sendEvent('error', { message: error.message });
+        endStream();
+      },
+    });
+  } catch (error) {
+    console.error('[HubV2] Error:', error);
+    // If headers haven't been sent yet, return JSON error
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Pipeline failed', message: error.message });
+    }
+  }
+});
+
+// ============================================
 // GIUE (Generative Intent-UI Engine) Routes
 // ============================================
 const { streamCanvasGeneration } = require('./generators/canvas-generator');
