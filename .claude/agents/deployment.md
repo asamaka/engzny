@@ -55,27 +55,25 @@ git push -u origin claude/<branch-name>
 
 After push, TWO GitHub Actions workflows trigger:
 
-### Workflow 1: `auto-deploy-production.yml` (auto-merge + deploy)
+### Workflow 1: `auto-deploy-production.yml` (auto-merge + verify)
 Triggers on `claude/**` push when `api/**`, `public/**`, or `.claude/**` changed.
 
 Steps:
 1. Checks out `main`
-2. Merges feature branch into `main`
-3. Pushes merged `main`
-4. Installs Vercel CLI
-5. Configures ANTHROPIC_API_KEY on Vercel
-6. Builds project with `vercel build --prod`
-7. Deploys with `vercel deploy --prebuilt --prod`
-8. Waits 30 seconds
-9. Verifies health check at `/api/health`
+2. Runs tests (npm test)
+3. Merges feature branch into `main`
+4. Pushes merged `main` (triggers Vercel Git integration deploy)
+5. Retries health check up to 4 times (30s/60s/90s/120s waits)
+6. Verifies `/api/health` and hub page load
 
-### Workflow 2: `deploy.yml` (test + deploy)
+**Note:** Actual deployment happens via Vercel's native Git integration when code is pushed to main.
+
+### Workflow 2: `deploy.yml` (test + verify)
 Triggers on all `claude/**` pushes.
 
 Steps:
 1. Runs `npm test` (Node 20.x)
-2. If push to main/develop: deploys to production
-3. If PR: deploys preview
+2. If push to main/develop: waits for Vercel deploy, then verifies production
 
 ### Monitor for Failures
 
@@ -186,3 +184,10 @@ If a deployment causes production issues:
 6. **ALWAYS use specific file staging** - Not `git add .`
 7. **ALWAYS include session URL** in commit messages for traceability
 8. **ALWAYS verify production** after successful deployment
+
+## Backlog
+
+See `.claude/BACKLOG.md` for test improvement items to pick up. Priority items:
+- E2E pipeline test (SSE round-trip)
+- Post-deploy health check script
+- Vercel secret validation

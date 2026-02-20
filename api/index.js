@@ -574,9 +574,13 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('[HubV2] Error:', error);
-    // If headers haven't been sent yet, return JSON error
+    clearInterval(keepAlive);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Pipeline failed', message: error.message });
+    } else {
+      // Stream is already open - send error event so client knows
+      sendEvent('error', { message: error.message || 'Pipeline failed' });
+      endStream();
     }
   }
 });

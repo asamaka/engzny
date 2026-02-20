@@ -77,21 +77,41 @@ case 'my_new_card':
     return `<div class="card-inner">...</div>`;
 ```
 
-## When You're Done
+## Pre-Merge Validation Checklist
 
-1. **Run tests locally:**
-   ```bash
-   npm test
-   ```
+Before considering any change complete, you MUST run through this checklist:
 
-2. **Verify module loading:**
-   ```bash
-   node -e "require('./api/index')"
-   ```
+### 1. Unit Tests
+```bash
+npm test
+```
+All 52 tests must pass. Do NOT skip this.
 
-3. **Tell the user** your changes are ready and what was changed
+### 2. Module Loading
+```bash
+node -e "require('./api/index')"
+```
+Must load without errors.
 
-4. **Do NOT push or deploy** - that's the Deployment Agent's job
+### 3. Endpoint Smoke Test (if API changed)
+```bash
+# Start server temporarily
+node -e "const app = require('./api/index'); const s = app.listen(3099, () => { console.log('up'); setTimeout(() => s.close(), 2000); })"
+# In parallel, verify health
+curl -s http://localhost:3099/api/health
+```
+
+### 4. Frontend Validation (if hub-v2.html changed)
+Manually verify these states work in the HTML:
+- **Paste state**: Paste zone renders, click triggers clipboard read
+- **Scan state**: Screenshot appears, scan line animates
+- **Blueprint**: Cards render as placeholders with shimmer
+- **Card populate**: Each card fills in without errors
+- **Error handling**: Stream timeout shows error, retry works
+
+### 5. Tell the user your changes are ready and what was changed
+
+### 6. Do NOT push or deploy - that's the Deployment Agent's job
 
 ## Common Tasks
 

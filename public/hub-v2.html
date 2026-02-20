@@ -1059,7 +1059,19 @@
         }
 
         // === Pipeline ===
+        let blueprintReceived = false;
+        let pipelineTimeout = null;
+
         async function startPipeline(imageDataUrl) {
+            blueprintReceived = false;
+
+            // Timeout: if no blueprint after 60s, something went wrong
+            pipelineTimeout = setTimeout(() => {
+                if (!blueprintReceived) {
+                    showError('Analysis timed out. Please try again.');
+                }
+            }, 60000);
+
             try {
                 const response = await fetch('/api/hub/v2/analyze', {
                     method: 'POST',
@@ -1075,11 +1087,13 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
+                let lastEventTime = Date.now();
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
+                    lastEventTime = Date.now();
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
@@ -1098,8 +1112,18 @@
                         }
                     }
                 }
+
+                // Stream ended - if no blueprint was received, show error
+                if (!blueprintReceived) {
+                    showError('Analysis stream ended unexpectedly. Please try again.');
+                }
             } catch (err) {
                 showError(err.message || 'connection failed');
+            } finally {
+                if (pipelineTimeout) {
+                    clearTimeout(pipelineTimeout);
+                    pipelineTimeout = null;
+                }
             }
         }
 
@@ -1141,6 +1165,12 @@
 
         // === Blueprint received: fade screenshot, show card placeholders ===
         function onBlueprintReceived(blueprint) {
+            blueprintReceived = true;
+            if (pipelineTimeout) {
+                clearTimeout(pipelineTimeout);
+                pipelineTimeout = null;
+            }
+
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
