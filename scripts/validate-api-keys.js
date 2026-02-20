@@ -101,24 +101,8 @@ async function main() {
   console.log('🔑 API Key Validation\n');
   console.log('=' .repeat(50));
 
-  // Test Gemini (Required)
-  console.log('\n📊 GEMINI API (Required for analysis)');
-  console.log('-'.repeat(50));
-  const geminiResult = await validateGeminiKey();
-
-  if (geminiResult.status === 'success') {
-    console.log('✅ Status:', geminiResult.message);
-    console.log('📦 Model:', geminiResult.model);
-    console.log('💬 Test response:', geminiResult.response.substring(0, 50) + '...');
-  } else {
-    console.log('❌ Status:', geminiResult.message);
-    if (geminiResult.hint) {
-      console.log('💡 Hint:', geminiResult.hint);
-    }
-  }
-
-  // Test Anthropic (Optional)
-  console.log('\n🤖 ANTHROPIC API (Optional alternative)');
+  // Test Anthropic (Default/Preferred)
+  console.log('\n🤖 ANTHROPIC CLAUDE API (Default - Recommended)');
   console.log('-'.repeat(50));
   const anthropicResult = await validateAnthropicKey();
 
@@ -134,23 +118,51 @@ async function main() {
     }
   }
 
+  // Test Gemini (Alternative)
+  console.log('\n📊 GEMINI API (Alternative option)');
+  console.log('-'.repeat(50));
+  const geminiResult = await validateGeminiKey();
+
+  if (geminiResult.status === 'success') {
+    console.log('✅ Status:', geminiResult.message);
+    console.log('📦 Model:', geminiResult.model);
+    console.log('💬 Test response:', geminiResult.response.substring(0, 50) + '...');
+  } else {
+    console.log('❌ Status:', geminiResult.message);
+    if (geminiResult.hint) {
+      console.log('💡 Hint:', geminiResult.hint);
+    }
+  }
+
   // Summary
   console.log('\n' + '='.repeat(50));
   console.log('\n📋 SUMMARY');
   console.log('-'.repeat(50));
 
-  const canAnalyze = geminiResult.status === 'success';
+  const hasAnthropic = anthropicResult.status === 'success';
+  const hasGemini = geminiResult.status === 'success';
+  const canAnalyze = hasAnthropic || hasGemini;
 
   if (canAnalyze) {
     console.log('✅ Ready to analyze screenshots!');
+    if (hasAnthropic) {
+      console.log('🎯 Using: Anthropic Claude API (Default)');
+    } else if (hasGemini) {
+      console.log('🎯 Using: Google Gemini API');
+      console.log('💡 Note: App defaults to Claude, but Gemini will work too');
+    }
     console.log('🚀 Start server: npm start');
     console.log('🌐 Visit: http://localhost:3000');
   } else {
     console.log('❌ Cannot analyze screenshots yet');
-    console.log('\n📝 TO DO:');
+    console.log('\n📝 CHOOSE ONE:');
+    console.log('\nOption A (Recommended): Anthropic Claude');
+    console.log('1. Get API key from: https://console.anthropic.com/');
+    console.log('2. Add to .env: ANTHROPIC_API_KEY=sk-ant-...');
+    console.log('\nOption B: Google Gemini');
     console.log('1. Get API key from: https://ai.google.dev/');
-    console.log('2. Add to .env file: GEMINI_API_KEY=your_key_here');
-    console.log('3. Run this script again: node scripts/validate-api-keys.js');
+    console.log('2. Add to .env: GEMINI_API_KEY=AIza...');
+    console.log('\nThen run: node scripts/validate-api-keys.js');
   }
 
   console.log('\n');
