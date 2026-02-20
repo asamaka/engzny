@@ -416,22 +416,37 @@
 
     let currentImageData = null;
 
-    // Load image from URL
+    // Load image from sessionStorage or URL (fallback for legacy links)
     function loadImageFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      const imageData = params.get('image');
+      // Try sessionStorage first (primary method)
+      let imageData = sessionStorage.getItem('pendingAnalysisImage');
+
+      // Fallback to URL parameter (for legacy links or direct access)
+      if (!imageData) {
+        const params = new URLSearchParams(window.location.search);
+        imageData = params.get('image');
+        if (imageData) {
+          try {
+            imageData = decodeURIComponent(imageData);
+          } catch (error) {
+            showError('Failed to decode image', error.message);
+            return;
+          }
+        }
+      }
 
       if (imageData) {
         try {
-          const decoded = decodeURIComponent(imageData);
-          currentImageData = decoded;
-          analysisImage.src = decoded;
+          currentImageData = imageData;
+          analysisImage.src = imageData;
+          // Clear sessionStorage after loading to free memory
+          sessionStorage.removeItem('pendingAnalysisImage');
           performInitialAnalysis();
         } catch (error) {
           showError('Failed to load image', error.message);
         }
       } else {
-        showError('No image provided', 'Please provide an image in the URL');
+        showError('No image provided', 'Please upload an image from the home page');
       }
     }
 
