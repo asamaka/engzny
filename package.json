@@ -8,7 +8,9 @@
     "dev": "node api/index.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:health": "jest tests/integration/api-health.test.js",
+    "test:unit": "jest tests/unit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
