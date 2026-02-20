@@ -1,12 +1,20 @@
 name: 🚀 Auto-Deploy to Production
 
 on:
+  push:
+    branches:
+      - 'claude/**'
+    paths:
+      - '.github/workflows/auto-deploy-production.yml'
+      - 'api/**'
+      - 'public/**'
+      - '.claude/**'
   workflow_dispatch:
     inputs:
       branch:
-        description: 'Branch to deploy'
-        required: true
-        default: 'claude/summarize-project-8RBlP'
+        description: 'Branch to deploy (leave empty for current branch)'
+        required: false
+        default: ''
 
 env:
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -24,20 +32,32 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 🔍 Determine source branch
+        id: branch
+        run: |
+          if [ -n "${{ github.event.inputs.branch }}" ]; then
+            BRANCH="${{ github.event.inputs.branch }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Using branch: $BRANCH"
+
       - name: 🔀 Merge feature branch to main
         run: |
-          echo "🔀 Merging ${{ github.event.inputs.branch }} to main..."
+          BRANCH="${{ steps.branch.outputs.branch }}"
+          echo "🔀 Merging $BRANCH to main..."
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # Fetch the feature branch
-          git fetch origin ${{ github.event.inputs.branch }}
+          git fetch origin $BRANCH
 
           # Merge it
-          git merge origin/${{ github.event.inputs.branch }} -m "Auto-merge: Deploy Claude Opus 4.6 to production
+          git merge origin/$BRANCH -m "Auto-merge: Deploy Claude Opus 4.6 to production
 
-          Automated merge from ${{ github.event.inputs.branch }}
+          Automated merge from $BRANCH
 
           Changes:
           - Switch to Claude Opus 4.6
