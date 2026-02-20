@@ -652,9 +652,11 @@
       try {
         showLoading();
 
-        // Redirect to analysis page with the image
-        const encodedImage = encodeURIComponent(dataUrl);
-        window.location.href = `/analyze.html?image=${encodedImage}`;
+        // Store image in sessionStorage to avoid URL length limits
+        sessionStorage.setItem('pendingAnalysisImage', dataUrl);
+
+        // Redirect to analysis page (image will be loaded from sessionStorage)
+        window.location.href = '/analyze.html';
 
       } catch (error) {
         hideLoading();
