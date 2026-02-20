@@ -2,205 +2,207 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>thinx.fun – Analysis</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>thinx</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     :root {
-      --bg-primary: #0a0a0f;
-      --bg-secondary: #14141a;
-      --bg-tertiary: #1e1e26;
-      --border: rgba(255, 255, 255, 0.1);
+      --bg: #000000;
+      --card-bg: #0a0a0a;
+      --border: rgba(255, 255, 255, 0.08);
       --text-primary: #ffffff;
       --text-secondary: rgba(255, 255, 255, 0.7);
-      --text-tertiary: rgba(255, 255, 255, 0.5);
-      --accent: #0A84FF;
-      --accent-hover: #0066CC;
-      --success: #30D158;
-      --warning: #FFD60A;
-      --error: #FF453A;
+      --text-tertiary: rgba(255, 255, 255, 0.4);
+      --accent: #00ff88;
+      --accent-dim: rgba(0, 255, 136, 0.1);
+      --error: #ff4444;
     }
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-      background: var(--bg-primary);
+      background: var(--bg);
       color: var(--text-primary);
       min-height: 100vh;
       overflow-x: hidden;
+      padding-bottom: 80px; /* Space for chat input */
     }
 
-    .container {
-      display: grid;
-      grid-template-columns: 1fr 500px;
-      height: 100vh;
-      gap: 0;
-    }
-
-    /* Left Panel - Image */
-    .image-panel {
-      background: var(--bg-secondary);
+    /* Image Section */
+    .image-section {
+      width: 100%;
+      max-height: 50vh;
+      background: #111;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 2rem;
-      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
       overflow: hidden;
     }
 
-    .image-container {
-      max-width: 100%;
-      max-height: 100%;
-      border-radius: 16px;
-      overflow: hidden;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    }
-
-    .image-container img {
+    .image-section img {
       width: 100%;
-      height: 100%;
-      object-fit: contain;
+      height: auto;
       display: block;
+      object-fit: contain;
     }
 
-    /* Right Panel - Chat */
-    .chat-panel {
-      background: var(--bg-primary);
+    /* Analysis Results */
+    .results-container {
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      height: 100vh;
+      gap: 12px;
     }
 
-    .chat-header {
-      padding: 1.5rem 2rem;
-      border-bottom: 1px solid var(--border);
+    /* Status Bar */
+    .status-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      backdrop-filter: blur(20px);
     }
 
-    .chat-title {
-      font-size: 1.25rem;
-      font-weight: 600;
-    }
-
-    .status-indicator {
+    .status-left {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      font-size: 0.875rem;
-      color: var(--text-tertiary);
+      gap: 8px;
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
-      background: var(--success);
+      background: var(--accent);
       animation: pulse 2s ease-in-out infinite;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      50% { opacity: 0.3; }
     }
 
-    .chat-messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    .message {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-
-    .message-label {
-      font-size: 0.75rem;
-      font-weight: 600;
+    .status-text {
+      font-size: 12px;
+      color: var(--text-tertiary);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      color: var(--text-tertiary);
     }
 
-    .quick-answer {
-      background: var(--bg-tertiary);
+    .logo {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    /* Quick Answer Card */
+    .answer-card {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      transition: all 0.2s ease;
+      border-radius: 16px;
+      overflow: hidden;
+      animation: slideUp 0.3s ease-out;
     }
 
-    .quick-answer:hover {
-      border-color: var(--accent);
-      transform: translateY(-2px);
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .answer-header {
+      padding: 16px;
       display: flex;
       align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 0.75rem;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
     .answer-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 100%);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: var(--accent-dim);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.125rem;
+      font-size: 20px;
+    }
+
+    .answer-meta {
+      flex: 1;
+    }
+
+    .answer-category {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
     }
 
     .answer-title {
-      font-size: 1rem;
+      font-size: 15px;
       font-weight: 600;
       color: var(--text-primary);
     }
 
     .answer-content {
-      color: var(--text-secondary);
-      font-size: 0.9375rem;
+      padding: 16px;
+      font-size: 14px;
       line-height: 1.6;
-      margin-bottom: 1rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
     }
 
     .answer-actions {
+      padding: 12px 16px;
       display: flex;
-      gap: 0.75rem;
+      gap: 8px;
+      border-top: 1px solid var(--border);
     }
 
     .btn {
-      padding: 0.625rem 1.25rem;
-      border-radius: 8px;
-      font-size: 0.875rem;
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 13px;
       font-weight: 600;
+      border: none;
       cursor: pointer;
       transition: all 0.2s ease;
-      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
       font-family: inherit;
     }
 
     .btn-primary {
       background: var(--accent);
-      color: white;
+      color: #000;
     }
 
-    .btn-primary:hover {
-      background: var(--accent-hover);
-      transform: translateY(-1px);
+    .btn-primary:active {
+      transform: scale(0.95);
+      opacity: 0.8;
     }
 
     .btn-secondary {
@@ -209,79 +211,19 @@
       border: 1px solid var(--border);
     }
 
-    .btn-secondary:hover {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-    }
-
-    /* Chat Input */
-    .chat-input-container {
-      padding: 1.5rem 2rem;
-      border-top: 1px solid var(--border);
-      background: var(--bg-secondary);
-    }
-
-    .input-wrapper {
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-    }
-
-    .chat-input {
-      flex: 1;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1rem 1.25rem;
-      color: var(--text-primary);
-      font-size: 0.9375rem;
-      font-family: inherit;
-      transition: all 0.2s ease;
-    }
-
-    .chat-input:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.1);
-    }
-
-    .chat-input::placeholder {
-      color: var(--text-tertiary);
-    }
-
-    .send-btn {
-      width: 48px;
-      height: 48px;
-      border-radius: 12px;
-      background: var(--accent);
-      border: none;
-      color: white;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.2s ease;
-    }
-
-    .send-btn:hover {
-      background: var(--accent-hover);
-      transform: scale(1.05);
-    }
-
-    .send-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    .btn-secondary:active {
+      background: rgba(255, 255, 255, 0.05);
     }
 
     /* Loading State */
-    .loading-message {
-      background: var(--bg-tertiary);
+    .loading-card {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
+      border-radius: 16px;
+      padding: 20px;
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 12px;
     }
 
     .spinner {
@@ -298,110 +240,183 @@
     }
 
     /* Error State */
-    .error-message {
-      background: rgba(255, 69, 58, 0.1);
-      border: 1px solid rgba(255, 69, 58, 0.3);
-      border-radius: 12px;
-      padding: 1.25rem;
-      color: var(--error);
+    .error-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 68, 68, 0.3);
+      border-radius: 16px;
+      padding: 20px;
     }
 
     .error-title {
+      font-size: 15px;
       font-weight: 600;
-      margin-bottom: 0.5rem;
+      color: var(--error);
+      margin-bottom: 8px;
+    }
+
+    .error-message {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
     }
 
     .error-hint {
-      font-size: 0.875rem;
-      opacity: 0.8;
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
     }
 
-    /* Responsive */
-    @media (max-width: 1024px) {
-      .container {
-        grid-template-columns: 1fr;
-        grid-template-rows: 400px 1fr;
-      }
-
-      .image-panel {
-        border-right: none;
-        border-bottom: 1px solid var(--border);
-      }
+    /* Chat Input (Fixed Bottom) */
+    .chat-input-container {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      padding: 12px 16px;
+      backdrop-filter: blur(20px);
+      z-index: 100;
     }
 
-    /* Scrollbar */
-    .chat-messages::-webkit-scrollbar {
-      width: 8px;
+    .input-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: center;
     }
 
-    .chat-messages::-webkit-scrollbar-track {
-      background: var(--bg-primary);
+    .chat-input {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
     }
 
-    .chat-messages::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 4px;
+    .chat-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(255, 255, 255, 0.08);
     }
 
-    .chat-messages::-webkit-scrollbar-thumb:hover {
-      background: rgba(255, 255, 255, 0.2);
+    .chat-input::placeholder {
+      color: var(--text-tertiary);
+    }
+
+    .send-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--accent);
+      border: none;
+      color: #000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .send-btn:active {
+      transform: scale(0.9);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.3;
+    }
+
+    /* User Message */
+    .user-message {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-left: 20%;
+    }
+
+    .user-label {
+      font-size: 10px;
+      color: var(--text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .user-text {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    /* Empty State */
+    .empty-state {
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty-text {
+      font-size: 14px;
+      color: var(--text-tertiary);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Left Panel: Image -->
-    <div class="image-panel">
-      <div class="image-container">
-        <img id="analysisImage" alt="Screenshot being analyzed">
-      </div>
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-left">
+      <span class="status-dot"></span>
+      <span class="status-text" id="statusText">analyzing</span>
     </div>
+    <div class="logo">thinx</div>
+  </div>
 
-    <!-- Right Panel: Chat -->
-    <div class="chat-panel">
-      <div class="chat-header">
-        <h1 class="chat-title">Analysis</h1>
-        <div class="status-indicator">
-          <span class="status-dot"></span>
-          <span id="statusText">AI Ready</span>
-        </div>
-      </div>
+  <!-- Image Section -->
+  <div class="image-section">
+    <img id="analysisImage" alt="Screenshot">
+  </div>
 
-      <div class="chat-messages" id="chatMessages">
-        <!-- Messages will be added here dynamically -->
-      </div>
+  <!-- Results Container -->
+  <div class="results-container" id="resultsContainer">
+    <!-- Results will be added here -->
+  </div>
 
-      <div class="chat-input-container">
-        <div class="input-wrapper">
-          <input
-            type="text"
-            class="chat-input"
-            id="chatInput"
-            placeholder="Ask a question about this image..."
-          >
-          <button class="send-btn" id="sendBtn">
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </button>
-        </div>
-      </div>
+  <!-- Chat Input (Fixed Bottom) -->
+  <div class="chat-input-container">
+    <div class="input-wrapper">
+      <input
+        type="text"
+        class="chat-input"
+        id="chatInput"
+        placeholder="Ask a question..."
+      >
+      <button class="send-btn" id="sendBtn">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M18 2L9 11M18 2L12 18L9 11M18 2L2 8L9 11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
   </div>
 
   <script>
-    // Get elements
-    const chatMessages = document.getElementById('chatMessages');
+    const resultsContainer = document.getElementById('resultsContainer');
     const chatInput = document.getElementById('chatInput');
     const sendBtn = document.getElementById('sendBtn');
     const analysisImage = document.getElementById('analysisImage');
     const statusText = document.getElementById('statusText');
 
-    // State
     let currentImageData = null;
-    let conversationHistory = [];
 
-    // Parse image from URL
+    // Load image from URL
     function loadImageFromUrl() {
       const params = new URLSearchParams(window.location.search);
       const imageData = params.get('image');
@@ -422,8 +437,8 @@
 
     // Perform initial analysis
     async function performInitialAnalysis() {
-      statusText.textContent = 'Analyzing...';
-      addMessage('system', 'Analyzing your screenshot...');
+      statusText.textContent = 'analyzing';
+      showLoading('Analyzing your screenshot...');
 
       try {
         const response = await fetch('/api/hub/analyze', {
@@ -434,48 +449,50 @@
 
         const data = await response.json();
 
+        // Remove loading
+        resultsContainer.innerHTML = '';
+
         if (!response.ok) {
-          throw new Error(data.message || 'Analysis failed');
+          statusText.textContent = 'error';
+          throw new Error(data.hint || data.message || 'Analysis failed');
         }
 
-        statusText.textContent = 'Ready';
-        displayAnalysisResults(data.toolCalls || []);
+        statusText.textContent = 'ready';
+        displayResults(data.toolCalls || []);
       } catch (error) {
-        statusText.textContent = 'Error';
+        statusText.textContent = 'error';
         showError('Analysis Failed', error.message);
       }
     }
 
-    // Display analysis results as quick answers
-    function displayAnalysisResults(toolCalls) {
-      // Clear loading message
-      chatMessages.innerHTML = '';
-
+    // Display analysis results
+    function displayResults(toolCalls) {
       if (!toolCalls || toolCalls.length === 0) {
-        addMessage('assistant', 'No analysis results available.');
+        showEmpty();
         return;
       }
 
-      // Process tool calls and create quick answers
-      toolCalls.forEach((toolCall, index) => {
+      toolCalls.forEach((toolCall) => {
         if (toolCall.tool === 'render_hero') {
-          addQuickAnswer({
+          addAnswerCard({
             icon: toolCall.args.icon || '🔍',
             title: toolCall.args.title || 'Overview',
-            content: toolCall.args.subtitle || 'Analysis complete',
-            category: toolCall.args.badge || 'General',
+            content: toolCall.args.subtitle || '',
+            category: toolCall.args.badge || 'Analysis',
           });
         } else if (toolCall.tool === 'render_metric') {
-          addQuickAnswer({
+          addAnswerCard({
             icon: '📊',
             title: toolCall.args.label || 'Metric',
-            content: `${toolCall.args.value} - ${toolCall.args.subtext || ''}`,
+            content: `${toolCall.args.value}\n${toolCall.args.subtext || ''}`,
             category: toolCall.args.title || 'Insight',
           });
         } else if (toolCall.tool === 'render_list') {
           const items = toolCall.args.items || [];
-          const content = items.map(item => `• ${item.label}: ${item.value}`).join('\n');
-          addQuickAnswer({
+          const content = items.map(item =>
+            `${item.icon || '•'} ${item.label}: ${item.value}`
+          ).join('\n');
+          addAnswerCard({
             icon: '📋',
             title: toolCall.args.title || 'Details',
             content: content,
@@ -485,94 +502,96 @@
       });
     }
 
-    // Add a quick answer card
-    function addQuickAnswer({ icon, title, content, category }) {
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'message';
-
-      messageDiv.innerHTML = `
-        <div class="message-label">${category}</div>
-        <div class="quick-answer">
-          <div class="answer-header">
-            <div class="answer-icon">${icon}</div>
+    // Add answer card
+    function addAnswerCard({ icon, title, content, category }) {
+      const card = document.createElement('div');
+      card.className = 'answer-card';
+      card.innerHTML = `
+        <div class="answer-header">
+          <div class="answer-icon">${icon}</div>
+          <div class="answer-meta">
+            <div class="answer-category">${category}</div>
             <div class="answer-title">${title}</div>
           </div>
-          <div class="answer-content">${content}</div>
-          <div class="answer-actions">
-            <button class="btn btn-primary" onclick="digDeeper('${title.replace(/'/g, "\\'")}')">
-              🔎 Dig Deeper
-            </button>
-            <button class="btn btn-secondary" onclick="askRelated('${title.replace(/'/g, "\\'")}')">
-              💬 Ask Related
-            </button>
-          </div>
+        </div>
+        <div class="answer-content">${content}</div>
+        <div class="answer-actions">
+          <button class="btn btn-primary" onclick="digDeeper('${title.replace(/'/g, "\\'")}')">
+            🔎 Dig Deeper
+          </button>
+          <button class="btn btn-secondary" onclick="askRelated('${title.replace(/'/g, "\\'")}')">
+            💬 Related
+          </button>
         </div>
       `;
+      resultsContainer.appendChild(card);
+    }
 
-      chatMessages.appendChild(messageDiv);
+    // Show loading
+    function showLoading(message) {
+      const loading = document.createElement('div');
+      loading.className = 'loading-card';
+      loading.innerHTML = `
+        <div class="spinner"></div>
+        <span style="color: var(--text-secondary); font-size: 14px;">${message}</span>
+      `;
+      resultsContainer.appendChild(loading);
+    }
+
+    // Show error
+    function showError(title, message) {
+      resultsContainer.innerHTML = '';
+      const error = document.createElement('div');
+      error.className = 'error-card';
+      error.innerHTML = `
+        <div class="error-title">${title}</div>
+        <div class="error-message">${message}</div>
+        ${message.includes('API') ? '<div class="error-hint">💡 Add your GEMINI_API_KEY to the .env file</div>' : ''}
+      `;
+      resultsContainer.appendChild(error);
+    }
+
+    // Show empty state
+    function showEmpty() {
+      resultsContainer.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🤔</div>
+          <div class="empty-text">No analysis results available</div>
+        </div>
+      `;
+    }
+
+    // Add user message
+    function addUserMessage(text) {
+      const msg = document.createElement('div');
+      msg.className = 'user-message';
+      msg.innerHTML = `
+        <div class="user-label">You</div>
+        <div class="user-text">${text}</div>
+      `;
+      resultsContainer.appendChild(msg);
       scrollToBottom();
     }
 
-    // Dig deeper into a specific topic
+    // Dig deeper
     async function digDeeper(topic) {
-      const question = `Tell me more about: ${topic}`;
+      const question = `Tell me more details about: ${topic}`;
       await askQuestion(question);
     }
 
-    // Ask a related question
+    // Ask related
     function askRelated(topic) {
       chatInput.value = `More about ${topic}`;
       chatInput.focus();
     }
 
-    // Add a message to the chat
-    function addMessage(role, content) {
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'message';
-
-      const label = role === 'user' ? 'You' : role === 'assistant' ? 'AI' : 'System';
-
-      messageDiv.innerHTML = `
-        <div class="message-label">${label}</div>
-        <div class="${role === 'system' ? 'loading-message' : 'quick-answer'}">
-          ${role === 'system' ? `<div class="spinner"></div>` : ''}
-          <div class="answer-content">${content}</div>
-        </div>
-      `;
-
-      chatMessages.appendChild(messageDiv);
-      scrollToBottom();
-    }
-
-    // Show error
-    function showError(title, message) {
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'message';
-
-      errorDiv.innerHTML = `
-        <div class="message-label">Error</div>
-        <div class="error-message">
-          <div class="error-title">${title}</div>
-          <div class="error-hint">${message}</div>
-        </div>
-      `;
-
-      chatMessages.appendChild(errorDiv);
-      scrollToBottom();
-    }
-
-    // Ask a follow-up question
+    // Ask question
     async function askQuestion(question) {
       if (!question.trim()) return;
 
-      // Add user message
-      addMessage('user', question);
-
-      // Add loading message
-      const loadingId = Date.now();
-      addMessage('system', 'Thinking...');
-
-      statusText.textContent = 'Processing...';
+      addUserMessage(question);
+      statusText.textContent = 'thinking';
+      showLoading('Thinking...');
 
       try {
         const response = await fetch('/api/hub/analyze', {
@@ -586,37 +605,28 @@
 
         const data = await response.json();
 
-        // Remove loading message
-        const messages = chatMessages.querySelectorAll('.message');
-        messages[messages.length - 1].remove();
+        // Remove loading
+        const loadingCards = resultsContainer.querySelectorAll('.loading-card');
+        loadingCards[loadingCards.length - 1]?.remove();
 
         if (!response.ok) {
-          throw new Error(data.message || 'Failed to get response');
+          statusText.textContent = 'error';
+          throw new Error(data.hint || data.message || 'Failed to get response');
         }
 
-        statusText.textContent = 'Ready';
-
-        // Display the response
-        if (data.toolCalls && data.toolCalls.length > 0) {
-          displayAnalysisResults(data.toolCalls);
-        } else {
-          addMessage('assistant', 'I analyzed your question but couldn\'t generate a structured response.');
-        }
+        statusText.textContent = 'ready';
+        displayResults(data.toolCalls || []);
       } catch (error) {
-        // Remove loading message
-        const messages = chatMessages.querySelectorAll('.message');
-        if (messages.length > 0) {
-          messages[messages.length - 1].remove();
-        }
-
-        statusText.textContent = 'Error';
+        const loadingCards = resultsContainer.querySelectorAll('.loading-card');
+        loadingCards[loadingCards.length - 1]?.remove();
+        statusText.textContent = 'error';
         showError('Failed to process question', error.message);
       }
     }
 
     // Scroll to bottom
     function scrollToBottom() {
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     }
 
     // Event listeners
