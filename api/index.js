@@ -301,6 +301,97 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
+// Keypoints Extraction API
+// Extract structured keypoints from screenshots with card-based navigation
+// ============================================
+const { extractKeypoints } = require('./generators/keypoint-extractor');
+
+app.post('/api/keypoints', upload.single('image'), async (req, res) => {
+  try {
+    let imageData = null;
+    let mediaType = null;
+
+    // Handle JSON request with base64 image (from Apple Shortcuts)
+    if (req.is('application/json') || (req.body && req.body.image && typeof req.body.image === 'string')) {
+      const body = req.body;
+
+      if (!body.image) {
+        return res.status(400).json({ error: 'No image provided' });
+      }
+
+      let base64Data = body.image;
+
+      // Extract media type and data from data URL if present
+      if (base64Data.startsWith('data:')) {
+        const matches = base64Data.match(/^data:([^;]+);base64,(.+)$/);
+        if (matches) {
+          mediaType = matches[1];
+          base64Data = matches[2];
+        } else {
+          return res.status(400).json({ error: 'Invalid image format' });
+        }
+      } else {
+        mediaType = body.mediaType || body.media_type || 'image/png';
+      }
+
+      // Validate base64 format
+      if (!/^[A-Za-z0-9+/]+=*$/.test(base64Data)) {
+        return res.status(400).json({ error: 'Invalid base64 data' });
+      }
+
+      imageData = base64Data;
+
+    } else if (req.file) {
+      // Traditional multipart file upload
+      imageData = req.file.buffer.toString('base64');
+      mediaType = req.file.mimetype;
+    } else {
+      return res.status(400).json({
+        error: 'No image provided',
+        message: 'Provide image as multipart form-data or JSON with base64'
+      });
+    }
+
+    // Validate media type
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!validTypes.includes(mediaType)) {
+      return res.status(400).json({
+        error: 'Invalid image type',
+        message: `Supported: JPEG, PNG, GIF, WebP. Got: ${mediaType}`
+      });
+    }
+
+    console.log('[KEYPOINTS] Extracting keypoints from image...');
+
+    // Extract keypoints using Claude Vision
+    const result = await extractKeypoints({
+      imageData,
+      mediaType,
+      adapterConfig: {
+        provider: 'claude', // Use Claude for best vision analysis
+      },
+    });
+
+    console.log('[KEYPOINTS] Extraction complete:', result.keypoints.length, 'keypoints found');
+
+    res.json({
+      success: true,
+      overview: result.overview,
+      keypoints: result.keypoints,
+      trails: result.trails,
+      timestamp: new Date().toISOString(),
+    });
+
+  } catch (error) {
+    console.error('[KEYPOINTS] Error:', error);
+    res.status(500).json({
+      error: 'Keypoint extraction failed',
+      message: error.message
+    });
+  }
+});
+
+// ============================================
 // Screenshot Intelligence Hub (v2) Routes
 // ============================================
 const buildHubPrompt = (question) => {

@@ -41,6 +41,8 @@ Mobile-first screenshot analyzer powered by Claude AI:
 - ✅ **Real-time streaming** - See Claude think
 - ✅ **Auto-scroll** - Smart scrolling with manual control
 - ✅ **Mobile-optimized** - Perfect for phones
+- ✨ **Keypoints Extraction** - Get structured insights with card-based navigation
+- 🎯 **Trail Navigation** - Explore people, events, facts, products, and more
 
 ---
 
@@ -138,6 +140,69 @@ npm run test:watch
 
 # Coverage
 npm run test:coverage
+```
+
+---
+
+## 🔍 Keypoints Feature
+
+The keypoints extraction feature provides structured, card-based insights from your screenshots.
+
+### How It Works
+
+1. **Upload a screenshot** via the paste interface
+2. **Wait for analysis** to complete
+3. **Click "View Keypoints"** button
+4. **Explore insights** organized into trails:
+   - 👥 **People** - Names, profiles, @handles
+   - 📅 **Events** - What happened, when, where
+   - 📊 **Facts** - Statistics, data, claims to verify
+   - 🛍️ **Products** - Items, prices, features
+   - 📍 **Locations** - Places, addresses, maps
+   - ⏰ **Dates** - Timelines, schedules
+   - 💬 **Context** - Background information
+   - ✓ **Claims** - Statements to fact-check
+
+### Card-Based Navigation
+
+Each keypoint shows:
+- **Question** - The obvious question you'd ask ("Who is this?", "What's this product?")
+- **Quick Answer** - Immediate response based on visible info
+- **Deep Dive** - Follow-up questions for exploration
+- **Priority** - How important this keypoint is
+- **Verification Badge** - If it needs fact-checking
+
+### API Endpoint
+
+```bash
+POST /api/keypoints
+Content-Type: application/json
+
+{
+  "image": "data:image/png;base64,..."
+}
+```
+
+Response:
+```json
+{
+  "overview": {
+    "mainTopic": "What this screenshot is about",
+    "immediateAnswer": "Quick summary"
+  },
+  "keypoints": [
+    {
+      "title": "Keypoint title",
+      "obviousQuestion": "What is this?",
+      "quickAnswer": "This is...",
+      "trail": "people",
+      "priority": "high"
+    }
+  ],
+  "trails": {
+    "people": { "count": 2, "keypointIds": [...] }
+  }
+}
 ```
 
 ---
