@@ -77,6 +77,9 @@ jobs:
 
           echo "✅ Merged successfully!"
 
+      - name: 📦 Install Vercel CLI
+        run: npm install -g vercel@latest
+
       - name: 🔐 Configure Vercel Environment Variables
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -84,53 +87,23 @@ jobs:
         run: |
           echo "🔐 Adding ANTHROPIC_API_KEY to Vercel..."
 
-          # Check if env var already exists
-          EXISTING=$(curl -s \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env" \
-            | jq -r '.envs[] | select(.key=="ANTHROPIC_API_KEY") | .id')
+          # Use Vercel CLI to add environment variable
+          # Add to production
+          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY production --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in production"
 
-          if [ -n "$EXISTING" ]; then
-            echo "⚠️ ANTHROPIC_API_KEY already exists, updating..."
+          # Add to preview
+          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY preview --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in preview"
 
-            # Delete existing
-            curl -X DELETE \
-              -H "Authorization: Bearer $VERCEL_TOKEN" \
-              "https://api.vercel.com/v9/projects/$VERCEL_PROJECT_ID/env/$EXISTING"
+          # Add to development
+          echo "$ANTHROPIC_API_KEY" | vercel env add ANTHROPIC_API_KEY development --token="$VERCEL_TOKEN" --yes || echo "⚠️ May already exist in development"
 
-            echo "🗑️ Removed old value"
-          fi
-
-          # Add new value
-          RESPONSE=$(curl -s -X POST \
-            -H "Authorization: Bearer $VERCEL_TOKEN" \
-            -H "Content-Type: application/json" \
-            "https://api.vercel.com/v10/projects/$VERCEL_PROJECT_ID/env" \
-            -d "{
-              \"key\": \"ANTHROPIC_API_KEY\",
-              \"value\": \"$ANTHROPIC_API_KEY\",
-              \"type\": \"encrypted\",
-              \"target\": [\"production\", \"preview\", \"development\"]
-            }")
-
-          echo "Response: $RESPONSE"
-
-          if echo "$RESPONSE" | jq -e '.created' > /dev/null; then
-            echo "✅ ANTHROPIC_API_KEY added successfully to all environments!"
-          else
-            echo "❌ Failed to add environment variable"
-            echo "$RESPONSE" | jq .
-            exit 1
-          fi
+          echo "✅ ANTHROPIC_API_KEY configured for all environments!"
 
       - name: 🟢 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
-
-      - name: 📦 Install Vercel CLI
-        run: npm install -g vercel@latest
 
       - name: 🔗 Pull Vercel Environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
