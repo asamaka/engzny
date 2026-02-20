@@ -42,16 +42,22 @@
             overflow-x: hidden;
         }
 
-        /* === STATES === */
-        .state { display: none; min-height: 100%; width: 100%; }
-        .state.active { display: flex; }
-
         /* === PASTE STATE === */
         #pasteState {
+            position: fixed;
+            inset: 0;
+            display: flex;
             align-items: center;
             justify-content: center;
             flex-direction: column;
-            height: 100%;
+            z-index: 200;
+            background: var(--bg);
+            transition: opacity 0.4s ease;
+        }
+
+        #pasteState.hidden {
+            opacity: 0;
+            pointer-events: none;
         }
 
         .paste-zone {
@@ -79,68 +85,160 @@
         .paste-zone:hover .paste-text { color: var(--accent); }
         .paste-hint { margin-top: 1.5rem; font-size: 0.65rem; color: var(--text-dim); opacity: 0.4; }
 
-        /* === SCANNING STATE === */
-        #scanState {
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100%;
+        /* === MAIN CANVAS (screenshot + overlay) === */
+        #mainCanvas {
             position: relative;
+            min-height: 100vh;
+            width: 100%;
+            display: none;
         }
 
-        .scan-preview {
-            max-width: 80%;
-            max-height: 50vh;
-            object-fit: contain;
-            border-radius: var(--radius-sm);
-            opacity: 0.5;
-            filter: brightness(0.7);
-        }
+        #mainCanvas.active { display: block; }
 
-        .scan-overlay {
-            position: absolute;
+        /* Screenshot background layer */
+        .screenshot-layer {
+            position: fixed;
             inset: 0;
+            z-index: 1;
             display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
-            gap: 16px;
+            transition: opacity 0.8s ease;
         }
 
-        .scan-bar {
-            width: 200px;
-            height: 3px;
+        .screenshot-layer img {
+            max-width: 92%;
+            max-height: 85vh;
+            object-fit: contain;
+            border-radius: var(--radius);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Screenshot states */
+        .screenshot-layer.scanning img {
+            opacity: 1;
+            filter: brightness(0.9);
+        }
+
+        .screenshot-layer.fading {
+            opacity: 0.08;
+        }
+
+        .screenshot-layer.gone {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Scan line effect */
+        .scan-line {
+            position: fixed;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: var(--accent);
+            box-shadow: 0 0 20px var(--accent), 0 0 60px var(--accent-glow), 0 -8px 20px var(--accent-dim);
+            z-index: 5;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .scan-line.active {
+            opacity: 1;
+            animation: scanMove 2.2s ease-in-out infinite;
+        }
+
+        @keyframes scanMove {
+            0% { top: 10%; }
+            50% { top: 85%; }
+            100% { top: 10%; }
+        }
+
+        /* Corner markers during scan */
+        .scan-corners {
+            position: fixed;
+            inset: 0;
+            z-index: 4;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .scan-corners.active { opacity: 1; }
+
+        .scan-corner {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border-color: var(--accent);
+            border-style: solid;
+            border-width: 0;
+        }
+
+        .scan-corner.tl { top: 8%; left: 5%; border-top-width: 2px; border-left-width: 2px; }
+        .scan-corner.tr { top: 8%; right: 5%; border-top-width: 2px; border-right-width: 2px; }
+        .scan-corner.bl { bottom: 12%; left: 5%; border-bottom-width: 2px; border-left-width: 2px; }
+        .scan-corner.br { bottom: 12%; right: 5%; border-bottom-width: 2px; border-right-width: 2px; }
+
+        /* Bottom status bar */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            padding: 16px 20px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            background: linear-gradient(transparent, rgba(10,10,10,0.95) 30%);
+            display: none;
+        }
+
+        .status-bar.active { display: block; }
+
+        .status-progress {
+            width: 100%;
+            height: 2px;
             background: var(--surface-2);
-            border-radius: 3px;
+            border-radius: 2px;
             overflow: hidden;
+            margin-bottom: 10px;
         }
 
-        .scan-bar-fill {
+        .status-progress-fill {
             height: 100%;
             background: var(--accent);
-            border-radius: 3px;
-            width: 5%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px var(--accent-glow);
+            border-radius: 2px;
+            width: 0%;
+            transition: width 0.4s ease;
+            box-shadow: 0 0 8px var(--accent-glow);
         }
 
-        .scan-label {
-            font-size: 0.7rem;
-            color: var(--accent);
+        .status-text {
+            font-size: 0.65rem;
             text-transform: uppercase;
             letter-spacing: 2px;
-            animation: pulse 1.5s ease-in-out infinite;
+            color: var(--accent);
+            animation: statusPulse 2s ease-in-out infinite;
         }
 
-        @keyframes pulse {
+        @keyframes statusPulse {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            50% { opacity: 0.5; }
         }
 
-        /* === LAYOUT STATE (Results) === */
-        #layoutState {
-            flex-direction: column;
+        /* === RESULTS OVERLAY (cards on top of screenshot) === */
+        .results-overlay {
+            position: relative;
+            z-index: 10;
             min-height: 100vh;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+            padding-bottom: 60px;
+        }
+
+        .results-overlay.visible {
+            opacity: 1;
+            transform: translateY(0);
         }
 
         /* Header bar */
@@ -148,7 +246,9 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            background: var(--surface);
+            background: rgba(20, 20, 20, 0.92);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--border-subtle);
             padding: 12px 16px;
             display: flex;
@@ -213,7 +313,9 @@
         /* Content analysis banner */
         .content-analysis {
             padding: 16px;
-            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+            background: linear-gradient(135deg, rgba(20,20,20,0.9) 0%, rgba(28,28,28,0.9) 100%);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             border-bottom: 1px solid var(--border-subtle);
         }
 
@@ -267,28 +369,45 @@
 
         /* === CARD BASE === */
         .card {
-            background: var(--surface);
+            background: rgba(20, 20, 20, 0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
             border: 1px solid var(--border-subtle);
             border-radius: var(--radius);
             overflow: hidden;
-            transition: all 0.3s ease;
             position: relative;
+            opacity: 0;
+            transform: translateY(12px) scale(0.97);
+            transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.3s ease;
+        }
+
+        .card.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
         }
 
         .card:hover {
             border-color: var(--border);
         }
 
+        /* Loading shimmer */
         .card.loading {
-            min-height: 100px;
+            min-height: 80px;
         }
 
         .card.loading::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(90deg, transparent 0%, var(--surface-2) 50%, transparent 100%);
-            animation: shimmer 1.5s ease-in-out infinite;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(0, 255, 170, 0.04) 35%,
+                rgba(0, 255, 170, 0.08) 50%,
+                rgba(0, 255, 170, 0.04) 65%,
+                transparent 100%
+            );
+            animation: shimmer 1.8s ease-in-out infinite;
         }
 
         @keyframes shimmer {
@@ -296,13 +415,21 @@
             100% { transform: translateX(100%); }
         }
 
+        /* Card populate animation */
         .card.populated {
-            animation: card-in 0.3s ease;
+            animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
-        @keyframes card-in {
-            from { opacity: 0.6; transform: scale(0.98); }
-            to { opacity: 1; transform: scale(1); }
+        @keyframes cardPop {
+            from { transform: scale(0.96); opacity: 0.7; }
+            60% { transform: scale(1.01); }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* Subtle glow when card just populated */
+        .card.just-populated {
+            border-color: rgba(0, 255, 170, 0.3);
+            box-shadow: 0 0 20px rgba(0, 255, 170, 0.06);
         }
 
         .card-inner {
@@ -328,9 +455,7 @@
         }
 
         /* === HERO SUMMARY CARD === */
-        .card-hero .card-inner {
-            padding: 20px;
-        }
+        .card-hero .card-inner { padding: 20px; }
 
         .card-hero .hero-badge {
             display: inline-block;
@@ -363,7 +488,7 @@
             color: var(--text);
             line-height: 1.6;
             padding: 12px;
-            background: var(--bg);
+            background: rgba(10,10,10,0.6);
             border-radius: var(--radius-sm);
             border-left: 3px solid var(--accent);
         }
@@ -437,9 +562,7 @@
             font-weight: 500;
         }
 
-        .card-list .list-item-icon {
-            margin-right: 6px;
-        }
+        .card-list .list-item-icon { margin-right: 6px; }
 
         /* === FACT CHECK CARD === */
         .card-fact-check .fact-claim {
@@ -447,7 +570,7 @@
             color: var(--text);
             line-height: 1.5;
             padding: 10px 12px;
-            background: var(--bg);
+            background: rgba(10,10,10,0.6);
             border-radius: var(--radius-sm);
             margin-bottom: 12px;
             border-left: 3px solid var(--border);
@@ -510,15 +633,8 @@
             color: var(--text-bright);
         }
 
-        .card-person .person-role {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-        }
-
-        .card-person .person-handle {
-            font-size: 0.7rem;
-            color: var(--accent);
-        }
+        .card-person .person-role { font-size: 0.7rem; color: var(--text-dim); }
+        .card-person .person-handle { font-size: 0.7rem; color: var(--accent); }
 
         .card-person .person-context {
             font-size: 0.78rem;
@@ -541,22 +657,14 @@
             margin-bottom: 8px;
         }
 
-        .card-product .product-rating {
-            font-size: 0.75rem;
-            color: var(--warning);
-            margin-bottom: 10px;
-        }
+        .card-product .product-rating { font-size: 0.75rem; color: var(--warning); margin-bottom: 10px; }
 
-        .card-product .product-features {
-            list-style: none;
-            margin-bottom: 10px;
-        }
+        .card-product .product-features { list-style: none; margin-bottom: 10px; }
 
         .card-product .product-features li {
             font-size: 0.75rem;
             color: var(--text);
-            padding: 4px 0;
-            padding-left: 16px;
+            padding: 4px 0 4px 16px;
             position: relative;
         }
 
@@ -567,21 +675,9 @@
             color: var(--accent);
         }
 
-        .card-product .product-warnings {
-            list-style: none;
-            margin-top: 8px;
-        }
-
-        .card-product .product-warnings li {
-            font-size: 0.7rem;
-            color: var(--warning);
-            padding: 3px 0;
-        }
-
-        .card-product .product-warnings li::before {
-            content: '! ';
-            font-weight: 600;
-        }
+        .card-product .product-warnings { list-style: none; margin-top: 8px; }
+        .card-product .product-warnings li { font-size: 0.7rem; color: var(--warning); padding: 3px 0; }
+        .card-product .product-warnings li::before { content: '! '; font-weight: 600; }
 
         /* === TIMELINE CARD === */
         .card-timeline .timeline-title {
@@ -611,12 +707,7 @@
 
         .card-timeline .timeline-event:last-child::before { display: none; }
 
-        .card-timeline .timeline-date {
-            color: var(--accent);
-            min-width: 50px;
-            flex-shrink: 0;
-            text-align: right;
-        }
+        .card-timeline .timeline-date { color: var(--accent); min-width: 50px; flex-shrink: 0; text-align: right; }
 
         .card-timeline .timeline-dot {
             width: 8px;
@@ -633,10 +724,7 @@
             box-shadow: 0 0 6px var(--accent-glow);
         }
 
-        .card-timeline .timeline-text {
-            color: var(--text);
-            line-height: 1.4;
-        }
+        .card-timeline .timeline-text { color: var(--text); line-height: 1.4; }
 
         /* === QUOTE CARD === */
         .card-quote .quote-text {
@@ -646,22 +734,12 @@
             font-style: italic;
             padding: 12px 16px;
             border-left: 3px solid var(--accent);
-            background: var(--bg);
+            background: rgba(10,10,10,0.6);
             border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
         }
 
-        .card-quote .quote-attribution {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 8px;
-        }
-
-        .card-quote .quote-context {
-            font-size: 0.72rem;
-            color: var(--text-dim);
-            margin-top: 6px;
-            line-height: 1.4;
-        }
+        .card-quote .quote-attribution { font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; }
+        .card-quote .quote-context { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
 
         /* === COMPARISON CARD === */
         .card-comparison .comparison-title {
@@ -671,11 +749,7 @@
             margin-bottom: 12px;
         }
 
-        .card-comparison table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.72rem;
-        }
+        .card-comparison table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
 
         .card-comparison th {
             text-align: left;
@@ -694,13 +768,8 @@
         .card-comparison tr:last-child td { border-bottom: none; }
 
         /* === WARNING CARD === */
-        .card-warning {
-            border-color: var(--warning) !important;
-        }
-
-        .card-warning.level-critical {
-            border-color: var(--danger) !important;
-        }
+        .card-warning { border-color: var(--warning) !important; }
+        .card-warning.level-critical { border-color: var(--danger) !important; }
 
         .card-warning .warning-header {
             display: flex;
@@ -709,30 +778,17 @@
             margin-bottom: 8px;
         }
 
-        .card-warning .warning-icon {
-            font-size: 1.2rem;
-        }
-
-        .card-warning .warning-title {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--warning);
-        }
-
+        .card-warning .warning-icon { font-size: 1.2rem; }
+        .card-warning .warning-title { font-size: 0.85rem; font-weight: 600; color: var(--warning); }
         .card-warning.level-critical .warning-title { color: var(--danger); }
 
-        .card-warning .warning-details {
-            font-size: 0.78rem;
-            color: var(--text);
-            line-height: 1.5;
-            margin-bottom: 8px;
-        }
+        .card-warning .warning-details { font-size: 0.78rem; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
 
         .card-warning .warning-advice {
             font-size: 0.72rem;
             color: var(--text-dim);
             padding: 8px 10px;
-            background: var(--bg);
+            background: rgba(10,10,10,0.6);
             border-radius: var(--radius-sm);
         }
 
@@ -768,17 +824,8 @@
             margin-top: 2px;
         }
 
-        .card-action .action-label {
-            font-size: 0.78rem;
-            color: var(--text);
-            font-weight: 500;
-        }
-
-        .card-action .action-desc {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 2px;
-        }
+        .card-action .action-label { font-size: 0.78rem; color: var(--text); font-weight: 500; }
+        .card-action .action-desc { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
 
         /* === TEXT EXTRACT CARD === */
         .card-extract .extract-title {
@@ -793,17 +840,13 @@
             color: var(--text);
             line-height: 1.6;
             padding: 12px;
-            background: var(--bg);
+            background: rgba(10,10,10,0.6);
             border-radius: var(--radius-sm);
             border-left: 2px solid var(--border);
             white-space: pre-wrap;
         }
 
-        .card-extract .extract-source {
-            font-size: 0.65rem;
-            color: var(--text-dim);
-            margin-top: 6px;
-        }
+        .card-extract .extract-source { font-size: 0.65rem; color: var(--text-dim); margin-top: 6px; }
 
         /* === LOCATION CARD === */
         .card-location .location-name {
@@ -813,11 +856,7 @@
             margin-bottom: 4px;
         }
 
-        .card-location .location-address {
-            font-size: 0.72rem;
-            color: var(--accent);
-            margin-bottom: 8px;
-        }
+        .card-location .location-address { font-size: 0.72rem; color: var(--accent); margin-bottom: 8px; }
 
         .card-location .location-context {
             font-size: 0.78rem;
@@ -827,13 +866,19 @@
 
         /* === ERROR STATE === */
         #errorState {
+            position: fixed;
+            inset: 0;
+            display: none;
             align-items: center;
             justify-content: center;
             flex-direction: column;
-            height: 100%;
+            z-index: 200;
+            background: var(--bg);
             padding: 2rem;
             text-align: center;
         }
+
+        #errorState.active { display: flex; }
 
         .error-text { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; }
         .retry-btn {
@@ -857,11 +902,23 @@
         }
         .placeholder-line.short { width: 60%; }
         .placeholder-line.medium { width: 80%; }
+
+        /* Loading dot animation for placeholder text */
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4) infinite;
+        }
+        @keyframes dots {
+            0% { content: ''; }
+            25% { content: '.'; }
+            50% { content: '..'; }
+            75% { content: '...'; }
+        }
     </style>
 </head>
 <body>
     <!-- Paste State -->
-    <div class="state active" id="pasteState">
+    <div id="pasteState">
         <div class="paste-zone" id="pasteZone">
             <div class="paste-icon">[ ]</div>
             <span class="paste-text">tap to paste screenshot</span>
@@ -869,63 +926,72 @@
         <p class="paste-hint">or press Ctrl+V / Cmd+V</p>
     </div>
 
-    <!-- Scanning State -->
-    <div class="state" id="scanState">
-        <img class="scan-preview" id="scanPreview" alt="">
-        <div class="scan-overlay">
-            <div class="scan-bar">
-                <div class="scan-bar-fill" id="scanBarFill"></div>
+    <!-- Main Canvas (screenshot + overlaid results) -->
+    <div id="mainCanvas">
+        <!-- Screenshot background -->
+        <div class="screenshot-layer" id="screenshotLayer">
+            <img id="screenshotImg" alt="">
+        </div>
+
+        <!-- Scan line -->
+        <div class="scan-line" id="scanLine"></div>
+
+        <!-- Corner markers -->
+        <div class="scan-corners" id="scanCorners">
+            <div class="scan-corner tl"></div>
+            <div class="scan-corner tr"></div>
+            <div class="scan-corner bl"></div>
+            <div class="scan-corner br"></div>
+        </div>
+
+        <!-- Results overlay (cards) -->
+        <div class="results-overlay" id="resultsOverlay">
+            <div class="layout-header">
+                <div class="layout-header-left">
+                    <button class="layout-back" id="layoutBack">&#8592; new</button>
+                    <span class="layout-badge" id="layoutBadge"></span>
+                </div>
+                <div class="layout-progress" id="layoutProgress">
+                    <div class="layout-progress-bar">
+                        <div class="layout-progress-fill" id="layoutProgressFill"></div>
+                    </div>
+                    <span class="layout-progress-text" id="layoutProgressText"></span>
+                </div>
             </div>
-            <div class="scan-label" id="scanLabel">analyzing</div>
+            <div class="content-analysis" id="contentAnalysis" style="display:none;">
+                <div class="content-analysis-intent" id="analysisIntent"></div>
+                <div class="top-questions" id="topQuestions"></div>
+            </div>
+            <div class="card-grid" id="cardGrid"></div>
         </div>
     </div>
 
-    <!-- Layout State (Results) -->
-    <div class="state" id="layoutState">
-        <div class="layout-header">
-            <div class="layout-header-left">
-                <button class="layout-back" id="layoutBack">&#8592; new</button>
-                <span class="layout-badge" id="layoutBadge"></span>
-            </div>
-            <div class="layout-progress" id="layoutProgress">
-                <div class="layout-progress-bar">
-                    <div class="layout-progress-fill" id="layoutProgressFill"></div>
-                </div>
-                <span class="layout-progress-text" id="layoutProgressText"></span>
-            </div>
+    <!-- Status Bar (bottom, persists across scan + research) -->
+    <div class="status-bar" id="statusBar">
+        <div class="status-progress">
+            <div class="status-progress-fill" id="statusProgressFill"></div>
         </div>
-        <div class="content-analysis" id="contentAnalysis" style="display:none;">
-            <div class="content-analysis-intent" id="analysisIntent"></div>
-            <div class="top-questions" id="topQuestions"></div>
-        </div>
-        <div class="card-grid" id="cardGrid"></div>
+        <div class="status-text" id="statusText">initializing</div>
     </div>
 
     <!-- Error State -->
-    <div class="state" id="errorState">
+    <div id="errorState">
         <p class="error-text" id="errorText">something went wrong</p>
         <button class="retry-btn" id="retryBtn">try again</button>
     </div>
 
     <script>
-        // === State Management ===
-        const states = {
-            paste: document.getElementById('pasteState'),
-            scan: document.getElementById('scanState'),
-            layout: document.getElementById('layoutState'),
-            error: document.getElementById('errorState'),
-        };
-
-        function showState(name) {
-            Object.values(states).forEach(s => s.classList.remove('active'));
-            states[name].classList.add('active');
-        }
-
         // === Elements ===
-        const pasteZone = document.getElementById('pasteZone');
-        const scanPreview = document.getElementById('scanPreview');
-        const scanBarFill = document.getElementById('scanBarFill');
-        const scanLabel = document.getElementById('scanLabel');
+        const pasteState = document.getElementById('pasteState');
+        const mainCanvas = document.getElementById('mainCanvas');
+        const screenshotLayer = document.getElementById('screenshotLayer');
+        const screenshotImg = document.getElementById('screenshotImg');
+        const scanLine = document.getElementById('scanLine');
+        const scanCorners = document.getElementById('scanCorners');
+        const resultsOverlay = document.getElementById('resultsOverlay');
+        const statusBar = document.getElementById('statusBar');
+        const statusProgressFill = document.getElementById('statusProgressFill');
+        const statusText = document.getElementById('statusText');
         const layoutBadge = document.getElementById('layoutBadge');
         const layoutProgressFill = document.getElementById('layoutProgressFill');
         const layoutProgressText = document.getElementById('layoutProgressText');
@@ -937,9 +1003,13 @@
         const retryBtn = document.getElementById('retryBtn');
         const layoutBack = document.getElementById('layoutBack');
         const layoutProgress = document.getElementById('layoutProgress');
+        const errorState = document.getElementById('errorState');
+        const pasteZone = document.getElementById('pasteZone');
 
         let currentImageUrl = null;
         let currentImageBase64 = null;
+        let totalCards = 0;
+        let completedCards = 0;
 
         // === Image Handling ===
         async function readClipboard() {
@@ -965,8 +1035,19 @@
 
         function handleImage(blob) {
             currentImageUrl = URL.createObjectURL(blob);
-            scanPreview.src = currentImageUrl;
-            showState('scan');
+
+            // Step 1: Show screenshot immediately (smooth from paste)
+            screenshotImg.src = currentImageUrl;
+            pasteState.classList.add('hidden');
+            mainCanvas.classList.add('active');
+
+            // Start scanning animation
+            screenshotLayer.className = 'screenshot-layer scanning';
+            scanLine.classList.add('active');
+            scanCorners.classList.add('active');
+            statusBar.classList.add('active');
+            statusProgressFill.style.width = '5%';
+            statusText.textContent = 'analyzing screenshot';
 
             // Convert to base64 and start pipeline
             const reader = new FileReader();
@@ -979,9 +1060,6 @@
 
         // === Pipeline ===
         async function startPipeline(imageDataUrl) {
-            scanBarFill.style.width = '5%';
-            scanLabel.textContent = 'analyzing';
-
             try {
                 const response = await fetch('/api/hub/v2/analyze', {
                     method: 'POST',
@@ -1028,29 +1106,31 @@
         function handleSSEEvent(event, data) {
             switch (event) {
                 case 'connected':
-                    scanBarFill.style.width = '10%';
+                    statusProgressFill.style.width = '10%';
+                    statusText.textContent = 'connected to pipeline';
                     break;
 
                 case 'progress':
-                    scanBarFill.style.width = Math.min(data.progress, 95) + '%';
-                    scanLabel.textContent = data.message || 'processing';
+                    statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
+                    statusText.textContent = data.message || 'processing';
+
+                    // Update header progress during research phase
                     if (data.phase === 'researching') {
                         layoutProgressFill.style.width = data.progress + '%';
-                        layoutProgressText.textContent = data.message || '';
+                        layoutProgressText.textContent = `${completedCards}/${totalCards}`;
                     }
                     break;
 
                 case 'blueprint':
-                    renderBlueprint(data);
-                    showState('layout');
+                    onBlueprintReceived(data);
                     break;
 
                 case 'card':
-                    populateCard(data.cardId, data.cardType, data.data);
+                    onCardReceived(data);
                     break;
 
                 case 'complete':
-                    layoutProgress.style.display = 'none';
+                    onPipelineComplete();
                     break;
 
                 case 'error':
@@ -1059,9 +1139,23 @@
             }
         }
 
-        // === Rendering ===
-        function renderBlueprint(blueprint) {
-            // Set header badge
+        // === Blueprint received: fade screenshot, show card placeholders ===
+        function onBlueprintReceived(blueprint) {
+            totalCards = (blueprint.cards || []).length;
+            completedCards = 0;
+
+            // Stop scan animation
+            scanLine.classList.remove('active');
+            scanCorners.classList.remove('active');
+
+            // Fade screenshot to background
+            screenshotLayer.className = 'screenshot-layer fading';
+
+            // Update status
+            statusProgressFill.style.width = '30%';
+            statusText.textContent = `researching ${totalCards} cards`;
+
+            // Set header
             const ct = blueprint.contentAnalysis?.contentType || 'general';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
 
@@ -1069,7 +1163,6 @@
             if (blueprint.contentAnalysis) {
                 contentAnalysisEl.style.display = '';
                 analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
-
                 topQuestionsEl.innerHTML = '';
                 (blueprint.contentAnalysis.topQuestions || []).forEach(q => {
                     const span = document.createElement('span');
@@ -1083,18 +1176,68 @@
             const cols = blueprint.layout?.columns || 1;
             cardGrid.className = 'card-grid' + (cols > 1 ? ` cols-${Math.min(cols, 3)}` : '');
 
-            // Render placeholder cards
+            // Create placeholder cards
             cardGrid.innerHTML = '';
-            (blueprint.cards || []).forEach(card => {
+            (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
                 cardGrid.appendChild(el);
+
+                // Stagger card entrance
+                setTimeout(() => {
+                    el.classList.add('visible');
+                }, 80 + index * 60);
             });
 
-            // Show progress
+            // Show the results overlay
             layoutProgressFill.style.width = '30%';
-            layoutProgressText.textContent = 'researching cards...';
+            layoutProgressText.textContent = `0/${totalCards}`;
+            setTimeout(() => {
+                resultsOverlay.classList.add('visible');
+            }, 100);
         }
 
+        // === Card research completed: populate a single card ===
+        function onCardReceived(data) {
+            completedCards++;
+
+            const el = document.getElementById(`card-${data.cardId}`);
+            if (!el) return;
+
+            // Remove loading, add populated
+            el.classList.remove('loading');
+            el.classList.add('populated', 'just-populated');
+            el.innerHTML = renderCardContent(data.cardType, data.data);
+
+            // Remove glow after a moment
+            setTimeout(() => {
+                el.classList.remove('just-populated');
+            }, 1500);
+
+            // Update progress
+            const pct = 30 + Math.round((completedCards / totalCards) * 65);
+            statusProgressFill.style.width = pct + '%';
+            statusText.textContent = `card ${completedCards}/${totalCards} complete`;
+            layoutProgressFill.style.width = pct + '%';
+            layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+        }
+
+        // === Pipeline complete ===
+        function onPipelineComplete() {
+            // Fully hide screenshot
+            screenshotLayer.className = 'screenshot-layer gone';
+
+            // Hide status bar
+            statusProgressFill.style.width = '100%';
+            statusText.textContent = 'complete';
+            setTimeout(() => {
+                statusBar.classList.remove('active');
+            }, 1200);
+
+            // Hide header progress
+            layoutProgress.style.display = 'none';
+        }
+
+        // === Card rendering ===
         function createCardElement(card) {
             const el = document.createElement('div');
             el.id = `card-${card.id}`;
@@ -1109,9 +1252,7 @@
                 el.classList.add('span-2');
             }
 
-            // Render placeholder content based on card type
             el.innerHTML = renderPlaceholder(card);
-
             return el;
         }
 
@@ -1128,22 +1269,12 @@
                 </div>`;
             }
 
-            // Generic placeholder
             return `<div class="card-inner">
                 <div class="card-type-label"><span class="card-type-dot"></span>${type.replace(/_/g, ' ')}</div>
                 <div class="placeholder-line medium"></div>
                 <div class="placeholder-line short"></div>
                 <div class="placeholder-line"></div>
             </div>`;
-        }
-
-        function populateCard(cardId, cardType, data) {
-            const el = document.getElementById(`card-${cardId}`);
-            if (!el) return;
-
-            el.classList.remove('loading');
-            el.classList.add('populated');
-            el.innerHTML = renderCardContent(cardType, data);
         }
 
         function renderCardContent(cardType, data) {
@@ -1294,7 +1425,6 @@
                     </div>`;
 
                 default:
-                    // Fallback: render as JSON
                     return `<div class="card-inner">
                         <div class="card-type-label"><span class="card-type-dot"></span>${cardType.replace(/_/g, ' ')}</div>
                         <pre style="font-size:0.7rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(d, null, 2))}</pre>
@@ -1312,7 +1442,10 @@
 
         function showError(message) {
             errorText.textContent = message;
-            showState('error');
+            errorState.classList.add('active');
+            statusBar.classList.remove('active');
+            scanLine.classList.remove('active');
+            scanCorners.classList.remove('active');
         }
 
         function reset() {
@@ -1321,11 +1454,23 @@
                 currentImageUrl = null;
             }
             currentImageBase64 = null;
+            totalCards = 0;
+            completedCards = 0;
+
+            // Reset all UI
+            pasteState.classList.remove('hidden');
+            mainCanvas.classList.remove('active');
+            screenshotLayer.className = 'screenshot-layer';
+            scanLine.classList.remove('active');
+            scanCorners.classList.remove('active');
+            resultsOverlay.classList.remove('visible');
+            statusBar.classList.remove('active');
+            errorState.classList.remove('active');
             cardGrid.innerHTML = '';
             contentAnalysisEl.style.display = 'none';
             layoutProgress.style.display = '';
             layoutProgressFill.style.width = '0%';
-            showState('paste');
+            statusProgressFill.style.width = '0%';
         }
 
         // === Event Listeners ===
@@ -1345,7 +1490,6 @@
             }
         });
 
-        // Also support drag and drop
         document.addEventListener('dragover', (e) => { e.preventDefault(); });
         document.addEventListener('drop', (e) => {
             e.preventDefault();
