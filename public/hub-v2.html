@@ -6,40 +6,60 @@
     <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Google+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #0a0a0a;
-            --surface: #141414;
-            --surface-2: #1c1c1c;
-            --surface-3: #242424;
-            --text: #e0e0e0;
-            --text-dim: #666;
-            --text-bright: #ffffff;
-            --accent: #00ffaa;
-            --accent-dim: rgba(0, 255, 170, 0.12);
-            --accent-glow: rgba(0, 255, 170, 0.25);
-            --border: #2a2a2a;
-            --border-subtle: #1e1e1e;
-            --danger: #ff4466;
-            --warning: #ffaa00;
-            --info: #44aaff;
-            --success: #00ff88;
-            --purple: #aa88ff;
-            --pink: #ff4499;
-            --radius: 10px;
-            --radius-sm: 6px;
+            --md-bg: #0f1318;
+            --md-surface: #1a1f27;
+            --md-surface-variant: #222830;
+            --md-surface-bright: #2a3140;
+            --md-surface-container: #1e2430;
+            --md-surface-container-high: #283040;
+            --md-on-surface: #e2e6ed;
+            --md-on-surface-variant: #8b95a5;
+            --md-outline: #3a4250;
+            --md-outline-variant: #2c3340;
+            --md-primary: #7cacf8;
+            --md-primary-container: #1a3560;
+            --md-on-primary: #002f65;
+            --md-on-primary-container: #d4e3ff;
+            --md-secondary: #b8c6dc;
+            --md-secondary-container: #3a4758;
+            --md-tertiary: #d4bde6;
+            --md-tertiary-container: #4a3560;
+            --md-error: #ffb4ab;
+            --md-error-container: #93000a;
+            --md-success: #7dd99a;
+            --md-success-container: #1a4028;
+            --md-warning: #f5c842;
+            --md-warning-container: #4a3800;
+            --md-info: #7cacf8;
+            --md-radius-xs: 4px;
+            --md-radius-sm: 8px;
+            --md-radius-md: 12px;
+            --md-radius-lg: 16px;
+            --md-radius-xl: 28px;
+            --md-elevation-1: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.24);
+            --md-elevation-2: 0 3px 6px rgba(0,0,0,0.32), 0 3px 6px rgba(0,0,0,0.23);
+            --md-elevation-3: 0 10px 20px rgba(0,0,0,0.35), 0 6px 6px rgba(0,0,0,0.23);
+            --md-elevation-4: 0 14px 28px rgba(0,0,0,0.4), 0 10px 10px rgba(0,0,0,0.22);
         }
 
         html, body { height: 100%; }
 
         body {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--bg);
-            color: var(--text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--md-bg);
+            color: var(--md-on-surface);
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
         }
 
         /* === PASTE STATE === */
@@ -51,8 +71,8 @@
             justify-content: center;
             flex-direction: column;
             z-index: 200;
-            background: var(--bg);
-            transition: opacity 0.4s ease;
+            background: var(--md-bg);
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         #pasteState.hidden {
@@ -61,31 +81,65 @@
         }
 
         .paste-zone {
-            width: 85%;
-            max-width: 320px;
-            aspect-ratio: 1;
+            width: 280px;
+            height: 280px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-direction: column;
-            gap: 12px;
-            border: 1px dashed var(--border);
-            border-radius: var(--radius);
+            gap: 16px;
+            border: 2px dashed var(--md-outline);
+            border-radius: var(--md-radius-xl);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: var(--md-surface);
         }
 
         .paste-zone:hover, .paste-zone:active {
-            border-color: var(--accent);
-            background: var(--accent-dim);
+            border-color: var(--md-primary);
+            background: var(--md-primary-container);
+            transform: scale(1.02);
+            box-shadow: var(--md-elevation-2);
         }
 
-        .paste-icon { font-size: 2rem; opacity: 0.4; }
-        .paste-text { font-size: 0.85rem; color: var(--text-dim); }
-        .paste-zone:hover .paste-text { color: var(--accent); }
-        .paste-hint { margin-top: 1.5rem; font-size: 0.65rem; color: var(--text-dim); opacity: 0.4; }
+        .paste-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--md-primary-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
 
-        /* === MAIN CANVAS (screenshot + overlay) === */
+        .paste-icon .material-symbols-rounded {
+            font-size: 32px;
+            color: var(--md-primary);
+        }
+
+        .paste-zone:hover .paste-icon {
+            background: var(--md-primary);
+        }
+
+        .paste-zone:hover .paste-icon .material-symbols-rounded {
+            color: var(--md-on-primary);
+        }
+
+        .paste-text {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--md-on-surface);
+        }
+
+        .paste-hint {
+            margin-top: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--md-on-surface-variant);
+            letter-spacing: 0.01em;
+        }
+
+        /* === MAIN CANVAS === */
         #mainCanvas {
             position: relative;
             min-height: 100vh;
@@ -95,7 +149,6 @@
 
         #mainCanvas.active { display: block; }
 
-        /* Screenshot background layer */
         .screenshot-layer {
             position: fixed;
             inset: 0;
@@ -103,40 +156,32 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: opacity 0.8s ease;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .screenshot-layer img {
             max-width: 92%;
             max-height: 85vh;
             object-fit: contain;
-            border-radius: var(--radius);
+            border-radius: var(--md-radius-lg);
             transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Screenshot states */
         .screenshot-layer.scanning img {
             opacity: 1;
-            filter: brightness(0.9);
+            filter: brightness(0.85);
         }
 
-        .screenshot-layer.fading {
-            opacity: 0.08;
-        }
+        .screenshot-layer.fading { opacity: 0.06; }
+        .screenshot-layer.gone { opacity: 0; pointer-events: none; }
 
-        .screenshot-layer.gone {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        /* Scan line effect */
         .scan-line {
             position: fixed;
             left: 0;
             right: 0;
             height: 2px;
-            background: var(--accent);
-            box-shadow: 0 0 20px var(--accent), 0 0 60px var(--accent-glow), 0 -8px 20px var(--accent-dim);
+            background: linear-gradient(90deg, transparent, var(--md-primary), transparent);
+            box-shadow: 0 0 24px var(--md-primary), 0 0 60px rgba(124,172,248,0.2);
             z-index: 5;
             opacity: 0;
             transition: opacity 0.3s;
@@ -144,16 +189,15 @@
 
         .scan-line.active {
             opacity: 1;
-            animation: scanMove 2.2s ease-in-out infinite;
+            animation: scanMove 2.5s ease-in-out infinite;
         }
 
         @keyframes scanMove {
-            0% { top: 10%; }
-            50% { top: 85%; }
-            100% { top: 10%; }
+            0% { top: 8%; }
+            50% { top: 88%; }
+            100% { top: 8%; }
         }
 
-        /* Corner markers during scan */
         .scan-corners {
             position: fixed;
             inset: 0;
@@ -167,19 +211,20 @@
 
         .scan-corner {
             position: absolute;
-            width: 20px;
-            height: 20px;
-            border-color: var(--accent);
+            width: 24px;
+            height: 24px;
+            border-color: var(--md-primary);
             border-style: solid;
             border-width: 0;
+            border-radius: 4px;
         }
 
-        .scan-corner.tl { top: 8%; left: 5%; border-top-width: 2px; border-left-width: 2px; }
-        .scan-corner.tr { top: 8%; right: 5%; border-top-width: 2px; border-right-width: 2px; }
-        .scan-corner.bl { bottom: 12%; left: 5%; border-bottom-width: 2px; border-left-width: 2px; }
-        .scan-corner.br { bottom: 12%; right: 5%; border-bottom-width: 2px; border-right-width: 2px; }
+        .scan-corner.tl { top: 7%; left: 4%; border-top-width: 3px; border-left-width: 3px; }
+        .scan-corner.tr { top: 7%; right: 4%; border-top-width: 3px; border-right-width: 3px; }
+        .scan-corner.bl { bottom: 10%; left: 4%; border-bottom-width: 3px; border-left-width: 3px; }
+        .scan-corner.br { bottom: 10%; right: 4%; border-bottom-width: 3px; border-right-width: 3px; }
 
-        /* Bottom status bar */
+        /* === STATUS BAR === */
         .status-bar {
             position: fixed;
             bottom: 0;
@@ -188,7 +233,7 @@
             z-index: 50;
             padding: 16px 20px;
             padding-bottom: max(16px, env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(10,10,10,0.95) 30%);
+            background: linear-gradient(transparent, rgba(15,19,24,0.96) 30%);
             display: none;
         }
 
@@ -196,27 +241,27 @@
 
         .status-progress {
             width: 100%;
-            height: 2px;
-            background: var(--surface-2);
-            border-radius: 2px;
+            height: 4px;
+            background: var(--md-surface-variant);
+            border-radius: 4px;
             overflow: hidden;
             margin-bottom: 10px;
         }
 
         .status-progress-fill {
             height: 100%;
-            background: var(--accent);
-            border-radius: 2px;
+            background: linear-gradient(90deg, var(--md-primary), var(--md-tertiary));
+            border-radius: 4px;
             width: 0%;
-            transition: width 0.4s ease;
-            box-shadow: 0 0 8px var(--accent-glow);
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .status-text {
-            font-size: 0.65rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+            color: var(--md-primary);
             text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--accent);
             animation: statusPulse 2s ease-in-out infinite;
         }
 
@@ -225,15 +270,15 @@
             50% { opacity: 0.5; }
         }
 
-        /* === RESULTS OVERLAY (cards on top of screenshot) === */
+        /* === RESULTS OVERLAY === */
         .results-overlay {
             position: relative;
             z-index: 10;
             min-height: 100vh;
             opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.5s ease, transform 0.5s ease;
-            padding-bottom: 60px;
+            transform: translateY(24px);
+            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            padding-bottom: 80px;
         }
 
         .results-overlay.visible {
@@ -241,15 +286,15 @@
             transform: translateY(0);
         }
 
-        /* Header bar */
+        /* === HEADER === */
         .layout-header {
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(20, 20, 20, 0.92);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border-subtle);
+            background: rgba(15, 19, 24, 0.88);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--md-outline-variant);
             padding: 12px 16px;
             display: flex;
             align-items: center;
@@ -265,23 +310,32 @@
         .layout-back {
             background: none;
             border: none;
-            color: var(--text-dim);
-            font-size: 0.8rem;
+            color: var(--md-on-surface-variant);
+            font-size: 0.85rem;
             cursor: pointer;
             font-family: inherit;
-            padding: 4px 0;
+            padding: 6px 8px;
+            border-radius: var(--md-radius-sm);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
         }
 
-        .layout-back:hover { color: var(--accent); }
+        .layout-back:hover {
+            color: var(--md-primary);
+            background: var(--md-primary-container);
+        }
 
         .layout-badge {
-            font-size: 0.6rem;
+            font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 3px 8px;
-            border-radius: 3px;
-            background: var(--accent-dim);
-            color: var(--accent);
+            letter-spacing: 0.08em;
+            padding: 4px 12px;
+            border-radius: var(--md-radius-xl);
+            background: var(--md-primary-container);
+            color: var(--md-primary);
         }
 
         .layout-progress {
@@ -292,38 +346,37 @@
 
         .layout-progress-bar {
             width: 80px;
-            height: 2px;
-            background: var(--border);
-            border-radius: 2px;
+            height: 4px;
+            background: var(--md-surface-variant);
+            border-radius: 4px;
             overflow: hidden;
         }
 
         .layout-progress-fill {
             height: 100%;
-            background: var(--accent);
-            transition: width 0.3s ease;
+            background: var(--md-primary);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
         }
 
         .layout-progress-text {
-            font-size: 0.6rem;
-            color: var(--text-dim);
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--md-on-surface-variant);
         }
 
-        /* Content analysis banner */
+        /* === CONTENT ANALYSIS === */
         .content-analysis {
-            padding: 16px;
-            background: linear-gradient(135deg, rgba(20,20,20,0.9) 0%, rgba(28,28,28,0.9) 100%);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            border-bottom: 1px solid var(--border-subtle);
+            padding: 20px 16px;
+            background: linear-gradient(180deg, var(--md-surface) 0%, transparent 100%);
         }
 
         .content-analysis-intent {
-            font-size: 0.8rem;
-            color: var(--text);
-            margin-bottom: 10px;
-            line-height: 1.5;
+            font-size: 0.95rem;
+            font-weight: 400;
+            color: var(--md-on-surface);
+            margin-bottom: 14px;
+            line-height: 1.6;
         }
 
         .top-questions {
@@ -333,18 +386,25 @@
         }
 
         .top-question {
-            font-size: 0.65rem;
-            padding: 4px 10px;
-            background: var(--surface-3);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            color: var(--text-dim);
+            font-size: 0.75rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            background: var(--md-surface-variant);
+            border: 1px solid var(--md-outline-variant);
+            border-radius: var(--md-radius-xl);
+            color: var(--md-secondary);
             cursor: default;
+            transition: all 0.2s ease;
         }
 
-        /* Card grid container */
+        .top-question:hover {
+            background: var(--md-surface-bright);
+            border-color: var(--md-outline);
+        }
+
+        /* === CARD GRID === */
         .card-grid {
-            padding: 16px;
+            padding: 12px;
             display: grid;
             gap: 12px;
             grid-template-columns: 1fr;
@@ -369,16 +429,16 @@
 
         /* === CARD BASE === */
         .card {
-            background: rgba(20, 20, 20, 0.88);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius);
+            background: var(--md-surface);
+            border-radius: var(--md-radius-lg);
             overflow: hidden;
             position: relative;
             opacity: 0;
-            transform: translateY(12px) scale(0.97);
-            transition: opacity 0.4s ease, transform 0.4s ease, border-color 0.3s ease;
+            transform: translateY(16px) scale(0.97);
+            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+                        box-shadow 0.3s ease;
+            box-shadow: var(--md-elevation-1);
         }
 
         .card.visible {
@@ -387,12 +447,11 @@
         }
 
         .card:hover {
-            border-color: var(--border);
+            box-shadow: var(--md-elevation-2);
         }
 
-        /* Loading shimmer */
         .card.loading {
-            min-height: 80px;
+            min-height: 100px;
         }
 
         .card.loading::after {
@@ -402,12 +461,12 @@
             background: linear-gradient(
                 90deg,
                 transparent 0%,
-                rgba(0, 255, 170, 0.04) 35%,
-                rgba(0, 255, 170, 0.08) 50%,
-                rgba(0, 255, 170, 0.04) 65%,
+                rgba(124,172,248,0.04) 35%,
+                rgba(124,172,248,0.08) 50%,
+                rgba(124,172,248,0.04) 65%,
                 transparent 100%
             );
-            animation: shimmer 1.8s ease-in-out infinite;
+            animation: shimmer 2s ease-in-out infinite;
         }
 
         @keyframes shimmer {
@@ -415,408 +474,586 @@
             100% { transform: translateX(100%); }
         }
 
-        /* Card populate animation */
         .card.populated {
-            animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: cardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         @keyframes cardPop {
-            from { transform: scale(0.96); opacity: 0.7; }
-            60% { transform: scale(1.01); }
+            from { transform: scale(0.95); opacity: 0.6; }
+            60% { transform: scale(1.015); }
             to { transform: scale(1); opacity: 1; }
         }
 
-        /* Subtle glow when card just populated */
         .card.just-populated {
-            border-color: rgba(0, 255, 170, 0.3);
-            box-shadow: 0 0 20px rgba(0, 255, 170, 0.06);
+            box-shadow: var(--md-elevation-3), 0 0 0 1px rgba(124,172,248,0.2);
         }
 
-        .card-inner {
-            padding: 16px;
-        }
+        .card-inner { padding: 20px; }
 
         .card-type-label {
-            font-size: 0.55rem;
+            font-size: 0.65rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            color: var(--text-dim);
-            margin-bottom: 8px;
+            letter-spacing: 0.08em;
+            color: var(--md-on-surface-variant);
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
-        .card-type-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
+        .card-type-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: var(--md-radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
         }
 
-        /* === HERO SUMMARY CARD === */
-        .card-hero .card-inner { padding: 20px; }
+        .card-type-icon .material-symbols-rounded {
+            font-size: 16px;
+        }
+
+        /* === HERO SUMMARY === */
+        .card-hero { background: linear-gradient(135deg, var(--md-surface) 0%, var(--md-surface-variant) 100%); }
+        .card-hero .card-inner { padding: 24px 20px; }
 
         .card-hero .hero-badge {
-            display: inline-block;
-            font-size: 0.6rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 3px 10px;
-            border-radius: 3px;
-            background: var(--accent-dim);
-            color: var(--accent);
-            margin-bottom: 10px;
+            letter-spacing: 0.06em;
+            padding: 5px 14px;
+            border-radius: var(--md-radius-xl);
+            background: var(--md-primary-container);
+            color: var(--md-primary);
+            margin-bottom: 14px;
         }
 
         .card-hero .hero-title {
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: var(--text-bright);
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #fff;
             margin-bottom: 6px;
             line-height: 1.3;
+            letter-spacing: -0.01em;
         }
 
         .card-hero .hero-subtitle {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            margin-bottom: 12px;
+            font-size: 0.9rem;
+            font-weight: 400;
+            color: var(--md-on-surface-variant);
+            margin-bottom: 16px;
+            line-height: 1.5;
         }
 
         .card-hero .hero-takeaway {
-            font-size: 0.8rem;
-            color: var(--text);
-            line-height: 1.6;
-            padding: 12px;
-            background: rgba(10,10,10,0.6);
-            border-radius: var(--radius-sm);
-            border-left: 3px solid var(--accent);
+            font-size: 0.88rem;
+            color: var(--md-on-surface);
+            line-height: 1.65;
+            padding: 14px 16px;
+            background: var(--md-surface-container);
+            border-radius: var(--md-radius-md);
+            border-left: 4px solid var(--md-primary);
         }
 
-        /* === KEY METRIC CARD === */
+        /* === KEY METRIC === */
+        .card-metric .card-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
         .card-metric .metric-value {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--accent);
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: var(--md-primary);
             line-height: 1.1;
+            letter-spacing: -0.02em;
+            margin: 4px 0;
         }
 
         .card-metric .metric-label {
-            font-size: 0.75rem;
-            color: var(--text-dim);
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--md-on-surface-variant);
             margin-top: 4px;
         }
 
         .card-metric .metric-context {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 8px;
-            opacity: 0.7;
+            font-size: 0.78rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-sm);
+            line-height: 1.4;
+            width: 100%;
         }
 
         .card-metric .metric-trend {
-            display: inline-block;
-            font-size: 0.7rem;
-            padding: 2px 6px;
-            border-radius: 3px;
-            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: var(--md-radius-xl);
+            margin-top: 8px;
         }
 
-        .card-metric .metric-trend.up { background: rgba(0,255,136,0.15); color: var(--success); }
-        .card-metric .metric-trend.down { background: rgba(255,68,102,0.15); color: var(--danger); }
-        .card-metric .metric-trend.stable { background: rgba(68,170,255,0.15); color: var(--info); }
+        .card-metric .metric-trend.up { background: var(--md-success-container); color: var(--md-success); }
+        .card-metric .metric-trend.down { background: var(--md-error-container); color: var(--md-error); }
+        .card-metric .metric-trend.stable { background: rgba(124,172,248,0.15); color: var(--md-info); }
 
-        /* === INFO LIST CARD === */
+        /* === INFO LIST === */
         .card-list .list-title {
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 12px;
+            color: #fff;
+            margin-bottom: 16px;
         }
 
         .card-list .list-item {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-subtle);
-            font-size: 0.78rem;
-            gap: 8px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--md-outline-variant);
+            font-size: 0.84rem;
+            gap: 12px;
         }
 
         .card-list .list-item:last-child { border-bottom: none; }
 
         .card-list .list-item-label {
-            color: var(--text-dim);
+            color: var(--md-on-surface-variant);
             flex-shrink: 0;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-list .list-item-icon {
+            font-size: 1rem;
         }
 
         .card-list .list-item-value {
-            color: var(--text);
+            color: var(--md-on-surface);
             text-align: right;
             word-break: break-word;
+            font-weight: 400;
         }
 
         .card-list .list-item.highlight .list-item-value {
-            color: var(--accent);
-            font-weight: 500;
+            color: var(--md-primary);
+            font-weight: 600;
         }
 
-        .card-list .list-item-icon { margin-right: 6px; }
-
-        /* === FACT CHECK CARD === */
+        /* === FACT CHECK === */
         .card-fact-check .fact-claim {
-            font-size: 0.8rem;
-            color: var(--text);
-            line-height: 1.5;
-            padding: 10px 12px;
-            background: rgba(10,10,10,0.6);
-            border-radius: var(--radius-sm);
-            margin-bottom: 12px;
-            border-left: 3px solid var(--border);
+            font-size: 0.88rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
+            padding: 14px 16px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-md);
+            margin-bottom: 14px;
             font-style: italic;
         }
 
         .card-fact-check .fact-verdict {
-            display: inline-block;
-            font-size: 0.65rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 4px 10px;
-            border-radius: 3px;
-            font-weight: 600;
-            margin-bottom: 8px;
+            letter-spacing: 0.06em;
+            padding: 6px 14px;
+            border-radius: var(--md-radius-xl);
+            margin-bottom: 12px;
         }
 
-        .fact-verdict.verified { background: rgba(0,255,136,0.15); color: var(--success); }
-        .fact-verdict.misleading { background: rgba(255,170,0,0.15); color: var(--warning); }
-        .fact-verdict.false { background: rgba(255,68,102,0.15); color: var(--danger); }
-        .fact-verdict.unverified { background: rgba(68,170,255,0.15); color: var(--info); }
-        .fact-verdict.partially_true { background: rgba(255,170,0,0.15); color: var(--warning); }
-        .fact-verdict.needs_context { background: rgba(170,136,255,0.15); color: var(--purple); }
+        .fact-verdict.verified { background: var(--md-success-container); color: var(--md-success); }
+        .fact-verdict.misleading { background: var(--md-warning-container); color: var(--md-warning); }
+        .fact-verdict.false { background: var(--md-error-container); color: var(--md-error); }
+        .fact-verdict.unverified { background: rgba(124,172,248,0.15); color: var(--md-info); }
+        .fact-verdict.partially_true { background: var(--md-warning-container); color: var(--md-warning); }
+        .fact-verdict.needs_context { background: rgba(212,189,230,0.15); color: var(--md-tertiary); }
 
         .card-fact-check .fact-explanation {
-            font-size: 0.78rem;
-            color: var(--text);
-            line-height: 1.5;
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
         }
 
         .card-fact-check .fact-confidence {
-            font-size: 0.65rem;
-            color: var(--text-dim);
-            margin-top: 8px;
+            font-size: 0.72rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 10px;
         }
 
         /* === PERSON CARD === */
         .card-person .person-header {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 10px;
+            gap: 14px;
+            margin-bottom: 14px;
         }
 
         .card-person .person-avatar {
-            width: 40px;
-            height: 40px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            background: var(--surface-3);
+            background: linear-gradient(135deg, var(--md-primary-container), var(--md-tertiary-container));
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--md-primary);
             flex-shrink: 0;
         }
 
         .card-person .person-name {
-            font-size: 0.9rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: var(--text-bright);
+            color: #fff;
         }
 
-        .card-person .person-role { font-size: 0.7rem; color: var(--text-dim); }
-        .card-person .person-handle { font-size: 0.7rem; color: var(--accent); }
+        .card-person .person-role {
+            font-size: 0.78rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 2px;
+        }
+
+        .card-person .person-handle {
+            font-size: 0.78rem;
+            color: var(--md-primary);
+            margin-top: 1px;
+        }
 
         .card-person .person-context {
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
+        }
+
+        .card-person .person-details {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-person .person-detail-item {
             font-size: 0.78rem;
-            color: var(--text);
-            line-height: 1.5;
+            color: var(--md-on-surface-variant);
+            padding: 4px 0;
+            padding-left: 12px;
+            border-left: 2px solid var(--md-outline-variant);
         }
 
         /* === PRODUCT CARD === */
-        .card-product .product-name {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 6px;
+        .card-product {
+            background: linear-gradient(135deg, var(--md-surface) 0%, rgba(26,64,40,0.2) 100%);
         }
 
-        .card-product .product-price {
-            font-size: 1.4rem;
-            font-weight: 600;
-            color: var(--accent);
+        .card-product .product-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
             margin-bottom: 8px;
         }
 
-        .card-product .product-rating { font-size: 0.75rem; color: var(--warning); margin-bottom: 10px; }
+        .card-product .product-price {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--md-success);
+            margin-bottom: 10px;
+        }
 
-        .card-product .product-features { list-style: none; margin-bottom: 10px; }
+        .card-product .product-rating {
+            font-size: 0.8rem;
+            color: var(--md-warning);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-product .product-features {
+            list-style: none;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
 
         .card-product .product-features li {
-            font-size: 0.75rem;
-            color: var(--text);
-            padding: 4px 0 4px 16px;
-            position: relative;
+            font-size: 0.78rem;
+            color: var(--md-on-surface);
+            padding: 6px 14px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-xl);
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .card-product .product-features li::before {
-            content: '+';
-            position: absolute;
-            left: 0;
-            color: var(--accent);
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--md-success);
+            flex-shrink: 0;
         }
 
-        .card-product .product-warnings { list-style: none; margin-top: 8px; }
-        .card-product .product-warnings li { font-size: 0.7rem; color: var(--warning); padding: 3px 0; }
-        .card-product .product-warnings li::before { content: '! '; font-weight: 600; }
-
-        /* === TIMELINE CARD === */
-        .card-timeline .timeline-title {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-bright);
+        .card-product .product-verdict {
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
+            padding: 14px 16px;
+            background: var(--md-surface-container);
+            border-radius: var(--md-radius-md);
+            border-left: 4px solid var(--md-success);
             margin-bottom: 12px;
+        }
+
+        .card-product .product-warnings {
+            list-style: none;
+            margin-top: 8px;
+        }
+
+        .card-product .product-warnings li {
+            font-size: 0.78rem;
+            color: var(--md-warning);
+            padding: 6px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .card-product .product-warnings li::before {
+            content: '!';
+            font-weight: 700;
+            font-size: 0.65rem;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--md-warning-container);
+            color: var(--md-warning);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        /* === TIMELINE === */
+        .card-timeline .timeline-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 16px;
         }
 
         .card-timeline .timeline-event {
             display: flex;
-            gap: 12px;
-            padding: 8px 0;
-            font-size: 0.75rem;
+            gap: 14px;
+            padding: 10px 0;
+            font-size: 0.82rem;
             position: relative;
         }
 
         .card-timeline .timeline-event::before {
             content: '';
             position: absolute;
-            left: 55px;
-            top: 24px;
-            bottom: -8px;
-            width: 1px;
-            background: var(--border);
+            left: 57px;
+            top: 28px;
+            bottom: -10px;
+            width: 2px;
+            background: var(--md-outline-variant);
+            border-radius: 1px;
         }
 
         .card-timeline .timeline-event:last-child::before { display: none; }
 
-        .card-timeline .timeline-date { color: var(--accent); min-width: 50px; flex-shrink: 0; text-align: right; }
-
-        .card-timeline .timeline-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--border);
-            margin-top: 4px;
+        .card-timeline .timeline-date {
+            color: var(--md-primary);
+            min-width: 50px;
             flex-shrink: 0;
-            z-index: 1;
-        }
-
-        .card-timeline .timeline-event.highlight .timeline-dot {
-            background: var(--accent);
-            box-shadow: 0 0 6px var(--accent-glow);
-        }
-
-        .card-timeline .timeline-text { color: var(--text); line-height: 1.4; }
-
-        /* === QUOTE CARD === */
-        .card-quote .quote-text {
-            font-size: 0.9rem;
-            color: var(--text);
-            line-height: 1.6;
-            font-style: italic;
-            padding: 12px 16px;
-            border-left: 3px solid var(--accent);
-            background: rgba(10,10,10,0.6);
-            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-        }
-
-        .card-quote .quote-attribution { font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; }
-        .card-quote .quote-context { font-size: 0.72rem; color: var(--text-dim); margin-top: 6px; line-height: 1.4; }
-
-        /* === COMPARISON CARD === */
-        .card-comparison .comparison-title {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 12px;
-        }
-
-        .card-comparison table { width: 100%; border-collapse: collapse; font-size: 0.72rem; }
-
-        .card-comparison th {
-            text-align: left;
-            padding: 6px 8px;
-            color: var(--accent);
-            border-bottom: 1px solid var(--border);
+            text-align: right;
             font-weight: 500;
         }
 
+        .card-timeline .timeline-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--md-outline);
+            margin-top: 5px;
+            flex-shrink: 0;
+            z-index: 1;
+            border: 2px solid var(--md-surface);
+        }
+
+        .card-timeline .timeline-event.highlight .timeline-dot {
+            background: var(--md-primary);
+            box-shadow: 0 0 8px rgba(124,172,248,0.4);
+        }
+
+        .card-timeline .timeline-text { color: var(--md-on-surface); line-height: 1.5; }
+
+        /* === QUOTE === */
+        .card-quote {
+            background: linear-gradient(135deg, var(--md-surface) 0%, rgba(74,53,96,0.2) 100%);
+        }
+
+        .card-quote .quote-text {
+            font-size: 1rem;
+            color: var(--md-on-surface);
+            line-height: 1.7;
+            font-style: italic;
+            padding: 16px 20px;
+            border-left: 4px solid var(--md-tertiary);
+            background: var(--md-surface-variant);
+            border-radius: 0 var(--md-radius-md) var(--md-radius-md) 0;
+        }
+
+        .card-quote .quote-attribution {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--md-tertiary);
+            margin-top: 12px;
+        }
+
+        .card-quote .quote-context {
+            font-size: 0.78rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        /* === COMPARISON === */
+        .card-comparison .comparison-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 16px;
+        }
+
+        .card-comparison table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 0.8rem;
+        }
+
+        .card-comparison th {
+            text-align: left;
+            padding: 10px 12px;
+            color: var(--md-primary);
+            font-weight: 600;
+            background: var(--md-surface-variant);
+        }
+
+        .card-comparison th:first-child { border-radius: var(--md-radius-sm) 0 0 0; }
+        .card-comparison th:last-child { border-radius: 0 var(--md-radius-sm) 0 0; }
+
         .card-comparison td {
-            padding: 6px 8px;
-            color: var(--text);
-            border-bottom: 1px solid var(--border-subtle);
+            padding: 10px 12px;
+            color: var(--md-on-surface);
+            border-bottom: 1px solid var(--md-outline-variant);
         }
 
         .card-comparison tr:last-child td { border-bottom: none; }
+        .card-comparison tr:hover td { background: var(--md-surface-variant); }
 
-        /* === WARNING CARD === */
-        .card-warning { border-color: var(--warning) !important; }
-        .card-warning.level-critical { border-color: var(--danger) !important; }
+        /* === WARNING === */
+        .card-warning { border-left: 4px solid var(--md-warning); }
+        .card-warning.level-critical { border-left-color: var(--md-error); }
 
         .card-warning .warning-header {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 10px;
+            margin-bottom: 12px;
         }
 
-        .card-warning .warning-icon { font-size: 1.2rem; }
-        .card-warning .warning-title { font-size: 0.85rem; font-weight: 600; color: var(--warning); }
-        .card-warning.level-critical .warning-title { color: var(--danger); }
+        .card-warning .warning-icon-wrap {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--md-radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--md-warning-container);
+            flex-shrink: 0;
+        }
 
-        .card-warning .warning-details { font-size: 0.78rem; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
+        .card-warning .warning-icon-wrap .material-symbols-rounded { color: var(--md-warning); font-size: 20px; }
+        .card-warning.level-critical .warning-icon-wrap { background: var(--md-error-container); }
+        .card-warning.level-critical .warning-icon-wrap .material-symbols-rounded { color: var(--md-error); }
+
+        .card-warning .warning-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--md-warning);
+        }
+
+        .card-warning.level-critical .warning-title { color: var(--md-error); }
+
+        .card-warning .warning-details {
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
 
         .card-warning .warning-advice {
-            font-size: 0.72rem;
-            color: var(--text-dim);
-            padding: 8px 10px;
-            background: rgba(10,10,10,0.6);
-            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            color: var(--md-on-surface);
+            padding: 12px 16px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-md);
+            line-height: 1.5;
         }
 
         /* === ACTION CARD === */
         .card-action .action-title {
-            font-size: 0.85rem;
+            font-size: 0.95rem;
             font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 12px;
+            color: #fff;
+            margin-bottom: 16px;
         }
 
         .card-action .action-item {
             display: flex;
             align-items: flex-start;
-            gap: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border-subtle);
+            gap: 14px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--md-outline-variant);
         }
 
         .card-action .action-item:last-child { border-bottom: none; }
 
         .card-action .action-bullet {
-            width: 20px;
-            height: 20px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
-            background: var(--accent-dim);
-            color: var(--accent);
-            font-size: 0.6rem;
+            background: var(--md-primary-container);
+            color: var(--md-primary);
+            font-size: 0.72rem;
+            font-weight: 700;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -824,44 +1061,95 @@
             margin-top: 2px;
         }
 
-        .card-action .action-label { font-size: 0.78rem; color: var(--text); font-weight: 500; }
-        .card-action .action-desc { font-size: 0.7rem; color: var(--text-dim); margin-top: 2px; }
-
-        /* === TEXT EXTRACT CARD === */
-        .card-extract .extract-title {
-            font-size: 0.8rem;
+        .card-action .action-label {
+            font-size: 0.88rem;
+            color: var(--md-on-surface);
             font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 8px;
+        }
+
+        .card-action .action-desc {
+            font-size: 0.78rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        .card-action .action-priority {
+            display: inline-block;
+            font-size: 0.6rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 8px;
+            border-radius: var(--md-radius-xl);
+            margin-top: 6px;
+        }
+
+        .action-priority.high { background: var(--md-error-container); color: var(--md-error); }
+        .action-priority.medium { background: var(--md-warning-container); color: var(--md-warning); }
+        .action-priority.low { background: rgba(124,172,248,0.15); color: var(--md-info); }
+
+        /* === TEXT EXTRACT === */
+        .card-extract .extract-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 12px;
         }
 
         .card-extract .extract-text {
-            font-size: 0.78rem;
-            color: var(--text);
-            line-height: 1.6;
-            padding: 12px;
-            background: rgba(10,10,10,0.6);
-            border-radius: var(--radius-sm);
-            border-left: 2px solid var(--border);
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.7;
+            padding: 16px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-md);
+            border-left: 3px solid var(--md-outline);
             white-space: pre-wrap;
+            font-family: 'Inter', sans-serif;
         }
 
-        .card-extract .extract-source { font-size: 0.65rem; color: var(--text-dim); margin-top: 6px; }
+        .card-extract .extract-source {
+            font-size: 0.72rem;
+            color: var(--md-on-surface-variant);
+            margin-top: 8px;
+        }
 
-        /* === LOCATION CARD === */
+        /* === LOCATION === */
         .card-location .location-name {
-            font-size: 0.9rem;
+            font-size: 1rem;
             font-weight: 600;
-            color: var(--text-bright);
+            color: #fff;
             margin-bottom: 4px;
         }
 
-        .card-location .location-address { font-size: 0.72rem; color: var(--accent); margin-bottom: 8px; }
+        .card-location .location-address {
+            font-size: 0.8rem;
+            color: var(--md-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
 
         .card-location .location-context {
+            font-size: 0.84rem;
+            color: var(--md-on-surface);
+            line-height: 1.6;
+        }
+
+        .card-location .location-details {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-location .location-detail-item {
             font-size: 0.78rem;
-            color: var(--text);
-            line-height: 1.5;
+            color: var(--md-on-surface-variant);
+            padding: 4px 0 4px 12px;
+            border-left: 2px solid var(--md-outline-variant);
         }
 
         /* === ERROR STATE === */
@@ -873,41 +1161,68 @@
             justify-content: center;
             flex-direction: column;
             z-index: 200;
-            background: var(--bg);
+            background: var(--md-bg);
             padding: 2rem;
             text-align: center;
         }
 
         #errorState.active { display: flex; }
 
-        .error-text { color: var(--danger); font-size: 0.85rem; margin-bottom: 1.5rem; }
+        .error-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--md-error-container);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .error-icon .material-symbols-rounded { font-size: 32px; color: var(--md-error); }
+
+        .error-text {
+            color: var(--md-error);
+            font-size: 0.95rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
         .retry-btn {
-            padding: 0.7rem 2rem;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-sm);
-            color: var(--text);
+            padding: 12px 32px;
+            background: var(--md-surface);
+            border: 1px solid var(--md-outline);
+            border-radius: var(--md-radius-xl);
+            color: var(--md-on-surface);
             font-family: inherit;
-            font-size: 0.8rem;
+            font-size: 0.88rem;
+            font-weight: 500;
             cursor: pointer;
+            transition: all 0.2s ease;
         }
-        .retry-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-        /* === PLACEHOLDER CONTENT === */
+        .retry-btn:hover {
+            background: var(--md-primary-container);
+            border-color: var(--md-primary);
+            color: var(--md-primary);
+        }
+
+        /* === PLACEHOLDERS === */
         .placeholder-line {
-            height: 12px;
-            background: var(--surface-2);
-            border-radius: 3px;
-            margin-bottom: 8px;
+            height: 14px;
+            background: var(--md-surface-variant);
+            border-radius: var(--md-radius-sm);
+            margin-bottom: 10px;
         }
-        .placeholder-line.short { width: 60%; }
-        .placeholder-line.medium { width: 80%; }
+        .placeholder-line.short { width: 55%; }
+        .placeholder-line.medium { width: 78%; }
 
-        /* Loading dot animation for placeholder text */
         .loading-dots::after {
             content: '';
             animation: dots 1.5s steps(4) infinite;
         }
+
         @keyframes dots {
             0% { content: ''; }
             25% { content: '.'; }
@@ -920,23 +1235,22 @@
     <!-- Paste State -->
     <div id="pasteState">
         <div class="paste-zone" id="pasteZone">
-            <div class="paste-icon">[ ]</div>
-            <span class="paste-text">tap to paste screenshot</span>
+            <div class="paste-icon">
+                <span class="material-symbols-rounded">content_paste</span>
+            </div>
+            <span class="paste-text">Tap to paste screenshot</span>
         </div>
         <p class="paste-hint">or press Ctrl+V / Cmd+V</p>
     </div>
 
-    <!-- Main Canvas (screenshot + overlaid results) -->
+    <!-- Main Canvas -->
     <div id="mainCanvas">
-        <!-- Screenshot background -->
         <div class="screenshot-layer" id="screenshotLayer">
             <img id="screenshotImg" alt="">
         </div>
 
-        <!-- Scan line -->
         <div class="scan-line" id="scanLine"></div>
 
-        <!-- Corner markers -->
         <div class="scan-corners" id="scanCorners">
             <div class="scan-corner tl"></div>
             <div class="scan-corner tr"></div>
@@ -944,11 +1258,13 @@
             <div class="scan-corner br"></div>
         </div>
 
-        <!-- Results overlay (cards) -->
         <div class="results-overlay" id="resultsOverlay">
             <div class="layout-header">
                 <div class="layout-header-left">
-                    <button class="layout-back" id="layoutBack">&#8592; new</button>
+                    <button class="layout-back" id="layoutBack">
+                        <span class="material-symbols-rounded" style="font-size:18px">arrow_back</span>
+                        New
+                    </button>
                     <span class="layout-badge" id="layoutBadge"></span>
                 </div>
                 <div class="layout-progress" id="layoutProgress">
@@ -966,7 +1282,7 @@
         </div>
     </div>
 
-    <!-- Status Bar (bottom, persists across scan + research) -->
+    <!-- Status Bar -->
     <div class="status-bar" id="statusBar">
         <div class="status-progress">
             <div class="status-progress-fill" id="statusProgressFill"></div>
@@ -976,12 +1292,14 @@
 
     <!-- Error State -->
     <div id="errorState">
+        <div class="error-icon">
+            <span class="material-symbols-rounded">error</span>
+        </div>
         <p class="error-text" id="errorText">something went wrong</p>
-        <button class="retry-btn" id="retryBtn">try again</button>
+        <button class="retry-btn" id="retryBtn">Try Again</button>
     </div>
 
     <script>
-        // === Elements ===
         const pasteState = document.getElementById('pasteState');
         const mainCanvas = document.getElementById('mainCanvas');
         const screenshotLayer = document.getElementById('screenshotLayer');
@@ -1011,6 +1329,59 @@
         let totalCards = 0;
         let completedCards = 0;
 
+        // === Utilities ===
+        function esc(val) {
+            if (val === null || val === undefined) return '';
+            if (typeof val === 'object') {
+                if (Array.isArray(val)) return val.map(v => esc(v)).join(', ');
+                const meaningful = val.label || val.name || val.value || val.text || val.title || val.header || val.event || val.description;
+                if (meaningful) return esc(meaningful);
+                return esc(JSON.stringify(val));
+            }
+            const d = document.createElement('div');
+            d.textContent = String(val);
+            return d.innerHTML;
+        }
+
+        function renderItemValue(item) {
+            if (typeof item === 'string') return esc(item);
+            if (typeof item === 'object' && item !== null) {
+                const parts = [];
+                if (item.label || item.name) parts.push(`<strong>${esc(item.label || item.name)}</strong>`);
+                if (item.value) parts.push(esc(item.value));
+                if (item.description) parts.push(`<span style="color:var(--md-on-surface-variant)">${esc(item.description)}</span>`);
+                if (parts.length) return parts.join(': ');
+                return esc(item);
+            }
+            return esc(item);
+        }
+
+        const CARD_ICONS = {
+            hero_summary: { icon: 'auto_awesome', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
+            key_metric: { icon: 'monitoring', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
+            info_list: { icon: 'list_alt', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
+            fact_check: { icon: 'fact_check', bg: 'var(--md-warning-container)', color: 'var(--md-warning)' },
+            person_card: { icon: 'person', bg: 'rgba(212,189,230,0.15)', color: 'var(--md-tertiary)' },
+            product_card: { icon: 'shopping_bag', bg: 'var(--md-success-container)', color: 'var(--md-success)' },
+            timeline_card: { icon: 'timeline', bg: 'rgba(124,172,248,0.15)', color: 'var(--md-info)' },
+            quote_card: { icon: 'format_quote', bg: 'rgba(212,189,230,0.15)', color: 'var(--md-tertiary)' },
+            comparison_card: { icon: 'compare', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
+            warning_card: { icon: 'warning', bg: 'var(--md-warning-container)', color: 'var(--md-warning)' },
+            action_card: { icon: 'bolt', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
+            text_extract: { icon: 'description', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
+            location_card: { icon: 'location_on', bg: 'rgba(124,172,248,0.15)', color: 'var(--md-info)' },
+        };
+
+        function getCardTypeLabel(cardType) {
+            const info = CARD_ICONS[cardType] || { icon: 'info', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' };
+            return `<div class="card-type-label">
+                <div class="card-type-icon" style="background:${info.bg}">
+                    <span class="material-symbols-rounded" style="color:${info.color}">${info.icon}</span>
+                </div>
+                ${cardType.replace(/_/g, ' ')}
+            </div>`;
+        }
+
         // === Image Handling ===
         async function readClipboard() {
             try {
@@ -1023,25 +1394,21 @@
                         return;
                     }
                 }
-                showError('no image in clipboard');
+                showError('No image found in clipboard');
             } catch (err) {
                 if (err.name === 'NotAllowedError') {
-                    showError('clipboard access denied');
+                    showError('Clipboard access denied');
                 } else {
-                    showError('couldn\'t read clipboard');
+                    showError('Could not read clipboard');
                 }
             }
         }
 
         function handleImage(blob) {
             currentImageUrl = URL.createObjectURL(blob);
-
-            // Step 1: Show screenshot immediately (smooth from paste)
             screenshotImg.src = currentImageUrl;
             pasteState.classList.add('hidden');
             mainCanvas.classList.add('active');
-
-            // Start scanning animation
             screenshotLayer.className = 'screenshot-layer scanning';
             scanLine.classList.add('active');
             scanCorners.classList.add('active');
@@ -1049,7 +1416,6 @@
             statusProgressFill.style.width = '5%';
             statusText.textContent = 'analyzing screenshot';
 
-            // Convert to base64 and start pipeline
             const reader = new FileReader();
             reader.onloadend = () => {
                 currentImageBase64 = reader.result;
@@ -1059,8 +1425,6 @@
         }
 
         // === Telemetry ===
-        // Tracks the full lifecycle of every pipeline run from the user's perspective.
-        // Reports to /api/debug/client-report on completion (success or failure).
         const telemetry = {
             pipelineStart: null,
             uploadStart: null,
@@ -1157,7 +1521,6 @@
             lastEventTime = Date.now();
             if (stallTimer) clearTimeout(stallTimer);
             if (pipelineComplete) return;
-            // If no real SSE event (not keep-alive) for 20s after skeleton, connection is stalled
             stallTimer = setTimeout(() => {
                 if (!pipelineComplete && blueprintReceived) {
                     const stallDuration = Date.now() - lastEventTime;
@@ -1195,7 +1558,6 @@
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             try {
-                // Step 1: Upload image, get requestId (quick POST, no streaming)
                 statusText.textContent = 'uploading screenshot';
                 telemetry.markUploadStart();
                 const startResp = await fetch('/api/hub/v2/start', {
@@ -1214,12 +1576,10 @@
                 telemetry.requestId = requestId;
                 statusText.textContent = 'connecting to pipeline';
 
-                // Step 2: Open GET-based SSE stream (mobile-friendly)
                 await new Promise((resolve, reject) => {
                     const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
                     currentEventSource = es;
 
-                    // Timeout: if no skeleton after 30s, connection is broken
                     pipelineTimeout = setTimeout(() => {
                         if (!blueprintReceived) {
                             es.close();
@@ -1286,9 +1646,7 @@
                     });
 
                     es.addEventListener('error', (e) => {
-                        // EventSource 'error' fires for both SSE error events and connection failures
                         if (es.readyState === EventSource.CLOSED) {
-                            // Connection closed - check if we got everything
                             if (!pipelineComplete) {
                                 if (!blueprintReceived) {
                                     reject(new Error('Connection lost before analysis started'));
@@ -1298,7 +1656,6 @@
                             }
                             return;
                         }
-                        // Try to parse as SSE error event
                         try {
                             const data = JSON.parse(e.data);
                             telemetry.trackEvent('error');
@@ -1306,8 +1663,6 @@
                             currentEventSource = null;
                             reject(new Error(data.message || 'Analysis failed'));
                         } catch {
-                            // Connection error, EventSource will auto-reconnect
-                            // but we don't want that - close and handle
                             es.close();
                             currentEventSource = null;
                             if (!pipelineComplete) {
@@ -1326,7 +1681,7 @@
                 }
                 telemetry.reportError(err.message || 'connection failed', { type: 'pipeline_error' });
                 telemetry.reportOutcome('error', err.message);
-                showError(err.message || 'connection failed');
+                showError(err.message || 'Connection failed');
             } finally {
                 if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
                 if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
@@ -1343,8 +1698,6 @@
                 case 'progress':
                     statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
                     statusText.textContent = data.message || 'processing';
-
-                    // Update header progress during research phase
                     if (data.phase === 'researching') {
                         layoutProgressFill.style.width = data.progress + '%';
                         layoutProgressText.textContent = `${completedCards}/${totalCards}`;
@@ -1369,12 +1722,11 @@
 
                 case 'error':
                     telemetry.reportError(data.message || 'analysis failed', { type: 'sse_error' });
-                    showError(data.message || 'analysis failed');
+                    showError(data.message || 'Analysis failed');
                     break;
             }
         }
 
-        // === Blueprint received: instant skeleton, transition from scan to cards ===
         function onBlueprintReceived(blueprint) {
             blueprintReceived = true;
             if (pipelineTimeout) {
@@ -1382,7 +1734,6 @@
                 pipelineTimeout = null;
             }
 
-            // Timeout 2: if pipeline doesn't complete within 90s after skeleton, something is wrong
             if (completionTimeout) clearTimeout(completionTimeout);
             completionTimeout = setTimeout(() => {
                 if (!pipelineComplete) {
@@ -1398,22 +1749,16 @@
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
-            // Stop scan animation
             scanLine.classList.remove('active');
             scanCorners.classList.remove('active');
-
-            // Fade screenshot to background
             screenshotLayer.className = 'screenshot-layer fading';
 
-            // Update status
             statusProgressFill.style.width = '15%';
             statusText.textContent = 'analyzing screenshot';
 
-            // Set header badge
             const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
 
-            // Create skeleton placeholder cards
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
@@ -1423,7 +1768,6 @@
                 }, 80 + index * 60);
             });
 
-            // Show the results overlay immediately
             layoutProgressFill.style.width = '10%';
             layoutProgressText.textContent = 'analyzing';
             setTimeout(() => {
@@ -1431,12 +1775,10 @@
             }, 100);
         }
 
-        // === Layout update: real blueprint replaces skeleton cards ===
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
-            // Update content analysis with real data
             const ct = blueprint.contentAnalysis?.contentType || 'general';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
 
@@ -1452,11 +1794,9 @@
                 });
             }
 
-            // Update grid layout
             const cols = blueprint.layout?.columns || 1;
             cardGrid.className = 'card-grid' + (cols > 1 ? ` cols-${Math.min(cols, 3)}` : '');
 
-            // Replace skeleton cards with real placeholder cards
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
@@ -1466,30 +1806,25 @@
                 }, 50 + index * 40);
             });
 
-            // Update progress
             statusText.textContent = `researching ${totalCards} cards`;
             layoutProgressFill.style.width = '30%';
             layoutProgressText.textContent = `0/${totalCards}`;
         }
 
-        // === Card research completed: populate a single card ===
         function onCardReceived(data) {
             completedCards++;
 
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
-            // Remove loading, add populated
             el.classList.remove('loading');
             el.classList.add('populated', 'just-populated');
             el.innerHTML = renderCardContent(data.cardType, data.data);
 
-            // Remove glow after a moment
             setTimeout(() => {
                 el.classList.remove('just-populated');
             }, 1500);
 
-            // Update progress
             const pct = 30 + Math.round((completedCards / totalCards) * 65);
             statusProgressFill.style.width = pct + '%';
             statusText.textContent = `card ${completedCards}/${totalCards} complete`;
@@ -1497,7 +1832,6 @@
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
 
-        // === Pipeline complete ===
         function onPipelineComplete() {
             pipelineComplete = true;
             if (completionTimeout) {
@@ -1509,28 +1843,24 @@
                 stallTimer = null;
             }
 
-            // Fully hide screenshot
             screenshotLayer.className = 'screenshot-layer gone';
 
-            // Hide status bar
             statusProgressFill.style.width = '100%';
             statusText.textContent = 'complete';
             setTimeout(() => {
                 statusBar.classList.remove('active');
             }, 1200);
 
-            // Hide header progress
             layoutProgress.style.display = 'none';
         }
 
-        // === Card rendering ===
+        // === Card Rendering ===
         function createCardElement(card) {
             const el = document.createElement('div');
             el.id = `card-${card.id}`;
             el.className = `card card-${card.cardType.replace(/_/g, '-')} loading`;
             el.dataset.cardType = card.cardType;
 
-            // Grid spanning
             const span = card.gridPosition?.columnSpan || 1;
             if (span >= 3 || card.cardType === 'hero_summary' || card.cardType === 'comparison_card' || card.cardType === 'warning_card') {
                 el.classList.add('span-full');
@@ -1550,13 +1880,13 @@
                 return `<div class="card-inner">
                     ${pd.badge ? `<span class="hero-badge">${esc(pd.badge)}</span>` : ''}
                     <div class="hero-title">${esc(pd.title || 'Analyzing...')}</div>
-                    <div class="hero-subtitle">${esc(pd.subtitle || 'Determining content...')}</div>
+                    <div class="hero-subtitle">${esc(pd.subtitle || 'Identifying content...')}</div>
                     <div class="placeholder-line medium"></div>
                 </div>`;
             }
 
             return `<div class="card-inner">
-                <div class="card-type-label"><span class="card-type-dot"></span>${type.replace(/_/g, ' ')}</div>
+                ${getCardTypeLabel(type)}
                 <div class="placeholder-line medium"></div>
                 <div class="placeholder-line short"></div>
                 <div class="placeholder-line"></div>
@@ -1570,7 +1900,7 @@
                 case 'hero_summary':
                     return `<div class="card-inner">
                         ${d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}22;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
-                        ${d.icon ? `<span style="font-size:1.4rem;margin-bottom:6px;display:inline-block">${esc(d.icon)}</span>` : ''}
+                        ${d.icon ? `<span style="font-size:1.5rem;margin-bottom:8px;display:inline-block">${esc(d.icon)}</span>` : ''}
                         <div class="hero-title">${esc(d.title || 'Analysis')}</div>
                         <div class="hero-subtitle">${esc(d.subtitle || '')}</div>
                         ${d.takeaway ? `<div class="hero-takeaway">${esc(d.takeaway)}</div>` : ''}
@@ -1578,29 +1908,47 @@
 
                 case 'key_metric':
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot"></span>metric</div>
+                        ${getCardTypeLabel('key_metric')}
                         <div class="metric-value" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
                         <div class="metric-label">${esc(d.label || '')}</div>
-                        ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">${d.trend === 'up' ? '&#x25B2;' : d.trend === 'down' ? '&#x25BC;' : '&#x25CF;'} ${esc(d.trend)}</span>` : ''}
+                        ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">
+                            <span class="material-symbols-rounded" style="font-size:14px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
+                            ${esc(d.trend)}
+                        </span>` : ''}
                         ${d.context ? `<div class="metric-context">${esc(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'info_list':
                     return `<div class="card-inner">
+                        ${getCardTypeLabel('info_list')}
                         <div class="list-title">${esc(d.title || 'Details')}</div>
-                        ${(d.items || []).map(item => `
-                            <div class="list-item${item.highlight ? ' highlight' : ''}">
-                                <span class="list-item-label">${item.icon ? `<span class="list-item-icon">${esc(item.icon)}</span>` : ''}${esc(item.label || '')}</span>
-                                <span class="list-item-value">${esc(item.value || '')}</span>
-                            </div>
-                        `).join('')}
+                        ${(d.items || []).map(item => {
+                            if (typeof item === 'object' && item !== null) {
+                                const label = item.label || item.name || item.key || '';
+                                const value = item.value || item.description || item.text || '';
+                                return `<div class="list-item${item.highlight ? ' highlight' : ''}">
+                                    <span class="list-item-label">${item.icon ? `<span class="list-item-icon">${esc(item.icon)}</span>` : ''}${esc(label)}</span>
+                                    <span class="list-item-value">${esc(value)}</span>
+                                </div>`;
+                            }
+                            return `<div class="list-item">
+                                <span class="list-item-value" style="text-align:left">${esc(item)}</span>
+                            </div>`;
+                        }).join('')}
                     </div>`;
 
                 case 'fact_check':
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--warning)"></span>fact check</div>
+                        ${getCardTypeLabel('fact_check')}
                         <div class="fact-claim">${esc(d.claim || '')}</div>
-                        <div class="fact-verdict ${esc(d.verdict || 'unverified')}">${esc(d.verdict || 'unverified')}</div>
+                        <div class="fact-verdict ${esc(d.verdict || 'unverified')}">
+                            <span class="material-symbols-rounded" style="font-size:14px">${
+                                d.verdict === 'verified' ? 'check_circle' :
+                                d.verdict === 'false' ? 'cancel' :
+                                d.verdict === 'misleading' ? 'warning' : 'help'
+                            }</span>
+                            ${esc(d.verdict || 'unverified')}
+                        </div>
                         <div class="fact-explanation">${esc(d.explanation || '')}</div>
                         ${d.source ? `<div class="fact-confidence">Source: ${esc(d.source)}</div>` : ''}
                         ${d.confidence ? `<div class="fact-confidence">Confidence: ${esc(d.confidence)}</div>` : ''}
@@ -1608,8 +1956,9 @@
 
                 case 'person_card':
                     return `<div class="card-inner">
+                        ${getCardTypeLabel('person_card')}
                         <div class="person-header">
-                            <div class="person-avatar">${esc(d.name ? d.name[0] : '?')}</div>
+                            <div class="person-avatar">${esc(d.name ? d.name[0].toUpperCase() : '?')}</div>
                             <div>
                                 <div class="person-name">${esc(d.name || 'Unknown')}</div>
                                 ${d.role ? `<div class="person-role">${esc(d.role)}</div>` : ''}
@@ -1617,35 +1966,46 @@
                             </div>
                         </div>
                         <div class="person-context">${esc(d.context || '')}</div>
-                        ${(d.details || []).length ? `<div style="margin-top:8px">${d.details.map(det => `<div style="font-size:0.72rem;color:var(--text-dim);padding:2px 0">- ${esc(det)}</div>`).join('')}</div>` : ''}
+                        ${(d.details || []).length ? `<div class="person-details">${d.details.map(det =>
+                            `<div class="person-detail-item">${renderItemValue(det)}</div>`
+                        ).join('')}</div>` : ''}
                     </div>`;
 
                 case 'product_card':
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--success)"></span>product</div>
+                        ${getCardTypeLabel('product_card')}
                         <div class="product-name">${esc(d.name || 'Product')}</div>
                         ${d.price ? `<div class="product-price">${esc(d.price)}</div>` : ''}
-                        ${d.rating ? `<div class="product-rating">${esc(d.rating)}</div>` : ''}
-                        ${(d.features || []).length ? `<ul class="product-features">${d.features.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
-                        ${d.verdict ? `<div style="font-size:0.78rem;color:var(--text);margin-top:8px">${esc(d.verdict)}</div>` : ''}
-                        ${(d.warnings || []).length ? `<ul class="product-warnings">${d.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}
+                        ${d.rating ? `<div class="product-rating">
+                            <span class="material-symbols-rounded" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
+                            ${esc(d.rating)}
+                        </div>` : ''}
+                        ${(d.features || []).length ? `<ul class="product-features">${d.features.map(f =>
+                            `<li>${renderItemValue(f)}</li>`
+                        ).join('')}</ul>` : ''}
+                        ${d.verdict ? `<div class="product-verdict">${esc(d.verdict)}</div>` : ''}
+                        ${(d.warnings || []).length ? `<ul class="product-warnings">${d.warnings.map(w =>
+                            `<li>${renderItemValue(w)}</li>`
+                        ).join('')}</ul>` : ''}
                     </div>`;
 
                 case 'timeline_card':
                     return `<div class="card-inner">
+                        ${getCardTypeLabel('timeline_card')}
                         <div class="timeline-title">${esc(d.title || 'Timeline')}</div>
-                        ${(d.events || []).map(ev => `
-                            <div class="timeline-event${ev.highlight ? ' highlight' : ''}">
-                                <div class="timeline-date">${esc(ev.date || '')}</div>
+                        ${(d.events || []).map(ev => {
+                            const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
+                            return `<div class="timeline-event${evObj.highlight ? ' highlight' : ''}">
+                                <div class="timeline-date">${esc(evObj.date || '')}</div>
                                 <div class="timeline-dot"></div>
-                                <div class="timeline-text">${esc(ev.event || '')}</div>
-                            </div>
-                        `).join('')}
+                                <div class="timeline-text">${esc(evObj.event || evObj.text || evObj.description || '')}</div>
+                            </div>`;
+                        }).join('')}
                     </div>`;
 
                 case 'quote_card':
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--purple)"></span>quote</div>
+                        ${getCardTypeLabel('quote_card')}
                         <div class="quote-text">"${esc(d.quote || '')}"</div>
                         ${d.attribution ? `<div class="quote-attribution">— ${esc(d.attribution)}</div>` : ''}
                         ${d.context ? `<div class="quote-context">${esc(d.context)}</div>` : ''}
@@ -1653,49 +2013,62 @@
 
                 case 'comparison_card':
                     if (!d.columns || !d.columns.length) {
-                        return `<div class="card-inner"><div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-dim);font-size:0.75rem">No data available</div></div>`;
+                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--md-on-surface-variant);font-size:0.82rem">No data available</div></div>`;
                     }
-                    const maxRows = Math.max(...d.columns.map(c => (c.values || []).length));
+                    const cols = Array.isArray(d.columns) ? d.columns : [];
+                    const maxRows = Math.max(...cols.map(c => (Array.isArray(c.values) ? c.values : []).length), 0);
                     return `<div class="card-inner">
+                        ${getCardTypeLabel('comparison_card')}
                         <div class="comparison-title">${esc(d.title || 'Comparison')}</div>
                         <table>
                             <thead><tr>
                                 ${d.rows ? '<th></th>' : ''}
-                                ${d.columns.map(c => `<th>${esc(c.header || '')}</th>`).join('')}
+                                ${cols.map(c => `<th>${esc(typeof c === 'object' ? (c.header || c.name || '') : c)}</th>`).join('')}
                             </tr></thead>
                             <tbody>${Array.from({ length: maxRows }, (_, i) => `<tr>
-                                ${d.rows ? `<td style="color:var(--text-dim)">${esc(d.rows[i] || '')}</td>` : ''}
-                                ${d.columns.map(c => `<td>${esc((c.values || [])[i] || '')}</td>`).join('')}
+                                ${d.rows ? `<td style="color:var(--md-on-surface-variant);font-weight:500">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
+                                ${cols.map(c => {
+                                    const vals = Array.isArray(c.values) ? c.values : [];
+                                    return `<td>${esc(vals[i] || '')}</td>`;
+                                }).join('')}
                             </tr>`).join('')}</tbody>
                         </table>
                     </div>`;
 
-                case 'warning_card':
-                    return `<div class="card-inner level-${esc(d.level || 'warning')}">
+                case 'warning_card': {
+                    const level = d.level || 'warning';
+                    return `<div class="card-inner level-${esc(level)}">
                         <div class="warning-header">
-                            <span class="warning-icon">${d.level === 'critical' ? '&#x26A0;' : d.level === 'info' ? 'i' : '!'}</span>
+                            <div class="warning-icon-wrap">
+                                <span class="material-symbols-rounded">${level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning'}</span>
+                            </div>
                             <span class="warning-title">${esc(d.title || 'Warning')}</span>
                         </div>
                         <div class="warning-details">${esc(d.details || '')}</div>
                         ${d.advice ? `<div class="warning-advice">${esc(d.advice)}</div>` : ''}
                     </div>`;
+                }
 
                 case 'action_card':
                     return `<div class="card-inner">
-                        <div class="action-title">${esc(d.title || 'Actions')}</div>
-                        ${(d.actions || []).map((a, i) => `
-                            <div class="action-item">
+                        ${getCardTypeLabel('action_card')}
+                        <div class="action-title">${esc(d.title || 'Next Steps')}</div>
+                        ${(d.actions || []).map((a, i) => {
+                            const aObj = typeof a === 'object' ? a : { label: String(a) };
+                            return `<div class="action-item">
                                 <span class="action-bullet">${i + 1}</span>
                                 <div>
-                                    <div class="action-label">${esc(a.label || '')}</div>
-                                    ${a.description ? `<div class="action-desc">${esc(a.description)}</div>` : ''}
+                                    <div class="action-label">${esc(aObj.label || aObj.name || '')}</div>
+                                    ${aObj.description ? `<div class="action-desc">${esc(aObj.description)}</div>` : ''}
+                                    ${aObj.priority ? `<span class="action-priority ${esc(aObj.priority)}">${esc(aObj.priority)}</span>` : ''}
                                 </div>
-                            </div>
-                        `).join('')}
+                            </div>`;
+                        }).join('')}
                     </div>`;
 
                 case 'text_extract':
                     return `<div class="card-inner">
+                        ${getCardTypeLabel('text_extract')}
                         <div class="extract-title">${esc(d.title || 'Extracted Text')}</div>
                         <div class="extract-text">${esc(d.text || '')}</div>
                         ${d.source ? `<div class="extract-source">${esc(d.source)}</div>` : ''}
@@ -1703,29 +2076,45 @@
 
                 case 'location_card':
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot" style="background:var(--info)"></span>location</div>
+                        ${getCardTypeLabel('location_card')}
                         <div class="location-name">${esc(d.name || 'Location')}</div>
-                        ${d.address ? `<div class="location-address">${esc(d.address)}</div>` : ''}
+                        ${d.address ? `<div class="location-address">
+                            <span class="material-symbols-rounded" style="font-size:14px">place</span>
+                            ${esc(d.address)}
+                        </div>` : ''}
                         <div class="location-context">${esc(d.context || '')}</div>
-                        ${(d.details || []).length ? `<div style="margin-top:8px">${d.details.map(det => `<div style="font-size:0.72rem;color:var(--text-dim);padding:2px 0">- ${esc(det)}</div>`).join('')}</div>` : ''}
+                        ${(d.details || []).length ? `<div class="location-details">${d.details.map(det =>
+                            `<div class="location-detail-item">${renderItemValue(det)}</div>`
+                        ).join('')}</div>` : ''}
                     </div>`;
 
                 default:
                     return `<div class="card-inner">
-                        <div class="card-type-label"><span class="card-type-dot"></span>${cardType.replace(/_/g, ' ')}</div>
-                        <pre style="font-size:0.7rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify(d, null, 2))}</pre>
+                        ${getCardTypeLabel(cardType)}
+                        ${Object.entries(d).filter(([k]) => !k.startsWith('_')).map(([key, val]) => {
+                            if (val === null || val === undefined) return '';
+                            if (Array.isArray(val)) {
+                                return `<div style="margin-bottom:8px">
+                                    <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
+                                    ${val.map(v => `<div style="font-size:0.82rem;color:var(--md-on-surface);padding:4px 0 4px 12px;border-left:2px solid var(--md-outline-variant)">${renderItemValue(v)}</div>`).join('')}
+                                </div>`;
+                            }
+                            if (typeof val === 'object') {
+                                return `<div style="margin-bottom:8px">
+                                    <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
+                                    <div style="font-size:0.82rem;color:var(--md-on-surface)">${renderItemValue(val)}</div>
+                                </div>`;
+                            }
+                            return `<div style="margin-bottom:8px">
+                                <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
+                                <div style="font-size:0.82rem;color:var(--md-on-surface)">${esc(val)}</div>
+                            </div>`;
+                        }).join('')}
                     </div>`;
             }
         }
 
-        // === Utilities ===
-        function esc(str) {
-            if (!str) return '';
-            const d = document.createElement('div');
-            d.textContent = String(str);
-            return d.innerHTML;
-        }
-
+        // === Error & Reset ===
         function showError(message) {
             errorText.textContent = message;
             errorState.classList.add('active');
@@ -1750,7 +2139,6 @@
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
-            // Reset all UI
             pasteState.classList.remove('hidden');
             mainCanvas.classList.remove('active');
             screenshotLayer.className = 'screenshot-layer';
@@ -1792,7 +2180,6 @@
             }
         });
 
-        // Auto-read clipboard if permission already granted
         if (navigator.clipboard?.read) {
             navigator.permissions?.query?.({ name: 'clipboard-read' })
                 .then(r => { if (r.state === 'granted') readClipboard(); })
