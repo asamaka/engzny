@@ -556,8 +556,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
   const sendEvent = (event, data) => {
     if (streamEnded || res.closed || res.destroyed || res.writableEnded) return;
     try {
-      res.write(`event: ${event}\n`);
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       if (res.flush) res.flush();
       logger.pipelineEvent(requestId, event);
     } catch (err) {
@@ -591,8 +590,17 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('X-Accel-Buffering', 'no');
-    res.setHeader('Transfer-Encoding', 'chunked');
     res.flushHeaders();
+
+    // Padding flush: push 2KB through proxy/edge buffers to start streaming immediately.
+    // Without this, Vercel/CDN/carrier proxies may buffer the entire response.
+    res.write(`:${' '.repeat(2048)}\n\n`);
+    if (res.flush) res.flush();
+
+    // Disable Nagle's algorithm for lower latency if socket is accessible
+    if (res.socket) {
+      res.socket.setNoDelay(true);
+    }
 
     res.on('close', () => {
       if (!streamEnded) {
@@ -601,12 +609,12 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       streamEnded = true;
     });
 
-    // Keep-alive during long operations
+    // Keep-alive every 5s (was 15s) -- more frequent pings push data through buffers
     keepAlive = setInterval(() => {
       if (!streamEnded) {
-        try { res.write(': keep-alive\n\n'); if (res.flush) res.flush(); } catch {}
+        try { res.write(`: ping ${Date.now()}\n\n`); if (res.flush) res.flush(); } catch {}
       }
-    }, 15000);
+    }, 5000);
 
     sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
 

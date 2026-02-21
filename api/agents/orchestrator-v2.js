@@ -103,7 +103,7 @@ async function runPipeline({
     }
 
     // =====================================================
-    // Phase 1: Layout Design (Sonnet vision, 5-10s)
+    // Phase 1: Layout Design (Sonnet vision, 10-20s)
     // =====================================================
     const designAdapterConfig = {
       ...adapterConfig,
@@ -111,12 +111,31 @@ async function runPipeline({
     };
 
     logger.info('Orchestrator', 'Phase 1: Layout Design', { model: designAdapterConfig.model });
-    const blueprint = await designLayout({
-      imageData,
-      mediaType,
-      question,
-      adapterConfig: designAdapterConfig,
-    });
+
+    // Send progress heartbeat every 3s during Layout Design so client knows we're alive
+    let designProgress = 10;
+    const designHeartbeat = setInterval(() => {
+      designProgress = Math.min(designProgress + 4, 28);
+      if (onProgress) {
+        onProgress({
+          phase: 'designing',
+          progress: designProgress,
+          message: designProgress < 18 ? 'Reading screenshot content...' : 'Designing card layout...',
+        });
+      }
+    }, 3000);
+
+    let blueprint;
+    try {
+      blueprint = await designLayout({
+        imageData,
+        mediaType,
+        question,
+        adapterConfig: designAdapterConfig,
+      });
+    } finally {
+      clearInterval(designHeartbeat);
+    }
 
     const designDuration = Date.now() - startTime;
     logger.info('Orchestrator', 'Blueprint ready', {

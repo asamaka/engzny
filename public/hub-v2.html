@@ -1101,19 +1101,61 @@
 
         // === Pipeline ===
         let blueprintReceived = false;
+        let pipelineComplete = false;
         let pipelineTimeout = null;
+        let completionTimeout = null;
+        let stallTimer = null;
+        let lastEventTime = 0;
+        let retryCount = 0;
+        const MAX_RETRIES = 2;
+
+        function resetStallTimer() {
+            lastEventTime = Date.now();
+            if (stallTimer) clearTimeout(stallTimer);
+            if (pipelineComplete) return;
+            // If no real SSE event (not keep-alive) for 20s after skeleton, connection is stalled
+            stallTimer = setTimeout(() => {
+                if (!pipelineComplete && blueprintReceived) {
+                    const stallDuration = Date.now() - lastEventTime;
+                    telemetry.reportError(`SSE stall detected (${Math.round(stallDuration/1000)}s)`, {
+                        type: 'sse_stall',
+                        completedCards,
+                        totalCards,
+                        retryCount,
+                    });
+                    if (retryCount < MAX_RETRIES && currentImageBase64) {
+                        retryCount++;
+                        statusText.textContent = `reconnecting (attempt ${retryCount})...`;
+                        startPipelineInner(currentImageBase64);
+                    } else {
+                        showError('Connection to server lost. Please try again.');
+                    }
+                }
+            }, 20000);
+        }
 
         async function startPipeline(imageDataUrl) {
+            retryCount = 0;
+            await startPipelineInner(imageDataUrl);
+        }
+
+        async function startPipelineInner(imageDataUrl) {
             blueprintReceived = false;
+            pipelineComplete = false;
+            lastEventTime = Date.now();
             telemetry.reset();
 
-            // Timeout: if no blueprint after 60s, something went wrong
+            if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+
+            // Timeout 1: if no skeleton after 30s, connection is broken
             pipelineTimeout = setTimeout(() => {
                 if (!blueprintReceived) {
-                    telemetry.reportError('Analysis timed out (60s)', { type: 'timeout' });
-                    showError('Analysis timed out. Please try again.');
+                    telemetry.reportError('No response from server (30s)', { type: 'timeout_no_skeleton' });
+                    showError('Could not connect to analysis server. Please try again.');
                 }
-            }, 60000);
+            }, 30000);
+
+            let currentReader = null;
 
             try {
                 const response = await fetch('/api/hub/v2/analyze', {
@@ -1128,6 +1170,7 @@
                 }
 
                 const reader = response.body.getReader();
+                currentReader = reader;
                 const decoder = new TextDecoder();
                 let buffer = '';
 
@@ -1152,24 +1195,48 @@
                                     telemetry.requestId = data.requestId;
                                 }
                                 handleSSEEvent(currentEvent, data);
+                                resetStallTimer();
                             } catch (e) {}
                             currentEvent = null;
                         }
                     }
                 }
 
-                // Stream ended - if no blueprint was received, show error
+                // Stream ended - check what was received
                 if (!blueprintReceived) {
                     telemetry.reportError('Stream ended without blueprint', { type: 'stream_end_no_blueprint' });
                     showError('Analysis stream ended unexpectedly. Please try again.');
+                } else if (!pipelineComplete) {
+                    telemetry.reportError('Stream ended before analysis completed', {
+                        type: 'stream_end_incomplete',
+                        completedCards,
+                        totalCards,
+                    });
+                    if (retryCount < MAX_RETRIES && currentImageBase64) {
+                        retryCount++;
+                        statusText.textContent = `reconnecting (attempt ${retryCount})...`;
+                        startPipelineInner(currentImageBase64);
+                        return;
+                    }
+                    showError('Analysis was interrupted. Please try again.');
                 }
             } catch (err) {
+                if (retryCount < MAX_RETRIES && currentImageBase64 && blueprintReceived && !pipelineComplete) {
+                    retryCount++;
+                    statusText.textContent = `reconnecting (attempt ${retryCount})...`;
+                    startPipelineInner(currentImageBase64);
+                    return;
+                }
                 telemetry.reportError(err.message || 'connection failed', { type: 'fetch_error' });
                 showError(err.message || 'connection failed');
             } finally {
                 if (pipelineTimeout) {
                     clearTimeout(pipelineTimeout);
                     pipelineTimeout = null;
+                }
+                if (completionTimeout) {
+                    clearTimeout(completionTimeout);
+                    completionTimeout = null;
                 }
             }
         }
@@ -1222,6 +1289,19 @@
                 clearTimeout(pipelineTimeout);
                 pipelineTimeout = null;
             }
+
+            // Timeout 2: if pipeline doesn't complete within 90s after skeleton, something is wrong
+            if (completionTimeout) clearTimeout(completionTimeout);
+            completionTimeout = setTimeout(() => {
+                if (!pipelineComplete) {
+                    telemetry.reportError('Analysis timed out after skeleton (90s)', {
+                        type: 'timeout_post_skeleton',
+                        completedCards,
+                        totalCards,
+                    });
+                    showError('Analysis is taking too long. Please try again.');
+                }
+            }, 90000);
 
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
@@ -1327,6 +1407,16 @@
 
         // === Pipeline complete ===
         function onPipelineComplete() {
+            pipelineComplete = true;
+            if (completionTimeout) {
+                clearTimeout(completionTimeout);
+                completionTimeout = null;
+            }
+            if (stallTimer) {
+                clearTimeout(stallTimer);
+                stallTimer = null;
+            }
+
             // Fully hide screenshot
             screenshotLayer.className = 'screenshot-layer gone';
 
@@ -1560,6 +1650,12 @@
             currentImageBase64 = null;
             totalCards = 0;
             completedCards = 0;
+            blueprintReceived = false;
+            pipelineComplete = false;
+            retryCount = 0;
+            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
+            if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
+            if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
 
             // Reset all UI
             pasteState.classList.remove('hidden');
