@@ -1139,6 +1139,8 @@
             await startPipelineInner(imageDataUrl);
         }
 
+        let currentEventSource = null;
+
         async function startPipelineInner(imageDataUrl) {
             blueprintReceived = false;
             pipelineComplete = false;
@@ -1146,98 +1148,140 @@
             telemetry.reset();
 
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-
-            // Timeout 1: if no skeleton after 30s, connection is broken
-            pipelineTimeout = setTimeout(() => {
-                if (!blueprintReceived) {
-                    telemetry.reportError('No response from server (30s)', { type: 'timeout_no_skeleton' });
-                    showError('Could not connect to analysis server. Please try again.');
-                }
-            }, 30000);
-
-            let currentReader = null;
+            if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             try {
-                const response = await fetch('/api/hub/v2/analyze', {
+                // Step 1: Upload image, get requestId (quick POST, no streaming)
+                statusText.textContent = 'uploading screenshot';
+                const startResp = await fetch('/api/hub/v2/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: imageDataUrl }),
                 });
 
-                if (!response.ok && !response.headers.get('content-type')?.includes('text/event-stream')) {
-                    const err = await response.json().catch(() => ({ message: 'request failed' }));
-                    throw new Error(err.message || 'request failed');
+                if (!startResp.ok) {
+                    const err = await startResp.json().catch(() => ({ error: 'Upload failed' }));
+                    throw new Error(err.error || 'Upload failed');
                 }
 
-                const reader = response.body.getReader();
-                currentReader = reader;
-                const decoder = new TextDecoder();
-                let buffer = '';
+                const { requestId } = await startResp.json();
+                telemetry.requestId = requestId;
+                statusText.textContent = 'connecting to pipeline';
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                // Step 2: Open GET-based SSE stream (mobile-friendly)
+                await new Promise((resolve, reject) => {
+                    const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
+                    currentEventSource = es;
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-
-                    let currentEvent = null;
-
-                    for (const line of lines) {
-                        if (line.startsWith('event: ')) {
-                            currentEvent = line.slice(7).trim();
-                        } else if (line.startsWith('data: ') && currentEvent) {
-                            try {
-                                const data = JSON.parse(line.slice(6));
-                                telemetry.trackEvent(currentEvent);
-                                if (currentEvent === 'connected' && data.requestId) {
-                                    telemetry.requestId = data.requestId;
-                                }
-                                handleSSEEvent(currentEvent, data);
-                                resetStallTimer();
-                            } catch (e) {}
-                            currentEvent = null;
+                    // Timeout: if no skeleton after 30s, connection is broken
+                    pipelineTimeout = setTimeout(() => {
+                        if (!blueprintReceived) {
+                            es.close();
+                            telemetry.reportError('No response from server (30s)', { type: 'timeout_no_skeleton' });
+                            reject(new Error('Could not connect to analysis server. Please try again.'));
                         }
-                    }
-                }
+                    }, 30000);
 
-                // Stream ended - check what was received
-                if (!blueprintReceived) {
-                    telemetry.reportError('Stream ended without blueprint', { type: 'stream_end_no_blueprint' });
-                    showError('Analysis stream ended unexpectedly. Please try again.');
-                } else if (!pipelineComplete) {
-                    telemetry.reportError('Stream ended before analysis completed', {
-                        type: 'stream_end_incomplete',
-                        completedCards,
-                        totalCards,
+                    es.addEventListener('connected', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('connected');
+                            handleSSEEvent('connected', data);
+                            resetStallTimer();
+                        } catch {}
                     });
-                    if (retryCount < MAX_RETRIES && currentImageBase64) {
-                        retryCount++;
-                        statusText.textContent = `reconnecting (attempt ${retryCount})...`;
-                        startPipelineInner(currentImageBase64);
-                        return;
-                    }
-                    showError('Analysis was interrupted. Please try again.');
-                }
+
+                    es.addEventListener('progress', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('progress');
+                            handleSSEEvent('progress', data);
+                            resetStallTimer();
+                        } catch {}
+                    });
+
+                    es.addEventListener('blueprint', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('blueprint');
+                            handleSSEEvent('blueprint', data);
+                            resetStallTimer();
+                        } catch {}
+                    });
+
+                    es.addEventListener('layout_update', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('layout_update');
+                            handleSSEEvent('layout_update', data);
+                            resetStallTimer();
+                        } catch {}
+                    });
+
+                    es.addEventListener('card', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('card');
+                            handleSSEEvent('card', data);
+                            resetStallTimer();
+                        } catch {}
+                    });
+
+                    es.addEventListener('complete', (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('complete');
+                            handleSSEEvent('complete', data);
+                        } catch {}
+                        es.close();
+                        currentEventSource = null;
+                        resolve();
+                    });
+
+                    es.addEventListener('error', (e) => {
+                        // EventSource 'error' fires for both SSE error events and connection failures
+                        if (es.readyState === EventSource.CLOSED) {
+                            // Connection closed - check if we got everything
+                            if (!pipelineComplete) {
+                                if (!blueprintReceived) {
+                                    reject(new Error('Connection lost before analysis started'));
+                                } else {
+                                    reject(new Error('Connection lost during analysis'));
+                                }
+                            }
+                            return;
+                        }
+                        // Try to parse as SSE error event
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent('error');
+                            es.close();
+                            currentEventSource = null;
+                            reject(new Error(data.message || 'Analysis failed'));
+                        } catch {
+                            // Connection error, EventSource will auto-reconnect
+                            // but we don't want that - close and handle
+                            es.close();
+                            currentEventSource = null;
+                            if (!pipelineComplete) {
+                                reject(new Error('Connection to server lost'));
+                            }
+                        }
+                    });
+                });
+
             } catch (err) {
-                if (retryCount < MAX_RETRIES && currentImageBase64 && blueprintReceived && !pipelineComplete) {
+                if (retryCount < MAX_RETRIES && currentImageBase64 && !pipelineComplete) {
                     retryCount++;
                     statusText.textContent = `reconnecting (attempt ${retryCount})...`;
                     startPipelineInner(currentImageBase64);
                     return;
                 }
-                telemetry.reportError(err.message || 'connection failed', { type: 'fetch_error' });
+                telemetry.reportError(err.message || 'connection failed', { type: 'pipeline_error' });
                 showError(err.message || 'connection failed');
             } finally {
-                if (pipelineTimeout) {
-                    clearTimeout(pipelineTimeout);
-                    pipelineTimeout = null;
-                }
-                if (completionTimeout) {
-                    clearTimeout(completionTimeout);
-                    completionTimeout = null;
-                }
+                if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
+                if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
             }
         }
 
@@ -1656,6 +1700,7 @@
             if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
             if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+            if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             // Reset all UI
             pasteState.classList.remove('hidden');

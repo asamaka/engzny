@@ -536,8 +536,155 @@ const normalizeImagePayload = ({ image, mediaType }) => {
 // ============================================
 const { runPipeline } = require('./agents/orchestrator-v2');
 
-// Hub v2 analyze - SSE endpoint for progressive card population
-// Primary analysis endpoint - v2 pipeline with SSE
+// In-memory pipeline job store (keyed by requestId)
+const pipelineJobs = new Map();
+
+// Step 1: POST image, get requestId immediately (no SSE, fast response)
+app.post('/api/hub/v2/start', async (req, res) => {
+  try {
+    const { image, question, mediaType: rawMediaType } = req.body || {};
+    const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
+    const requestId = crypto.randomUUID().slice(0, 8);
+
+    pipelineJobs.set(requestId, {
+      imageData: normalized.imageData,
+      mediaType: normalized.mediaType,
+      question: question || null,
+      createdAt: Date.now(),
+    });
+
+    // Evict old jobs (keep last 50)
+    if (pipelineJobs.size > 50) {
+      const oldest = pipelineJobs.keys().next().value;
+      pipelineJobs.delete(oldest);
+    }
+
+    res.json({ requestId });
+  } catch (error) {
+    logger.error('PipelineStart', 'Failed to start', { err: error.message });
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Step 2: GET SSE stream for a requestId (mobile-friendly streaming)
+app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
+  const { requestId } = req.params;
+  const job = pipelineJobs.get(requestId);
+
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found or expired' });
+  }
+
+  // Remove from store (one-time use)
+  pipelineJobs.delete(requestId);
+
+  let streamEnded = false;
+  let keepAlive = null;
+
+  const endStream = () => {
+    if (streamEnded) return;
+    streamEnded = true;
+    if (!res.writableEnded && !res.destroyed) {
+      res.end();
+    }
+  };
+
+  const sendEvent = (event, data) => {
+    if (streamEnded || res.closed || res.destroyed || res.writableEnded) return;
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      if (res.flush) res.flush();
+      logger.pipelineEvent(requestId, event);
+    } catch (err) {
+      logger.error('SSE', `Failed to send ${event}`, { requestId, err: err.message });
+      endStream();
+    }
+  };
+
+  // SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  // Padding flush to push through proxy/CDN buffers
+  res.write(`:${' '.repeat(2048)}\n\n`);
+  if (res.flush) res.flush();
+
+  if (res.socket) res.socket.setNoDelay(true);
+
+  res.on('close', () => {
+    if (!streamEnded) logger.warn('SSE', 'Client disconnected', { requestId });
+    streamEnded = true;
+  });
+
+  keepAlive = setInterval(() => {
+    if (!streamEnded) {
+      try { res.write(`: ping ${Date.now()}\n\n`); if (res.flush) res.flush(); } catch {}
+    }
+  }, 5000);
+
+  const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
+  logger.startPipeline(requestId, {
+    mediaType: job.mediaType,
+    imageSize: `${imageSize}KB`,
+    hasQuestion: !!job.question,
+    method: 'GET-stream',
+  });
+
+  sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
+
+  try {
+    await runPipeline({
+      imageData: job.imageData,
+      mediaType: job.mediaType,
+      question: job.question,
+
+      onProgress: (progress) => {
+        logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
+        sendEvent('progress', progress);
+      },
+
+      onBlueprint: (blueprint) => {
+        logger.pipelinePhase(requestId, 'skeleton', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
+        sendEvent('blueprint', blueprint);
+      },
+
+      onLayoutUpdate: (blueprint) => {
+        logger.pipelinePhase(requestId, 'blueprint', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
+        sendEvent('layout_update', blueprint);
+      },
+
+      onCardPopulated: (cardUpdate) => {
+        logger.pipelineEvent(requestId, 'card', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, completed: `${cardUpdate.completedCount}/${cardUpdate.totalCount}` });
+        sendEvent('card', cardUpdate);
+      },
+
+      onComplete: (populatedLayout) => {
+        clearInterval(keepAlive);
+        logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, designDuration: populatedLayout._meta?.designDuration });
+        sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
+        endStream();
+      },
+
+      onError: (error) => {
+        clearInterval(keepAlive);
+        logger.pipelineError(requestId, error, { phase: 'pipeline' });
+        sendEvent('error', { message: error.message });
+        endStream();
+      },
+    });
+  } catch (error) {
+    logger.pipelineError(requestId, error, { phase: 'catch' });
+    if (keepAlive) clearInterval(keepAlive);
+    sendEvent('error', { message: error.message || 'Pipeline failed' });
+    endStream();
+  }
+});
+
+// Hub v2 analyze - legacy SSE endpoint (POST-based, kept for backward compat)
 app.post('/api/hub/v2/analyze', async (req, res) => {
   const requestId = crypto.randomUUID().slice(0, 8);
 
