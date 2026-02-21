@@ -9,6 +9,8 @@ on:
       - 'api/**'
       - 'public/**'
       - '.claude/**'
+      - 'vercel.json'
+      - 'package.json'
   workflow_dispatch:
     inputs:
       branch:
