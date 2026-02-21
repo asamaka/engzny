@@ -53,8 +53,8 @@ describe('ProdLogger', () => {
     });
 
     it('should enforce ring buffer max', () => {
-      for (let i = 0; i < 600; i++) logger.info('X', `msg${i}`);
-      expect(logger.entries.length).toBe(500);
+      for (let i = 0; i < 1100; i++) logger.info('X', `msg${i}`);
+      expect(logger.entries.length).toBe(1000);
     });
   });
 
