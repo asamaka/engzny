@@ -1,32 +1,30 @@
 /**
  * Production Logger
  *
- * Lightweight structured logging for Vercel serverless.
- * - In-memory ring buffer (survives within a single function invocation / warm container)
- * - Structured JSON entries with timestamps, levels, context
- * - Queryable via /api/debug/logs endpoint
- * - Auto-captures pipeline lifecycle events for retroactive debugging
- *
- * Note: Vercel serverless functions share memory within warm containers,
- * so logs persist across requests within the same container lifecycle.
- * For cold starts, logs begin fresh. This is acceptable for debugging
- * recent failures - the failure and its context will be in the same container.
+ * Structured logging for Vercel serverless with full observability:
+ * - In-memory ring buffer (persists within warm container)
+ * - Pipeline lifecycle tracing (skeleton → design → research → complete)
+ * - HTTP request logging (method, path, status, duration)
+ * - Client telemetry collection (what the user saw, timing, errors)
+ * - Queryable via /api/debug/* endpoints
  */
 
-const MAX_ENTRIES = 500;
-const MAX_ERRORS = 100;
+const MAX_ENTRIES = 1000;
+const MAX_ERRORS = 200;
+const MAX_REQUESTS = 200;
+const MAX_CLIENT_SESSIONS = 100;
 
 class ProdLogger {
   constructor() {
     this.entries = [];
     this.errors = [];
-    this.pipelines = new Map(); // requestId -> pipeline trace
+    this.pipelines = new Map();
+    this.requests = [];          // HTTP request log
+    this.clientSessions = [];    // Full client telemetry reports
     this.startTime = Date.now();
+    this.counters = { requests: 0, pipelines: 0, pipelineErrors: 0, clientErrors: 0, sseDisconnects: 0 };
   }
 
-  /**
-   * Core log method
-   */
   _log(level, category, message, meta = {}) {
     const entry = {
       ts: new Date().toISOString(),
@@ -37,18 +35,13 @@ class ProdLogger {
     };
 
     this.entries.push(entry);
-    if (this.entries.length > MAX_ENTRIES) {
-      this.entries.shift();
-    }
+    if (this.entries.length > MAX_ENTRIES) this.entries.shift();
 
     if (level === 'error') {
       this.errors.push(entry);
-      if (this.errors.length > MAX_ERRORS) {
-        this.errors.shift();
-      }
+      if (this.errors.length > MAX_ERRORS) this.errors.shift();
     }
 
-    // Also write to stdout for Vercel's built-in log drain
     const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
     logFn(`[${category}] ${message}`, meta.err ? `| ${meta.err}` : '', meta.dur ? `| ${meta.dur}ms` : '');
   }
@@ -57,10 +50,27 @@ class ProdLogger {
   warn(category, message, meta) { this._log('warn', category, message, meta); }
   error(category, message, meta) { this._log('error', category, message, meta); }
 
-  /**
-   * Start tracking a pipeline request
-   */
+  // ── HTTP Request Logging ──────────────────────────────────────
+  logRequest({ method, path, status, duration, userAgent, ip, requestId, error }) {
+    this.counters.requests++;
+    const entry = {
+      ts: new Date().toISOString(),
+      method,
+      path,
+      status,
+      dur: duration,
+      ua: userAgent,
+      ip,
+      requestId: requestId || null,
+      error: error || null,
+    };
+    this.requests.push(entry);
+    if (this.requests.length > MAX_REQUESTS) this.requests.shift();
+  }
+
+  // ── Pipeline Tracking ─────────────────────────────────────────
   startPipeline(requestId, meta = {}) {
+    this.counters.pipelines++;
     const trace = {
       requestId,
       startedAt: new Date().toISOString(),
@@ -69,23 +79,18 @@ class ProdLogger {
       events: [],
       error: null,
       completed: false,
+      clientReport: null,
       ...meta,
     };
     this.pipelines.set(requestId, trace);
-
-    // Limit stored pipelines
     if (this.pipelines.size > 50) {
       const oldest = this.pipelines.keys().next().value;
       this.pipelines.delete(oldest);
     }
-
     this.info('Pipeline', `Started ${requestId}`, { requestId, ...meta });
     return trace;
   }
 
-  /**
-   * Record a pipeline phase (designing, researching, etc.)
-   */
   pipelinePhase(requestId, phase, meta = {}) {
     const trace = this.pipelines.get(requestId);
     if (trace) {
@@ -95,9 +100,6 @@ class ProdLogger {
     this.info('Pipeline', `${requestId} → ${phase}`, { requestId, ...meta });
   }
 
-  /**
-   * Record a pipeline event (blueprint sent, card populated, etc.)
-   */
   pipelineEvent(requestId, event, meta = {}) {
     const trace = this.pipelines.get(requestId);
     if (trace) {
@@ -106,9 +108,6 @@ class ProdLogger {
     }
   }
 
-  /**
-   * Record pipeline completion
-   */
   pipelineComplete(requestId, meta = {}) {
     const trace = this.pipelines.get(requestId);
     if (trace) {
@@ -120,10 +119,8 @@ class ProdLogger {
     this.info('Pipeline', `Completed ${requestId}`, { requestId, dur: trace?.duration, ...meta });
   }
 
-  /**
-   * Record pipeline error
-   */
   pipelineError(requestId, error, meta = {}) {
+    this.counters.pipelineErrors++;
     const trace = this.pipelines.get(requestId);
     if (trace) {
       trace.error = {
@@ -142,42 +139,66 @@ class ProdLogger {
     });
   }
 
-  /**
-   * Record a client-reported error
-   */
+  // ── Client Telemetry ──────────────────────────────────────────
   clientError(errorData) {
+    this.counters.clientErrors++;
     this._log('error', 'Client', errorData.message || 'Unknown client error', {
       userAgent: errorData.userAgent,
       url: errorData.url,
+      requestId: errorData.requestId,
       state: errorData.state,
       streamEvents: errorData.streamEvents,
       elapsed: errorData.elapsed,
+      type: errorData.type,
     });
   }
 
   /**
-   * Get recent logs with optional filters
+   * Record a full client session report (sent on success AND failure).
+   * Correlates with server-side pipeline trace via requestId.
    */
+  clientReport(report) {
+    const entry = {
+      ts: new Date().toISOString(),
+      ...report,
+    };
+    this.clientSessions.push(entry);
+    if (this.clientSessions.length > MAX_CLIENT_SESSIONS) this.clientSessions.shift();
+
+    // Attach to pipeline trace if we have a matching requestId
+    if (report.requestId) {
+      const trace = this.pipelines.get(report.requestId);
+      if (trace) {
+        trace.clientReport = entry;
+      }
+    }
+
+    const outcome = report.outcome || 'unknown';
+    const dur = report.totalDuration ? `${Math.round(report.totalDuration / 1000)}s` : '?';
+    this.info('ClientReport', `${report.requestId || '?'} ${outcome} (${dur})`, {
+      requestId: report.requestId,
+      outcome,
+      dur: report.totalDuration,
+    });
+  }
+
+  sseDisconnect(requestId) {
+    this.counters.sseDisconnects++;
+    this.warn('SSE', 'Client disconnected', { requestId });
+  }
+
+  // ── Queries ───────────────────────────────────────────────────
   query({ level, category, limit = 50, since } = {}) {
     let results = [...this.entries];
-
-    if (level) {
-      results = results.filter(e => e.level === level);
-    }
-    if (category) {
-      results = results.filter(e => e.cat === category);
-    }
+    if (level) results = results.filter(e => e.level === level);
+    if (category) results = results.filter(e => e.cat === category);
     if (since) {
       const sinceDate = new Date(since);
       results = results.filter(e => new Date(e.ts) >= sinceDate);
     }
-
     return results.slice(-limit);
   }
 
-  /**
-   * Get full summary for the debug endpoint
-   */
   getSummary() {
     const now = Date.now();
     const recentPipelines = [...this.pipelines.values()]
@@ -195,6 +216,7 @@ class ProdLogger {
       uptimeHuman: formatDuration(now - this.startTime),
       totalLogs: this.entries.length,
       totalErrors: this.errors.length,
+      counters: this.counters,
       recentErrors: this.errors.slice(-10),
       pipelineStats: {
         total: this.pipelines.size,
@@ -212,8 +234,97 @@ class ProdLogger {
         eventCount: p.events?.length || 0,
         imageSize: p.imageSize,
         mediaType: p.mediaType,
+        method: p.method,
+        clientReport: p.clientReport ? {
+          outcome: p.clientReport.outcome,
+          totalDuration: p.clientReport.totalDuration,
+          uploadDuration: p.clientReport.uploadDuration,
+          firstEventDelay: p.clientReport.firstEventDelay,
+          eventsReceived: p.clientReport.eventsReceived?.length,
+          retries: p.clientReport.retries,
+          userAgent: p.clientReport.userAgent,
+        } : null,
       })),
       recentLogs: this.entries.slice(-30),
+    };
+  }
+
+  /**
+   * At-a-glance dashboard: designed for quick curl/browser check.
+   */
+  getDashboard() {
+    const now = Date.now();
+    const pipelines = [...this.pipelines.values()].sort((a, b) => (b.startMs || 0) - (a.startMs || 0));
+    const recent5 = pipelines.slice(0, 5);
+    const recentClient5 = this.clientSessions.slice(-5).reverse();
+
+    const completedPipelines = pipelines.filter(p => p.completed);
+    const failedPipelines = pipelines.filter(p => p.error);
+    const avgDesignTime = completedPipelines.length
+      ? Math.round(completedPipelines.reduce((s, p) => {
+          const designPhase = p.phases?.find(ph => ph.phase === 'blueprint');
+          return s + (designPhase?.elapsed || 0);
+        }, 0) / completedPipelines.length)
+      : null;
+
+    // Detect stuck pipelines (started > 60s ago, not completed, no error)
+    const stuckPipelines = pipelines.filter(p => !p.completed && !p.error && (now - p.startMs > 60000));
+
+    // Client success rate from session reports
+    const successReports = this.clientSessions.filter(r => r.outcome === 'success');
+    const failedReports = this.clientSessions.filter(r => r.outcome !== 'success');
+
+    return {
+      status: stuckPipelines.length > 0 ? 'DEGRADED' : failedPipelines.length > 0 ? 'WARNINGS' : 'HEALTHY',
+      uptime: formatDuration(now - this.startTime),
+      counters: this.counters,
+
+      serverSide: {
+        recentPipelines: recent5.map(p => ({
+          id: p.requestId,
+          status: p.completed ? 'done' : p.error ? 'FAILED' : 'running',
+          age: formatDuration(now - p.startMs),
+          duration: p.duration ? `${(p.duration / 1000).toFixed(1)}s` : null,
+          designTime: (() => { const bp = p.phases?.find(ph => ph.phase === 'blueprint'); return bp ? `${(bp.elapsed / 1000).toFixed(1)}s` : null; })(),
+          cards: (() => { const cardEvents = p.events?.filter(e => e.event === 'card') || []; return `${cardEvents.length}/${p.cardCount || '?'}`; })(),
+          error: p.error?.message || null,
+          method: p.method || 'POST',
+          imageSize: p.imageSize,
+        })),
+        avgDesignTime: avgDesignTime ? `${(avgDesignTime / 1000).toFixed(1)}s` : null,
+        stuckCount: stuckPipelines.length,
+      },
+
+      clientSide: {
+        totalReports: this.clientSessions.length,
+        successCount: successReports.length,
+        failedCount: failedReports.length,
+        recentSessions: recentClient5.map(r => ({
+          requestId: r.requestId,
+          outcome: r.outcome,
+          totalDuration: r.totalDuration ? `${(r.totalDuration / 1000).toFixed(1)}s` : null,
+          uploadTime: r.uploadDuration ? `${(r.uploadDuration / 1000).toFixed(1)}s` : null,
+          firstEvent: r.firstEventDelay ? `${(r.firstEventDelay / 1000).toFixed(1)}s` : null,
+          eventsReceived: r.eventsReceived?.length || 0,
+          retries: r.retries || 0,
+          error: r.error || null,
+          ua: r.userAgent ? (r.userAgent.includes('Mobile') ? 'mobile' : 'desktop') : '?',
+          age: r.ts ? formatDuration(now - new Date(r.ts).getTime()) : '?',
+        })),
+        recentErrors: this.errors
+          .filter(e => e.cat === 'Client')
+          .slice(-5)
+          .reverse()
+          .map(e => ({ msg: e.msg, requestId: e.requestId, age: formatDuration(now - new Date(e.ts).getTime()) })),
+      },
+
+      recentRequests: this.requests.slice(-10).reverse().map(r => ({
+        method: r.method,
+        path: r.path,
+        status: r.status,
+        dur: r.dur ? `${r.dur}ms` : null,
+        age: formatDuration(now - new Date(r.ts).getTime()),
+      })),
     };
   }
 }
@@ -227,7 +338,6 @@ function formatDuration(ms) {
   return `${s}s`;
 }
 
-// Singleton instance - persists across requests in warm Vercel containers
 const logger = new ProdLogger();
 
 module.exports = { logger };

@@ -1059,44 +1059,88 @@
         }
 
         // === Telemetry ===
+        // Tracks the full lifecycle of every pipeline run from the user's perspective.
+        // Reports to /api/debug/client-report on completion (success or failure).
         const telemetry = {
             pipelineStart: null,
+            uploadStart: null,
+            uploadEnd: null,
+            firstEventAt: null,
             eventsReceived: [],
             requestId: null,
 
             reset() {
                 this.pipelineStart = Date.now();
+                this.uploadStart = null;
+                this.uploadEnd = null;
+                this.firstEventAt = null;
                 this.eventsReceived = [];
                 this.requestId = null;
             },
 
+            markUploadStart() { this.uploadStart = Date.now(); },
+            markUploadEnd() { this.uploadEnd = Date.now(); },
+
             trackEvent(event) {
-                const elapsed = Date.now() - (this.pipelineStart || Date.now());
+                const now = Date.now();
+                if (!this.firstEventAt) this.firstEventAt = now;
+                const elapsed = now - (this.pipelineStart || now);
                 this.eventsReceived.push({ event, elapsed });
             },
 
-            reportError(message, extra = {}) {
-                const payload = {
-                    message,
+            _buildPayload(extra = {}) {
+                const now = Date.now();
+                return {
+                    requestId: this.requestId,
                     url: location.href,
                     userAgent: navigator.userAgent,
-                    elapsed: this.pipelineStart ? Date.now() - this.pipelineStart : null,
-                    streamEvents: this.eventsReceived,
-                    requestId: this.requestId,
+                    screen: `${screen.width}x${screen.height}`,
+                    connection: navigator.connection ? {
+                        type: navigator.connection.effectiveType,
+                        downlink: navigator.connection.downlink,
+                        rtt: navigator.connection.rtt,
+                    } : null,
+                    totalDuration: this.pipelineStart ? now - this.pipelineStart : null,
+                    uploadDuration: (this.uploadStart && this.uploadEnd) ? this.uploadEnd - this.uploadStart : null,
+                    firstEventDelay: (this.pipelineStart && this.firstEventAt) ? this.firstEventAt - this.pipelineStart : null,
+                    eventsReceived: this.eventsReceived,
+                    retries: retryCount,
                     state: {
                         blueprintReceived,
+                        pipelineComplete,
                         totalCards,
                         completedCards,
                     },
                     ...extra,
                 };
-                // Fire-and-forget error report
+            },
+
+            reportError(message, extra = {}) {
+                const payload = { ...this._buildPayload(extra), message, outcome: 'error' };
                 fetch('/api/debug/client-error', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 }).catch(() => {});
-            }
+            },
+
+            reportSuccess() {
+                const payload = { ...this._buildPayload(), outcome: 'success' };
+                fetch('/api/debug/client-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            },
+
+            reportOutcome(outcome, error = null) {
+                const payload = { ...this._buildPayload(), outcome, error };
+                fetch('/api/debug/client-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            },
         };
 
         // === Pipeline ===
@@ -1153,15 +1197,17 @@
             try {
                 // Step 1: Upload image, get requestId (quick POST, no streaming)
                 statusText.textContent = 'uploading screenshot';
+                telemetry.markUploadStart();
                 const startResp = await fetch('/api/hub/v2/start', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ image: imageDataUrl }),
                 });
+                telemetry.markUploadEnd();
 
                 if (!startResp.ok) {
-                    const err = await startResp.json().catch(() => ({ error: 'Upload failed' }));
-                    throw new Error(err.error || 'Upload failed');
+                    const err = await startResp.json().catch(() => ({ error: `Upload failed (HTTP ${startResp.status})` }));
+                    throw new Error(err.error || `Upload failed (HTTP ${startResp.status})`);
                 }
 
                 const { requestId } = await startResp.json();
@@ -1235,6 +1281,7 @@
                         } catch {}
                         es.close();
                         currentEventSource = null;
+                        telemetry.reportSuccess();
                         resolve();
                     });
 
@@ -1278,6 +1325,7 @@
                     return;
                 }
                 telemetry.reportError(err.message || 'connection failed', { type: 'pipeline_error' });
+                telemetry.reportOutcome('error', err.message);
                 showError(err.message || 'connection failed');
             } finally {
                 if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }

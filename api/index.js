@@ -116,6 +116,28 @@ app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 app.use(express.raw({ type: 'image/*', limit: '20mb' }));
 
+// Request logging middleware - logs every HTTP request
+app.use((req, res, next) => {
+  const start = Date.now();
+  const originalEnd = res.end;
+  res.end = function (...args) {
+    const duration = Date.now() - start;
+    // Skip noisy static/health requests
+    if (!req.path.startsWith('/api/debug') && req.path !== '/api/health' && !req.path.match(/\.(js|css|png|ico|svg|woff)$/)) {
+      logger.logRequest({
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        duration,
+        userAgent: req.headers['user-agent']?.slice(0, 120),
+        ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
+      });
+    }
+    originalEnd.apply(this, args);
+  };
+  next();
+});
+
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
@@ -312,50 +334,52 @@ app.get('/api/health', (req, res) => {
 // Debug & Monitoring Endpoints
 // ============================================
 
-// GET /api/debug/logs - Query production logs
-// Debug auth: require ?token= for read endpoints, allow client error reports open
-const DEBUG_TOKEN = process.env.DEBUG_TOKEN || null;
+// All read endpoints require auth. Write endpoints (client reports) are open.
+const DEBUG_TOKEN = process.env.DEBUG_TOKEN || 'thinx-debug-2026';
 
 function requireDebugAuth(req, res, next) {
-  // If no DEBUG_TOKEN configured, allow all (dev/initial setup)
-  if (!DEBUG_TOKEN) return next();
-  if (req.query.token === DEBUG_TOKEN) return next();
-  res.status(401).json({ error: 'Unauthorized', hint: 'Add ?token=YOUR_DEBUG_TOKEN' });
+  if (req.query.token === DEBUG_TOKEN || req.headers['x-debug-token'] === DEBUG_TOKEN) return next();
+  res.status(401).json({ error: 'Unauthorized' });
 }
 
+// GET /api/debug/dashboard - Quick at-a-glance production status
+app.get('/api/debug/dashboard', requireDebugAuth, (req, res) => {
+  res.json(logger.getDashboard());
+});
+
+// GET /api/debug/logs - Query raw logs
 app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
   const { level, category, limit, since, summary } = req.query;
-
   if (summary === 'true' || summary === '1') {
     return res.json(logger.getSummary());
   }
-
   const logs = logger.query({
     level,
     category,
     limit: limit ? parseInt(limit, 10) : 50,
     since,
   });
-
-  res.json({
-    count: logs.length,
-    logs,
-  });
+  res.json({ count: logs.length, logs });
 });
 
-// GET /api/debug/pipelines - Recent pipeline traces
+// GET /api/debug/pipelines - Pipeline traces
 app.get('/api/debug/pipelines', requireDebugAuth, (req, res) => {
   const summary = logger.getSummary();
-  res.json({
-    stats: summary.pipelineStats,
-    pipelines: summary.recentPipelines,
-  });
+  res.json({ stats: summary.pipelineStats, pipelines: summary.recentPipelines });
 });
 
-// POST /api/debug/client-error - Client-side error reporting (open - no auth needed)
+// POST /api/debug/client-error - Client error reports (open, no auth)
 app.post('/api/debug/client-error', (req, res) => {
   const errorData = req.body || {};
   logger.clientError(errorData);
+  res.json({ received: true });
+});
+
+// POST /api/debug/client-report - Full client session telemetry (open, no auth)
+// Sent by the frontend on EVERY pipeline run (success or failure)
+app.post('/api/debug/client-report', (req, res) => {
+  const report = req.body || {};
+  logger.clientReport(report);
   res.json({ received: true });
 });
 
@@ -616,7 +640,7 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   if (res.socket) res.socket.setNoDelay(true);
 
   res.on('close', () => {
-    if (!streamEnded) logger.warn('SSE', 'Client disconnected', { requestId });
+    if (!streamEnded) logger.sseDisconnect(requestId);
     streamEnded = true;
   });
 
