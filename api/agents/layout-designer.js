@@ -13,6 +13,7 @@
 
 const { getVisionAdapter } = require('../llm');
 const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { logger } = require('../lib/logger');
 
 const LAYOUT_DESIGNER_PROMPT = `You are a layout designer for a screenshot intelligence app. Your job is to analyze a screenshot and design the best possible card-based layout to present the extracted information.
 
@@ -76,6 +77,7 @@ Return ONLY valid JSON matching this structure:
  * @returns {Promise<Object>} Layout blueprint
  */
 async function designLayout({ imageData, mediaType, question, adapterConfig = {} }) {
+  const startTime = Date.now();
   const adapter = getVisionAdapter(adapterConfig);
 
   let prompt = LAYOUT_DESIGNER_PROMPT;
@@ -83,10 +85,19 @@ async function designLayout({ imageData, mediaType, question, adapterConfig = {}
     prompt += `\n\n**User's specific question:** "${question}"\nMake sure at least one card directly addresses this question.`;
   }
 
+  logger.info('LayoutDesigner', 'Starting vision analysis', { model: adapterConfig.model || 'default' });
+
   const result = await adapter.analyzeImage({
     imageData,
     mediaType,
     prompt,
+  });
+
+  const duration = Date.now() - startTime;
+  logger.info('LayoutDesigner', 'Vision analysis complete', {
+    dur: duration,
+    model: result.model,
+    usage: result.usage,
   });
 
   const blueprint = parseBlueprint(result.text);
@@ -113,7 +124,7 @@ function parseBlueprint(text) {
 
     return JSON.parse(text.trim());
   } catch (e) {
-    console.error('[LayoutDesigner] Failed to parse blueprint:', e.message);
+    logger.error('LayoutDesigner', 'Failed to parse blueprint', { err: e.message });
     return createFallbackBlueprint();
   }
 }

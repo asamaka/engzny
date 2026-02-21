@@ -313,7 +313,17 @@ app.get('/api/health', (req, res) => {
 // ============================================
 
 // GET /api/debug/logs - Query production logs
-app.get('/api/debug/logs', (req, res) => {
+// Debug auth: require ?token= for read endpoints, allow client error reports open
+const DEBUG_TOKEN = process.env.DEBUG_TOKEN || null;
+
+function requireDebugAuth(req, res, next) {
+  // If no DEBUG_TOKEN configured, allow all (dev/initial setup)
+  if (!DEBUG_TOKEN) return next();
+  if (req.query.token === DEBUG_TOKEN) return next();
+  res.status(401).json({ error: 'Unauthorized', hint: 'Add ?token=YOUR_DEBUG_TOKEN' });
+}
+
+app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
   const { level, category, limit, since, summary } = req.query;
 
   if (summary === 'true' || summary === '1') {
@@ -334,7 +344,7 @@ app.get('/api/debug/logs', (req, res) => {
 });
 
 // GET /api/debug/pipelines - Recent pipeline traces
-app.get('/api/debug/pipelines', (req, res) => {
+app.get('/api/debug/pipelines', requireDebugAuth, (req, res) => {
   const summary = logger.getSummary();
   res.json({
     stats: summary.pipelineStats,
@@ -342,7 +352,7 @@ app.get('/api/debug/pipelines', (req, res) => {
   });
 });
 
-// POST /api/debug/client-error - Client-side error reporting
+// POST /api/debug/client-error - Client-side error reporting (open - no auth needed)
 app.post('/api/debug/client-error', (req, res) => {
   const errorData = req.body || {};
   logger.clientError(errorData);

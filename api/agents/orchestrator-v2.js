@@ -62,12 +62,19 @@ async function runPipeline({
       });
     }
 
-    logger.info('Orchestrator', 'Phase 1: Layout Design');
+    // Use Sonnet for layout design - fast vision, good enough for layout decisions
+    // Opus is overkill and takes 20-40s, Sonnet takes 5-10s
+    const designAdapterConfig = {
+      ...adapterConfig,
+      model: adapterConfig.designModel || 'claude-sonnet-4-20250514',
+    };
+
+    logger.info('Orchestrator', 'Phase 1: Layout Design', { model: designAdapterConfig.model });
     const blueprint = await designLayout({
       imageData,
       mediaType,
       question,
-      adapterConfig,
+      adapterConfig: designAdapterConfig,
     });
 
     const designDuration = Date.now() - startTime;

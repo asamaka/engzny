@@ -11,6 +11,7 @@
 
 const { getVisionAdapter, getDefaultAdapter } = require('../llm');
 const { getCardSchema, validateCardData } = require('../contracts/card-types');
+const { logger } = require('../lib/logger');
 
 /**
  * Build the research prompt for a specific card
@@ -69,7 +70,7 @@ Return JSON:`;
  */
 async function researchCard({ card, contentAnalysis, imageData, mediaType, adapterConfig = {} }) {
   const startTime = Date.now();
-  console.log(`[CardResearcher] Starting research for ${card.id} (${card.cardType})`);
+  logger.info('CardResearcher', `Starting ${card.id}`, { cardType: card.cardType });
 
   try {
     const adapter = getVisionAdapter(adapterConfig);
@@ -83,12 +84,12 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
 
     const data = parseCardData(result.text);
     const duration = Date.now() - startTime;
-    console.log(`[CardResearcher] ${card.id} completed in ${duration}ms`);
+    logger.info('CardResearcher', `${card.id} complete`, { dur: duration, model: result.model });
 
     // Validate against schema
     const validation = validateCardData(card.cardType, data);
     if (!validation.valid) {
-      console.warn(`[CardResearcher] ${card.id} validation warnings:`, validation.errors);
+      logger.warn('CardResearcher', `${card.id} validation issues`, { errors: validation.errors });
       // Merge with placeholder data for missing required fields
       return {
         ...card.placeholderData,
@@ -109,7 +110,7 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
       },
     };
   } catch (error) {
-    console.error(`[CardResearcher] Error researching ${card.id}:`, error.message);
+    logger.error('CardResearcher', `Failed ${card.id}`, { err: error.message, cardType: card.cardType });
     // Return placeholder data on failure
     return {
       ...card.placeholderData,
@@ -140,7 +141,7 @@ async function researchCardsInParallel({
   onCardComplete,
   adapterConfig = {},
 }) {
-  console.log(`[CardResearcher] Starting parallel research for ${cards.length} cards`);
+  logger.info('CardResearcher', `Parallel research starting`, { cardCount: cards.length });
   const startTime = Date.now();
   const results = new Map();
 
@@ -174,7 +175,7 @@ async function researchCardsInParallel({
   await Promise.allSettled(promises);
 
   const totalDuration = Date.now() - startTime;
-  console.log(`[CardResearcher] All ${cards.length} cards researched in ${totalDuration}ms`);
+  logger.info('CardResearcher', `All cards complete`, { cardCount: cards.length, dur: totalDuration });
 
   return results;
 }
@@ -197,7 +198,7 @@ function parseCardData(text) {
 
     return JSON.parse(text.trim());
   } catch (e) {
-    console.error('[CardResearcher] Failed to parse card data:', e.message);
+    logger.warn('CardResearcher', 'Failed to parse card data', { err: e.message });
     return {};
   }
 }
