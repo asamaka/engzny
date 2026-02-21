@@ -1058,16 +1058,59 @@
             reader.readAsDataURL(blob);
         }
 
+        // === Telemetry ===
+        const telemetry = {
+            pipelineStart: null,
+            eventsReceived: [],
+            requestId: null,
+
+            reset() {
+                this.pipelineStart = Date.now();
+                this.eventsReceived = [];
+                this.requestId = null;
+            },
+
+            trackEvent(event) {
+                const elapsed = Date.now() - (this.pipelineStart || Date.now());
+                this.eventsReceived.push({ event, elapsed });
+            },
+
+            reportError(message, extra = {}) {
+                const payload = {
+                    message,
+                    url: location.href,
+                    userAgent: navigator.userAgent,
+                    elapsed: this.pipelineStart ? Date.now() - this.pipelineStart : null,
+                    streamEvents: this.eventsReceived,
+                    requestId: this.requestId,
+                    state: {
+                        blueprintReceived,
+                        totalCards,
+                        completedCards,
+                    },
+                    ...extra,
+                };
+                // Fire-and-forget error report
+                fetch('/api/debug/client-error', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                }).catch(() => {});
+            }
+        };
+
         // === Pipeline ===
         let blueprintReceived = false;
         let pipelineTimeout = null;
 
         async function startPipeline(imageDataUrl) {
             blueprintReceived = false;
+            telemetry.reset();
 
             // Timeout: if no blueprint after 60s, something went wrong
             pipelineTimeout = setTimeout(() => {
                 if (!blueprintReceived) {
+                    telemetry.reportError('Analysis timed out (60s)', { type: 'timeout' });
                     showError('Analysis timed out. Please try again.');
                 }
             }, 60000);
@@ -1087,13 +1130,11 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
-                let lastEventTime = Date.now();
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    lastEventTime = Date.now();
                     buffer += decoder.decode(value, { stream: true });
                     const lines = buffer.split('\n');
                     buffer = lines.pop() || '';
@@ -1106,6 +1147,10 @@
                         } else if (line.startsWith('data: ') && currentEvent) {
                             try {
                                 const data = JSON.parse(line.slice(6));
+                                telemetry.trackEvent(currentEvent);
+                                if (currentEvent === 'connected' && data.requestId) {
+                                    telemetry.requestId = data.requestId;
+                                }
                                 handleSSEEvent(currentEvent, data);
                             } catch (e) {}
                             currentEvent = null;
@@ -1115,9 +1160,11 @@
 
                 // Stream ended - if no blueprint was received, show error
                 if (!blueprintReceived) {
+                    telemetry.reportError('Stream ended without blueprint', { type: 'stream_end_no_blueprint' });
                     showError('Analysis stream ended unexpectedly. Please try again.');
                 }
             } catch (err) {
+                telemetry.reportError(err.message || 'connection failed', { type: 'fetch_error' });
                 showError(err.message || 'connection failed');
             } finally {
                 if (pipelineTimeout) {
@@ -1158,6 +1205,7 @@
                     break;
 
                 case 'error':
+                    telemetry.reportError(data.message || 'analysis failed', { type: 'sse_error' });
                     showError(data.message || 'analysis failed');
                     break;
             }

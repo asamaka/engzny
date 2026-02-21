@@ -7,8 +7,11 @@ const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
 const sharp = require('sharp');
 const { ClaudeAdapter } = require('./llm/claude');
+const { logger } = require('./lib/logger');
 
 const app = express();
+
+logger.info('Server', 'Initializing', { nodeVersion: process.version, env: process.env.NODE_ENV || 'development' });
 
 // In-memory job storage (fallback when Redis is not configured)
 // For production, configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
@@ -306,6 +309,47 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
+// Debug & Monitoring Endpoints
+// ============================================
+
+// GET /api/debug/logs - Query production logs
+app.get('/api/debug/logs', (req, res) => {
+  const { level, category, limit, since, summary } = req.query;
+
+  if (summary === 'true' || summary === '1') {
+    return res.json(logger.getSummary());
+  }
+
+  const logs = logger.query({
+    level,
+    category,
+    limit: limit ? parseInt(limit, 10) : 50,
+    since,
+  });
+
+  res.json({
+    count: logs.length,
+    logs,
+  });
+});
+
+// GET /api/debug/pipelines - Recent pipeline traces
+app.get('/api/debug/pipelines', (req, res) => {
+  const summary = logger.getSummary();
+  res.json({
+    stats: summary.pipelineStats,
+    pipelines: summary.recentPipelines,
+  });
+});
+
+// POST /api/debug/client-error - Client-side error reporting
+app.post('/api/debug/client-error', (req, res) => {
+  const errorData = req.body || {};
+  logger.clientError(errorData);
+  res.json({ received: true });
+});
+
+// ============================================
 // Keypoints Extraction API
 // Extract structured keypoints from screenshots with card-based navigation
 // ============================================
@@ -485,6 +529,8 @@ const { runPipeline } = require('./agents/orchestrator-v2');
 // Hub v2 analyze - SSE endpoint for progressive card population
 // Primary analysis endpoint - v2 pipeline with SSE
 app.post('/api/hub/v2/analyze', async (req, res) => {
+  const requestId = crypto.randomUUID().slice(0, 8);
+
   // Declare stream helpers OUTSIDE try so they're accessible in catch
   let streamEnded = false;
   let keepAlive = null;
@@ -503,8 +549,9 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
       if (res.flush) res.flush();
+      logger.pipelineEvent(requestId, event);
     } catch (err) {
-      console.error(`[HubV2] Error sending ${event}:`, err.message);
+      logger.error('SSE', `Failed to send ${event}`, { requestId, err: err.message });
       endStream();
     }
   };
@@ -513,7 +560,15 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     const { image, question, mediaType: rawMediaType } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
 
+    const imageSize = normalized.imageData ? Math.round(normalized.imageData.length * 0.75 / 1024) : 0;
+    logger.startPipeline(requestId, {
+      mediaType: normalized.mediaType,
+      imageSize: `${imageSize}KB`,
+      hasQuestion: !!question,
+    });
+
     if (!process.env.ANTHROPIC_API_KEY) {
+      logger.error('Pipeline', 'Missing ANTHROPIC_API_KEY', { requestId });
       return res.status(500).json({
         error: 'API Configuration Missing',
         message: 'ANTHROPIC_API_KEY is not configured.',
@@ -529,7 +584,12 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
     res.flushHeaders();
 
-    res.on('close', () => { streamEnded = true; });
+    res.on('close', () => {
+      if (!streamEnded) {
+        logger.warn('SSE', 'Client disconnected', { requestId });
+      }
+      streamEnded = true;
+    });
 
     // Keep-alive during long operations
     keepAlive = setInterval(() => {
@@ -538,7 +598,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       }
     }, 15000);
 
-    sendEvent('connected', { message: 'Pipeline started', timestamp: new Date().toISOString() });
+    sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
 
     await runPipeline({
       imageData: normalized.imageData,
@@ -546,21 +606,33 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       question,
 
       onProgress: (progress) => {
+        logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
         sendEvent('progress', progress);
       },
 
       onBlueprint: (blueprint) => {
-        // Client receives the layout blueprint with placeholder cards
+        const cardCount = (blueprint.cards || []).length;
+        const layoutType = blueprint.layout?.type || 'unknown';
+        logger.pipelinePhase(requestId, 'blueprint', { cardCount, layoutType });
         sendEvent('blueprint', blueprint);
       },
 
       onCardPopulated: (cardUpdate) => {
-        // Client receives populated data for a single card
+        logger.pipelineEvent(requestId, 'card', {
+          cardId: cardUpdate.cardId,
+          cardType: cardUpdate.cardType,
+          completed: `${cardUpdate.completedCount}/${cardUpdate.totalCount}`,
+        });
         sendEvent('card', cardUpdate);
       },
 
       onComplete: (populatedLayout) => {
         clearInterval(keepAlive);
+        logger.pipelineComplete(requestId, {
+          cardCount: populatedLayout.cards?.length,
+          layoutType: populatedLayout.layout?.type,
+          designDuration: populatedLayout._meta?.designDuration,
+        });
         sendEvent('complete', {
           layout: populatedLayout.layout,
           contentAnalysis: populatedLayout.contentAnalysis,
@@ -571,17 +643,17 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
 
       onError: (error) => {
         clearInterval(keepAlive);
+        logger.pipelineError(requestId, error, { phase: 'pipeline' });
         sendEvent('error', { message: error.message });
         endStream();
       },
     });
   } catch (error) {
-    console.error('[HubV2] Error:', error);
+    logger.pipelineError(requestId, error, { phase: 'catch', headersSent: res.headersSent });
     if (keepAlive) clearInterval(keepAlive);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Pipeline failed', message: error.message });
     } else {
-      // Stream is already open - send error event so client knows
       sendEvent('error', { message: error.message || 'Pipeline failed' });
       endStream();
     }

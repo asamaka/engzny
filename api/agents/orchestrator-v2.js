@@ -20,6 +20,7 @@
 
 const { designLayout } = require('./layout-designer');
 const { researchCardsInParallel } = require('./card-researcher');
+const { logger } = require('../lib/logger');
 
 /**
  * Run the full v2 pipeline with SSE callbacks
@@ -61,7 +62,7 @@ async function runPipeline({
       });
     }
 
-    console.log('[OrchestratorV2] Phase 1: Layout Design');
+    logger.info('Orchestrator', 'Phase 1: Layout Design');
     const blueprint = await designLayout({
       imageData,
       mediaType,
@@ -70,7 +71,11 @@ async function runPipeline({
     });
 
     const designDuration = Date.now() - startTime;
-    console.log(`[OrchestratorV2] Blueprint ready in ${designDuration}ms: ${blueprint.layout.type} layout, ${blueprint.cards.length} cards`);
+    logger.info('Orchestrator', 'Blueprint ready', {
+      dur: designDuration,
+      layoutType: blueprint.layout.type,
+      cardCount: blueprint.cards.length,
+    });
 
     // Send blueprint to client (cards render as placeholders immediately)
     if (onBlueprint) {
@@ -90,7 +95,7 @@ async function runPipeline({
     // Use Sonnet for card research - faster and cheaper than Opus
     // Layout Designer already did the heavy vision analysis
     // =====================================================
-    console.log('[OrchestratorV2] Phase 2: Parallel Card Research');
+    logger.info('Orchestrator', 'Phase 2: Parallel Card Research', { cardCount: cardsToResearch.length });
     const researchAdapterConfig = {
       ...adapterConfig,
       model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
@@ -150,7 +155,7 @@ async function runPipeline({
     // Phase 3: Assemble final layout
     // =====================================================
     const totalDuration = Date.now() - startTime;
-    console.log(`[OrchestratorV2] Pipeline complete in ${totalDuration}ms`);
+    logger.info('Orchestrator', 'Pipeline complete', { dur: totalDuration });
 
     // Build final populated layout
     const populatedLayout = {
@@ -177,7 +182,7 @@ async function runPipeline({
 
     return populatedLayout;
   } catch (error) {
-    console.error('[OrchestratorV2] Pipeline error:', error);
+    logger.error('Orchestrator', 'Pipeline error', { err: error.message, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
     if (onError) {
       onError(error);
     } else {
