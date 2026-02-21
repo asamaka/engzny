@@ -1196,6 +1196,10 @@
                     onBlueprintReceived(data);
                     break;
 
+                case 'layout_update':
+                    onLayoutUpdate(data);
+                    break;
+
                 case 'card':
                     onCardReceived(data);
                     break;
@@ -1211,7 +1215,7 @@
             }
         }
 
-        // === Blueprint received: fade screenshot, show card placeholders ===
+        // === Blueprint received: instant skeleton, transition from scan to cards ===
         function onBlueprintReceived(blueprint) {
             blueprintReceived = true;
             if (pipelineTimeout) {
@@ -1230,14 +1234,40 @@
             screenshotLayer.className = 'screenshot-layer fading';
 
             // Update status
-            statusProgressFill.style.width = '30%';
-            statusText.textContent = `researching ${totalCards} cards`;
+            statusProgressFill.style.width = '15%';
+            statusText.textContent = 'analyzing screenshot';
 
-            // Set header
+            // Set header badge
+            const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
+            layoutBadge.textContent = ct.replace(/_/g, ' ');
+
+            // Create skeleton placeholder cards
+            cardGrid.innerHTML = '';
+            (blueprint.cards || []).forEach((card, index) => {
+                const el = createCardElement(card);
+                cardGrid.appendChild(el);
+                setTimeout(() => {
+                    el.classList.add('visible');
+                }, 80 + index * 60);
+            });
+
+            // Show the results overlay immediately
+            layoutProgressFill.style.width = '10%';
+            layoutProgressText.textContent = 'analyzing';
+            setTimeout(() => {
+                resultsOverlay.classList.add('visible');
+            }, 100);
+        }
+
+        // === Layout update: real blueprint replaces skeleton cards ===
+        function onLayoutUpdate(blueprint) {
+            totalCards = (blueprint.cards || []).length;
+            completedCards = 0;
+
+            // Update content analysis with real data
             const ct = blueprint.contentAnalysis?.contentType || 'general';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
 
-            // Set content analysis
             if (blueprint.contentAnalysis) {
                 contentAnalysisEl.style.display = '';
                 analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
@@ -1250,28 +1280,24 @@
                 });
             }
 
-            // Set grid columns
+            // Update grid layout
             const cols = blueprint.layout?.columns || 1;
             cardGrid.className = 'card-grid' + (cols > 1 ? ` cols-${Math.min(cols, 3)}` : '');
 
-            // Create placeholder cards
+            // Replace skeleton cards with real placeholder cards
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
                 cardGrid.appendChild(el);
-
-                // Stagger card entrance
                 setTimeout(() => {
                     el.classList.add('visible');
-                }, 80 + index * 60);
+                }, 50 + index * 40);
             });
 
-            // Show the results overlay
+            // Update progress
+            statusText.textContent = `researching ${totalCards} cards`;
             layoutProgressFill.style.width = '30%';
             layoutProgressText.textContent = `0/${totalCards}`;
-            setTimeout(() => {
-                resultsOverlay.classList.add('visible');
-            }, 100);
         }
 
         // === Card research completed: populate a single card ===

@@ -623,8 +623,15 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       onBlueprint: (blueprint) => {
         const cardCount = (blueprint.cards || []).length;
         const layoutType = blueprint.layout?.type || 'unknown';
-        logger.pipelinePhase(requestId, 'blueprint', { cardCount, layoutType });
+        logger.pipelinePhase(requestId, 'skeleton', { cardCount, layoutType });
         sendEvent('blueprint', blueprint);
+      },
+
+      onLayoutUpdate: (blueprint) => {
+        const cardCount = (blueprint.cards || []).length;
+        const layoutType = blueprint.layout?.type || 'unknown';
+        logger.pipelinePhase(requestId, 'blueprint', { cardCount, layoutType });
+        sendEvent('layout_update', blueprint);
       },
 
       onCardPopulated: (cardUpdate) => {

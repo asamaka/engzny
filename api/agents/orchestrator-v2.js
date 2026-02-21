@@ -1,26 +1,59 @@
 /**
  * Orchestrator v2
  *
- * Enhanced pipeline coordinator implementing the new architecture:
+ * Pipeline with instant feedback:
  *
- * 1. Screenshot → Layout Designer LLM (vision)
- *    - Describes content, identifies intent, suggests top questions
- *    - Picks the best layout type
- *    - Creates placeholder cards with research assignments
- *
- * 2. Blueprint → SSE to client (cards render as placeholders immediately)
- *
- * 3. Blueprint → Parallel Card Researchers (multiple LLM calls)
- *    - Each card gets its own researcher LLM
- *    - Researchers populate cards based on the agreed contract
- *    - As each completes, SSE sends populated card data to client
- *
- * 4. All complete → Final event with full populated layout
+ * 1. Immediate: Send skeleton blueprint (user sees cards in <1s)
+ * 2. Layout Designer LLM (vision) → sends layout_update with real cards
+ * 3. Parallel Card Researchers → each card populates as it completes
+ * 4. All complete → final event
  */
 
 const { designLayout } = require('./layout-designer');
 const { researchCardsInParallel } = require('./card-researcher');
 const { logger } = require('../lib/logger');
+
+/**
+ * Create a generic skeleton blueprint for instant display.
+ * Shows hero + 3 shimmer cards while the real layout designer runs.
+ */
+function createSkeletonBlueprint() {
+  return {
+    contentAnalysis: {
+      contentType: 'analyzing',
+      platform: null,
+      intent: 'Analyzing screenshot...',
+      topQuestions: [],
+    },
+    layout: { type: 'simple', columns: 1, reason: 'Skeleton layout while analyzing' },
+    cards: [
+      {
+        id: 'skeleton-hero',
+        cardType: 'hero_summary',
+        gridPosition: { row: 1, column: 1, columnSpan: 1, rowSpan: 1 },
+        researchBrief: '',
+        placeholderData: { title: 'Analyzing screenshot...', subtitle: 'Identifying content and designing layout' },
+        status: 'placeholder',
+      },
+      {
+        id: 'skeleton-2',
+        cardType: 'info_list',
+        gridPosition: { row: 2, column: 1, columnSpan: 1, rowSpan: 1 },
+        researchBrief: '',
+        placeholderData: {},
+        status: 'placeholder',
+      },
+      {
+        id: 'skeleton-3',
+        cardType: 'info_list',
+        gridPosition: { row: 3, column: 1, columnSpan: 1, rowSpan: 1 },
+        researchBrief: '',
+        placeholderData: {},
+        status: 'placeholder',
+      },
+    ],
+  };
+}
 
 /**
  * Run the full v2 pipeline with SSE callbacks
@@ -29,7 +62,8 @@ const { logger } = require('../lib/logger');
  * @param {string} options.imageData - Base64 encoded image
  * @param {string} options.mediaType - MIME type
  * @param {string} options.question - Optional user question
- * @param {Function} options.onBlueprint - Called with layout blueprint (cards as placeholders)
+ * @param {Function} options.onBlueprint - Called with skeleton blueprint (instant)
+ * @param {Function} options.onLayoutUpdate - Called with real blueprint from layout designer
  * @param {Function} options.onCardPopulated - Called when each card research completes
  * @param {Function} options.onComplete - Called when all research is done
  * @param {Function} options.onError - Called on error
@@ -42,6 +76,7 @@ async function runPipeline({
   mediaType,
   question,
   onBlueprint,
+  onLayoutUpdate,
   onCardPopulated,
   onComplete,
   onError,
@@ -52,18 +87,24 @@ async function runPipeline({
 
   try {
     // =====================================================
-    // Phase 1: Layout Design (single LLM vision call)
+    // Phase 0: Instant skeleton (no LLM, <1ms)
     // =====================================================
+    const skeleton = createSkeletonBlueprint();
+    if (onBlueprint) {
+      onBlueprint(skeleton);
+    }
+
     if (onProgress) {
       onProgress({
         phase: 'designing',
-        progress: 5,
-        message: 'Analyzing screenshot and designing layout...',
+        progress: 10,
+        message: 'Analyzing screenshot...',
       });
     }
 
-    // Use Sonnet for layout design - fast vision, good enough for layout decisions
-    // Opus is overkill and takes 20-40s, Sonnet takes 5-10s
+    // =====================================================
+    // Phase 1: Layout Design (Sonnet vision, 5-10s)
+    // =====================================================
     const designAdapterConfig = {
       ...adapterConfig,
       model: adapterConfig.designModel || 'claude-sonnet-4-20250514',
@@ -84,36 +125,25 @@ async function runPipeline({
       cardCount: blueprint.cards.length,
     });
 
-    // Send blueprint to client (cards render as placeholders immediately)
-    if (onBlueprint) {
-      onBlueprint(blueprint);
+    // Send real layout to replace skeleton
+    if (onLayoutUpdate) {
+      onLayoutUpdate(blueprint);
     }
 
     if (onProgress) {
       onProgress({
         phase: 'researching',
         progress: 30,
-        message: `Layout designed. Researching ${blueprint.cards.length} cards in parallel...`,
+        message: `Researching ${blueprint.cards.length} cards...`,
       });
     }
 
     // =====================================================
-    // Phase 2: Parallel Card Research (multiple LLM calls)
-    // Use Sonnet for card research - faster and cheaper than Opus
-    // Layout Designer already did the heavy vision analysis
+    // Phase 2: Parallel Card Research (Sonnet, 5-10s)
     // =====================================================
-    logger.info('Orchestrator', 'Phase 2: Parallel Card Research', { cardCount: cardsToResearch.length });
-    const researchAdapterConfig = {
-      ...adapterConfig,
-      model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
-    };
-
-    // The hero card can use placeholder data directly since the designer already has good context
-    // Research the remaining cards in parallel
+    // Hero card can use placeholder data since designer already has good context
     const cardsToResearch = blueprint.cards.filter((c, i) => {
-      // Skip hero if it already has solid placeholder data
       if (i === 0 && c.cardType === 'hero_summary' && c.placeholderData?.title && c.placeholderData?.subtitle) {
-        // Immediately "populate" the hero with its placeholder data
         if (onCardPopulated) {
           onCardPopulated({
             cardId: c.id,
@@ -127,6 +157,12 @@ async function runPipeline({
       }
       return true;
     });
+
+    logger.info('Orchestrator', 'Phase 2: Parallel Card Research', { cardCount: cardsToResearch.length });
+    const researchAdapterConfig = {
+      ...adapterConfig,
+      model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
+    };
 
     let completedCount = blueprint.cards.length - cardsToResearch.length;
 
@@ -164,7 +200,6 @@ async function runPipeline({
     const totalDuration = Date.now() - startTime;
     logger.info('Orchestrator', 'Pipeline complete', { dur: totalDuration });
 
-    // Build final populated layout
     const populatedLayout = {
       ...blueprint,
       cards: blueprint.cards.map((card) => ({
