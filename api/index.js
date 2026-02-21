@@ -485,6 +485,30 @@ const { runPipeline } = require('./agents/orchestrator-v2');
 // Hub v2 analyze - SSE endpoint for progressive card population
 // Primary analysis endpoint - v2 pipeline with SSE
 app.post('/api/hub/v2/analyze', async (req, res) => {
+  // Declare stream helpers OUTSIDE try so they're accessible in catch
+  let streamEnded = false;
+  let keepAlive = null;
+
+  const endStream = () => {
+    if (streamEnded) return;
+    streamEnded = true;
+    if (!res.writableEnded && !res.destroyed) {
+      res.end();
+    }
+  };
+
+  const sendEvent = (event, data) => {
+    if (streamEnded || res.closed || res.destroyed || res.writableEnded) return;
+    try {
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      if (res.flush) res.flush();
+    } catch (err) {
+      console.error(`[HubV2] Error sending ${event}:`, err.message);
+      endStream();
+    }
+  };
+
   try {
     const { image, question, mediaType: rawMediaType } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
@@ -505,31 +529,10 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     res.setHeader('Transfer-Encoding', 'chunked');
     res.flushHeaders();
 
-    let streamEnded = false;
-    const endStream = () => {
-      if (streamEnded) return;
-      streamEnded = true;
-      if (!res.writableEnded && !res.destroyed) {
-        res.end();
-      }
-    };
-
-    const sendEvent = (event, data) => {
-      if (streamEnded || res.closed || res.destroyed || res.writableEnded) return;
-      try {
-        res.write(`event: ${event}\n`);
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-        if (res.flush) res.flush();
-      } catch (err) {
-        console.error(`[HubV2] Error sending ${event}:`, err.message);
-        endStream();
-      }
-    };
-
     res.on('close', () => { streamEnded = true; });
 
     // Keep-alive during long operations
-    const keepAlive = setInterval(() => {
+    keepAlive = setInterval(() => {
       if (!streamEnded) {
         try { res.write(': keep-alive\n\n'); if (res.flush) res.flush(); } catch {}
       }
@@ -574,7 +577,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     });
   } catch (error) {
     console.error('[HubV2] Error:', error);
-    clearInterval(keepAlive);
+    if (keepAlive) clearInterval(keepAlive);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Pipeline failed', message: error.message });
     } else {

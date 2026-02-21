@@ -87,8 +87,14 @@ async function runPipeline({
 
     // =====================================================
     // Phase 2: Parallel Card Research (multiple LLM calls)
+    // Use Sonnet for card research - faster and cheaper than Opus
+    // Layout Designer already did the heavy vision analysis
     // =====================================================
     console.log('[OrchestratorV2] Phase 2: Parallel Card Research');
+    const researchAdapterConfig = {
+      ...adapterConfig,
+      model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
+    };
 
     // The hero card can use placeholder data directly since the designer already has good context
     // Research the remaining cards in parallel
@@ -117,7 +123,7 @@ async function runPipeline({
       contentAnalysis: blueprint.contentAnalysis,
       imageData,
       mediaType,
-      adapterConfig,
+      adapterConfig: researchAdapterConfig,
       onCardComplete: (result) => {
         completedCount++;
 
