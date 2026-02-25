@@ -676,6 +676,11 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         sendEvent('blueprint', blueprint);
       },
 
+      onLayoutPreview: (blueprint) => {
+        logger.pipelinePhase(requestId, 'fast_classify', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown', contentType: blueprint.contentAnalysis?.contentType });
+        sendEvent('layout_preview', blueprint);
+      },
+
       onLayoutUpdate: (blueprint) => {
         logger.pipelinePhase(requestId, 'blueprint', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
         sendEvent('layout_update', blueprint);
@@ -804,6 +809,13 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
         const layoutType = blueprint.layout?.type || 'unknown';
         logger.pipelinePhase(requestId, 'skeleton', { cardCount, layoutType });
         sendEvent('blueprint', blueprint);
+      },
+
+      onLayoutPreview: (blueprint) => {
+        const cardCount = (blueprint.cards || []).length;
+        const layoutType = blueprint.layout?.type || 'unknown';
+        logger.pipelinePhase(requestId, 'fast_classify', { cardCount, layoutType, contentType: blueprint.contentAnalysis?.contentType });
+        sendEvent('layout_preview', blueprint);
       },
 
       onLayoutUpdate: (blueprint) => {

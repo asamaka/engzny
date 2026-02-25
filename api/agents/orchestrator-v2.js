@@ -1,21 +1,23 @@
 /**
  * Orchestrator v2
  *
- * Pipeline with instant feedback:
+ * Pipeline with instant feedback + fast classification:
  *
- * 1. Immediate: Send skeleton blueprint (user sees cards in <1s)
- * 2. Layout Designer LLM (vision) → sends layout_update with real cards
- * 3. Parallel Card Researchers → each card populates as it completes
- * 4. All complete → final event
+ * 1. Immediate: Send generic skeleton (user sees cards in <1ms)
+ * 2. Fast Classifier (Haiku, 2-4s): Contextual skeleton with correct layout + card types
+ * 3. Layout Designer LLM (Sonnet, 10-20s): Full blueprint with research briefs
+ * 4. Parallel Card Researchers → each card populates as it completes
+ * 5. All complete → final event
  */
 
 const { designLayout } = require('./layout-designer');
+const { fastClassify } = require('./fast-classifier');
 const { researchCardsInParallel } = require('./card-researcher');
 const { logger } = require('../lib/logger');
 
 /**
  * Create a generic skeleton blueprint for instant display.
- * Shows hero + 3 shimmer cards while the real layout designer runs.
+ * Shows hero + 2 shimmer cards while the fast classifier runs.
  */
 function createSkeletonBlueprint() {
   return {
@@ -57,19 +59,6 @@ function createSkeletonBlueprint() {
 
 /**
  * Run the full v2 pipeline with SSE callbacks
- *
- * @param {Object} options
- * @param {string} options.imageData - Base64 encoded image
- * @param {string} options.mediaType - MIME type
- * @param {string} options.question - Optional user question
- * @param {Function} options.onBlueprint - Called with skeleton blueprint (instant)
- * @param {Function} options.onLayoutUpdate - Called with real blueprint from layout designer
- * @param {Function} options.onCardPopulated - Called when each card research completes
- * @param {Function} options.onComplete - Called when all research is done
- * @param {Function} options.onError - Called on error
- * @param {Function} options.onProgress - Called with progress updates
- * @param {Object} options.adapterConfig - Optional LLM adapter config
- * @returns {Promise<Object>} Final populated layout
  */
 async function runPipeline({
   imageData,
@@ -77,6 +66,7 @@ async function runPipeline({
   question,
   onBlueprint,
   onLayoutUpdate,
+  onLayoutPreview,
   onCardPopulated,
   onComplete,
   onError,
@@ -96,43 +86,86 @@ async function runPipeline({
 
     if (onProgress) {
       onProgress({
-        phase: 'designing',
-        progress: 10,
-        message: 'Analyzing screenshot...',
+        phase: 'classifying',
+        progress: 5,
+        message: 'Detecting content type...',
       });
     }
 
     // =====================================================
+    // Phase 0.5: Fast Classification (Haiku, 2-4s)
+    // Runs in parallel with the start of Phase 1
+    // =====================================================
+    const fastClassifyPromise = fastClassify({
+      imageData,
+      mediaType,
+      question,
+      adapterConfig,
+    }).catch((err) => {
+      logger.warn('Orchestrator', 'Fast classify failed', { err: err.message });
+      return null;
+    });
+
+    // =====================================================
     // Phase 1: Layout Design (Sonnet vision, 10-20s)
+    // Start immediately - don't wait for fast classifier
     // =====================================================
     const designAdapterConfig = {
       ...adapterConfig,
       model: adapterConfig.designModel || 'claude-sonnet-4-20250514',
     };
 
-    logger.info('Orchestrator', 'Phase 1: Layout Design', { model: designAdapterConfig.model });
+    logger.info('Orchestrator', 'Phase 1: Layout Design + Fast Classify (parallel)', {
+      designModel: designAdapterConfig.model,
+      classifyModel: 'claude-haiku-4-5-20241022',
+    });
 
-    // Send progress heartbeat every 3s during Layout Design so client knows we're alive
-    let designProgress = 10;
+    let designProgress = 5;
     const designHeartbeat = setInterval(() => {
-      designProgress = Math.min(designProgress + 4, 28);
+      designProgress = Math.min(designProgress + 3, 28);
       if (onProgress) {
         onProgress({
           phase: 'designing',
           progress: designProgress,
-          message: designProgress < 18 ? 'Reading screenshot content...' : 'Designing card layout...',
+          message: designProgress < 12 ? 'Detecting content type...' :
+                   designProgress < 20 ? 'Reading screenshot content...' : 'Designing card layout...',
         });
       }
     }, 3000);
 
-    let blueprint;
-    try {
-      blueprint = await designLayout({
-        imageData,
-        mediaType,
-        question,
-        adapterConfig: designAdapterConfig,
+    // Wait for fast classifier first (should be much faster than layout designer)
+    const quickBlueprint = await fastClassifyPromise;
+    const classifyDuration = Date.now() - startTime;
+
+    if (quickBlueprint && onLayoutPreview) {
+      logger.info('Orchestrator', 'Fast classification ready', {
+        dur: classifyDuration,
+        contentType: quickBlueprint.contentAnalysis?.contentType,
+        layoutType: quickBlueprint.layout?.type,
+        cardCount: quickBlueprint.cards?.length,
       });
+      onLayoutPreview(quickBlueprint);
+
+      if (onProgress) {
+        onProgress({
+          phase: 'designing',
+          progress: 15,
+          message: `${quickBlueprint.contentAnalysis?.contentType || 'Content'} detected — designing detailed layout...`,
+        });
+      }
+    }
+
+    // Now wait for the full layout designer
+    let blueprint;
+    const designPromise = designLayout({
+      imageData,
+      mediaType,
+      question,
+      adapterConfig: designAdapterConfig,
+    });
+
+    try {
+      blueprint = await designPromise;
     } finally {
       clearInterval(designHeartbeat);
     }
@@ -144,7 +177,6 @@ async function runPipeline({
       cardCount: blueprint.cards.length,
     });
 
-    // Send real layout to replace skeleton
     if (onLayoutUpdate) {
       onLayoutUpdate(blueprint);
     }
@@ -160,7 +192,6 @@ async function runPipeline({
     // =====================================================
     // Phase 2: Parallel Card Research (Sonnet, 5-10s)
     // =====================================================
-    // Hero card can use placeholder data since designer already has good context
     const cardsToResearch = blueprint.cards.filter((c, i) => {
       if (i === 0 && c.cardType === 'hero_summary' && c.placeholderData?.title && c.placeholderData?.subtitle) {
         if (onCardPopulated) {
@@ -229,6 +260,7 @@ async function runPipeline({
       _meta: {
         totalDuration,
         designDuration,
+        classifyDuration,
         cardsResearched: cardsToResearch.length,
       },
     };

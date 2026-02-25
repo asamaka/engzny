@@ -6,54 +6,53 @@
     <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Google+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --md-bg: #0f1318;
-            --md-surface: #1a1f27;
-            --md-surface-variant: #222830;
-            --md-surface-bright: #2a3140;
-            --md-surface-container: #1e2430;
-            --md-surface-container-high: #283040;
-            --md-on-surface: #e2e6ed;
-            --md-on-surface-variant: #8b95a5;
-            --md-outline: #3a4250;
-            --md-outline-variant: #2c3340;
-            --md-primary: #7cacf8;
-            --md-primary-container: #1a3560;
-            --md-on-primary: #002f65;
-            --md-on-primary-container: #d4e3ff;
-            --md-secondary: #b8c6dc;
-            --md-secondary-container: #3a4758;
-            --md-tertiary: #d4bde6;
-            --md-tertiary-container: #4a3560;
-            --md-error: #ffb4ab;
-            --md-error-container: #93000a;
-            --md-success: #7dd99a;
-            --md-success-container: #1a4028;
-            --md-warning: #f5c842;
-            --md-warning-container: #4a3800;
-            --md-info: #7cacf8;
-            --md-radius-xs: 4px;
-            --md-radius-sm: 8px;
-            --md-radius-md: 12px;
-            --md-radius-lg: 16px;
-            --md-radius-xl: 28px;
-            --md-elevation-1: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.24);
-            --md-elevation-2: 0 3px 6px rgba(0,0,0,0.32), 0 3px 6px rgba(0,0,0,0.23);
-            --md-elevation-3: 0 10px 20px rgba(0,0,0,0.35), 0 6px 6px rgba(0,0,0,0.23);
-            --md-elevation-4: 0 14px 28px rgba(0,0,0,0.4), 0 10px 10px rgba(0,0,0,0.22);
+            --bg: #0a0d12;
+            --bg-raised: #0f1319;
+            --surface: #151a22;
+            --surface-2: #1b222c;
+            --surface-3: #222a36;
+            --surface-bright: #2a3444;
+            --border: #1e2736;
+            --border-bright: #2d3a4e;
+            --text: #e8ecf2;
+            --text-secondary: #8d99ae;
+            --text-muted: #5c6878;
+            --accent: #6c9fff;
+            --accent-dim: #3d6cc7;
+            --accent-bg: rgba(108,159,255,0.08);
+            --accent-bg-strong: rgba(108,159,255,0.15);
+            --green: #5bdb8a;
+            --green-bg: rgba(91,219,138,0.1);
+            --green-dim: #2a7a4a;
+            --red: #ff6b6b;
+            --red-bg: rgba(255,107,107,0.1);
+            --yellow: #ffd15c;
+            --yellow-bg: rgba(255,209,92,0.08);
+            --purple: #b48eff;
+            --purple-bg: rgba(180,142,255,0.08);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 20px;
+            --radius-pill: 100px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+            --shadow-glow: 0 0 20px rgba(108,159,255,0.15);
         }
 
         html, body { height: 100%; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--md-bg);
-            color: var(--md-on-surface);
+            background: var(--bg);
+            color: var(--text);
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
         }
@@ -71,7 +70,7 @@
             justify-content: center;
             flex-direction: column;
             z-index: 200;
-            background: var(--md-bg);
+            background: var(--bg);
             transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -88,25 +87,25 @@
             justify-content: center;
             flex-direction: column;
             gap: 16px;
-            border: 2px dashed var(--md-outline);
-            border-radius: var(--md-radius-xl);
+            border: 2px dashed var(--border-bright);
+            border-radius: var(--radius-xl);
             cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: var(--md-surface);
+            background: var(--surface);
         }
 
         .paste-zone:hover, .paste-zone:active {
-            border-color: var(--md-primary);
-            background: var(--md-primary-container);
+            border-color: var(--accent);
+            background: var(--accent-bg);
             transform: scale(1.02);
-            box-shadow: var(--md-elevation-2);
+            box-shadow: var(--shadow-glow);
         }
 
         .paste-icon {
             width: 64px;
             height: 64px;
             border-radius: 50%;
-            background: var(--md-primary-container);
+            background: var(--accent-bg-strong);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -115,28 +114,27 @@
 
         .paste-icon .material-symbols-rounded {
             font-size: 32px;
-            color: var(--md-primary);
+            color: var(--accent);
         }
 
         .paste-zone:hover .paste-icon {
-            background: var(--md-primary);
+            background: var(--accent);
         }
 
         .paste-zone:hover .paste-icon .material-symbols-rounded {
-            color: var(--md-on-primary);
+            color: #fff;
         }
 
         .paste-text {
             font-size: 0.95rem;
             font-weight: 500;
-            color: var(--md-on-surface);
+            color: var(--text);
         }
 
         .paste-hint {
             margin-top: 1.5rem;
             font-size: 0.8rem;
-            color: var(--md-on-surface-variant);
-            letter-spacing: 0.01em;
+            color: var(--text-muted);
         }
 
         /* === MAIN CANVAS === */
@@ -163,7 +161,7 @@
             max-width: 92%;
             max-height: 85vh;
             object-fit: contain;
-            border-radius: var(--md-radius-lg);
+            border-radius: var(--radius-lg);
             transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -180,8 +178,8 @@
             left: 0;
             right: 0;
             height: 2px;
-            background: linear-gradient(90deg, transparent, var(--md-primary), transparent);
-            box-shadow: 0 0 24px var(--md-primary), 0 0 60px rgba(124,172,248,0.2);
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            box-shadow: 0 0 24px var(--accent), 0 0 60px rgba(108,159,255,0.2);
             z-index: 5;
             opacity: 0;
             transition: opacity 0.3s;
@@ -213,7 +211,7 @@
             position: absolute;
             width: 24px;
             height: 24px;
-            border-color: var(--md-primary);
+            border-color: var(--accent);
             border-style: solid;
             border-width: 0;
             border-radius: 4px;
@@ -233,7 +231,7 @@
             z-index: 50;
             padding: 16px 20px;
             padding-bottom: max(16px, env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(15,19,24,0.96) 30%);
+            background: linear-gradient(transparent, rgba(10,13,18,0.96) 30%);
             display: none;
         }
 
@@ -241,8 +239,8 @@
 
         .status-progress {
             width: 100%;
-            height: 4px;
-            background: var(--md-surface-variant);
+            height: 3px;
+            background: var(--surface-3);
             border-radius: 4px;
             overflow: hidden;
             margin-bottom: 10px;
@@ -250,17 +248,17 @@
 
         .status-progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, var(--md-primary), var(--md-tertiary));
+            background: linear-gradient(90deg, var(--accent), var(--purple));
             border-radius: 4px;
             width: 0%;
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .status-text {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 500;
-            letter-spacing: 0.04em;
-            color: var(--md-primary);
+            letter-spacing: 0.05em;
+            color: var(--accent);
             text-transform: uppercase;
             animation: statusPulse 2s ease-in-out infinite;
         }
@@ -275,6 +273,7 @@
             position: relative;
             z-index: 10;
             min-height: 100vh;
+            width: 100%;
             opacity: 0;
             transform: translateY(24px);
             transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -291,11 +290,11 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(15, 19, 24, 0.88);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--md-outline-variant);
-            padding: 12px 16px;
+            background: rgba(10, 13, 18, 0.92);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -310,12 +309,12 @@
         .layout-back {
             background: none;
             border: none;
-            color: var(--md-on-surface-variant);
-            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
             cursor: pointer;
             font-family: inherit;
             padding: 6px 8px;
-            border-radius: var(--md-radius-sm);
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             gap: 4px;
@@ -323,19 +322,19 @@
         }
 
         .layout-back:hover {
-            color: var(--md-primary);
-            background: var(--md-primary-container);
+            color: var(--accent);
+            background: var(--accent-bg);
         }
 
         .layout-badge {
-            font-size: 0.7rem;
-            font-weight: 600;
+            font-size: 0.65rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.1em;
             padding: 4px 12px;
-            border-radius: var(--md-radius-xl);
-            background: var(--md-primary-container);
-            color: var(--md-primary);
+            border-radius: var(--radius-pill);
+            background: var(--accent-bg-strong);
+            color: var(--accent);
         }
 
         .layout-progress {
@@ -346,67 +345,67 @@
 
         .layout-progress-bar {
             width: 80px;
-            height: 4px;
-            background: var(--md-surface-variant);
+            height: 3px;
+            background: var(--surface-3);
             border-radius: 4px;
             overflow: hidden;
         }
 
         .layout-progress-fill {
             height: 100%;
-            background: var(--md-primary);
+            background: var(--accent);
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
         }
 
         .layout-progress-text {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 500;
-            color: var(--md-on-surface-variant);
+            color: var(--text-muted);
         }
 
         /* === CONTENT ANALYSIS === */
         .content-analysis {
-            padding: 20px 16px;
-            background: linear-gradient(180deg, var(--md-surface) 0%, transparent 100%);
+            padding: 16px 16px 12px;
         }
 
         .content-analysis-intent {
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             font-weight: 400;
-            color: var(--md-on-surface);
-            margin-bottom: 14px;
+            color: var(--text);
+            margin-bottom: 12px;
             line-height: 1.6;
         }
 
         .top-questions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
         .top-question {
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 500;
-            padding: 6px 14px;
-            background: var(--md-surface-variant);
-            border: 1px solid var(--md-outline-variant);
-            border-radius: var(--md-radius-xl);
-            color: var(--md-secondary);
+            padding: 5px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-pill);
+            color: var(--text-secondary);
             cursor: default;
             transition: all 0.2s ease;
         }
 
         .top-question:hover {
-            background: var(--md-surface-bright);
-            border-color: var(--md-outline);
+            background: var(--surface-3);
+            border-color: var(--border-bright);
+            color: var(--text);
         }
 
         /* === CARD GRID === */
         .card-grid {
-            padding: 12px;
+            padding: 8px;
             display: grid;
-            gap: 12px;
+            gap: 8px;
             grid-template-columns: 1fr;
         }
 
@@ -429,16 +428,17 @@
 
         /* === CARD BASE === */
         .card {
-            background: var(--md-surface);
-            border-radius: var(--md-radius-lg);
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
             overflow: hidden;
             position: relative;
             opacity: 0;
-            transform: translateY(16px) scale(0.97);
-            transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                        transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+            transform: translateY(12px) scale(0.98);
+            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                        border-color 0.3s ease,
                         box-shadow 0.3s ease;
-            box-shadow: var(--md-elevation-1);
         }
 
         .card.visible {
@@ -447,11 +447,12 @@
         }
 
         .card:hover {
-            box-shadow: var(--md-elevation-2);
+            border-color: var(--border-bright);
+            box-shadow: var(--shadow-sm);
         }
 
         .card.loading {
-            min-height: 100px;
+            min-height: 80px;
         }
 
         .card.loading::after {
@@ -461,9 +462,9 @@
             background: linear-gradient(
                 90deg,
                 transparent 0%,
-                rgba(124,172,248,0.04) 35%,
-                rgba(124,172,248,0.08) 50%,
-                rgba(124,172,248,0.04) 65%,
+                rgba(108,159,255,0.03) 35%,
+                rgba(108,159,255,0.06) 50%,
+                rgba(108,159,255,0.03) 65%,
                 transparent 100%
             );
             animation: shimmer 2s ease-in-out infinite;
@@ -475,37 +476,38 @@
         }
 
         .card.populated {
-            animation: cardPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         @keyframes cardPop {
-            from { transform: scale(0.95); opacity: 0.6; }
-            60% { transform: scale(1.015); }
+            from { transform: scale(0.96); opacity: 0.7; }
+            60% { transform: scale(1.01); }
             to { transform: scale(1); opacity: 1; }
         }
 
         .card.just-populated {
-            box-shadow: var(--md-elevation-3), 0 0 0 1px rgba(124,172,248,0.2);
+            border-color: rgba(108,159,255,0.3);
+            box-shadow: var(--shadow-glow);
         }
 
-        .card-inner { padding: 20px; }
+        .card-inner { padding: 16px; }
 
         .card-type-label {
-            font-size: 0.65rem;
-            font-weight: 600;
+            font-size: 0.6rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--md-on-surface-variant);
-            margin-bottom: 12px;
+            letter-spacing: 0.1em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .card-type-icon {
-            width: 28px;
-            height: 28px;
-            border-radius: var(--md-radius-sm);
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -513,54 +515,74 @@
         }
 
         .card-type-icon .material-symbols-rounded {
-            font-size: 16px;
+            font-size: 14px;
         }
 
         /* === HERO SUMMARY === */
-        .card-hero { background: linear-gradient(135deg, var(--md-surface) 0%, var(--md-surface-variant) 100%); }
-        .card-hero .card-inner { padding: 24px 20px; }
+        .card-hero {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+            border-color: var(--border-bright);
+        }
+        .card-hero .card-inner { padding: 20px 16px; }
 
         .card-hero .hero-badge {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            font-size: 0.7rem;
-            font-weight: 600;
+            gap: 5px;
+            font-size: 0.65rem;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 5px 14px;
-            border-radius: var(--md-radius-xl);
-            background: var(--md-primary-container);
-            color: var(--md-primary);
-            margin-bottom: 14px;
+            letter-spacing: 0.08em;
+            padding: 4px 12px;
+            border-radius: var(--radius-pill);
+            background: var(--accent-bg-strong);
+            color: var(--accent);
+            margin-bottom: 12px;
         }
 
         .card-hero .hero-title {
-            font-size: 1.35rem;
-            font-weight: 700;
+            font-size: 1.25rem;
+            font-weight: 800;
             color: #fff;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
             line-height: 1.3;
-            letter-spacing: -0.01em;
+            letter-spacing: -0.02em;
         }
 
         .card-hero .hero-subtitle {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: 400;
-            color: var(--md-on-surface-variant);
-            margin-bottom: 16px;
+            color: var(--text-secondary);
+            margin-bottom: 14px;
             line-height: 1.5;
         }
 
         .card-hero .hero-takeaway {
-            font-size: 0.88rem;
-            color: var(--md-on-surface);
-            line-height: 1.65;
-            padding: 14px 16px;
-            background: var(--md-surface-container);
-            border-radius: var(--md-radius-md);
-            border-left: 4px solid var(--md-primary);
+            font-size: 0.84rem;
+            color: var(--text);
+            line-height: 1.6;
+            padding: 12px 14px;
+            background: var(--surface-3);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--accent);
         }
+
+        .card-hero .hero-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 12px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-decoration: none;
+            padding: 6px 12px;
+            background: var(--accent-bg);
+            border-radius: var(--radius-sm);
+            transition: background 0.2s;
+        }
+
+        .card-hero .hero-link:hover { background: var(--accent-bg-strong); }
 
         /* === KEY METRIC === */
         .card-metric .card-inner {
@@ -570,28 +592,28 @@
         }
 
         .card-metric .metric-value {
-            font-size: 2.4rem;
-            font-weight: 700;
-            color: var(--md-primary);
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--accent);
             line-height: 1.1;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
             margin: 4px 0;
         }
 
         .card-metric .metric-label {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 500;
-            color: var(--md-on-surface-variant);
+            color: var(--text-secondary);
             margin-top: 4px;
         }
 
         .card-metric .metric-context {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
+            font-size: 0.74rem;
+            color: var(--text-muted);
             margin-top: 10px;
-            padding: 8px 12px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-sm);
+            padding: 6px 10px;
+            background: var(--surface-2);
+            border-radius: var(--radius-sm);
             line-height: 1.4;
             width: 100%;
         }
@@ -599,258 +621,305 @@
         .card-metric .metric-trend {
             display: inline-flex;
             align-items: center;
-            gap: 4px;
-            font-size: 0.72rem;
-            font-weight: 600;
-            padding: 4px 10px;
-            border-radius: var(--md-radius-xl);
-            margin-top: 8px;
+            gap: 3px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: var(--radius-pill);
+            margin-top: 6px;
         }
 
-        .card-metric .metric-trend.up { background: var(--md-success-container); color: var(--md-success); }
-        .card-metric .metric-trend.down { background: var(--md-error-container); color: var(--md-error); }
-        .card-metric .metric-trend.stable { background: rgba(124,172,248,0.15); color: var(--md-info); }
+        .card-metric .metric-trend.up { background: var(--green-bg); color: var(--green); }
+        .card-metric .metric-trend.down { background: var(--red-bg); color: var(--red); }
+        .card-metric .metric-trend.stable { background: var(--accent-bg); color: var(--accent); }
 
         /* === INFO LIST === */
         .card-list .list-title {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 700;
             color: #fff;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .card-list .list-item {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--md-outline-variant);
-            font-size: 0.84rem;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8rem;
             gap: 12px;
         }
 
         .card-list .list-item:last-child { border-bottom: none; }
 
         .card-list .list-item-label {
-            color: var(--md-on-surface-variant);
+            color: var(--text-secondary);
             flex-shrink: 0;
             font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
-        .card-list .list-item-icon {
-            font-size: 1rem;
-        }
+        .card-list .list-item-icon { font-size: 0.9rem; }
 
         .card-list .list-item-value {
-            color: var(--md-on-surface);
+            color: var(--text);
             text-align: right;
             word-break: break-word;
             font-weight: 400;
         }
 
         .card-list .list-item.highlight .list-item-value {
-            color: var(--md-primary);
+            color: var(--accent);
             font-weight: 600;
         }
 
+        .card-list .list-item-link {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .card-list .list-item-link:hover { text-decoration: underline; }
+
         /* === FACT CHECK === */
         .card-fact-check .fact-claim {
-            font-size: 0.88rem;
-            color: var(--md-on-surface);
+            font-size: 0.84rem;
+            color: var(--text);
             line-height: 1.6;
-            padding: 14px 16px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-md);
-            margin-bottom: 14px;
+            padding: 12px 14px;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            margin-bottom: 12px;
             font-style: italic;
         }
 
         .card-fact-check .fact-verdict {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
-            font-size: 0.7rem;
-            font-weight: 700;
+            gap: 5px;
+            font-size: 0.65rem;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 6px 14px;
-            border-radius: var(--md-radius-xl);
-            margin-bottom: 12px;
+            letter-spacing: 0.08em;
+            padding: 5px 12px;
+            border-radius: var(--radius-pill);
+            margin-bottom: 10px;
         }
 
-        .fact-verdict.verified { background: var(--md-success-container); color: var(--md-success); }
-        .fact-verdict.misleading { background: var(--md-warning-container); color: var(--md-warning); }
-        .fact-verdict.false { background: var(--md-error-container); color: var(--md-error); }
-        .fact-verdict.unverified { background: rgba(124,172,248,0.15); color: var(--md-info); }
-        .fact-verdict.partially_true { background: var(--md-warning-container); color: var(--md-warning); }
-        .fact-verdict.needs_context { background: rgba(212,189,230,0.15); color: var(--md-tertiary); }
+        .fact-verdict.verified { background: var(--green-bg); color: var(--green); }
+        .fact-verdict.misleading { background: var(--yellow-bg); color: var(--yellow); }
+        .fact-verdict.false { background: var(--red-bg); color: var(--red); }
+        .fact-verdict.unverified { background: var(--accent-bg); color: var(--accent); }
+        .fact-verdict.partially_true { background: var(--yellow-bg); color: var(--yellow); }
+        .fact-verdict.needs_context { background: var(--purple-bg); color: var(--purple); }
 
         .card-fact-check .fact-explanation {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
+            font-size: 0.8rem;
+            color: var(--text);
             line-height: 1.6;
         }
 
-        .card-fact-check .fact-confidence {
-            font-size: 0.72rem;
-            color: var(--md-on-surface-variant);
-            margin-top: 10px;
+        .card-fact-check .fact-source {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-top: 8px;
         }
+
+        .card-fact-check .fact-source a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .card-fact-check .fact-source a:hover { text-decoration: underline; }
 
         /* === PERSON CARD === */
         .card-person .person-header {
             display: flex;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 14px;
+            gap: 12px;
+            margin-bottom: 12px;
         }
 
         .card-person .person-avatar {
-            width: 48px;
-            height: 48px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--md-primary-container), var(--md-tertiary-container));
+            background: linear-gradient(135deg, var(--accent-bg-strong), var(--purple-bg));
+            border: 2px solid var(--border-bright);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--md-primary);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent);
             flex-shrink: 0;
         }
 
         .card-person .person-name {
-            font-size: 1rem;
-            font-weight: 600;
+            font-size: 0.95rem;
+            font-weight: 700;
             color: #fff;
         }
 
         .card-person .person-role {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
+            font-size: 0.74rem;
+            color: var(--text-secondary);
             margin-top: 2px;
         }
 
         .card-person .person-handle {
-            font-size: 0.78rem;
-            color: var(--md-primary);
+            font-size: 0.74rem;
+            color: var(--accent);
             margin-top: 1px;
         }
 
+        .card-person .person-handle a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .card-person .person-handle a:hover { text-decoration: underline; }
+
         .card-person .person-context {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
+            font-size: 0.8rem;
+            color: var(--text);
             line-height: 1.6;
         }
 
         .card-person .person-details {
-            margin-top: 12px;
+            margin-top: 10px;
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 3px;
         }
 
         .card-person .person-detail-item {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
-            padding: 4px 0;
-            padding-left: 12px;
-            border-left: 2px solid var(--md-outline-variant);
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            padding: 3px 0 3px 10px;
+            border-left: 2px solid var(--border);
         }
 
         /* === PRODUCT CARD === */
         .card-product {
-            background: linear-gradient(135deg, var(--md-surface) 0%, rgba(26,64,40,0.2) 100%);
+            background: linear-gradient(135deg, var(--surface) 0%, rgba(91,219,138,0.04) 100%);
+        }
+
+        .card-product .product-header {
+            display: flex;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+
+        .card-product .product-image {
+            width: 80px;
+            height: 80px;
+            border-radius: var(--radius-md);
+            background: var(--surface-2);
+            overflow: hidden;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card-product .product-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-product .product-image .material-symbols-rounded {
+            font-size: 32px;
+            color: var(--text-muted);
         }
 
         .card-product .product-name {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
 
         .card-product .product-price {
-            font-size: 1.6rem;
-            font-weight: 700;
-            color: var(--md-success);
-            margin-bottom: 10px;
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--green);
+            margin-bottom: 6px;
         }
 
         .card-product .product-rating {
-            font-size: 0.8rem;
-            color: var(--md-warning);
-            margin-bottom: 14px;
+            font-size: 0.76rem;
+            color: var(--yellow);
             display: flex;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
         }
 
         .card-product .product-features {
             list-style: none;
             display: flex;
             flex-wrap: wrap;
-            gap: 8px;
-            margin-bottom: 14px;
+            gap: 6px;
+            margin: 12px 0;
         }
 
         .card-product .product-features li {
-            font-size: 0.78rem;
-            color: var(--md-on-surface);
-            padding: 6px 14px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-xl);
+            font-size: 0.74rem;
+            color: var(--text);
+            padding: 4px 10px;
+            background: var(--surface-2);
+            border-radius: var(--radius-pill);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .card-product .product-features li::before {
             content: '';
-            width: 6px;
-            height: 6px;
+            width: 5px;
+            height: 5px;
             border-radius: 50%;
-            background: var(--md-success);
+            background: var(--green);
             flex-shrink: 0;
         }
 
         .card-product .product-verdict {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
+            font-size: 0.8rem;
+            color: var(--text);
             line-height: 1.6;
-            padding: 14px 16px;
-            background: var(--md-surface-container);
-            border-radius: var(--md-radius-md);
-            border-left: 4px solid var(--md-success);
-            margin-bottom: 12px;
+            padding: 10px 12px;
+            background: var(--surface-3);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--green);
+            margin-bottom: 8px;
         }
 
         .card-product .product-warnings {
             list-style: none;
-            margin-top: 8px;
+            margin-top: 6px;
         }
 
         .card-product .product-warnings li {
-            font-size: 0.78rem;
-            color: var(--md-warning);
-            padding: 6px 0;
+            font-size: 0.74rem;
+            color: var(--yellow);
+            padding: 4px 0;
             display: flex;
             align-items: flex-start;
-            gap: 8px;
+            gap: 6px;
         }
 
         .card-product .product-warnings li::before {
             content: '!';
-            font-weight: 700;
-            font-size: 0.65rem;
-            width: 18px;
-            height: 18px;
+            font-weight: 800;
+            font-size: 0.6rem;
+            width: 16px;
+            height: 16px;
             border-radius: 50%;
-            background: var(--md-warning-container);
-            color: var(--md-warning);
+            background: var(--yellow-bg);
+            color: var(--yellow);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -858,202 +927,374 @@
             margin-top: 1px;
         }
 
+        .card-product .product-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 10px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--accent);
+            text-decoration: none;
+            padding: 6px 12px;
+            background: var(--accent-bg);
+            border-radius: var(--radius-sm);
+            transition: background 0.2s;
+        }
+
+        .card-product .product-link:hover { background: var(--accent-bg-strong); }
+
         /* === TIMELINE === */
         .card-timeline .timeline-title {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 700;
             color: #fff;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .card-timeline .timeline-event {
             display: flex;
-            gap: 14px;
-            padding: 10px 0;
-            font-size: 0.82rem;
+            gap: 12px;
+            padding: 8px 0;
+            font-size: 0.78rem;
             position: relative;
         }
 
         .card-timeline .timeline-event::before {
             content: '';
             position: absolute;
-            left: 57px;
-            top: 28px;
-            bottom: -10px;
+            left: 55px;
+            top: 26px;
+            bottom: -8px;
             width: 2px;
-            background: var(--md-outline-variant);
+            background: var(--border);
             border-radius: 1px;
         }
 
         .card-timeline .timeline-event:last-child::before { display: none; }
 
         .card-timeline .timeline-date {
-            color: var(--md-primary);
-            min-width: 50px;
+            color: var(--accent);
+            min-width: 48px;
             flex-shrink: 0;
             text-align: right;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 0.72rem;
         }
 
         .card-timeline .timeline-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            background: var(--md-outline);
+            background: var(--border-bright);
             margin-top: 5px;
             flex-shrink: 0;
             z-index: 1;
-            border: 2px solid var(--md-surface);
         }
 
         .card-timeline .timeline-event.highlight .timeline-dot {
-            background: var(--md-primary);
-            box-shadow: 0 0 8px rgba(124,172,248,0.4);
+            background: var(--accent);
+            box-shadow: 0 0 6px rgba(108,159,255,0.4);
         }
 
-        .card-timeline .timeline-text { color: var(--md-on-surface); line-height: 1.5; }
+        .card-timeline .timeline-text { color: var(--text); line-height: 1.5; }
+
+        .card-timeline .timeline-text a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .card-timeline .timeline-text a:hover { text-decoration: underline; }
 
         /* === QUOTE === */
         .card-quote {
-            background: linear-gradient(135deg, var(--md-surface) 0%, rgba(74,53,96,0.2) 100%);
+            background: linear-gradient(135deg, var(--surface) 0%, rgba(180,142,255,0.04) 100%);
+        }
+
+        .card-quote .quote-mark {
+            font-size: 2rem;
+            color: var(--purple);
+            opacity: 0.3;
+            line-height: 1;
+            margin-bottom: -8px;
         }
 
         .card-quote .quote-text {
-            font-size: 1rem;
-            color: var(--md-on-surface);
+            font-size: 0.92rem;
+            color: var(--text);
             line-height: 1.7;
             font-style: italic;
-            padding: 16px 20px;
-            border-left: 4px solid var(--md-tertiary);
-            background: var(--md-surface-variant);
-            border-radius: 0 var(--md-radius-md) var(--md-radius-md) 0;
+            padding: 12px 14px;
+            border-left: 3px solid var(--purple);
+            background: var(--surface-2);
+            border-radius: 0 var(--radius-md) var(--radius-md) 0;
         }
 
         .card-quote .quote-attribution {
-            font-size: 0.78rem;
-            font-weight: 600;
-            color: var(--md-tertiary);
-            margin-top: 12px;
+            font-size: 0.74rem;
+            font-weight: 700;
+            color: var(--purple);
+            margin-top: 10px;
         }
 
         .card-quote .quote-context {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
-            margin-top: 6px;
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
             line-height: 1.5;
         }
 
         /* === COMPARISON === */
         .card-comparison .comparison-title {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 700;
             color: #fff;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .card-comparison table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
         }
 
         .card-comparison th {
             text-align: left;
-            padding: 10px 12px;
-            color: var(--md-primary);
-            font-weight: 600;
-            background: var(--md-surface-variant);
+            padding: 8px 10px;
+            color: var(--accent);
+            font-weight: 700;
+            background: var(--surface-2);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
-        .card-comparison th:first-child { border-radius: var(--md-radius-sm) 0 0 0; }
-        .card-comparison th:last-child { border-radius: 0 var(--md-radius-sm) 0 0; }
+        .card-comparison th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+        .card-comparison th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
 
         .card-comparison td {
-            padding: 10px 12px;
-            color: var(--md-on-surface);
-            border-bottom: 1px solid var(--md-outline-variant);
+            padding: 8px 10px;
+            color: var(--text);
+            border-bottom: 1px solid var(--border);
         }
 
         .card-comparison tr:last-child td { border-bottom: none; }
-        .card-comparison tr:hover td { background: var(--md-surface-variant); }
 
         /* === WARNING === */
-        .card-warning { border-left: 4px solid var(--md-warning); }
-        .card-warning.level-critical { border-left-color: var(--md-error); }
+        .card-warning { border-left: 3px solid var(--yellow); }
+        .card-warning.level-critical { border-left-color: var(--red); }
+        .card-warning.level-info { border-left-color: var(--accent); }
 
         .card-warning .warning-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-warning .warning-icon-wrap {
-            width: 36px;
-            height: 36px;
-            border-radius: var(--md-radius-sm);
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
             display: flex;
             align-items: center;
             justify-content: center;
-            background: var(--md-warning-container);
+            background: var(--yellow-bg);
             flex-shrink: 0;
         }
 
-        .card-warning .warning-icon-wrap .material-symbols-rounded { color: var(--md-warning); font-size: 20px; }
-        .card-warning.level-critical .warning-icon-wrap { background: var(--md-error-container); }
-        .card-warning.level-critical .warning-icon-wrap .material-symbols-rounded { color: var(--md-error); }
+        .card-warning .warning-icon-wrap .material-symbols-rounded { color: var(--yellow); font-size: 18px; }
+        .card-warning.level-critical .warning-icon-wrap { background: var(--red-bg); }
+        .card-warning.level-critical .warning-icon-wrap .material-symbols-rounded { color: var(--red); }
+        .card-warning.level-info .warning-icon-wrap { background: var(--accent-bg); }
+        .card-warning.level-info .warning-icon-wrap .material-symbols-rounded { color: var(--accent); }
 
         .card-warning .warning-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--md-warning);
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--yellow);
         }
 
-        .card-warning.level-critical .warning-title { color: var(--md-error); }
+        .card-warning.level-critical .warning-title { color: var(--red); }
+        .card-warning.level-info .warning-title { color: var(--accent); }
 
         .card-warning .warning-details {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
+            font-size: 0.8rem;
+            color: var(--text);
             line-height: 1.6;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-warning .warning-advice {
-            font-size: 0.8rem;
-            color: var(--md-on-surface);
-            padding: 12px 16px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-md);
+            font-size: 0.76rem;
+            color: var(--text);
+            padding: 10px 12px;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
             line-height: 1.5;
         }
 
         /* === ACTION CARD === */
         .card-action .action-title {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.88rem;
+            font-weight: 700;
             color: #fff;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .card-action .action-item {
             display: flex;
             align-items: flex-start;
-            gap: 14px;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--md-outline-variant);
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border);
         }
 
         .card-action .action-item:last-child { border-bottom: none; }
 
         .card-action .action-bullet {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent-bg-strong);
+            color: var(--accent);
+            font-size: 0.68rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .card-action .action-label {
+            font-size: 0.84rem;
+            color: var(--text);
+            font-weight: 600;
+        }
+
+        .card-action .action-label a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+        .card-action .action-label a:hover { text-decoration: underline; }
+
+        .card-action .action-desc {
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            margin-top: 3px;
+            line-height: 1.5;
+        }
+
+        .card-action .action-priority {
+            display: inline-block;
+            font-size: 0.58rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 2px 7px;
+            border-radius: var(--radius-pill);
+            margin-top: 4px;
+        }
+
+        .action-priority.high { background: var(--red-bg); color: var(--red); }
+        .action-priority.medium { background: var(--yellow-bg); color: var(--yellow); }
+        .action-priority.low { background: var(--accent-bg); color: var(--accent); }
+
+        /* === TEXT EXTRACT === */
+        .card-extract .extract-title {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .card-extract .extract-text {
+            font-size: 0.8rem;
+            color: var(--text);
+            line-height: 1.7;
+            padding: 12px 14px;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--border-bright);
+            white-space: pre-wrap;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .card-extract .extract-source {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* === LOCATION === */
+        .card-location .location-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .card-location .location-address {
+            font-size: 0.76rem;
+            color: var(--accent);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .card-location .location-address a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        .card-location .location-address a:hover { text-decoration: underline; }
+
+        .card-location .location-context {
+            font-size: 0.8rem;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .card-location .location-details {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .card-location .location-detail-item {
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            padding: 3px 0 3px 10px;
+            border-left: 2px solid var(--border);
+        }
+
+        /* === LINK CARD === */
+        .card-links .links-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .card-links .link-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-links .link-item:last-child { border-bottom: none; }
+
+        .card-links .link-icon {
             width: 28px;
             height: 28px;
-            border-radius: 50%;
-            background: var(--md-primary-container);
-            color: var(--md-primary);
-            font-size: 0.72rem;
-            font-weight: 700;
+            border-radius: 6px;
+            background: var(--accent-bg);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1061,95 +1302,28 @@
             margin-top: 2px;
         }
 
-        .card-action .action-label {
-            font-size: 0.88rem;
-            color: var(--md-on-surface);
+        .card-links .link-icon .material-symbols-rounded {
+            font-size: 14px;
+            color: var(--accent);
+        }
+
+        .card-links .link-label {
+            font-size: 0.82rem;
             font-weight: 600;
         }
 
-        .card-action .action-desc {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
-            margin-top: 4px;
-            line-height: 1.5;
+        .card-links .link-label a {
+            color: var(--accent);
+            text-decoration: none;
         }
 
-        .card-action .action-priority {
-            display: inline-block;
-            font-size: 0.6rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            padding: 2px 8px;
-            border-radius: var(--md-radius-xl);
-            margin-top: 6px;
-        }
+        .card-links .link-label a:hover { text-decoration: underline; }
 
-        .action-priority.high { background: var(--md-error-container); color: var(--md-error); }
-        .action-priority.medium { background: var(--md-warning-container); color: var(--md-warning); }
-        .action-priority.low { background: rgba(124,172,248,0.15); color: var(--md-info); }
-
-        /* === TEXT EXTRACT === */
-        .card-extract .extract-title {
-            font-size: 0.88rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 12px;
-        }
-
-        .card-extract .extract-text {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
-            line-height: 1.7;
-            padding: 16px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-md);
-            border-left: 3px solid var(--md-outline);
-            white-space: pre-wrap;
-            font-family: 'Inter', sans-serif;
-        }
-
-        .card-extract .extract-source {
-            font-size: 0.72rem;
-            color: var(--md-on-surface-variant);
-            margin-top: 8px;
-        }
-
-        /* === LOCATION === */
-        .card-location .location-name {
-            font-size: 1rem;
-            font-weight: 600;
-            color: #fff;
-            margin-bottom: 4px;
-        }
-
-        .card-location .location-address {
-            font-size: 0.8rem;
-            color: var(--md-primary);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .card-location .location-context {
-            font-size: 0.84rem;
-            color: var(--md-on-surface);
-            line-height: 1.6;
-        }
-
-        .card-location .location-details {
-            margin-top: 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .card-location .location-detail-item {
-            font-size: 0.78rem;
-            color: var(--md-on-surface-variant);
-            padding: 4px 0 4px 12px;
-            border-left: 2px solid var(--md-outline-variant);
+        .card-links .link-desc {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            line-height: 1.4;
         }
 
         /* === ERROR STATE === */
@@ -1161,7 +1335,7 @@
             justify-content: center;
             flex-direction: column;
             z-index: 200;
-            background: var(--md-bg);
+            background: var(--bg);
             padding: 2rem;
             text-align: center;
         }
@@ -1172,18 +1346,18 @@
             width: 64px;
             height: 64px;
             border-radius: 50%;
-            background: var(--md-error-container);
+            background: var(--red-bg);
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 20px;
         }
 
-        .error-icon .material-symbols-rounded { font-size: 32px; color: var(--md-error); }
+        .error-icon .material-symbols-rounded { font-size: 32px; color: var(--red); }
 
         .error-text {
-            color: var(--md-error);
-            font-size: 0.95rem;
+            color: var(--red);
+            font-size: 0.92rem;
             font-weight: 500;
             margin-bottom: 24px;
             line-height: 1.5;
@@ -1191,29 +1365,29 @@
 
         .retry-btn {
             padding: 12px 32px;
-            background: var(--md-surface);
-            border: 1px solid var(--md-outline);
-            border-radius: var(--md-radius-xl);
-            color: var(--md-on-surface);
+            background: var(--surface);
+            border: 1px solid var(--border-bright);
+            border-radius: var(--radius-pill);
+            color: var(--text);
             font-family: inherit;
-            font-size: 0.88rem;
+            font-size: 0.85rem;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
         }
 
         .retry-btn:hover {
-            background: var(--md-primary-container);
-            border-color: var(--md-primary);
-            color: var(--md-primary);
+            background: var(--accent-bg);
+            border-color: var(--accent);
+            color: var(--accent);
         }
 
         /* === PLACEHOLDERS === */
         .placeholder-line {
-            height: 14px;
-            background: var(--md-surface-variant);
-            border-radius: var(--md-radius-sm);
-            margin-bottom: 10px;
+            height: 12px;
+            background: var(--surface-2);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
         }
         .placeholder-line.short { width: 55%; }
         .placeholder-line.medium { width: 78%; }
@@ -1229,6 +1403,14 @@
             50% { content: '..'; }
             75% { content: '...'; }
         }
+
+        /* === AUTO-LINKIFY === */
+        .auto-link {
+            color: var(--accent);
+            text-decoration: none;
+            word-break: break-all;
+        }
+        .auto-link:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -1343,37 +1525,63 @@
             return d.innerHTML;
         }
 
+        function linkify(text) {
+            if (!text) return '';
+            const escaped = esc(text);
+            return escaped.replace(
+                /(https?:\/\/[^\s<>"']+)/gi,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="auto-link">$1</a>'
+            );
+        }
+
+        function normalizeFeature(item) {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                return item.label || item.name || item.value || item.text ||
+                       item.description || item.type || item.feature ||
+                       JSON.stringify(item);
+            }
+            return String(item);
+        }
+
         function renderItemValue(item) {
-            if (typeof item === 'string') return esc(item);
+            if (typeof item === 'string') return linkify(item);
             if (typeof item === 'object' && item !== null) {
                 const parts = [];
                 if (item.label || item.name) parts.push(`<strong>${esc(item.label || item.name)}</strong>`);
-                if (item.value) parts.push(esc(item.value));
-                if (item.description) parts.push(`<span style="color:var(--md-on-surface-variant)">${esc(item.description)}</span>`);
+                if (item.value) parts.push(linkify(item.value));
+                if (item.description) parts.push(`<span style="color:var(--text-secondary)">${linkify(item.description)}</span>`);
                 if (parts.length) return parts.join(': ');
-                return esc(item);
+                return linkify(normalizeFeature(item));
             }
             return esc(item);
         }
 
+        function renderLink(url, label, extraClass) {
+            if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
+            const cls = extraClass ? ` class="${extraClass}"` : ' class="auto-link"';
+            return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"${cls}>${esc(label || url)}</a>`;
+        }
+
         const CARD_ICONS = {
-            hero_summary: { icon: 'auto_awesome', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
-            key_metric: { icon: 'monitoring', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
-            info_list: { icon: 'list_alt', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
-            fact_check: { icon: 'fact_check', bg: 'var(--md-warning-container)', color: 'var(--md-warning)' },
-            person_card: { icon: 'person', bg: 'rgba(212,189,230,0.15)', color: 'var(--md-tertiary)' },
-            product_card: { icon: 'shopping_bag', bg: 'var(--md-success-container)', color: 'var(--md-success)' },
-            timeline_card: { icon: 'timeline', bg: 'rgba(124,172,248,0.15)', color: 'var(--md-info)' },
-            quote_card: { icon: 'format_quote', bg: 'rgba(212,189,230,0.15)', color: 'var(--md-tertiary)' },
-            comparison_card: { icon: 'compare', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
-            warning_card: { icon: 'warning', bg: 'var(--md-warning-container)', color: 'var(--md-warning)' },
-            action_card: { icon: 'bolt', bg: 'var(--md-primary-container)', color: 'var(--md-primary)' },
-            text_extract: { icon: 'description', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' },
-            location_card: { icon: 'location_on', bg: 'rgba(124,172,248,0.15)', color: 'var(--md-info)' },
+            hero_summary: { icon: 'auto_awesome', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
+            key_metric: { icon: 'monitoring', bg: 'var(--accent-bg)', color: 'var(--accent)' },
+            info_list: { icon: 'list_alt', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
+            fact_check: { icon: 'fact_check', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
+            person_card: { icon: 'person', bg: 'var(--purple-bg)', color: 'var(--purple)' },
+            product_card: { icon: 'shopping_bag', bg: 'var(--green-bg)', color: 'var(--green)' },
+            timeline_card: { icon: 'timeline', bg: 'var(--accent-bg)', color: 'var(--accent)' },
+            quote_card: { icon: 'format_quote', bg: 'var(--purple-bg)', color: 'var(--purple)' },
+            comparison_card: { icon: 'compare', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
+            warning_card: { icon: 'warning', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
+            action_card: { icon: 'bolt', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
+            text_extract: { icon: 'description', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
+            location_card: { icon: 'location_on', bg: 'var(--accent-bg)', color: 'var(--accent)' },
+            link_card: { icon: 'link', bg: 'var(--accent-bg)', color: 'var(--accent)' },
         };
 
         function getCardTypeLabel(cardType) {
-            const info = CARD_ICONS[cardType] || { icon: 'info', bg: 'var(--md-surface-bright)', color: 'var(--md-secondary)' };
+            const info = CARD_ICONS[cardType] || { icon: 'info', bg: 'var(--surface-3)', color: 'var(--text-secondary)' };
             return `<div class="card-type-label">
                 <div class="card-type-icon" style="background:${info.bg}">
                     <span class="material-symbols-rounded" style="color:${info.color}">${info.icon}</span>
@@ -1588,71 +1796,28 @@
                         }
                     }, 30000);
 
-                    es.addEventListener('connected', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('connected');
-                            handleSSEEvent('connected', data);
-                            resetStallTimer();
-                        } catch {}
-                    });
-
-                    es.addEventListener('progress', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('progress');
-                            handleSSEEvent('progress', data);
-                            resetStallTimer();
-                        } catch {}
-                    });
-
-                    es.addEventListener('blueprint', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('blueprint');
-                            handleSSEEvent('blueprint', data);
-                            resetStallTimer();
-                        } catch {}
-                    });
-
-                    es.addEventListener('layout_update', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('layout_update');
-                            handleSSEEvent('layout_update', data);
-                            resetStallTimer();
-                        } catch {}
-                    });
-
-                    es.addEventListener('card', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('card');
-                            handleSSEEvent('card', data);
-                            resetStallTimer();
-                        } catch {}
-                    });
-
-                    es.addEventListener('complete', (e) => {
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('complete');
-                            handleSSEEvent('complete', data);
-                        } catch {}
-                        es.close();
-                        currentEventSource = null;
-                        telemetry.reportSuccess();
-                        resolve();
+                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
+                    events.forEach(evt => {
+                        es.addEventListener(evt, (e) => {
+                            try {
+                                const data = JSON.parse(e.data);
+                                telemetry.trackEvent(evt);
+                                handleSSEEvent(evt, data);
+                                if (evt !== 'complete') resetStallTimer();
+                                if (evt === 'complete') {
+                                    es.close();
+                                    currentEventSource = null;
+                                    telemetry.reportSuccess();
+                                    resolve();
+                                }
+                            } catch {}
+                        });
                     });
 
                     es.addEventListener('error', (e) => {
                         if (es.readyState === EventSource.CLOSED) {
                             if (!pipelineComplete) {
-                                if (!blueprintReceived) {
-                                    reject(new Error('Connection lost before analysis started'));
-                                } else {
-                                    reject(new Error('Connection lost during analysis'));
-                                }
+                                reject(new Error(blueprintReceived ? 'Connection lost during analysis' : 'Connection lost before analysis started'));
                             }
                             return;
                         }
@@ -1692,7 +1857,7 @@
             switch (event) {
                 case 'connected':
                     statusProgressFill.style.width = '10%';
-                    statusText.textContent = 'connected to pipeline';
+                    statusText.textContent = 'connected — detecting content';
                     break;
 
                 case 'progress':
@@ -1706,6 +1871,10 @@
 
                 case 'blueprint':
                     onBlueprintReceived(data);
+                    break;
+
+                case 'layout_preview':
+                    onLayoutPreview(data);
                     break;
 
                 case 'layout_update':
@@ -1753,8 +1922,8 @@
             scanCorners.classList.remove('active');
             screenshotLayer.className = 'screenshot-layer fading';
 
-            statusProgressFill.style.width = '15%';
-            statusText.textContent = 'analyzing screenshot';
+            statusProgressFill.style.width = '8%';
+            statusText.textContent = 'detecting content type...';
 
             const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
@@ -1768,11 +1937,47 @@
                 }, 80 + index * 60);
             });
 
-            layoutProgressFill.style.width = '10%';
-            layoutProgressText.textContent = 'analyzing';
+            layoutProgressFill.style.width = '5%';
+            layoutProgressText.textContent = 'classifying';
             setTimeout(() => {
                 resultsOverlay.classList.add('visible');
             }, 100);
+        }
+
+        function onLayoutPreview(blueprint) {
+            totalCards = (blueprint.cards || []).length;
+            completedCards = 0;
+
+            const ct = blueprint.contentAnalysis?.contentType || 'general';
+            layoutBadge.textContent = ct.replace(/_/g, ' ');
+
+            if (blueprint.contentAnalysis) {
+                contentAnalysisEl.style.display = '';
+                analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
+                topQuestionsEl.innerHTML = '';
+                (blueprint.contentAnalysis.topQuestions || []).forEach(q => {
+                    const span = document.createElement('span');
+                    span.className = 'top-question';
+                    span.textContent = q;
+                    topQuestionsEl.appendChild(span);
+                });
+            }
+
+            const cols = blueprint.layout?.columns || 1;
+            cardGrid.className = 'card-grid' + (cols > 1 ? ` cols-${Math.min(cols, 3)}` : '');
+
+            cardGrid.innerHTML = '';
+            (blueprint.cards || []).forEach((card, index) => {
+                const el = createCardElement(card);
+                cardGrid.appendChild(el);
+                setTimeout(() => {
+                    el.classList.add('visible');
+                }, 40 + index * 35);
+            });
+
+            statusText.textContent = `${ct} detected — designing layout`;
+            layoutProgressFill.style.width = '15%';
+            layoutProgressText.textContent = 'designing';
         }
 
         function onLayoutUpdate(blueprint) {
@@ -1858,7 +2063,9 @@
         function createCardElement(card) {
             const el = document.createElement('div');
             el.id = `card-${card.id}`;
-            el.className = `card card-${card.cardType.replace(/_/g, '-')} loading`;
+
+            const cssClass = card.cardType === 'link_card' ? 'links' : card.cardType.replace(/_/g, '-');
+            el.className = `card card-${cssClass} loading`;
             el.dataset.cardType = card.cardType;
 
             const span = card.gridPosition?.columnSpan || 1;
@@ -1866,6 +2073,11 @@
                 el.classList.add('span-full');
             } else if (span === 2) {
                 el.classList.add('span-2');
+            }
+
+            if (card.cardType === 'warning_card') {
+                const level = card.placeholderData?.level || 'warning';
+                el.classList.add(`level-${level}`);
             }
 
             el.innerHTML = renderPlaceholder(card);
@@ -1885,6 +2097,39 @@
                 </div>`;
             }
 
+            if (type === 'key_metric' && pd.value) {
+                return `<div class="card-inner">
+                    ${getCardTypeLabel(type)}
+                    <div class="metric-value" style="opacity:0.5">${esc(pd.value || '...')}</div>
+                    <div class="metric-label">${esc(pd.label || '')}</div>
+                    <div class="placeholder-line short"></div>
+                </div>`;
+            }
+
+            if (type === 'product_card' && pd.name) {
+                return `<div class="card-inner">
+                    ${getCardTypeLabel(type)}
+                    <div class="product-name" style="opacity:0.6">${esc(pd.name)}</div>
+                    ${pd.price ? `<div class="product-price" style="opacity:0.4">${esc(pd.price)}</div>` : ''}
+                    <div class="placeholder-line medium"></div>
+                    <div class="placeholder-line short"></div>
+                </div>`;
+            }
+
+            if (type === 'person_card' && pd.name) {
+                return `<div class="card-inner">
+                    ${getCardTypeLabel(type)}
+                    <div class="person-header">
+                        <div class="person-avatar" style="opacity:0.5">${esc(pd.name ? pd.name[0].toUpperCase() : '?')}</div>
+                        <div>
+                            <div class="person-name" style="opacity:0.6">${esc(pd.name)}</div>
+                            ${pd.role ? `<div class="person-role">${esc(pd.role)}</div>` : ''}
+                        </div>
+                    </div>
+                    <div class="placeholder-line medium"></div>
+                </div>`;
+            }
+
             return `<div class="card-inner">
                 ${getCardTypeLabel(type)}
                 <div class="placeholder-line medium"></div>
@@ -1899,11 +2144,12 @@
             switch (cardType) {
                 case 'hero_summary':
                     return `<div class="card-inner">
-                        ${d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}22;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
-                        ${d.icon ? `<span style="font-size:1.5rem;margin-bottom:8px;display:inline-block">${esc(d.icon)}</span>` : ''}
+                        ${d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}15;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
+                        ${d.icon ? `<span style="font-size:1.4rem;margin-bottom:6px;display:inline-block">${esc(d.icon)}</span>` : ''}
                         <div class="hero-title">${esc(d.title || 'Analysis')}</div>
-                        <div class="hero-subtitle">${esc(d.subtitle || '')}</div>
-                        ${d.takeaway ? `<div class="hero-takeaway">${esc(d.takeaway)}</div>` : ''}
+                        <div class="hero-subtitle">${linkify(d.subtitle || '')}</div>
+                        ${d.takeaway ? `<div class="hero-takeaway">${linkify(d.takeaway)}</div>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="hero-link"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View Source</a>` : ''}
                     </div>`;
 
                 case 'key_metric':
@@ -1912,10 +2158,10 @@
                         <div class="metric-value" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
                         <div class="metric-label">${esc(d.label || '')}</div>
                         ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">
-                            <span class="material-symbols-rounded" style="font-size:14px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
+                            <span class="material-symbols-rounded" style="font-size:12px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
                             ${esc(d.trend)}
                         </span>` : ''}
-                        ${d.context ? `<div class="metric-context">${esc(d.context)}</div>` : ''}
+                        ${d.context ? `<div class="metric-context">${linkify(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'info_list':
@@ -1926,13 +2172,14 @@
                             if (typeof item === 'object' && item !== null) {
                                 const label = item.label || item.name || item.key || '';
                                 const value = item.value || item.description || item.text || '';
+                                const hasUrl = item.url && typeof item.url === 'string' && item.url.startsWith('http');
                                 return `<div class="list-item${item.highlight ? ' highlight' : ''}">
                                     <span class="list-item-label">${item.icon ? `<span class="list-item-icon">${esc(item.icon)}</span>` : ''}${esc(label)}</span>
-                                    <span class="list-item-value">${esc(value)}</span>
+                                    <span class="list-item-value">${hasUrl ? renderLink(item.url, value, 'list-item-link') : linkify(value)}</span>
                                 </div>`;
                             }
                             return `<div class="list-item">
-                                <span class="list-item-value" style="text-align:left">${esc(item)}</span>
+                                <span class="list-item-value" style="text-align:left">${linkify(item)}</span>
                             </div>`;
                         }).join('')}
                     </div>`;
@@ -1940,18 +2187,18 @@
                 case 'fact_check':
                     return `<div class="card-inner">
                         ${getCardTypeLabel('fact_check')}
-                        <div class="fact-claim">${esc(d.claim || '')}</div>
+                        <div class="fact-claim">${linkify(d.claim || '')}</div>
                         <div class="fact-verdict ${esc(d.verdict || 'unverified')}">
-                            <span class="material-symbols-rounded" style="font-size:14px">${
+                            <span class="material-symbols-rounded" style="font-size:13px">${
                                 d.verdict === 'verified' ? 'check_circle' :
                                 d.verdict === 'false' ? 'cancel' :
                                 d.verdict === 'misleading' ? 'warning' : 'help'
                             }</span>
                             ${esc(d.verdict || 'unverified')}
                         </div>
-                        <div class="fact-explanation">${esc(d.explanation || '')}</div>
-                        ${d.source ? `<div class="fact-confidence">Source: ${esc(d.source)}</div>` : ''}
-                        ${d.confidence ? `<div class="fact-confidence">Confidence: ${esc(d.confidence)}</div>` : ''}
+                        <div class="fact-explanation">${linkify(d.explanation || '')}</div>
+                        ${d.source ? `<div class="fact-source">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
+                        ${d.confidence ? `<div class="fact-source">Confidence: ${esc(d.confidence)}</div>` : ''}
                     </div>`;
 
                 case 'person_card':
@@ -1962,32 +2209,44 @@
                             <div>
                                 <div class="person-name">${esc(d.name || 'Unknown')}</div>
                                 ${d.role ? `<div class="person-role">${esc(d.role)}</div>` : ''}
-                                ${d.handle ? `<div class="person-handle">${esc(d.handle)}</div>` : ''}
+                                ${d.handle ? `<div class="person-handle">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
                             </div>
                         </div>
-                        <div class="person-context">${esc(d.context || '')}</div>
+                        <div class="person-context">${linkify(d.context || '')}</div>
                         ${(d.details || []).length ? `<div class="person-details">${d.details.map(det =>
                             `<div class="person-detail-item">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
                     </div>`;
 
-                case 'product_card':
+                case 'product_card': {
+                    const features = (d.features || []).map(normalizeFeature);
+                    const warnings = (d.warnings || []).map(normalizeFeature);
+                    const hasRating = d.rating && d.rating !== 'Not visible' && d.rating !== 'N/A';
+                    const hasPrice = d.price && d.price !== 'Not visible' && d.price !== 'N/A';
+
                     return `<div class="card-inner">
                         ${getCardTypeLabel('product_card')}
-                        <div class="product-name">${esc(d.name || 'Product')}</div>
-                        ${d.price ? `<div class="product-price">${esc(d.price)}</div>` : ''}
-                        ${d.rating ? `<div class="product-rating">
-                            <span class="material-symbols-rounded" style="font-size:16px;font-variation-settings:'FILL' 1">star</span>
-                            ${esc(d.rating)}
-                        </div>` : ''}
-                        ${(d.features || []).length ? `<ul class="product-features">${d.features.map(f =>
-                            `<li>${renderItemValue(f)}</li>`
+                        <div class="product-header">
+                            ${d.imageUrl ? `<div class="product-image"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>inventory_2</span>'"></div>` : ''}
+                            <div>
+                                <div class="product-name">${esc(d.name || 'Product')}</div>
+                                ${hasPrice ? `<div class="product-price">${esc(d.price)}</div>` : ''}
+                                ${hasRating ? `<div class="product-rating">
+                                    <span class="material-symbols-rounded" style="font-size:14px;font-variation-settings:'FILL' 1">star</span>
+                                    ${esc(d.rating)}
+                                </div>` : ''}
+                            </div>
+                        </div>
+                        ${features.length ? `<ul class="product-features">${features.map(f =>
+                            `<li>${esc(f)}</li>`
                         ).join('')}</ul>` : ''}
-                        ${d.verdict ? `<div class="product-verdict">${esc(d.verdict)}</div>` : ''}
-                        ${(d.warnings || []).length ? `<ul class="product-warnings">${d.warnings.map(w =>
-                            `<li>${renderItemValue(w)}</li>`
+                        ${d.verdict ? `<div class="product-verdict">${linkify(d.verdict)}</div>` : ''}
+                        ${warnings.length ? `<ul class="product-warnings">${warnings.map(w =>
+                            `<li>${esc(w)}</li>`
                         ).join('')}</ul>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="product-link"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View Product</a>` : ''}
                     </div>`;
+                }
 
                 case 'timeline_card':
                     return `<div class="card-inner">
@@ -1995,10 +2254,11 @@
                         <div class="timeline-title">${esc(d.title || 'Timeline')}</div>
                         ${(d.events || []).map(ev => {
                             const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
+                            const evText = evObj.event || evObj.text || evObj.description || '';
                             return `<div class="timeline-event${evObj.highlight ? ' highlight' : ''}">
                                 <div class="timeline-date">${esc(evObj.date || '')}</div>
                                 <div class="timeline-dot"></div>
-                                <div class="timeline-text">${esc(evObj.event || evObj.text || evObj.description || '')}</div>
+                                <div class="timeline-text">${evObj.url ? renderLink(evObj.url, evText) : linkify(evText)}</div>
                             </div>`;
                         }).join('')}
                     </div>`;
@@ -2006,14 +2266,15 @@
                 case 'quote_card':
                     return `<div class="card-inner">
                         ${getCardTypeLabel('quote_card')}
-                        <div class="quote-text">"${esc(d.quote || '')}"</div>
-                        ${d.attribution ? `<div class="quote-attribution">— ${esc(d.attribution)}</div>` : ''}
-                        ${d.context ? `<div class="quote-context">${esc(d.context)}</div>` : ''}
+                        <div class="quote-mark">"</div>
+                        <div class="quote-text">${linkify(d.quote || '')}</div>
+                        ${d.attribution ? `<div class="quote-attribution">— ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>` : ''}
+                        ${d.context ? `<div class="quote-context">${linkify(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'comparison_card':
                     if (!d.columns || !d.columns.length) {
-                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--md-on-surface-variant);font-size:0.82rem">No data available</div></div>`;
+                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-muted);font-size:0.78rem">No data available</div></div>`;
                     }
                     const cols = Array.isArray(d.columns) ? d.columns : [];
                     const maxRows = Math.max(...cols.map(c => (Array.isArray(c.values) ? c.values : []).length), 0);
@@ -2026,10 +2287,10 @@
                                 ${cols.map(c => `<th>${esc(typeof c === 'object' ? (c.header || c.name || '') : c)}</th>`).join('')}
                             </tr></thead>
                             <tbody>${Array.from({ length: maxRows }, (_, i) => `<tr>
-                                ${d.rows ? `<td style="color:var(--md-on-surface-variant);font-weight:500">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
+                                ${d.rows ? `<td style="color:var(--text-secondary);font-weight:500">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
                                 ${cols.map(c => {
                                     const vals = Array.isArray(c.values) ? c.values : [];
-                                    return `<td>${esc(vals[i] || '')}</td>`;
+                                    return `<td>${linkify(vals[i] || '')}</td>`;
                                 }).join('')}
                             </tr>`).join('')}</tbody>
                         </table>
@@ -2037,15 +2298,15 @@
 
                 case 'warning_card': {
                     const level = d.level || 'warning';
-                    return `<div class="card-inner level-${esc(level)}">
+                    return `<div class="card-inner">
                         <div class="warning-header">
                             <div class="warning-icon-wrap">
                                 <span class="material-symbols-rounded">${level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning'}</span>
                             </div>
                             <span class="warning-title">${esc(d.title || 'Warning')}</span>
                         </div>
-                        <div class="warning-details">${esc(d.details || '')}</div>
-                        ${d.advice ? `<div class="warning-advice">${esc(d.advice)}</div>` : ''}
+                        <div class="warning-details">${linkify(d.details || '')}</div>
+                        ${d.advice ? `<div class="warning-advice">${linkify(d.advice)}</div>` : ''}
                     </div>`;
                 }
 
@@ -2058,8 +2319,8 @@
                             return `<div class="action-item">
                                 <span class="action-bullet">${i + 1}</span>
                                 <div>
-                                    <div class="action-label">${esc(aObj.label || aObj.name || '')}</div>
-                                    ${aObj.description ? `<div class="action-desc">${esc(aObj.description)}</div>` : ''}
+                                    <div class="action-label">${aObj.url ? renderLink(aObj.url, aObj.label || aObj.name || '') : esc(aObj.label || aObj.name || '')}</div>
+                                    ${aObj.description ? `<div class="action-desc">${linkify(aObj.description)}</div>` : ''}
                                     ${aObj.priority ? `<span class="action-priority ${esc(aObj.priority)}">${esc(aObj.priority)}</span>` : ''}
                                 </div>
                             </div>`;
@@ -2070,7 +2331,7 @@
                     return `<div class="card-inner">
                         ${getCardTypeLabel('text_extract')}
                         <div class="extract-title">${esc(d.title || 'Extracted Text')}</div>
-                        <div class="extract-text">${esc(d.text || '')}</div>
+                        <div class="extract-text">${linkify(d.text || '')}</div>
                         ${d.source ? `<div class="extract-source">${esc(d.source)}</div>` : ''}
                     </div>`;
 
@@ -2080,12 +2341,28 @@
                         <div class="location-name">${esc(d.name || 'Location')}</div>
                         ${d.address ? `<div class="location-address">
                             <span class="material-symbols-rounded" style="font-size:14px">place</span>
-                            ${esc(d.address)}
+                            ${d.mapUrl ? renderLink(d.mapUrl, d.address) : linkify(d.address)}
                         </div>` : ''}
-                        <div class="location-context">${esc(d.context || '')}</div>
+                        <div class="location-context">${linkify(d.context || '')}</div>
                         ${(d.details || []).length ? `<div class="location-details">${d.details.map(det =>
                             `<div class="location-detail-item">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
+                    </div>`;
+
+                case 'link_card':
+                    return `<div class="card-inner">
+                        ${getCardTypeLabel('link_card')}
+                        <div class="links-title">${esc(d.title || 'Links')}</div>
+                        ${(d.links || []).map(link => {
+                            const lObj = typeof link === 'object' ? link : { label: String(link), url: '' };
+                            return `<div class="link-item">
+                                <div class="link-icon"><span class="material-symbols-rounded">link</span></div>
+                                <div>
+                                    <div class="link-label">${lObj.url ? renderLink(lObj.url, lObj.label || lObj.url) : esc(lObj.label || '')}</div>
+                                    ${lObj.description ? `<div class="link-desc">${esc(lObj.description)}</div>` : ''}
+                                </div>
+                            </div>`;
+                        }).join('')}
                     </div>`;
 
                 default:
@@ -2094,20 +2371,20 @@
                         ${Object.entries(d).filter(([k]) => !k.startsWith('_')).map(([key, val]) => {
                             if (val === null || val === undefined) return '';
                             if (Array.isArray(val)) {
-                                return `<div style="margin-bottom:8px">
-                                    <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
-                                    ${val.map(v => `<div style="font-size:0.82rem;color:var(--md-on-surface);padding:4px 0 4px 12px;border-left:2px solid var(--md-outline-variant)">${renderItemValue(v)}</div>`).join('')}
+                                return `<div style="margin-bottom:6px">
+                                    <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                    ${val.map(v => `<div style="font-size:0.78rem;color:var(--text);padding:3px 0 3px 10px;border-left:2px solid var(--border)">${renderItemValue(v)}</div>`).join('')}
                                 </div>`;
                             }
                             if (typeof val === 'object') {
-                                return `<div style="margin-bottom:8px">
-                                    <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
-                                    <div style="font-size:0.82rem;color:var(--md-on-surface)">${renderItemValue(val)}</div>
+                                return `<div style="margin-bottom:6px">
+                                    <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                    <div style="font-size:0.78rem;color:var(--text)">${renderItemValue(val)}</div>
                                 </div>`;
                             }
-                            return `<div style="margin-bottom:8px">
-                                <div style="font-size:0.72rem;font-weight:600;color:var(--md-on-surface-variant);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.06em">${esc(key.replace(/_/g, ' '))}</div>
-                                <div style="font-size:0.82rem;color:var(--md-on-surface)">${esc(val)}</div>
+                            return `<div style="margin-bottom:6px">
+                                <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                <div style="font-size:0.78rem;color:var(--text)">${linkify(val)}</div>
                             </div>`;
                         }).join('')}
                     </div>`;
