@@ -50,10 +50,12 @@ ${fieldDescriptions}
 
 **Rules:**
 1. ONLY use information visible in the screenshot - do not fabricate
-2. If a field cannot be determined, use "Not visible" or omit optional fields
+2. If a field cannot be determined, OMIT it rather than using "Not visible"
 3. Be concise - this is a card, not an essay
 4. For fact_check cards: assess based on visible information, mark confidence as "low" if you cannot verify
-5. Return ONLY valid JSON with the card data fields - no markdown, no explanation
+5. For product_card: features and warnings MUST be arrays of plain strings, NOT objects
+6. Include any visible URLs in url/imageUrl/sourceUrl/mapUrl fields
+7. Return ONLY valid JSON with the card data fields - no markdown, no explanation
 
 Return JSON:`;
 }

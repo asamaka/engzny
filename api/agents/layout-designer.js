@@ -36,6 +36,9 @@ ${getCardTypeSummaryForPrompt()}
 - Choose card types that MATCH the content (don't use product_card for news articles)
 - Each card gets a "researchBrief" - instructions for the research LLM on what to extract/investigate
 - Include a "placeholderData" with best-guess content from what you can directly see
+- Include any visible URLs, prices, or links in placeholderData fields (url, imageUrl, etc.)
+- For product_card: features and warnings arrays must contain PLAIN STRINGS, not objects
+- If you see relevant links/URLs in the screenshot, consider adding a link_card
 - Assign a grid position (row, column, span) for each card based on the layout
 
 Return ONLY valid JSON matching this structure:
