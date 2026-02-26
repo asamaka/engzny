@@ -457,9 +457,9 @@ async function validateImage(filePath) {
 // Dataset builder
 // ---------------------------------------------------------------------------
 
-function ensureDirectories(categories) {
+function ensureDirectories() {
   fs.mkdirSync(DATASET_DIR, { recursive: true });
-  for (const cat of categories) {
+  for (const cat of Object.keys(WIKIMEDIA_CATEGORIES)) {
     fs.mkdirSync(path.join(SCREENSHOTS_DIR, cat), { recursive: true });
   }
 }
@@ -551,16 +551,19 @@ async function downloadScreenshots(items, opts) {
   };
 
   const seenUrls = new Set();
+  const seenOriginalUrls = new Set();
   let downloaded = 0;
   let skipped = 0;
   let failed = 0;
 
   for (const item of items) {
-    if (seenUrls.has(item.url)) {
+    const dedupeKey = item.originalUrl || item.url;
+    if (seenUrls.has(item.url) || seenOriginalUrls.has(dedupeKey)) {
       skipped++;
       continue;
     }
     seenUrls.add(item.url);
+    seenOriginalUrls.add(dedupeKey);
 
     const ext = extensionFromMime(item.mime);
     const safeName = sanitizeFilename(item.title);
@@ -642,13 +645,57 @@ async function downloadScreenshots(items, opts) {
     }
   }
 
-  // Populate category stats
-  for (const cat of opts.categories) {
+  // Scan for any existing images from prior runs in non-selected categories
+  const allCategories = Object.keys(WIKIMEDIA_CATEGORIES);
+  const existingManifestPaths = new Set(manifest.images.map(img => img.path));
+  const existingHashes = new Set(manifest.images.map(img => img.hash).filter(Boolean));
+
+  for (const cat of allCategories) {
+    if (opts.categories.includes(cat)) continue;
+    const catDir = path.join(SCREENSHOTS_DIR, cat);
+    if (!fs.existsSync(catDir)) continue;
+
+    const files = fs.readdirSync(catDir).filter(f => /\.(png|jpe?g|webp|gif)$/i.test(f));
+    for (const file of files) {
+      const filePath = path.join(catDir, file);
+      const relPath = path.relative(DATASET_DIR, filePath);
+      if (existingManifestPaths.has(relPath)) continue;
+
+      try {
+        const validation = await validateImage(filePath);
+        if (!validation.valid) continue;
+        const stat = fs.statSync(filePath);
+        const fileHash = sha256(fs.readFileSync(filePath));
+        if (existingHashes.has(fileHash)) continue;
+        existingHashes.add(fileHash);
+        manifest.images.push({
+          filename: file,
+          category: cat,
+          path: relPath,
+          url: 'local (from previous run)',
+          source: 'Wikimedia Commons',
+          license: 'Unknown',
+          description: '',
+          author: 'Unknown',
+          width: validation.width,
+          height: validation.height,
+          format: validation.format,
+          fileSize: stat.size,
+          hash: fileHash,
+        });
+      } catch { /* skip unreadable files */ }
+    }
+  }
+
+  // Populate category stats for all categories with images
+  for (const cat of allCategories) {
     const catImages = manifest.images.filter(img => img.category === cat);
-    manifest.categories[cat] = {
-      count: catImages.length,
-      totalSize: catImages.reduce((sum, img) => sum + (img.fileSize || 0), 0),
-    };
+    if (catImages.length > 0) {
+      manifest.categories[cat] = {
+        count: catImages.length,
+        totalSize: catImages.reduce((sum, img) => sum + (img.fileSize || 0), 0),
+      };
+    }
   }
   manifest.totalImages = manifest.images.length;
 
@@ -668,7 +715,7 @@ async function main() {
   if (opts.dryRun) log('DRY RUN MODE — no files will be downloaded');
   log('');
 
-  ensureDirectories(opts.categories);
+  ensureDirectories();
 
   // Gather download list from all sources
   let items = [];
