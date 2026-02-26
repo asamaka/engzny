@@ -422,6 +422,59 @@ async function searchWikimediaFiles(searchTerm, limit) {
 }
 
 // ---------------------------------------------------------------------------
+// Quality filtering — reject photos-of-phones, banners, and tiny images
+// ---------------------------------------------------------------------------
+
+const PHOTO_OF_PHONE_PATTERNS = [
+  /photograph/i, /photo of/i, /holding a (smart ?)?phone/i,
+  /person holding/i, /outside MOD/i, /on a work desk/i,
+  /app on smartphone/i, /on smartphone.*grass/i,
+];
+
+const NON_SCREENSHOT_PATTERNS = [
+  /\bbanner\b/i, /\bposter\b/i, /\badvertisement\b/i,
+  /\bpin map\b/i, /\bgeoreferencing\b/i,
+];
+
+const MIN_QUALITY_WIDTH = 200;
+const MIN_QUALITY_HEIGHT = 300;
+const MIN_QUALITY_PIXELS = 100000;
+
+function isLikelyPhotoOfPhone(item) {
+  const text = `${item.description || ''} ${item.title || ''}`;
+  return PHOTO_OF_PHONE_PATTERNS.some(p => p.test(text));
+}
+
+function isLikelyNonScreenshot(item) {
+  const text = `${item.description || ''} ${item.title || ''}`;
+  return NON_SCREENSHOT_PATTERNS.some(p => p.test(text));
+}
+
+function failsPreDownloadQuality(item) {
+  if (isLikelyPhotoOfPhone(item)) return 'photo-of-phone';
+  if (isLikelyNonScreenshot(item)) return 'non-screenshot';
+
+  const w = item.width;
+  const h = item.height;
+  if (w && h) {
+    if (w < MIN_QUALITY_WIDTH && h < MIN_QUALITY_HEIGHT) return 'too-small';
+    if (w * h < MIN_QUALITY_PIXELS) return 'too-few-pixels';
+    const ratio = w / h;
+    if (ratio > 4.0 || ratio < 0.15) return 'extreme-aspect-ratio';
+  }
+  return null;
+}
+
+function failsPostDownloadQuality(width, height) {
+  if (!width || !height) return null;
+  if (width < MIN_QUALITY_WIDTH && height < MIN_QUALITY_HEIGHT) return 'too-small';
+  if (width * height < MIN_QUALITY_PIXELS) return 'too-few-pixels';
+  const ratio = width / height;
+  if (ratio > 4.0 || ratio < 0.15) return 'extreme-aspect-ratio';
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Image validation (uses sharp if available, falls back to basic checks)
 // ---------------------------------------------------------------------------
 
@@ -554,6 +607,7 @@ async function downloadScreenshots(items, opts) {
   let downloaded = 0;
   let skipped = 0;
   let failed = 0;
+  let filtered = 0;
 
   for (const item of items) {
     const dedupeKey = item.originalUrl || item.url;
@@ -563,6 +617,14 @@ async function downloadScreenshots(items, opts) {
     }
     seenUrls.add(item.url);
     seenOriginalUrls.add(dedupeKey);
+
+    // Pre-download quality gate
+    const qualityIssue = failsPreDownloadQuality(item);
+    if (qualityIssue) {
+      verbose(`Filtered (${qualityIssue}): ${sanitizeFilename(item.title)}`, opts);
+      filtered++;
+      continue;
+    }
 
     const ext = extensionFromMime(item.mime);
     const safeName = sanitizeFilename(item.title);
@@ -612,6 +674,14 @@ async function downloadScreenshots(items, opts) {
         log(`  Invalid image, removing: ${filename}`);
         fs.unlinkSync(destPath);
         failed++;
+        continue;
+      }
+
+      const postQuality = failsPostDownloadQuality(validation.width, validation.height);
+      if (postQuality) {
+        verbose(`  Filtered post-download (${postQuality}): ${filename} (${validation.width}x${validation.height})`, opts);
+        fs.unlinkSync(destPath);
+        filtered++;
         continue;
       }
 
@@ -698,7 +768,7 @@ async function downloadScreenshots(items, opts) {
   }
   manifest.totalImages = manifest.images.length;
 
-  return { manifest, downloaded, skipped, failed };
+  return { manifest, downloaded, skipped, failed, filtered };
 }
 
 // ---------------------------------------------------------------------------
@@ -737,7 +807,7 @@ async function main() {
   log(`\nTotal candidates: ${items.length}`);
   log('Starting downloads...\n');
 
-  const { manifest, downloaded, skipped, failed } = await downloadScreenshots(items, opts);
+  const { manifest, downloaded, skipped, failed, filtered } = await downloadScreenshots(items, opts);
 
   // Write manifest
   if (!opts.dryRun) {
@@ -748,6 +818,7 @@ async function main() {
   // Summary
   log('\n=== Summary ===');
   log(`Downloaded: ${downloaded}`);
+  log(`Filtered (quality): ${filtered}`);
   log(`Skipped (duplicates/existing): ${skipped}`);
   log(`Failed: ${failed}`);
   log(`Total in dataset: ${manifest.totalImages}`);
