@@ -27,3 +27,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 test-images/large-test.png
+
+# Screenshot test dataset (downloaded images, not the manifest/scripts)
+tests/dataset/screenshots/

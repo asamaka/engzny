@@ -10,7 +10,10 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:health": "jest tests/integration/api-health.test.js",
-    "test:unit": "jest tests/unit"
+    "test:unit": "jest tests/unit",
+    "test:dataset": "jest tests/unit/dataset-validation.test.js",
+    "dataset:fetch": "node scripts/fetch-screenshot-dataset.js --verbose",
+    "dataset:fetch:quick": "node scripts/fetch-screenshot-dataset.js --curated-only --verbose"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
