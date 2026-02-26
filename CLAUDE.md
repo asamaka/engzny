@@ -79,7 +79,8 @@ api/
     gemini.js                 # Gemini adapter (fallback)
     index.js                  # Provider factory
   lib/
-    logger.js                 # Production logger (ring buffer, pipeline traces, client telemetry)
+    logger.js                 # Production logger (in-memory + Redis persistence)
+    vercel-logs.js            # Vercel runtime logs API client
 
 public/
   hub-v2.html                 # Main page (served at /)
@@ -87,7 +88,7 @@ public/
   canvas.html                 # GIUE canvas view
 
 tests/
-  unit/                       # 73 unit tests (mocked)
+  unit/                       # 108 unit tests (mocked)
   integration/                # 3 health checks (real API)
 ```
 
@@ -105,10 +106,14 @@ tests/
 ### Debug & Monitoring (require `?token=` auth)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/debug/dashboard` | GET | **At-a-glance production status** — use this first |
+| `/api/debug/dashboard` | GET | **At-a-glance production status** — use this first (reads from Redis when available) |
 | `/api/debug/logs` | GET | Raw structured logs (filterable by level, category) |
-| `/api/debug/logs?summary=true` | GET | Full summary with pipeline stats |
-| `/api/debug/pipelines` | GET | Pipeline traces with phase timing |
+| `/api/debug/logs?summary=true` | GET | Full summary with pipeline stats (persistent) |
+| `/api/debug/pipelines` | GET | Pipeline traces with phase timing (persistent) |
+| `/api/debug/activity` | GET | Usage activity log — page views, uploads, pipeline events (persistent) |
+| `/api/debug/sessions` | GET | Client session reports (persistent) |
+| `/api/debug/vercel-logs` | GET | Vercel runtime function logs (requires VERCEL_TOKEN + VERCEL_PROJECT_ID) |
+| `/api/debug/vercel-deployments` | GET | Recent Vercel deployments |
 | `/api/debug/client-error` | POST | Client error reports (open, no auth) |
 | `/api/debug/client-report` | POST | Client session telemetry (open, no auth) |
 
@@ -155,7 +160,7 @@ editorial, dashboard, product_showcase, social_feed, investigation, simple
 ## Testing
 
 ```bash
-npm test              # All 73 tests (must pass before deploy)
+npm test              # All 108 tests (must pass before deploy)
 npm run test:unit     # Unit tests only (fast, mocked)
 npm run test:health   # Integration health checks (real API)
 ```
@@ -185,10 +190,19 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 ### Required secrets
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`)
+- **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+- **Vercel env vars (for Vercel log API):** VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID (optional)
 
 ## Runtime Monitoring & Logs
 
 **This is about RUNTIME behavior (what users experience), not deployment CI.**
+
+### Two-tier logging architecture
+
+1. **In-memory ring buffer** — fast, local to each serverless instance, resets on cold start
+2. **Redis persistence** (Upstash) — survives cold starts, shared across all instances
+
+When Redis is configured, the dashboard and all debug endpoints automatically read from the persistent store. Without Redis, everything falls back to in-memory.
 
 ### Quick check: Dashboard
 
@@ -198,23 +212,36 @@ curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'
 
 Shows at a glance:
 - **Server health:** HEALTHY / DEGRADED / WARNINGS
-- **Counters:** total requests, pipelines, errors, SSE disconnects
+- **Counters:** total requests, pipelines, errors, SSE disconnects (persisted across cold starts)
 - **Recent pipelines:** each with status, duration, design time, card count, errors
 - **Client sessions:** what users actually saw — upload time, first event delay, events received, retries, outcome (success/error), device type
 - **Recent HTTP requests:** method, path, status code, duration
 - **Client errors:** exact error messages users saw
+- **`persistence` field:** shows `redis` (persistent) or `memory-only` (ephemeral)
 
 ### Detailed queries
 
 ```bash
-# All recent errors
+# All recent errors (persisted)
 curl 'https://www.thinx.fun/api/debug/logs?level=error&limit=20&token=thinx-debug-2026'
 
-# Pipeline traces with full phase timing
+# Pipeline traces with full phase timing (persisted)
 curl 'https://www.thinx.fun/api/debug/pipelines?token=thinx-debug-2026'
 
-# Full log summary (everything)
+# Full log summary (persistent — includes Redis data)
 curl 'https://www.thinx.fun/api/debug/logs?summary=true&token=thinx-debug-2026'
+
+# Usage activity log — page views, uploads, pipeline events (persisted)
+curl 'https://www.thinx.fun/api/debug/activity?token=thinx-debug-2026'
+
+# Client session reports (persisted)
+curl 'https://www.thinx.fun/api/debug/sessions?token=thinx-debug-2026'
+
+# Vercel runtime logs (requires VERCEL_TOKEN + VERCEL_PROJECT_ID on Vercel)
+curl 'https://www.thinx.fun/api/debug/vercel-logs?token=thinx-debug-2026'
+
+# Recent Vercel deployments
+curl 'https://www.thinx.fun/api/debug/vercel-deployments?token=thinx-debug-2026'
 ```
 
 ### What the logs tell you
@@ -248,10 +275,21 @@ curl 'https://www.thinx.fun/api/debug/logs?summary=true&token=thinx-debug-2026'
 
 ### Log storage
 
-Logs are stored in an **in-memory ring buffer** within the Vercel serverless function. They persist across requests in a warm container but reset on cold starts. This is fine for debugging recent issues — the failure and its context will be in the same container.
+**Tier 1 — In-memory ring buffer** (always active):
+- 1000 log entries, 200 errors, 200 HTTP requests, 100 client sessions, 50 pipeline traces
+- Fast, local to each serverless instance, resets on cold start
+- All entries also go to stdout (visible in Vercel's built-in log viewer)
 
-- Max entries: 1000 logs, 200 errors, 200 HTTP requests, 100 client sessions, 50 pipeline traces
-- Logs also go to stdout (visible in Vercel's built-in log viewer)
+**Tier 2 — Redis persistence** (when UPSTASH_REDIS_REST_URL is configured):
+- 100 pipeline traces, 200 client sessions, 200 errors, 500 HTTP requests, 1000 activity events
+- Shared across all serverless instances, survives cold starts
+- Counters (total requests, pipelines, errors) are persisted with HINCRBY
+- All debug endpoints automatically read from Redis when available
+
+**Tier 3 — Vercel Runtime Logs API** (when VERCEL_TOKEN + VERCEL_PROJECT_ID are configured):
+- Fetches Vercel's own persistent runtime logs (all stdout/stderr from every function invocation)
+- Available via `/api/debug/vercel-logs` endpoint
+- Useful even without Redis — Vercel captures everything from console.log
 
 ### Security
 
