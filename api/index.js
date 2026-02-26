@@ -8,10 +8,29 @@ const Anthropic = require('@anthropic-ai/sdk').default;
 const sharp = require('sharp');
 const { ClaudeAdapter } = require('./llm/claude');
 const { logger } = require('./lib/logger');
+const vercelLogs = require('./lib/vercel-logs');
 
 const app = express();
 
 logger.info('Server', 'Initializing', { nodeVersion: process.version, env: process.env.NODE_ENV || 'development' });
+
+// Initialize Redis persistence for logger (fire-and-forget)
+(async () => {
+  try {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const { Redis } = require('@upstash/redis');
+      const redisClient = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+      await logger.initRedis(redisClient);
+    } else {
+      logger.info('Server', 'Redis not configured — using in-memory logging only');
+    }
+  } catch (err) {
+    console.warn('[Server] Failed to init Redis for logger:', err.message);
+  }
+})();
 
 // In-memory job storage (fallback when Redis is not configured)
 // For production, configure UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
@@ -316,6 +335,11 @@ app.get('/api/scan', async (req, res) => {
 
 // Main route - v2 dynamic layout hub
 app.get('/', (req, res) => {
+  logger.logActivity('page_view', {
+    page: 'hub',
+    ua: req.headers['user-agent']?.includes('Mobile') ? 'mobile' : 'desktop',
+    ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
+  });
   res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
 });
 
@@ -343,15 +367,31 @@ function requireDebugAuth(req, res, next) {
 }
 
 // GET /api/debug/dashboard - Quick at-a-glance production status
-app.get('/api/debug/dashboard', requireDebugAuth, (req, res) => {
-  res.json(logger.getDashboard());
+// Reads from Redis (persistent) when available, falls back to in-memory
+app.get('/api/debug/dashboard', requireDebugAuth, async (req, res) => {
+  try {
+    const dashboard = await logger.getPersistedDashboard();
+    res.json(dashboard);
+  } catch (err) {
+    res.json(logger.getDashboard());
+  }
 });
 
 // GET /api/debug/logs - Query raw logs
-app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
-  const { level, category, limit, since, summary } = req.query;
+// ?summary=true returns full persistent summary
+// ?source=redis returns only persisted data
+app.get('/api/debug/logs', requireDebugAuth, async (req, res) => {
+  const { level, category, limit, since, summary, source } = req.query;
   if (summary === 'true' || summary === '1') {
-    return res.json(logger.getSummary());
+    try {
+      return res.json(await logger.getPersistedSummary());
+    } catch {
+      return res.json(logger.getSummary());
+    }
+  }
+  if (source === 'redis') {
+    const errors = await logger.getPersistedErrors(limit ? parseInt(limit, 10) : 50);
+    return res.json({ count: errors.length, source: 'redis', logs: errors });
   }
   const logs = logger.query({
     level,
@@ -359,13 +399,89 @@ app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
     limit: limit ? parseInt(limit, 10) : 50,
     since,
   });
-  res.json({ count: logs.length, logs });
+  res.json({ count: logs.length, source: 'memory', logs });
 });
 
-// GET /api/debug/pipelines - Pipeline traces
-app.get('/api/debug/pipelines', requireDebugAuth, (req, res) => {
+// GET /api/debug/pipelines - Pipeline traces (persistent when Redis available)
+app.get('/api/debug/pipelines', requireDebugAuth, async (req, res) => {
+  try {
+    const persisted = await logger.getPersistedPipelines(20);
+    if (persisted.length > 0) {
+      const completed = persisted.filter(p => p.completed);
+      const failed = persisted.filter(p => p.error);
+      const avgDuration = completed.length
+        ? Math.round(completed.reduce((s, p) => s + (p.duration || 0), 0) / completed.length)
+        : null;
+      return res.json({
+        source: 'redis',
+        stats: { total: persisted.length, completed: completed.length, failed: failed.length, avgDurationMs: avgDuration },
+        pipelines: persisted,
+      });
+    }
+  } catch {}
   const summary = logger.getSummary();
-  res.json({ stats: summary.pipelineStats, pipelines: summary.recentPipelines });
+  res.json({ source: 'memory', stats: summary.pipelineStats, pipelines: summary.recentPipelines });
+});
+
+// GET /api/debug/activity - Recent usage activity log (Redis-persisted)
+app.get('/api/debug/activity', requireDebugAuth, async (req, res) => {
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+  try {
+    const activity = await logger.getPersistedActivity(limit);
+    res.json({ count: activity.length, source: logger.hasRedis ? 'redis' : 'memory', activity });
+  } catch (err) {
+    res.json({ count: 0, source: 'error', error: err.message, activity: [] });
+  }
+});
+
+// GET /api/debug/sessions - Client session reports (Redis-persisted)
+app.get('/api/debug/sessions', requireDebugAuth, async (req, res) => {
+  const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+  try {
+    const sessions = await logger.getPersistedSessions(limit);
+    res.json({ count: sessions.length, source: logger.hasRedis ? 'redis' : 'memory', sessions });
+  } catch (err) {
+    res.json({ count: 0, source: 'error', error: err.message, sessions: [] });
+  }
+});
+
+// GET /api/debug/vercel-logs - Fetch runtime logs from Vercel API
+// Requires VERCEL_TOKEN + VERCEL_PROJECT_ID env vars
+app.get('/api/debug/vercel-logs', requireDebugAuth, async (req, res) => {
+  if (!vercelLogs.isConfigured()) {
+    return res.status(501).json({
+      error: 'Vercel API not configured',
+      message: 'Set VERCEL_TOKEN and VERCEL_PROJECT_ID environment variables on Vercel to enable.',
+      required: ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID'],
+      optional: ['VERCEL_TEAM_ID'],
+    });
+  }
+  try {
+    const { limit, since, until, level } = req.query;
+    const logs = await vercelLogs.fetchRuntimeLogs({
+      limit: limit ? parseInt(limit, 10) : 100,
+      since: since ? parseInt(since, 10) : undefined,
+      until: until ? parseInt(until, 10) : undefined,
+      level,
+    });
+    res.json(logs);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch Vercel logs', message: err.message });
+  }
+});
+
+// GET /api/debug/vercel-deployments - List recent Vercel deployments
+app.get('/api/debug/vercel-deployments', requireDebugAuth, async (req, res) => {
+  if (!vercelLogs.isConfigured()) {
+    return res.status(501).json({ error: 'Vercel API not configured' });
+  }
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+    const deployments = await vercelLogs.listDeployments({ limit });
+    res.json({ count: deployments.length, deployments });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to list deployments', message: err.message });
+  }
 });
 
 // POST /api/debug/client-error - Client error reports (open, no auth)
@@ -376,7 +492,6 @@ app.post('/api/debug/client-error', (req, res) => {
 });
 
 // POST /api/debug/client-report - Full client session telemetry (open, no auth)
-// Sent by the frontend on EVERY pipeline run (success or failure)
 app.post('/api/debug/client-report', (req, res) => {
   const report = req.body || {};
   logger.clientReport(report);
@@ -569,6 +684,16 @@ app.post('/api/hub/v2/start', async (req, res) => {
     const { image, question, mediaType: rawMediaType } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
+    const imageSize = normalized.imageData ? Math.round(normalized.imageData.length * 0.75 / 1024) : 0;
+
+    logger.logActivity('upload', {
+      requestId,
+      mediaType: normalized.mediaType,
+      imageSize: `${imageSize}KB`,
+      hasQuestion: !!question,
+      ua: req.headers['user-agent']?.includes('Mobile') ? 'mobile' : 'desktop',
+      ip: req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip,
+    });
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
