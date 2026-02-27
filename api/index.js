@@ -851,6 +851,143 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   }
 });
 
+// ============================================
+// V3 Pipeline — Opus Tool-Calling (progressive UI updates)
+// ============================================
+const { runPipelineV3 } = require('./agents/orchestrator-v3');
+
+// Step 1: POST image, get requestId (shared with v2 — same endpoint)
+// Step 2: GET SSE stream for v3 pipeline
+app.get('/api/hub/v3/stream/:requestId', async (req, res) => {
+  const { requestId } = req.params;
+  const job = pipelineJobs.get(requestId);
+
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found or expired' });
+  }
+
+  pipelineJobs.delete(requestId);
+
+  let streamEnded = false;
+  let keepAlive = null;
+
+  const endStream = () => {
+    if (streamEnded) return;
+    streamEnded = true;
+    if (keepAlive) clearInterval(keepAlive);
+    if (!res.writableEnded && !res.destroyed) res.end();
+  };
+
+  const sendEvent = (event, data) => {
+    if (streamEnded || res.writableEnded) return;
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      if (res.flush) res.flush();
+      logger.pipelineEvent(requestId, event);
+    } catch (err) {
+      logger.error('SSE', `v3 send ${event} failed`, { requestId, err: err.message });
+      endStream();
+    }
+  };
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  res.write(`:${' '.repeat(2048)}\n\n`);
+  if (res.flush) res.flush();
+  if (res.socket) res.socket.setNoDelay(true);
+
+  res.on('close', () => {
+    if (!streamEnded) logger.sseDisconnect(requestId);
+    streamEnded = true;
+  });
+
+  keepAlive = setInterval(() => {
+    if (!streamEnded) {
+      try { res.write(`: ping ${Date.now()}\n\n`); if (res.flush) res.flush(); } catch {}
+    }
+  }, 5000);
+
+  const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
+  logger.startPipeline(requestId, {
+    mediaType: job.mediaType,
+    imageSize: `${imageSize}KB`,
+    hasQuestion: !!job.question,
+    method: 'v3-tools',
+  });
+
+  sendEvent('connected', { message: 'Pipeline v3 started', requestId, timestamp: new Date().toISOString() });
+
+  let cardCount = 0;
+  let completedCards = 0;
+
+  try {
+    await runPipelineV3({
+      imageData: job.imageData,
+      mediaType: job.mediaType,
+      question: job.question,
+
+      onClassify: (classification) => {
+        logger.pipelinePhase(requestId, 'classify', { contentType: classification.contentType });
+        sendEvent('classify', classification);
+      },
+
+      onLayout: (layout) => {
+        cardCount = layout.cards?.length || 0;
+        logger.pipelinePhase(requestId, 'layout', { cardCount, layoutType: layout.layoutType });
+
+        const blueprint = {
+          layout: { type: layout.layoutType },
+          cards: layout.cards.map(c => ({
+            id: c.id,
+            cardType: c.cardType,
+            title: c.title,
+            gridColumn: c.gridColumn,
+            gridRow: c.gridRow,
+            data: null,
+          })),
+        };
+        sendEvent('layout_update', blueprint);
+      },
+
+      onCardContent: ({ cardId, data }) => {
+        completedCards++;
+        const cardDef = cardCount > 0 ? { completedCount: completedCards, totalCount: cardCount } : {};
+        logger.pipelineEvent(requestId, 'card', { cardId, completed: `${completedCards}/${cardCount}` });
+        sendEvent('card', { cardId, data, ...cardDef });
+      },
+
+      onComplete: (result) => {
+        logger.pipelineComplete(requestId, {
+          cardCount: result.cards?.length,
+          layoutType: result.layout?.layoutType,
+          toolCalls: result.toolCallOrder?.length,
+        });
+        sendEvent('complete', {
+          layout: result.layout,
+          classification: result.classification,
+          meta: result._meta,
+        });
+        endStream();
+      },
+
+      onError: (error) => {
+        logger.pipelineError(requestId, error, { phase: 'v3-pipeline' });
+        sendEvent('error', { message: error.message });
+        endStream();
+      },
+    });
+  } catch (error) {
+    logger.pipelineError(requestId, error, { phase: 'v3-catch' });
+    sendEvent('error', { message: error.message || 'Pipeline failed' });
+    endStream();
+  }
+});
+
 // Hub v2 analyze - legacy SSE endpoint (POST-based, kept for backward compat)
 app.post('/api/hub/v2/analyze', async (req, res) => {
   const requestId = crypto.randomUUID().slice(0, 8);
