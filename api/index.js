@@ -390,6 +390,9 @@ app.post('/api/debug/client-report', (req, res) => {
 const reportStore = require('./lib/report-store');
 reportStore.init(getRedis);
 
+const screenshotCapture = require('./lib/screenshot-capture');
+screenshotCapture.init(getRedis);
+
 const SESSION_COOKIE = 'thinx_sid';
 const SESSION_MAX_AGE = 7 * 24 * 3600 * 1000;
 
@@ -473,6 +476,45 @@ app.delete('/api/reports/:id', requireReportAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ============================================
+// Screenshot Capture Admin API
+// ============================================
+
+// GET /api/captures — List captured screenshots
+app.get('/api/captures', requireReportAuth, async (req, res) => {
+  const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+  const offset = parseInt(req.query.offset) || 0;
+  const result = await screenshotCapture.listCaptures({ limit, offset });
+  const storage = await screenshotCapture.getStorageType();
+  res.json({ ...result, storage });
+});
+
+// GET /api/captures/:id/thumb — Serve thumbnail as JPEG
+app.get('/api/captures/:id/thumb', requireReportAuth, async (req, res) => {
+  const thumb = await screenshotCapture.getCaptureThumbnail(req.params.id);
+  if (!thumb) return res.status(404).json({ error: 'Not found' });
+  res.set('Content-Type', 'image/jpeg');
+  res.send(Buffer.from(thumb, 'base64'));
+});
+
+// GET /api/captures/:id/full — Serve full image
+app.get('/api/captures/:id/full', requireReportAuth, async (req, res) => {
+  const data = await screenshotCapture.getCaptureFullImage(req.params.id);
+  if (!data) return res.status(404).json({ error: 'Not found' });
+  const mime = data.entry?.mediaType || 'image/png';
+  if (req.query.format === 'base64') {
+    return res.json({ id: req.params.id, mediaType: mime, base64: data.base64 });
+  }
+  res.set('Content-Type', mime);
+  res.send(Buffer.from(data.base64, 'base64'));
+});
+
+// DELETE /api/captures/:id
+app.delete('/api/captures/:id', requireReportAuth, async (req, res) => {
+  await screenshotCapture.deleteCapture(req.params.id);
+  res.json({ ok: true });
+});
+
 // GET /reports — Admin dashboard (public page, auth happens via JS + cookie)
 app.get('/reports', (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
@@ -519,6 +561,18 @@ function getReportsDashboardHtml() {
   .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 100px; font-weight: 600; }
   .badge-count { background: rgba(108,159,255,0.15); color: var(--accent); }
   .badge-warn { background: rgba(255,209,92,0.15); color: #ffd15c; font-size: 0.7rem; margin-left: 8px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+  .tab { padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: transparent; border: 1px solid var(--border); color: var(--text-2); transition: all 0.2s; }
+  .tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+  .captures-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .capture-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: border-color 0.2s; cursor: pointer; }
+  .capture-card:hover { border-color: var(--accent); }
+  .capture-thumb { width: 100%; aspect-ratio: 9/16; object-fit: cover; background: #000; display: block; }
+  .capture-info { padding: 8px 10px; font-size: 0.7rem; color: var(--text-3); }
+  .capture-info .cap-type { color: var(--accent); font-weight: 600; }
+  .capture-info .cap-dim { margin-top: 2px; }
+  .capture-actions { padding: 4px 10px 8px; }
 </style>
 </head>
 <body>
@@ -537,13 +591,19 @@ function getReportsDashboardHtml() {
     <h1>Test Reports</h1>
     <div class="subtitle">Pipeline test results against the screenshot dataset</div>
     <div class="toolbar">
-      <div>
-        <span class="badge badge-count" id="report-count"></span>
-        <span class="badge badge-warn" id="storage-warn" style="display:none"></span>
+      <div class="tabs">
+        <div class="tab active" id="tab-reports" onclick="switchTab('reports')">Reports</div>
+        <div class="tab" id="tab-captures" onclick="switchTab('captures')">Captures <span class="badge badge-count" id="capture-count" style="margin-left:4px"></span></div>
       </div>
       <button class="btn btn-outline" onclick="logout()" style="font-size:0.75rem;padding:6px 12px;">Logout</button>
     </div>
-    <div id="reports-list" class="reports-list"></div>
+    <div id="storage-warn-box" style="display:none;margin-bottom:12px;"><span class="badge badge-warn" id="storage-warn"></span></div>
+    <div id="panel-reports">
+      <div id="reports-list" class="reports-list"></div>
+    </div>
+    <div id="panel-captures" style="display:none">
+      <div id="captures-grid" class="captures-grid"></div>
+    </div>
   </div>
 </div>
 <script>
@@ -564,10 +624,20 @@ async function login() {
     setTimeout(function(){ document.getElementById('auth-error').style.display='none'; }, 3000);
   }
 }
+var currentTab = 'reports';
 async function showDashboard() {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
   await loadReports();
+  loadCaptures();
+}
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-reports').className = 'tab' + (tab==='reports'?' active':'');
+  document.getElementById('tab-captures').className = 'tab' + (tab==='captures'?' active':'');
+  document.getElementById('panel-reports').style.display = tab==='reports'?'':'none';
+  document.getElementById('panel-captures').style.display = tab==='captures'?'':'none';
+  if (tab==='captures') loadCaptures();
 }
 async function loadReports() {
   var res = await fetch('/api/reports', {credentials:'same-origin'});
@@ -577,8 +647,9 @@ async function loadReports() {
   var reports = data.reports;
   document.getElementById('report-count').textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '');
   var warn = document.getElementById('storage-warn');
-  if (data.storage === 'memory') { warn.textContent = 'ephemeral — lost on redeploy'; warn.style.display = ''; }
-  else { warn.style.display = 'none'; }
+  var warnBox = document.getElementById('storage-warn-box');
+  if (data.storage === 'memory') { warn.textContent = 'ephemeral storage — data lost on redeploy'; warnBox.style.display = ''; }
+  else { warnBox.style.display = 'none'; }
   var list = document.getElementById('reports-list');
   if (!reports.length) {
     list.innerHTML = '<div class="empty-state"><div style="font-size:2rem;opacity:0.3">&#128202;</div><p>No reports yet.<br>Run: <code>npm run dataset:pipeline</code></p></div>';
@@ -601,6 +672,35 @@ async function del(id) {
   if (!confirm('Delete this report?')) return;
   await fetch('/api/reports/'+id, {method:'DELETE',credentials:'same-origin'});
   await loadReports();
+}
+async function loadCaptures() {
+  var res = await fetch('/api/captures',{credentials:'same-origin'});
+  if (!res.ok) return;
+  var data = await res.json();
+  document.getElementById('capture-count').textContent = data.total || 0;
+  var grid = document.getElementById('captures-grid');
+  if (!data.captures.length) {
+    grid.innerHTML = '<div class="empty-state"><div style="font-size:2rem;opacity:0.3">&#128247;</div><p>No captured screenshots yet.<br>Screenshots are captured automatically from production usage.</p></div>';
+    return;
+  }
+  grid.innerHTML = data.captures.map(function(c) {
+    var ago = timeSince(new Date(c.capturedAt));
+    return '<div class="capture-card" onclick="window.open(\\'/api/captures/'+esc(c.id)+'/full\\',\\'_blank\\')">' +
+      '<img class="capture-thumb" src="/api/captures/'+esc(c.id)+'/thumb" loading="lazy" alt="" />' +
+      '<div class="capture-info">' +
+        '<div class="cap-type">'+ esc(c.contentType||'unknown') + (c.platform?' · '+esc(c.platform):'') +'</div>' +
+        '<div class="cap-dim">'+c.width+'x'+c.height+' · '+ago+'</div>' +
+      '</div>' +
+      '<div class="capture-actions" onclick="event.stopPropagation()">' +
+        '<button class="btn btn-outline" style="font-size:0.65rem;padding:3px 8px;" onclick="delCapture(\\''+esc(c.id)+'\\')">Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+async function delCapture(id) {
+  if (!confirm('Delete this captured screenshot?')) return;
+  await fetch('/api/captures/'+id,{method:'DELETE',credentials:'same-origin'});
+  await loadCaptures();
 }
 async function logout() {
   await fetch('/api/reports/session', {method:'DELETE',credentials:'same-origin'});
@@ -818,6 +918,18 @@ app.post('/api/hub/v2/start', async (req, res) => {
       pipelineJobs.delete(oldest);
     }
 
+    // Capture screenshot for test dataset (async, non-blocking)
+    screenshotCapture.captureScreenshot({
+      base64Data: normalized.imageData,
+      mediaType: normalized.mediaType,
+      requestId,
+    }).then(entry => {
+      if (entry) {
+        pipelineJobs.get(requestId) && (pipelineJobs.get(requestId)._captureId = entry.id);
+        logger.info('Capture', `Saved screenshot ${entry.id}`, { requestId, w: entry.width, h: entry.height, size: entry.originalSize });
+      }
+    }).catch(() => {});
+
     res.json({ requestId });
   } catch (error) {
     logger.error('PipelineStart', 'Failed to start', { err: error.message });
@@ -919,6 +1031,16 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       onLayoutUpdate: (blueprint) => {
         logger.pipelinePhase(requestId, 'blueprint', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
         sendEvent('layout_update', blueprint);
+
+        const captureId = job._captureId;
+        if (captureId) {
+          screenshotCapture.updateCapturePipelineResult(captureId, {
+            contentType: blueprint.contentAnalysis?.contentType,
+            platform: blueprint.contentAnalysis?.platform,
+            layoutType: blueprint.layout?.type,
+            cardCount: (blueprint.cards || []).length,
+          }).catch(() => {});
+        }
       },
 
       onCardPopulated: (cardUpdate) => {

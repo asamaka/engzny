@@ -74,6 +74,7 @@ const WIKIMEDIA_CATEGORIES = {
     'Category:Smartphone_screenshots',
     'Category:Screenshots_of_mobile_web_browsers',
   ],
+  captured: [],
 };
 
 // Wikimedia search queries for finding more mobile screenshots beyond categories.
