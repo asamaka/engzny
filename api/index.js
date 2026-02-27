@@ -397,6 +397,21 @@ const liveReports = require('./lib/live-reports');
 liveReports.init(getRedis);
 const reportRenderer = require('./lib/report-renderer');
 
+// Log storage status on first request
+let _storageLogged = false;
+app.use(async (req, res, next) => {
+  if (!_storageLogged) {
+    _storageLogged = true;
+    const storage = await liveReports.getStorageStatus();
+    if (storage === 'redis') {
+      logger.info('Storage', 'Redis persistence active — reports will survive cold starts');
+    } else {
+      logger.warn('Storage', 'Memory-only mode — set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for persistent reports');
+    }
+  }
+  next();
+});
+
 const SESSION_COOKIE = 'thinx_sid';
 const SESSION_MAX_AGE = 7 * 24 * 3600 * 1000;
 
@@ -2424,18 +2439,24 @@ function requirePin(req, res, next) {
 
 // JSON API for report data (PIN-protected)
 app.get('/api/r/list', requirePin, async (req, res) => {
-  const live = await liveReports.listLiveReports();
-  res.json({ reports: live });
+  const [live, storage] = await Promise.all([
+    liveReports.listLiveReports(),
+    liveReports.getStorageStatus(),
+  ]);
+  res.json({ reports: live, storage });
 });
 
 app.get('/api/r/search', requirePin, async (req, res) => {
   const { q, contentType, layoutType, outcome, from, to, cardType, limit, offset } = req.query;
-  const result = await liveReports.searchArchive({
-    q, contentType, layoutType, outcome, from, to, cardType,
-    limit: Math.min(parseInt(limit) || 50, 200),
-    offset: parseInt(offset) || 0,
-  });
-  res.json(result);
+  const [result, storage] = await Promise.all([
+    liveReports.searchArchive({
+      q, contentType, layoutType, outcome, from, to, cardType,
+      limit: Math.min(parseInt(limit) || 50, 200),
+      offset: parseInt(offset) || 0,
+    }),
+    liveReports.getStorageStatus(),
+  ]);
+  res.json({ ...result, storage });
 });
 
 app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
@@ -2518,6 +2539,9 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
 .search-filters select{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:6px 10px;color:var(--t2);font-size:.74rem;font-family:inherit;outline:none;cursor:pointer;flex:1}
 .search-count{font-size:.74rem;color:var(--t3);text-align:center;padding:8px 0}
 .rcard .title{font-size:.78rem;color:var(--t);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.storage-warn{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:var(--rad);padding:12px 16px;margin-bottom:14px;font-size:.8rem;color:var(--r);line-height:1.5}
+.storage-warn strong{color:var(--t)}
+.storage-ok{background:rgba(91,219,138,.06);border:1px solid rgba(91,219,138,.15);color:var(--g)}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head><body>
@@ -2538,6 +2562,7 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
     <button class="refresh-btn" onclick="loadCurrent()">Refresh</button>
   </div>
   <div class="tabs"><button class="tab active" id="tab-live" onclick="switchTab('live')">Live</button><button class="tab" id="tab-all" onclick="switchTab('all')">All Reports</button></div>
+  <div id="storage-warn" class="storage-warn" style="display:none"></div>
   <div id="search-bar" class="search-bar" style="display:none"><input type="text" id="search-input" placeholder="Search by title, content type, platform..." class="search-input" oninput="debounceSearch()"><div class="search-filters"><select id="f-outcome" onchange="doSearch()"><option value="">Any outcome</option><option value="success">Success</option><option value="error">Error</option></select><select id="f-layout" onchange="doSearch()"><option value="">Any layout</option><option value="editorial">Editorial</option><option value="dashboard">Dashboard</option><option value="product_showcase">Product</option><option value="social_feed">Social</option><option value="investigation">Investigation</option><option value="simple">Simple</option></select></div></div>
   <div id="list" class="rlist"><div class="empty">Loading...</div></div>
   <div id="search-count" class="search-count" style="display:none"></div>
@@ -2594,10 +2619,26 @@ function renderCard(r,isLive){
     +(r.duration?'<span>'+Math.round(r.duration/1000)+'s</span>':'')
     +'</div></div><span class="arrow">&#8250;</span></a>';
 }
+function showStorageStatus(storage){
+  var w=document.getElementById('storage-warn');
+  if(storage==='memory'){
+    w.className='storage-warn';
+    w.innerHTML='<strong>Not persistent.</strong> Reports are stored in-memory only and will be lost on redeploy or cold start. Add <code>UPSTASH_REDIS_REST_URL</code> and <code>UPSTASH_REDIS_REST_TOKEN</code> to Vercel env vars for persistent storage.';
+    w.style.display='block';
+  } else if(storage==='redis'){
+    w.className='storage-warn storage-ok';
+    w.innerHTML='Persistent storage active (Redis)';
+    w.style.display='block';
+    setTimeout(function(){w.style.display='none';},5000);
+  } else {
+    w.style.display='none';
+  }
+}
 async function loadLive(){
   var r=await fetch('/api/r/list',{credentials:'same-origin'});
   if(r.status===401){document.getElementById('gate').style.display='flex';document.getElementById('content').style.display='none';return;}
   var data=await r.json();
+  showStorageStatus(data.storage);
   var el=document.getElementById('list');
   if(!data.reports||!data.reports.length){el.innerHTML='<div class="empty">No live reports yet. Analyze a screenshot to generate one.</div>';return;}
   el.innerHTML=data.reports.map(function(r){return renderCard(r,true);}).join('');

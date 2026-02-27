@@ -235,6 +235,11 @@ async function searchArchive({ q, contentType, layoutType, outcome, from, to, ca
   };
 }
 
+async function getStorageStatus() {
+  const r = await redis();
+  return r ? 'redis' : 'memory';
+}
+
 function _resetForTest() {
   mem.reports.clear(); mem.index.length = 0;
   mem.archive.clear(); mem.archiveIndex.length = 0;
@@ -244,6 +249,6 @@ module.exports = {
   init,
   saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports,
   getArchive, getArchiveThumb, getReport, getReportThumb,
-  searchArchive,
+  searchArchive, getStorageStatus,
   _resetForTest,
 };
