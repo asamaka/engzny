@@ -49,6 +49,8 @@ let _redisEnvSource = null;
 function getRedisEnv() {
   const candidates = [
     { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN, source: 'UPSTASH_REDIS_REST_*' },
+    // Vercel Upstash integration adds a prefix to KV env var names
+    { url: process.env.UPSTASH_REDIS_REST_KV_REST_API_URL, token: process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN, source: 'UPSTASH_REDIS_REST_KV_REST_API_*' },
     { url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN, source: 'KV_REST_API_*' },
     { url: process.env.KV_URL, token: process.env.KV_REST_API_TOKEN, source: 'KV_URL + KV_REST_API_TOKEN' },
     { url: process.env.REDIS_REST_URL, token: process.env.REDIS_REST_TOKEN, source: 'REDIS_REST_*' },
@@ -461,6 +463,8 @@ app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
       envVarsDetected: {
         UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
         UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+        UPSTASH_REDIS_REST_KV_REST_API_URL: !!process.env.UPSTASH_REDIS_REST_KV_REST_API_URL,
+        UPSTASH_REDIS_REST_KV_REST_API_TOKEN: !!process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN,
         KV_REST_API_URL: !!process.env.KV_REST_API_URL,
         KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
         KV_URL: !!process.env.KV_URL,
