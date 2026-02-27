@@ -1827,7 +1827,7 @@
                 statusText.textContent = 'connecting to pipeline';
 
                 await new Promise((resolve, reject) => {
-                    const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
+                    const es = new EventSource(`/api/hub/v3/stream/${requestId}`);
                     currentEventSource = es;
 
                     pipelineTimeout = setTimeout(() => {
@@ -1838,7 +1838,7 @@
                         }
                     }, 30000);
 
-                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
+                    const events = ['connected', 'classify', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
                     events.forEach(evt => {
                         es.addEventListener(evt, (e) => {
                             try {
@@ -1902,6 +1902,10 @@
                     statusText.textContent = 'connected — detecting content';
                     break;
 
+                case 'classify':
+                    onClassifyReceived(data);
+                    break;
+
                 case 'progress':
                     statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
                     statusText.textContent = data.message || 'processing';
@@ -1936,6 +1940,34 @@
                     showError(data.message || 'Analysis failed');
                     break;
             }
+        }
+
+        function onClassifyReceived(data) {
+            blueprintReceived = true;
+            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
+
+            scanLine.classList.remove('active');
+            scanCorners.classList.remove('active');
+            screenshotLayer.className = 'screenshot-layer fading';
+
+            statusProgressFill.style.width = '20%';
+            statusText.textContent = data.summary || 'building layout...';
+
+            const ct = data.contentType || 'analyzing';
+            layoutBadge.textContent = ct.replace(/_/g, ' ');
+
+            if (data.summary) {
+                contentAnalysisEl.style.display = '';
+                contentAnalysisEl.querySelector('.analysis-content').textContent = data.summary;
+            }
+            if (data.topQuestions?.length) {
+                questionsEl.style.display = '';
+                questionsEl.innerHTML = data.topQuestions
+                    .map(q => `<span class="question-chip">${q}</span>`)
+                    .join('');
+            }
+
+            resultsOverlay.classList.add('visible');
         }
 
         function onBlueprintReceived(blueprint) {
@@ -2023,13 +2055,23 @@
         }
 
         function onLayoutUpdate(blueprint) {
+            blueprintReceived = true;
+            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
+            if (!completionTimeout) {
+                completionTimeout = setTimeout(() => {
+                    if (!pipelineComplete) {
+                        telemetry.reportError('Analysis timed out (90s)', { type: 'timeout_post_layout', completedCards, totalCards });
+                        showError('Analysis is taking too long. Please try again.');
+                    }
+                }, 90000);
+            }
+
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
-            const ct = blueprint.contentAnalysis?.contentType || 'general';
-            layoutBadge.textContent = ct.replace(/_/g, ' ');
-
             if (blueprint.contentAnalysis) {
+                const ct = blueprint.contentAnalysis.contentType || 'general';
+                layoutBadge.textContent = ct.replace(/_/g, ' ');
                 contentAnalysisEl.style.display = '';
                 analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
                 topQuestionsEl.innerHTML = '';
@@ -2047,26 +2089,38 @@
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
+                if (card.gridColumn) el.style.gridColumn = card.gridColumn;
+                if (card.gridRow) el.style.gridRow = card.gridRow;
                 cardGrid.appendChild(el);
                 setTimeout(() => {
                     el.classList.add('visible');
                 }, 50 + index * 40);
             });
 
-            statusText.textContent = `researching ${totalCards} cards`;
+            scanLine.classList.remove('active');
+            scanCorners.classList.remove('active');
+            screenshotLayer.className = 'screenshot-layer fading';
+            resultsOverlay.classList.add('visible');
+
+            statusText.textContent = `populating ${totalCards} cards`;
+            statusProgressFill.style.width = '30%';
             layoutProgressFill.style.width = '30%';
             layoutProgressText.textContent = `0/${totalCards}`;
         }
 
         function onCardReceived(data) {
-            completedCards++;
+            completedCards = data.completedCount || (completedCards + 1);
+            if (data.totalCount) totalCards = data.totalCount;
 
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
+            const cardType = data.cardType || el.dataset.cardType;
+            const cardData = data.data || data;
+
             el.classList.remove('loading');
             el.classList.add('populated', 'just-populated');
-            el.innerHTML = renderCardContent(data.cardType, data.data);
+            el.innerHTML = renderCardContent(cardType, cardData);
 
             setTimeout(() => {
                 el.classList.remove('just-populated');
