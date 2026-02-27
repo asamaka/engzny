@@ -40,6 +40,7 @@ class ProdLogger {
     this.pipelines = new Map();
     this.requests = [];
     this.clientSessions = [];
+    this.activityLog = [];
     this.startTime = Date.now();
     this.counters = { requests: 0, pipelines: 0, pipelineErrors: 0, clientErrors: 0, sseDisconnects: 0 };
     this._redis = null;
@@ -142,6 +143,8 @@ class ProdLogger {
       action,
       ...details,
     };
+    this.activityLog.push(entry);
+    if (this.activityLog.length > MAX_ENTRIES) this.activityLog.shift();
     this._persistToRedis(REDIS_KEYS.ACTIVITY, entry, REDIS_LIMITS.ACTIVITY);
     this.info('Activity', action, details);
   }
@@ -325,23 +328,36 @@ class ProdLogger {
   }
 
   async getPersistedPipelines(limit = 20) {
-    return this._readRedisList(REDIS_KEYS.PIPELINES, limit);
+    const redis = await this._readRedisList(REDIS_KEYS.PIPELINES, limit);
+    if (redis.length > 0) return redis;
+    return [...this.pipelines.values()]
+      .sort((a, b) => (b.startMs || 0) - (a.startMs || 0))
+      .slice(0, limit)
+      .map(p => { const c = { ...p }; delete c.startMs; return c; });
   }
 
   async getPersistedSessions(limit = 20) {
-    return this._readRedisList(REDIS_KEYS.SESSIONS, limit);
+    const redis = await this._readRedisList(REDIS_KEYS.SESSIONS, limit);
+    if (redis.length > 0) return redis;
+    return this.clientSessions.slice(-limit).reverse();
   }
 
   async getPersistedErrors(limit = 20) {
-    return this._readRedisList(REDIS_KEYS.ERRORS, limit);
+    const redis = await this._readRedisList(REDIS_KEYS.ERRORS, limit);
+    if (redis.length > 0) return redis;
+    return this.errors.slice(-limit).reverse();
   }
 
   async getPersistedRequests(limit = 50) {
-    return this._readRedisList(REDIS_KEYS.REQUESTS, limit);
+    const redis = await this._readRedisList(REDIS_KEYS.REQUESTS, limit);
+    if (redis.length > 0) return redis;
+    return this.requests.slice(-limit).reverse();
   }
 
   async getPersistedActivity(limit = 50) {
-    return this._readRedisList(REDIS_KEYS.ACTIVITY, limit);
+    const redis = await this._readRedisList(REDIS_KEYS.ACTIVITY, limit);
+    if (redis.length > 0) return redis;
+    return this.activityLog.slice(-limit).reverse();
   }
 
   // ── Queries ───────────────────────────────────────────────────
