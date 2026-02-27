@@ -16,6 +16,7 @@ logger.info('Server', 'Initializing', { nodeVersion: process.version, env: proce
 
 // Auto-detect Redis credentials from all known Vercel/Upstash env var patterns
 function detectRedisCredentials() {
+  // Explicit well-known patterns
   const patterns = [
     { url: 'UPSTASH_REDIS_REST_URL', token: 'UPSTASH_REDIS_REST_TOKEN' },
     { url: 'KV_REST_API_URL', token: 'KV_REST_API_TOKEN' },
@@ -25,6 +26,20 @@ function detectRedisCredentials() {
   for (const p of patterns) {
     if (process.env[p.url] && process.env[p.token]) {
       return { url: process.env[p.url], token: process.env[p.token], source: `${p.url} + ${p.token}` };
+    }
+  }
+  // Dynamic scan: find any env var pair matching *_URL + *_TOKEN that looks like Upstash
+  const envKeys = Object.keys(process.env);
+  const urlKeys = envKeys.filter(k => k.endsWith('_URL') && process.env[k]?.includes('upstash'));
+  for (const urlKey of urlKeys) {
+    const prefix = urlKey.replace(/_URL$/, '');
+    const tokenKey = `${prefix}_TOKEN`;
+    if (process.env[tokenKey]) {
+      return { url: process.env[urlKey], token: process.env[tokenKey], source: `${urlKey} + ${tokenKey}` };
+    }
+    const restTokenKey = `${prefix}_REST_TOKEN`;
+    if (process.env[restTokenKey]) {
+      return { url: process.env[urlKey], token: process.env[restTokenKey], source: `${urlKey} + ${restTokenKey}` };
     }
   }
   return null;
@@ -386,17 +401,15 @@ function requireDebugAuth(req, res, next) {
 // GET /api/debug/env - Diagnostic: which integrations are configured (no secret values)
 app.get('/api/debug/env', requireDebugAuth, (req, res) => {
   const check = (name) => !!process.env[name];
+  const redisRelated = Object.keys(process.env)
+    .filter(k => /redis|kv|upstash|storage/i.test(k))
+    .map(k => k);
   res.json({
     redis: {
-      UPSTASH_REDIS_REST_URL: check('UPSTASH_REDIS_REST_URL'),
-      UPSTASH_REDIS_REST_TOKEN: check('UPSTASH_REDIS_REST_TOKEN'),
-      KV_REST_API_URL: check('KV_REST_API_URL'),
-      KV_REST_API_TOKEN: check('KV_REST_API_TOKEN'),
-      REDIS_URL: check('REDIS_URL'),
-      REDIS_TOKEN: check('REDIS_TOKEN'),
-      KV_URL: check('KV_URL'),
       detected: !!detectRedisCredentials(),
+      detectedSource: detectRedisCredentials()?.source || null,
       loggerActive: logger.hasRedis,
+      envVarsFound: redisRelated,
     },
     vercel: {
       VERCEL_TOKEN: check('VERCEL_TOKEN'),
