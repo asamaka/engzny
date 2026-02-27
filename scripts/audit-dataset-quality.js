@@ -30,12 +30,15 @@ const PHOTO_OF_PHONE_KEYWORDS = [
   'photograph', 'photo of', 'holding a phone', 'holding a smart phone',
   'smartphone on', 'device on', 'outside MOD', 'person holding',
   'on smartphone', 'on a work desk', 'grass background',
+  'using a phone', 'using a smart phone', 'using an ipad',
+  'using a desktop', 'using a tablet', 'pengjiajie',
+  'phone standing', 'phone on desk',
 ];
 
-// Keywords that suggest the image is not a mobile screenshot
 const NON_SCREENSHOT_KEYWORDS = [
   'banner', 'logo', 'advertisement', 'poster', 'FOSS4G',
   'copyright banner', 'pin map', 'georeferencing',
+  'serviceman accesses',
 ];
 
 function classifyAspectRatio(width, height) {

@@ -429,11 +429,19 @@ const PHOTO_OF_PHONE_PATTERNS = [
   /photograph/i, /photo of/i, /holding a (smart ?)?phone/i,
   /person holding/i, /outside MOD/i, /on a work desk/i,
   /app on smartphone/i, /on smartphone.*grass/i,
+  /using a (smart ?)?phone/i, /using an iPad/i,
+  /using a desktop/i, /using a tablet/i,
+  /\bPhone\b.*\(.*\)\.jpg$/,       // "Android_Phone_(Gingerbread).jpg" pattern
+  /Pengjiajie/i,                     // photographer of phone-comparison photos
+  /Redmi.*Blue/i,                    // photos of Redmi hardware
+  /phone.*on.*desk/i, /phone.*standing/i,
+  /iPhone.*with.*app.*standing/i,
 ];
 
 const NON_SCREENSHOT_PATTERNS = [
   /\bbanner\b/i, /\bposter\b/i, /\badvertisement\b/i,
   /\bpin map\b/i, /\bgeoreferencing\b/i,
+  /serviceman accesses/i,           // MOD stock photos of people using devices
 ];
 
 const MIN_QUALITY_WIDTH = 200;
@@ -442,7 +450,18 @@ const MIN_QUALITY_PIXELS = 100000;
 
 function isLikelyPhotoOfPhone(item) {
   const text = `${item.description || ''} ${item.title || ''}`;
-  return PHOTO_OF_PHONE_PATTERNS.some(p => p.test(text));
+  if (PHOTO_OF_PHONE_PATTERNS.some(p => p.test(text))) return true;
+
+  // Landscape images titled "Android_Phone_*" or "iPhone_*" with (Version) are
+  // almost always photos of physical hardware, not screenshots.
+  const title = item.title || '';
+  if (/Android_Phone/i.test(title) || /iPhone.*\(\d/i.test(title)) {
+    const w = item.width || 0;
+    const h = item.height || 0;
+    if (w > 0 && h > 0 && w > h) return true;
+  }
+
+  return false;
 }
 
 function isLikelyNonScreenshot(item) {
