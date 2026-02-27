@@ -8,7 +8,6 @@ const Anthropic = require('@anthropic-ai/sdk').default;
 const sharp = require('sharp');
 const { ClaudeAdapter } = require('./llm/claude');
 const { logger } = require('./lib/logger');
-const vercelLogs = require('./lib/vercel-logs');
 
 const app = express();
 
@@ -411,12 +410,6 @@ app.get('/api/debug/env', requireDebugAuth, (req, res) => {
       loggerActive: logger.hasRedis,
       envVarsFound: redisRelated,
     },
-    vercel: {
-      VERCEL_TOKEN: check('VERCEL_TOKEN'),
-      VERCEL_PROJECT_ID: check('VERCEL_PROJECT_ID'),
-      VERCEL_TEAM_ID: check('VERCEL_TEAM_ID'),
-      configured: vercelLogs.isConfigured(),
-    },
     anthropic: {
       ANTHROPIC_API_KEY: check('ANTHROPIC_API_KEY'),
     },
@@ -501,45 +494,6 @@ app.get('/api/debug/sessions', requireDebugAuth, async (req, res) => {
     res.json({ count: sessions.length, source: logger.hasRedis ? 'redis' : 'memory', sessions });
   } catch (err) {
     res.json({ count: 0, source: 'error', error: err.message, sessions: [] });
-  }
-});
-
-// GET /api/debug/vercel-logs - Fetch runtime logs from Vercel API
-// Requires VERCEL_TOKEN + VERCEL_PROJECT_ID env vars
-app.get('/api/debug/vercel-logs', requireDebugAuth, async (req, res) => {
-  if (!vercelLogs.isConfigured()) {
-    return res.status(501).json({
-      error: 'Vercel API not configured',
-      message: 'Set VERCEL_TOKEN and VERCEL_PROJECT_ID environment variables on Vercel to enable.',
-      required: ['VERCEL_TOKEN', 'VERCEL_PROJECT_ID'],
-      optional: ['VERCEL_TEAM_ID'],
-    });
-  }
-  try {
-    const { limit, since, until, level } = req.query;
-    const logs = await vercelLogs.fetchRuntimeLogs({
-      limit: limit ? parseInt(limit, 10) : 100,
-      since: since ? parseInt(since, 10) : undefined,
-      until: until ? parseInt(until, 10) : undefined,
-      level,
-    });
-    res.json(logs);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch Vercel logs', message: err.message });
-  }
-});
-
-// GET /api/debug/vercel-deployments - List recent Vercel deployments
-app.get('/api/debug/vercel-deployments', requireDebugAuth, async (req, res) => {
-  if (!vercelLogs.isConfigured()) {
-    return res.status(501).json({ error: 'Vercel API not configured' });
-  }
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
-    const deployments = await vercelLogs.listDeployments({ limit });
-    res.json({ count: deployments.length, deployments });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to list deployments', message: err.message });
   }
 });
 
