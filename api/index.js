@@ -919,13 +919,15 @@ app.post('/api/hub/v2/start', async (req, res) => {
     }
 
     // Capture screenshot for test dataset (async, non-blocking)
+    // Hold a direct reference — the job may be removed from the map before capture completes
+    const jobRef = pipelineJobs.get(requestId);
     screenshotCapture.captureScreenshot({
       base64Data: normalized.imageData,
       mediaType: normalized.mediaType,
       requestId,
     }).then(entry => {
-      if (entry) {
-        pipelineJobs.get(requestId) && (pipelineJobs.get(requestId)._captureId = entry.id);
+      if (entry && jobRef) {
+        jobRef._captureId = entry.id;
         logger.info('Capture', `Saved screenshot ${entry.id}`, { requestId, w: entry.width, h: entry.height, size: entry.originalSize });
       }
     }).catch(() => {});
