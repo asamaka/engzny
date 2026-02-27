@@ -2450,14 +2450,13 @@ app.get('/r', (req, res) => {
 
 app.get('/r/:requestId', async (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
-  // If user has valid PIN cookie, render the full report server-side
-  const hasCookie = req.cookies[RPIN_COOKIE] && verifyPin(req.cookies[RPIN_COOKIE]);
-  if (hasCookie) {
+  const authed = !!(req.cookies[RPIN_COOKIE] && verifyPin(req.cookies[RPIN_COOKIE]));
+  if (authed) {
     const report = await liveReports.getLiveReport(req.params.requestId);
     const thumb = report ? await liveReports.getLiveReportThumb(req.params.requestId) : null;
-    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb));
+    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true));
   } else {
-    res.send(getLiveReportViewerHtml(req.params.requestId, null, null));
+    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false));
   }
 });
 
@@ -2570,11 +2569,13 @@ async function loadList(){
 </body></html>`;
 }
 
-function getLiveReportViewerHtml(requestId, report, thumbBase64) {
+function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated) {
   const { renderCardHtml, renderReflection, esc, fmtMs } = reportRenderer;
 
   // If no report data, show just the PIN gate (client-side JS will redirect after auth)
   const hasReport = !!report;
+  const showPinGate = !isAuthenticated;
+  const showExpired = isAuthenticated && !hasReport;
 
   function timeSince(ts) {
     const s = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
@@ -2647,8 +2648,6 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64) {
       + reflectionLines.map(l => '<p>' + l + '</p>').join('')
       + '</div>';
 
-  } else if (hasReport === false || (hasReport && report.expiresAt && new Date(report.expiresAt) < new Date())) {
-    reportHtml = '<div class="expired"><div class="big">&#9203;</div><p>This report has expired or does not exist.</p><p style="margin-top:8px"><a href="/r" style="color:var(--a)">View all reports</a></p></div>';
   }
 
   return `<!DOCTYPE html>
@@ -2844,11 +2843,11 @@ footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--b);color:var(
 </style>
 </head><body>
 <div class="wrap">
-${hasReport ? '' : '<div id="gate" class="pin-gate"><h2>Enter 4-digit PIN</h2><div class="pin-row"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric" autofocus><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"></div><div class="pin-err" id="pin-err"></div></div>'}
-${hasReport ? reportHtml : ''}
-${hasReport ? '<footer>thinx.fun live report &middot; auto-generated &middot; expires in 1 hour</footer>' : ''}
+${showPinGate ? '<div id="gate" class="pin-gate"><h2>Enter 4-digit PIN</h2><div class="pin-row"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric" autofocus><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"><input class="pin-box" type="tel" maxlength="1" inputmode="numeric"></div><div class="pin-err" id="pin-err"></div></div>' : ''}
+${hasReport ? reportHtml : showExpired ? '<div class="expired"><div class="big">&#9203;</div><p>This report has expired or does not exist.</p><p style="margin-top:8px"><a href="/r" style="color:var(--a)">View all reports</a></p></div>' : ''}
+${(hasReport || showExpired) ? '<footer>thinx.fun live report &middot; auto-generated &middot; expires in 1 hour</footer>' : ''}
 </div>
-${hasReport ? '' : `<script>
+${showPinGate ? `<script>
 var boxes=document.querySelectorAll('.pin-box');
 boxes.forEach(function(b,i){
   b.addEventListener('input',function(){if(b.value.length===1&&i<3)boxes[i+1].focus();if(i===3&&b.value.length===1)tryPin();});
@@ -2862,7 +2861,7 @@ async function tryPin(){
   if(r.ok)location.reload();
   else{document.getElementById('pin-err').textContent='Wrong PIN';boxes.forEach(function(b){b.value='';});boxes[0].focus();}
 }
-</script>`}
+</script>` : ''}
 </body></html>`;
 }
 
