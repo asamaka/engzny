@@ -393,6 +393,9 @@ reportStore.init(getRedis);
 const screenshotCapture = require('./lib/screenshot-capture');
 screenshotCapture.init(getRedis);
 
+const liveReports = require('./lib/live-reports');
+liveReports.init(getRedis);
+
 const SESSION_COOKIE = 'thinx_sid';
 const SESSION_MAX_AGE = 7 * 24 * 3600 * 1000;
 
@@ -1055,6 +1058,35 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, designDuration: populatedLayout._meta?.designDuration });
         sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
         endStream();
+
+        // Auto-save live report (async, non-blocking)
+        (async () => {
+          try {
+            let thumb = null;
+            if (job._captureId) {
+              thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
+            }
+            await liveReports.saveLiveReport(requestId, {
+              contentType: populatedLayout.contentAnalysis?.contentType,
+              platform: populatedLayout.contentAnalysis?.platform,
+              layoutType: populatedLayout.layout?.type,
+              cardCount: populatedLayout.cards?.length,
+              duration: populatedLayout._meta?.totalDuration,
+              designDuration: populatedLayout._meta?.designDuration,
+              outcome: 'success',
+              imageSize: `${imageSize}KB`,
+              mediaType: job.mediaType,
+              contentAnalysis: populatedLayout.contentAnalysis,
+              layout: populatedLayout.layout,
+              cards: populatedLayout.cards,
+              meta: populatedLayout._meta,
+              thumb,
+            });
+            logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
+          } catch (err) {
+            logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
+          }
+        })();
       },
 
       onError: (error) => {
@@ -1062,6 +1094,14 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         logger.pipelineError(requestId, error, { phase: 'pipeline' });
         sendEvent('error', { message: error.message });
         endStream();
+
+        // Save failed report too
+        liveReports.saveLiveReport(requestId, {
+          outcome: 'error',
+          error: error.message,
+          imageSize: `${imageSize}KB`,
+          mediaType: job.mediaType,
+        }).catch(() => {});
       },
     });
   } catch (error) {
@@ -2321,6 +2361,392 @@ app.use((error, req, res, next) => {
   }
   next(error);
 });
+
+// ============================================
+// Live Run Reports — public with 4-digit PIN
+// ============================================
+const REPORT_PIN = process.env.REPORT_PIN || '0427';
+const RPIN_COOKIE = 'thinx_rpin';
+const RPIN_MAX_AGE = 3600 * 1000; // 1 hour
+
+function signPin(pin) {
+  return pin + '.' + crypto.createHmac('sha256', REPORT_PIN).update(pin).digest('hex').slice(0, 12);
+}
+function verifyPin(cookie) {
+  if (!cookie || !cookie.includes('.')) return false;
+  const [pin, sig] = cookie.split('.');
+  return pin === REPORT_PIN && sig === crypto.createHmac('sha256', REPORT_PIN).update(pin).digest('hex').slice(0, 12);
+}
+
+// PIN verification endpoint
+app.post('/api/r/auth', (req, res) => {
+  const { pin } = req.body || {};
+  if (String(pin) !== REPORT_PIN) return res.status(401).json({ error: 'Invalid PIN' });
+  res.cookie(RPIN_COOKIE, signPin(REPORT_PIN), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: RPIN_MAX_AGE,
+    path: '/',
+  });
+  res.json({ ok: true });
+});
+
+function requirePin(req, res, next) {
+  if (req.cookies[RPIN_COOKIE] && verifyPin(req.cookies[RPIN_COOKIE])) return next();
+  return res.status(401).json({ error: 'PIN required' });
+}
+
+// JSON API for report data (PIN-protected)
+app.get('/api/r/list', requirePin, async (req, res) => {
+  const reports = await liveReports.listLiveReports();
+  res.json({ reports });
+});
+
+app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
+  const report = await liveReports.getLiveReport(req.params.requestId);
+  if (!report) return res.status(404).json({ error: 'Report not found or expired' });
+  const { thumb, ...data } = report;
+  res.json({ report: data, hasThumb: !!thumb });
+});
+
+app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
+  const thumb = await liveReports.getLiveReportThumb(req.params.requestId);
+  if (!thumb) return res.status(404).json({ error: 'No thumbnail' });
+  res.set('Content-Type', 'image/jpeg');
+  res.send(Buffer.from(thumb, 'base64'));
+});
+
+// Public report pages (HTML — PIN gate is client-side JS calling /api/r/auth)
+app.get('/r', (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(getLiveReportIndexHtml());
+});
+
+app.get('/r/:requestId', (req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(getLiveReportViewerHtml(req.params.requestId));
+});
+
+function getLiveReportIndexHtml() {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>thinx.fun — Live Reports</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0d12;--s:#151a22;--s2:#1b222c;--b:#1e2736;--b2:#2d3a4e;--t:#e8ecf2;--t2:#8d99ae;--t3:#5c6878;--a:#6c9fff;--g:#5bdb8a;--r:#ff6b6b;--y:#ffd15c;--rad:12px}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+.wrap{max-width:640px;margin:0 auto;padding:24px 16px}
+h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
+.sub{color:var(--t2);font-size:.82rem;margin-bottom:24px}
+.pin-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
+.pin-gate h2{font-size:1.1rem;color:var(--t2);font-weight:500}
+.pin-row{display:flex;gap:8px}
+.pin-box{width:48px;height:56px;background:var(--s);border:2px solid var(--b);border-radius:var(--rad);text-align:center;font-size:1.5rem;font-weight:700;color:var(--a);caret-color:var(--a);outline:none;transition:border-color .2s}
+.pin-box:focus{border-color:var(--a)}
+.pin-err{color:var(--r);font-size:.8rem;height:20px}
+.content{display:none}
+.badge{display:inline-block;padding:2px 10px;border-radius:100px;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.badge-g{background:rgba(91,219,138,.12);color:var(--g)}
+.badge-r{background:rgba(255,107,107,.12);color:var(--r)}
+.badge-a{background:rgba(108,159,255,.1);color:var(--a)}
+.badge-y{background:rgba(255,209,92,.1);color:var(--y)}
+.empty{text-align:center;color:var(--t3);padding:48px 16px;font-size:.9rem}
+.rlist{display:flex;flex-direction:column;gap:10px}
+.rcard{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--s);border:1px solid var(--b);border-radius:var(--rad);text-decoration:none;color:inherit;transition:border-color .2s,transform .15s}
+.rcard:hover{border-color:var(--a);transform:translateY(-1px)}
+.rcard .thumb{width:48px;height:48px;border-radius:8px;object-fit:cover;background:var(--s2);flex-shrink:0}
+.rcard .info{flex:1;min-width:0}
+.rcard .rid{font-family:'SF Mono',monospace;font-weight:700;font-size:.9rem;color:var(--a)}
+.rcard .meta{font-size:.75rem;color:var(--t2);margin-top:3px;display:flex;flex-wrap:wrap;gap:8px}
+.rcard .meta span{white-space:nowrap}
+.rcard .arrow{color:var(--t3);font-size:1.2rem}
+.refresh-btn{background:var(--s);border:1px solid var(--b);color:var(--t2);padding:6px 14px;border-radius:100px;font-size:.75rem;cursor:pointer;transition:border-color .2s}
+.refresh-btn:hover{border-color:var(--a);color:var(--a)}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head><body>
+<div class="wrap">
+<div id="gate" class="pin-gate">
+  <h2>Enter 4-digit PIN</h2>
+  <div class="pin-row">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric" autofocus>
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+  </div>
+  <div class="pin-err" id="pin-err"></div>
+</div>
+<div id="content" class="content">
+  <div class="hdr">
+    <div><h1>Live Reports</h1><div class="sub">Auto-generated for every pipeline run &middot; 1hr TTL</div></div>
+    <button class="refresh-btn" onclick="loadList()">Refresh</button>
+  </div>
+  <div id="list" class="rlist"><div class="empty">Loading...</div></div>
+</div>
+</div>
+<script>
+var boxes=document.querySelectorAll('.pin-box');
+boxes.forEach(function(b,i){
+  b.addEventListener('input',function(){
+    if(b.value.length===1&&i<3)boxes[i+1].focus();
+    if(i===3&&b.value.length===1)tryPin();
+  });
+  b.addEventListener('keydown',function(e){
+    if(e.key==='Backspace'&&!b.value&&i>0){boxes[i-1].focus();boxes[i-1].value='';}
+  });
+  b.addEventListener('paste',function(e){
+    e.preventDefault();
+    var d=(e.clipboardData||window.clipboardData).getData('text').replace(/\\D/g,'').slice(0,4);
+    for(var j=0;j<d.length&&j<4;j++){boxes[j].value=d[j];}
+    if(d.length>=4)tryPin();
+  });
+});
+async function tryPin(){
+  var pin=Array.from(boxes).map(function(b){return b.value}).join('');
+  if(pin.length!==4)return;
+  var r=await fetch('/api/r/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:pin}),credentials:'same-origin'});
+  if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadList();}
+  else{document.getElementById('pin-err').textContent='Wrong PIN';boxes.forEach(function(b){b.value='';});boxes[0].focus();}
+}
+function timeSince(d){var s=Math.floor((Date.now()-new Date(d).getTime())/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+function ttlLeft(d){var ms=new Date(d).getTime()-Date.now();if(ms<=0)return'expired';var m=Math.floor(ms/60000);return m+'m left';}
+async function loadList(){
+  var r=await fetch('/api/r/list',{credentials:'same-origin'});
+  if(r.status===401){document.getElementById('gate').style.display='flex';document.getElementById('content').style.display='none';return;}
+  var data=await r.json();
+  var el=document.getElementById('list');
+  if(!data.reports||!data.reports.length){el.innerHTML='<div class="empty">No live reports yet. Analyze a screenshot to generate one.</div>';return;}
+  el.innerHTML=data.reports.map(function(r){
+    var badge=r.outcome==='success'?'<span class="badge badge-g">success</span>':'<span class="badge badge-r">'+r.outcome+'</span>';
+    return '<a class="rcard" href="/r/'+r.requestId+'">'
+      +(r.hasThumb?'<img class="thumb" src="/api/r/'+r.requestId+'/thumb" alt="">':'<div class="thumb"></div>')
+      +'<div class="info"><div class="rid">'+r.requestId+' '+badge+'</div>'
+      +'<div class="meta"><span>'+timeSince(r.createdAt)+'</span>'
+      +(r.layoutType?'<span>'+r.layoutType+'</span>':'')
+      +(r.cardCount?'<span>'+r.cardCount+' cards</span>':'')
+      +(r.duration?'<span>'+Math.round(r.duration/1000)+'s</span>':'')
+      +'<span class="badge badge-y">'+ttlLeft(r.expiresAt)+'</span>'
+      +'</div></div><span class="arrow">&#8250;</span></a>';
+  }).join('');
+}
+(async function(){var r=await fetch('/api/r/list',{credentials:'same-origin'});if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadList();}})();
+</script>
+</body></html>`;
+}
+
+function getLiveReportViewerHtml(requestId) {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>thinx.fun — Report ${requestId}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0d12;--s:#151a22;--s2:#1b222c;--s3:#222a36;--b:#1e2736;--b2:#2d3a4e;--t:#e8ecf2;--t2:#8d99ae;--t3:#5c6878;--a:#6c9fff;--g:#5bdb8a;--r:#ff6b6b;--y:#ffd15c;--p:#b48eff;--rad:12px}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--t);min-height:100vh}
+.wrap{max-width:720px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:1.3rem;font-weight:700}
+h2{font-size:1rem;font-weight:600;color:var(--a);margin:28px 0 12px;padding-bottom:6px;border-bottom:1px solid var(--b)}
+.sub{color:var(--t2);font-size:.8rem;margin:4px 0 20px}
+.back{color:var(--t3);text-decoration:none;font-size:.82rem;display:inline-flex;align-items:center;gap:4px;margin-bottom:12px;transition:color .2s}
+.back:hover{color:var(--a)}
+.badge{display:inline-block;padding:2px 10px;border-radius:100px;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.badge-g{background:rgba(91,219,138,.12);color:var(--g)}
+.badge-r{background:rgba(255,107,107,.12);color:var(--r)}
+.badge-a{background:rgba(108,159,255,.1);color:var(--a)}
+.badge-y{background:rgba(255,209,92,.1);color:var(--y)}
+.card{background:var(--s);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px}
+.kv{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(30,39,54,.6);font-size:.84rem}
+.kv:last-child{border-bottom:none}
+.kv .k{color:var(--t2)}.kv .v{font-weight:500;text-align:right;max-width:60%;word-break:break-word}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:500px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--s);border:1px solid var(--b);border-radius:var(--rad);padding:14px;text-align:center}
+.stat .v{font-size:1.5rem;font-weight:700;color:var(--a)}
+.stat .l{font-size:.68rem;color:var(--t2);text-transform:uppercase;letter-spacing:.05em;margin-top:4px}
+.screenshot-row{display:flex;gap:16px;align-items:flex-start;margin:12px 0}
+.screenshot-row img{max-width:200px;border-radius:var(--rad);border:1px solid var(--b);flex-shrink:0}
+@media(max-width:500px){.screenshot-row{flex-direction:column}.screenshot-row img{max-width:100%}}
+.cardlist{display:flex;flex-direction:column;gap:8px}
+.ccard{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:14px;cursor:pointer;transition:border-color .2s}
+.ccard:hover{border-color:var(--a)}
+.ccard-hdr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ccard-hdr .icon{font-size:1.1rem}
+.ccard-hdr .name{font-weight:600;font-size:.88rem}
+.ccard-hdr .ctype{margin-left:auto;font-size:.7rem;color:var(--t3);font-family:'SF Mono',monospace}
+.ccard-data{font-size:.82rem;color:var(--t2);line-height:1.5}
+.ccard-data strong{color:var(--t);font-weight:600}
+.ccard-data .field{margin:4px 0}
+.ccard-data .field-label{color:var(--t3);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em}
+.ccard-data ul{padding-left:18px;margin:4px 0}
+.timeline-bar{display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden;margin:8px 0}
+.timeline-bar div{height:100%;border-radius:2px}
+.pin-gate{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px}
+.pin-gate h2{font-size:1.1rem;color:var(--t2);font-weight:500}
+.pin-row{display:flex;gap:8px}
+.pin-box{width:48px;height:56px;background:var(--s);border:2px solid var(--b);border-radius:var(--rad);text-align:center;font-size:1.5rem;font-weight:700;color:var(--a);caret-color:var(--a);outline:none;transition:border-color .2s}
+.pin-box:focus{border-color:var(--a)}
+.pin-err{color:var(--r);font-size:.8rem;height:20px}
+.expired{text-align:center;padding:48px;color:var(--t3)}
+.expired .big{font-size:2rem;margin-bottom:12px}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head><body>
+<div class="wrap">
+<div id="gate" class="pin-gate">
+  <h2>Enter 4-digit PIN</h2>
+  <div class="pin-row">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric" autofocus>
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+    <input class="pin-box" type="tel" maxlength="1" inputmode="numeric">
+  </div>
+  <div class="pin-err" id="pin-err"></div>
+</div>
+<div id="content" style="display:none">
+  <a class="back" href="/r">&lsaquo; All Reports</a>
+  <div id="report">Loading...</div>
+</div>
+</div>
+<script>
+var RID='${requestId}';
+var boxes=document.querySelectorAll('.pin-box');
+boxes.forEach(function(b,i){
+  b.addEventListener('input',function(){if(b.value.length===1&&i<3)boxes[i+1].focus();if(i===3&&b.value.length===1)tryPin();});
+  b.addEventListener('keydown',function(e){if(e.key==='Backspace'&&!b.value&&i>0){boxes[i-1].focus();boxes[i-1].value='';}});
+  b.addEventListener('paste',function(e){e.preventDefault();var d=(e.clipboardData||window.clipboardData).getData('text').replace(/\\\\D/g,'').slice(0,4);for(var j=0;j<d.length&&j<4;j++)boxes[j].value=d[j];if(d.length>=4)tryPin();});
+});
+async function tryPin(){
+  var pin=Array.from(boxes).map(function(b){return b.value}).join('');
+  if(pin.length!==4)return;
+  var r=await fetch('/api/r/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:pin}),credentials:'same-origin'});
+  if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadReport();}
+  else{document.getElementById('pin-err').textContent='Wrong PIN';boxes.forEach(function(b){b.value='';});boxes[0].focus();}
+}
+function esc(s){var d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML;}
+function fmtMs(ms){return ms<1000?ms+'ms':(ms/1000).toFixed(1)+'s';}
+function timeSince(d){var s=Math.floor((Date.now()-new Date(d).getTime())/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';return Math.floor(s/3600)+'h ago';}
+function ttlLeft(d){var ms=new Date(d).getTime()-Date.now();if(ms<=0)return'expired';return Math.floor(ms/60000)+'m left';}
+var cardIcons={hero_summary:'\\u{1F4F0}',key_metric:'\\u{1F4CA}',info_list:'\\u{1F4CB}',fact_check:'\\u2705',person_card:'\\u{1F464}',product_card:'\\u{1F6CD}',timeline_card:'\\u{1F4C5}',quote_card:'\\u{1F4AC}',comparison_card:'\\u2696\\uFE0F',warning_card:'\\u26A0\\uFE0F',action_card:'\\u{1F3AF}',text_extract:'\\u{1F4DD}',location_card:'\\u{1F4CD}',link_card:'\\u{1F517}'};
+
+function renderCardData(type,data){
+  if(!data)return'<div class="ccard-data" style="color:var(--t3)">No data</div>';
+  var h='<div class="ccard-data">';
+  // Render based on type
+  if(data.title)h+='<div class="field"><strong>'+esc(data.title)+'</strong></div>';
+  if(data.subtitle)h+='<div class="field">'+esc(data.subtitle)+'</div>';
+  if(data.badge)h+='<span class="badge badge-a">'+esc(data.badge)+'</span> ';
+  if(data.takeaway)h+='<div class="field" style="margin-top:6px">'+esc(data.takeaway)+'</div>';
+  if(data.name&&type!=='hero_summary')h+='<div class="field"><strong>'+esc(data.name)+'</strong>'+(data.role?' &mdash; '+esc(data.role):'')+'</div>';
+  if(data.claim)h+='<div class="field"><div class="field-label">Claim</div>'+esc(data.claim)+'</div>';
+  if(data.verdict)h+='<div class="field"><div class="field-label">Verdict</div><span class="badge '+(data.verdict==='verified'||data.verdict==='true'?'badge-g':data.verdict==='false'?'badge-r':'badge-y')+'">'+esc(data.verdict)+'</span></div>';
+  if(data.explanation)h+='<div class="field"><div class="field-label">Explanation</div>'+esc(data.explanation)+'</div>';
+  if(data.context)h+='<div class="field">'+esc(data.context)+'</div>';
+  if(data.level)h+='<span class="badge '+(data.level==='critical'?'badge-r':data.level==='warning'?'badge-y':'badge-a')+'">'+esc(data.level)+'</span> ';
+  if(data.details&&typeof data.details==='string')h+='<div class="field">'+esc(data.details)+'</div>';
+  if(data.advice)h+='<div class="field"><div class="field-label">Advice</div>'+esc(data.advice)+'</div>';
+  if(data.label&&data.value)h+='<div class="field"><strong>'+esc(data.value)+(data.unit||'')+'</strong> '+esc(data.label)+'</div>';
+  if(data.quote)h+='<div class="field" style="font-style:italic;border-left:3px solid var(--a);padding-left:10px">&ldquo;'+esc(data.quote)+'&rdquo;'+(data.attribution?' &mdash; '+esc(data.attribution):'')+'</div>';
+  if(data.address)h+='<div class="field"><div class="field-label">Address</div>'+esc(data.address)+'</div>';
+  if(data.price)h+='<div class="field"><div class="field-label">Price</div>'+esc(data.price)+'</div>';
+  if(data.text)h+='<div class="field" style="font-family:monospace;font-size:.8rem;background:var(--s3);padding:8px;border-radius:6px">'+esc(data.text)+'</div>';
+  // Arrays
+  if(Array.isArray(data.items)){h+='<ul>';data.items.forEach(function(it){h+='<li>'+(typeof it==='string'?esc(it):(esc(it.label||'')+': <strong>'+esc(it.value||'')+'</strong>'))+'</li>';});h+='</ul>';}
+  if(Array.isArray(data.events)){data.events.forEach(function(ev){h+='<div class="field"><span style="color:var(--a);font-weight:600">'+esc(ev.date||'')+'</span> '+esc(ev.event||'')+'</div>';});}
+  if(Array.isArray(data.actions)){data.actions.forEach(function(a){h+='<div class="field">'+(a.priority?'<span class="badge '+(a.priority==='high'?'badge-r':a.priority==='medium'?'badge-y':'badge-a')+'">'+esc(a.priority)+'</span> ':'')+esc(a.label||'')+(a.description?' &mdash; '+esc(a.description):'')+'</div>';});}
+  if(Array.isArray(data.features)){h+='<ul>';data.features.forEach(function(f){h+='<li>'+esc(typeof f==='string'?f:f.label||JSON.stringify(f))+'</li>';});h+='</ul>';}
+  if(Array.isArray(data.details)){h+='<ul>';data.details.forEach(function(d){h+='<li>'+esc(d)+'</li>';});h+='</ul>';}
+  if(Array.isArray(data.links)){data.links.forEach(function(l){h+='<div class="field"><a href="'+esc(l.url)+'" style="color:var(--a)" target="_blank">'+esc(l.label)+'</a>'+(l.description?' &mdash; '+esc(l.description):'')+'</div>';});}
+  if(Array.isArray(data.warnings)){h+='<ul>';data.warnings.forEach(function(w){h+='<li style="color:var(--y)">'+esc(w)+'</li>';});h+='</ul>';}
+  h+='</div>';
+  return h;
+}
+
+async function loadReport(){
+  var el=document.getElementById('report');
+  var r=await fetch('/api/r/'+RID+'/data',{credentials:'same-origin'});
+  if(r.status===401){document.getElementById('gate').style.display='flex';document.getElementById('content').style.display='none';return;}
+  if(r.status===404){el.innerHTML='<div class="expired"><div class="big">\\u23F3</div><p>This report has expired or does not exist.</p><p style="margin-top:8px"><a href="/r" style="color:var(--a)">View all reports</a></p></div>';return;}
+  var d=(await r.json()).report;
+  var html='';
+
+  // Header
+  html+='<h1>Report '+esc(d.requestId)+'</h1>';
+  html+='<div class="sub">'+timeSince(d.createdAt)+' &middot; <span class="badge badge-y">'+ttlLeft(d.expiresAt)+'</span> &middot; <span class="badge '+(d.outcome==='success'?'badge-g':'badge-r')+'">'+esc(d.outcome)+'</span></div>';
+
+  // Stats
+  html+='<div class="stats">';
+  html+='<div class="stat"><div class="v">'+(d.duration?fmtMs(d.duration):'—')+'</div><div class="l">Duration</div></div>';
+  html+='<div class="stat"><div class="v">'+(d.cardCount||'—')+'</div><div class="l">Cards</div></div>';
+  html+='<div class="stat"><div class="v">'+(d.layoutType||'—')+'</div><div class="l">Layout</div></div>';
+  html+='<div class="stat"><div class="v">'+(d.imageSize||'—')+'</div><div class="l">Image</div></div>';
+  html+='</div>';
+
+  // Pipeline timeline bar
+  if(d.meta){
+    var design=d.meta.designDuration||0;
+    var research=(d.meta.totalDuration||0)-design;
+    var total=d.meta.totalDuration||1;
+    html+='<div class="card"><div style="font-size:.82rem;font-weight:600;margin-bottom:6px">Pipeline Timing</div>';
+    html+='<div class="timeline-bar">';
+    html+='<div style="width:'+Math.round(design/total*100)+'%;background:var(--a)" title="Design: '+fmtMs(design)+'"></div>';
+    html+='<div style="width:'+Math.round(research/total*100)+'%;background:var(--g)" title="Research: '+fmtMs(research)+'"></div>';
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--t3);margin-top:4px">';
+    html+='<span style="color:var(--a)">Design: '+fmtMs(design)+'</span>';
+    html+='<span style="color:var(--g)">Research: '+fmtMs(research)+'</span>';
+    html+='<span>Total: '+fmtMs(total)+'</span>';
+    html+='</div></div>';
+  }
+
+  // Screenshot + Content Analysis
+  html+='<h2>Screenshot &amp; Content</h2>';
+  html+='<div class="screenshot-row">';
+  html+='<img src="/api/r/'+RID+'/thumb" alt="Screenshot" onerror="this.style.display=\\'none\\'">';
+  html+='<div class="card" style="flex:1">';
+  if(d.contentAnalysis){
+    var ca=d.contentAnalysis;
+    html+='<div class="kv"><span class="k">Content Type</span><span class="v">'+esc(ca.contentType)+'</span></div>';
+    if(ca.platform)html+='<div class="kv"><span class="k">Platform</span><span class="v">'+esc(ca.platform)+'</span></div>';
+    if(ca.intent)html+='<div class="kv"><span class="k">Intent</span><span class="v">'+esc(ca.intent)+'</span></div>';
+    if(ca.topQuestions&&ca.topQuestions.length){html+='<div class="kv"><span class="k">Top Questions</span><span class="v">'+ca.topQuestions.map(function(q){return esc(q)}).join('<br>')+'</span></div>';}
+  }
+  html+='<div class="kv"><span class="k">Media Type</span><span class="v">'+esc(d.mediaType||'—')+'</span></div>';
+  html+='<div class="kv"><span class="k">Image Size</span><span class="v">'+esc(d.imageSize||'—')+'</span></div>';
+  html+='</div></div>';
+
+  // Cards
+  if(d.cards&&d.cards.length){
+    html+='<h2>Cards Presented ('+d.cards.length+')</h2>';
+    html+='<div class="cardlist">';
+    d.cards.forEach(function(c,i){
+      var icon=cardIcons[c.cardType]||'\\u{1F4C4}';
+      html+='<div class="ccard">';
+      html+='<div class="ccard-hdr"><span class="icon">'+icon+'</span><span class="name">'+(c.data?.title||c.data?.name||c.data?.claim||'Card '+(i+1))+'</span><span class="ctype">'+esc(c.cardType)+'</span></div>';
+      html+=renderCardData(c.cardType,c.data);
+      html+='</div>';
+    });
+    html+='</div>';
+  }
+
+  // Layout details
+  if(d.layout){
+    html+='<h2>Layout</h2>';
+    html+='<div class="card">';
+    html+='<div class="kv"><span class="k">Type</span><span class="v">'+esc(d.layout.type)+'</span></div>';
+    if(d.layout.columns)html+='<div class="kv"><span class="k">Columns</span><span class="v">'+d.layout.columns+'</span></div>';
+    if(d.layout.reason)html+='<div class="kv"><span class="k">Reason</span><span class="v">'+esc(d.layout.reason)+'</span></div>';
+    html+='</div>';
+  }
+
+  el.innerHTML=html;
+}
+(async function(){var r=await fetch('/api/r/'+RID+'/data',{credentials:'same-origin'});if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadReport();}})();
+</script>
+</body></html>`;
+}
 
 // Serve job progress page for UUID-formatted paths
 const UUID_REGEX = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;

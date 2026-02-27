@@ -72,7 +72,7 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
 
   const config = {
     ...adapterConfig,
-    model: 'claude-haiku-4-5-20241022',
+    model: 'claude-haiku-4-5-latest',
     maxTokens: 2048,
   };
 

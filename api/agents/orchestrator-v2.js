@@ -117,7 +117,7 @@ async function runPipeline({
 
     logger.info('Orchestrator', 'Phase 1: Layout Design + Fast Classify (parallel)', {
       designModel: designAdapterConfig.model,
-      classifyModel: 'claude-haiku-4-5-20241022',
+      classifyModel: 'claude-haiku-4-5-latest',
     });
 
     let designProgress = 5;
