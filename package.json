@@ -13,7 +13,9 @@
     "test:unit": "jest tests/unit",
     "test:dataset": "jest tests/unit/dataset-validation.test.js",
     "dataset:fetch": "node scripts/fetch-screenshot-dataset.js --verbose",
-    "dataset:fetch:quick": "node scripts/fetch-screenshot-dataset.js --curated-only --verbose"
+    "dataset:fetch:quick": "node scripts/fetch-screenshot-dataset.js --curated-only --verbose",
+    "dataset:pipeline": "node scripts/run-dataset-pipeline.js --count 4",
+    "dataset:audit": "node scripts/audit-dataset-quality.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
