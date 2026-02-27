@@ -76,21 +76,56 @@ async function fetchRuntimeLogs({ limit = 100, since, until, level } = {}) {
   if (since) params.since = String(since);
   if (until) params.until = String(until);
 
-  const res = await vercelFetch(
-    `/v1/projects/${projectId}/deployments/${deployment.uid}/runtime-logs`,
-    params
-  );
+  const { token, teamId } = getConfig();
+  const url = new URL(`/v1/projects/${projectId}/deployments/${deployment.uid}/runtime-logs`, VERCEL_API);
+  if (teamId) url.searchParams.set('teamId', teamId);
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+  }
 
-  const text = await res.text();
-  const lines = text.split('\n').filter(Boolean);
-  let entries = lines.map(line => {
-    try { return JSON.parse(line); } catch { return null; }
-  }).filter(Boolean);
+  // Runtime logs is a streaming endpoint (NDJSON). Use AbortController to
+  // stop reading after we have enough data or hit a timeout.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  let entries = [];
+  try {
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Vercel API ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const maxEntries = limit * 2;
+
+    while (entries.length < maxEntries) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { entries.push(JSON.parse(line)); } catch {}
+        if (entries.length >= maxEntries) break;
+      }
+    }
+    reader.cancel().catch(() => {});
+  } catch (err) {
+    if (err.name !== 'AbortError') throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (level) {
     entries = entries.filter(e => e.level === level);
   }
-
   entries = entries.slice(0, limit);
 
   return {
