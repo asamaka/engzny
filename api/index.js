@@ -388,6 +388,7 @@ app.post('/api/debug/client-report', (req, res) => {
 // Stores pipeline test reports with token + passkey auth
 // ============================================
 const reportStore = require('./lib/report-store');
+reportStore.init(getRedis);
 
 // POST /api/reports — Upload a new report
 app.post('/api/reports', requireDebugAuth, async (req, res) => {
