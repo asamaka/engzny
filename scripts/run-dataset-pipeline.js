@@ -70,7 +70,7 @@ function imageToBase64DataUrl(filePath) {
   return `data:${mime};base64,${buffer.toString('base64')}`;
 }
 
-function postJSON(url, body) {
+function postJSON(url, body, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
     const proto = urlObj.protocol === 'https:' ? https : http;
@@ -78,9 +78,9 @@ function postJSON(url, body) {
     const req = proto.request({
       hostname: urlObj.hostname,
       port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
-      path: urlObj.pathname,
+      path: urlObj.pathname + (urlObj.search || ''),
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data), ...extraHeaders },
     }, (res) => {
       let body = '';
       res.on('data', chunk => { body += chunk; });
@@ -526,7 +526,7 @@ async function main() {
 
   const debugToken = process.env.DEBUG_TOKEN || 'thinx-debug-2026';
   try {
-    const uploadRes = await postJSON(`${uploadUrl}?token=${encodeURIComponent(debugToken)}`, { title, html, meta: reportMeta });
+    const uploadRes = await postJSON(uploadUrl, { title, html, meta: reportMeta }, { 'X-Debug-Token': debugToken });
     if (uploadRes.ok && uploadRes.report) {
       log(`\nReport uploaded to storage: ${uploadRes.report.id}`);
       log(`View at: ${baseUrl}/reports`);
