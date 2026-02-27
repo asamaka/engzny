@@ -39,16 +39,28 @@ const PROGRESS_MESSAGES = {
 
 // Redis client (lazy loaded)
 let redis = null;
+let _loggerRedisInitialized = false;
 const getRedis = async () => {
   if (redis) return redis;
   
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = require('@upstash/redis');
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
-    return redis;
+    try {
+      const { Redis } = require('@upstash/redis');
+      redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+      if (!_loggerRedisInitialized) {
+        _loggerRedisInitialized = true;
+        logger.initRedis(redis).catch(err =>
+          console.warn('[Redis] Logger Redis init failed:', err.message)
+        );
+      }
+      return redis;
+    } catch (err) {
+      console.warn('[Redis] Failed to create client:', err.message);
+      return null;
+    }
   }
   
   return null;
@@ -342,16 +354,24 @@ function requireDebugAuth(req, res, next) {
   res.status(401).json({ error: 'Unauthorized' });
 }
 
-// GET /api/debug/dashboard - Quick at-a-glance production status
-app.get('/api/debug/dashboard', requireDebugAuth, (req, res) => {
-  res.json(logger.getDashboard());
+// GET /api/debug/dashboard - Quick at-a-glance production status (Redis-aware)
+app.get('/api/debug/dashboard', requireDebugAuth, async (req, res) => {
+  try {
+    res.json(await logger.getPersistedDashboard());
+  } catch (err) {
+    res.json(logger.getDashboard());
+  }
 });
 
-// GET /api/debug/logs - Query raw logs
-app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
+// GET /api/debug/logs - Query raw logs (Redis-aware for summary)
+app.get('/api/debug/logs', requireDebugAuth, async (req, res) => {
   const { level, category, limit, since, summary } = req.query;
   if (summary === 'true' || summary === '1') {
-    return res.json(logger.getSummary());
+    try {
+      return res.json(await logger.getPersistedSummary());
+    } catch (err) {
+      return res.json(logger.getSummary());
+    }
   }
   const logs = logger.query({
     level,
@@ -362,10 +382,81 @@ app.get('/api/debug/logs', requireDebugAuth, (req, res) => {
   res.json({ count: logs.length, logs });
 });
 
-// GET /api/debug/pipelines - Pipeline traces
-app.get('/api/debug/pipelines', requireDebugAuth, (req, res) => {
-  const summary = logger.getSummary();
-  res.json({ stats: summary.pipelineStats, pipelines: summary.recentPipelines });
+// GET /api/debug/pipelines - Pipeline traces (Redis-aware)
+app.get('/api/debug/pipelines', requireDebugAuth, async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+    const pipelines = await logger.getPersistedPipelines(limit);
+    const completed = pipelines.filter(p => p.completed);
+    const failed = pipelines.filter(p => p.error);
+    res.json({
+      persistence: logger.hasRedis ? 'redis' : 'memory-only',
+      stats: { total: pipelines.length, completed: completed.length, failed: failed.length },
+      pipelines,
+    });
+  } catch (err) {
+    const summary = logger.getSummary();
+    res.json({ stats: summary.pipelineStats, pipelines: summary.recentPipelines });
+  }
+});
+
+// GET /api/debug/activity - Usage activity log (Redis-aware)
+app.get('/api/debug/activity', requireDebugAuth, async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const activity = await logger.getPersistedActivity(limit);
+    res.json({ persistence: logger.hasRedis ? 'redis' : 'memory-only', count: activity.length, activity });
+  } catch (err) {
+    res.json({ persistence: 'memory-only', count: logger.activityLog.length, activity: logger.activityLog.slice(-50).reverse() });
+  }
+});
+
+// GET /api/debug/sessions - Client session reports (Redis-aware)
+app.get('/api/debug/sessions', requireDebugAuth, async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 20;
+    const sessions = await logger.getPersistedSessions(limit);
+    res.json({ persistence: logger.hasRedis ? 'redis' : 'memory-only', count: sessions.length, sessions });
+  } catch (err) {
+    res.json({ persistence: 'memory-only', count: logger.clientSessions.length, sessions: logger.clientSessions.slice(-20).reverse() });
+  }
+});
+
+// GET /api/debug/env - Environment diagnostic (what's configured)
+app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
+  const redisClient = await getRedis();
+  let redisStatus = 'not_configured';
+  if (redisClient) {
+    try {
+      await redisClient.ping();
+      redisStatus = 'connected';
+    } catch (err) {
+      redisStatus = `error: ${err.message}`;
+    }
+  }
+  res.json({
+    redis: {
+      status: redisStatus,
+      urlConfigured: !!process.env.UPSTASH_REDIS_REST_URL,
+      tokenConfigured: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+      loggerPersistence: logger.hasRedis ? 'active' : 'inactive',
+    },
+    anthropic: {
+      configured: !!process.env.ANTHROPIC_API_KEY,
+    },
+    debug: {
+      tokenConfigured: !!process.env.DEBUG_TOKEN,
+      usingDefault: !process.env.DEBUG_TOKEN,
+    },
+    reportPin: {
+      configured: !!process.env.REPORT_PIN,
+      usingDefault: !process.env.REPORT_PIN,
+    },
+    node: process.version,
+    env: process.env.NODE_ENV || 'development',
+    vercel: !!process.env.VERCEL,
+    region: process.env.VERCEL_REGION || null,
+  });
 });
 
 // POST /api/debug/client-error - Client error reports (open, no auth)
@@ -397,14 +488,18 @@ const liveReports = require('./lib/live-reports');
 liveReports.init(getRedis);
 const reportRenderer = require('./lib/report-renderer');
 
-// Log storage status on first request
+// Initialize Redis + log storage status on first request
 let _storageLogged = false;
 app.use(async (req, res, next) => {
   if (!_storageLogged) {
     _storageLogged = true;
+    // Eagerly initialize Redis so logger persistence is ready
+    const redisClient = await getRedis();
     const storage = await liveReports.getStorageStatus();
     if (storage === 'redis') {
-      logger.info('Storage', 'Redis persistence active — reports will survive cold starts');
+      logger.info('Storage', 'Redis persistence active — reports will survive cold starts', {
+        loggerRedis: logger.hasRedis ? 'active' : 'pending',
+      });
     } else {
       logger.warn('Storage', 'Memory-only mode — set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for persistent reports');
     }
