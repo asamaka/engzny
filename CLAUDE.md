@@ -112,8 +112,7 @@ tests/
 | `/api/debug/pipelines` | GET | Pipeline traces with phase timing (persistent) |
 | `/api/debug/activity` | GET | Usage activity log — page views, uploads, pipeline events (persistent) |
 | `/api/debug/sessions` | GET | Client session reports (persistent) |
-| `/api/debug/vercel-logs` | GET | Vercel runtime function logs (requires VERCEL_TOKEN + VERCEL_PROJECT_ID) |
-| `/api/debug/vercel-deployments` | GET | Recent Vercel deployments |
+| `/api/debug/env` | GET | Diagnostic: which integrations are configured |
 | `/api/debug/client-error` | POST | Client error reports (open, no auth) |
 | `/api/debug/client-report` | POST | Client session telemetry (open, no auth) |
 
@@ -191,7 +190,7 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
-- **Vercel env vars (for Vercel log API):** VERCEL_TOKEN, VERCEL_PROJECT_ID, VERCEL_TEAM_ID (optional)
+- **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
 
 ## Runtime Monitoring & Logs
 
@@ -237,11 +236,8 @@ curl 'https://www.thinx.fun/api/debug/activity?token=thinx-debug-2026'
 # Client session reports (persisted)
 curl 'https://www.thinx.fun/api/debug/sessions?token=thinx-debug-2026'
 
-# Vercel runtime logs (requires VERCEL_TOKEN + VERCEL_PROJECT_ID on Vercel)
-curl 'https://www.thinx.fun/api/debug/vercel-logs?token=thinx-debug-2026'
-
-# Recent Vercel deployments
-curl 'https://www.thinx.fun/api/debug/vercel-deployments?token=thinx-debug-2026'
+# Environment diagnostic (check Redis, Anthropic status)
+curl 'https://www.thinx.fun/api/debug/env?token=thinx-debug-2026'
 ```
 
 ### What the logs tell you
@@ -286,9 +282,9 @@ curl 'https://www.thinx.fun/api/debug/vercel-deployments?token=thinx-debug-2026'
 - Counters (total requests, pipelines, errors) are persisted with HINCRBY
 - All debug endpoints automatically read from Redis when available
 
-**Tier 3 — Vercel Runtime Logs API** (when VERCEL_TOKEN + VERCEL_PROJECT_ID are configured):
-- Fetches Vercel's own persistent runtime logs (all stdout/stderr from every function invocation)
-- Available via `/api/debug/vercel-logs` endpoint
+**Tier 3 — Vercel Runtime Logs** (for agents via `VERCEL_TOKEN` Cursor secret):
+- Agents can query Vercel's persistent runtime logs using the `vercel-logs.js` module or `gh` CLI
+- VERCEL_TOKEN is stored as a Cursor Cloud Agent secret (never in Vercel env vars)
 - Useful even without Redis — Vercel captures everything from console.log
 
 ### Security
