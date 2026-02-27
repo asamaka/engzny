@@ -14,18 +14,39 @@ const app = express();
 
 logger.info('Server', 'Initializing', { nodeVersion: process.version, env: process.env.NODE_ENV || 'development' });
 
+// Auto-detect Redis credentials from all known Vercel/Upstash env var patterns
+function detectRedisCredentials() {
+  const patterns = [
+    { url: 'UPSTASH_REDIS_REST_URL', token: 'UPSTASH_REDIS_REST_TOKEN' },
+    { url: 'KV_REST_API_URL', token: 'KV_REST_API_TOKEN' },
+    { url: 'REDIS_URL', token: 'REDIS_TOKEN' },
+    { url: 'KV_URL', token: 'KV_REST_API_TOKEN' },
+  ];
+  for (const p of patterns) {
+    if (process.env[p.url] && process.env[p.token]) {
+      return { url: process.env[p.url], token: process.env[p.token], source: `${p.url} + ${p.token}` };
+    }
+  }
+  return null;
+}
+
 // Initialize Redis persistence for logger (fire-and-forget)
 (async () => {
   try {
-    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const creds = detectRedisCredentials();
+    if (creds) {
+      logger.info('Server', `Redis detected via ${creds.source}`);
       const { Redis } = require('@upstash/redis');
-      const redisClient = new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-      });
+      const redisClient = new Redis({ url: creds.url, token: creds.token });
       await logger.initRedis(redisClient);
     } else {
-      logger.info('Server', 'Redis not configured — using in-memory logging only');
+      const checked = ['UPSTASH_REDIS_REST_URL', 'KV_REST_API_URL', 'REDIS_URL', 'KV_URL'];
+      const found = checked.filter(k => !!process.env[k]);
+      logger.info('Server', 'Redis not configured — using in-memory logging only', {
+        hint: 'Add Upstash Redis via Vercel Storage tab',
+        envChecked: checked.join(', '),
+        envFound: found.length > 0 ? found.join(', ') : 'none',
+      });
     }
   } catch (err) {
     console.warn('[Server] Failed to init Redis for logger:', err.message);
@@ -56,20 +77,16 @@ const PROGRESS_MESSAGES = {
   [JOB_STATUS.FAILED]: 'Analysis failed',
 };
 
-// Redis client (lazy loaded)
+// Redis client (lazy loaded, uses same auto-detection as logger)
 let redis = null;
 const getRedis = async () => {
   if (redis) return redis;
-  
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const creds = detectRedisCredentials();
+  if (creds) {
     const { Redis } = require('@upstash/redis');
-    redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
+    redis = new Redis({ url: creds.url, token: creds.token });
     return redis;
   }
-  
   return null;
 };
 
@@ -365,6 +382,35 @@ function requireDebugAuth(req, res, next) {
   if (req.query.token === DEBUG_TOKEN || req.headers['x-debug-token'] === DEBUG_TOKEN) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
+
+// GET /api/debug/env - Diagnostic: which integrations are configured (no secret values)
+app.get('/api/debug/env', requireDebugAuth, (req, res) => {
+  const check = (name) => !!process.env[name];
+  res.json({
+    redis: {
+      UPSTASH_REDIS_REST_URL: check('UPSTASH_REDIS_REST_URL'),
+      UPSTASH_REDIS_REST_TOKEN: check('UPSTASH_REDIS_REST_TOKEN'),
+      KV_REST_API_URL: check('KV_REST_API_URL'),
+      KV_REST_API_TOKEN: check('KV_REST_API_TOKEN'),
+      REDIS_URL: check('REDIS_URL'),
+      REDIS_TOKEN: check('REDIS_TOKEN'),
+      KV_URL: check('KV_URL'),
+      detected: !!detectRedisCredentials(),
+      loggerActive: logger.hasRedis,
+    },
+    vercel: {
+      VERCEL_TOKEN: check('VERCEL_TOKEN'),
+      VERCEL_PROJECT_ID: check('VERCEL_PROJECT_ID'),
+      VERCEL_TEAM_ID: check('VERCEL_TEAM_ID'),
+      configured: vercelLogs.isConfigured(),
+    },
+    anthropic: {
+      ANTHROPIC_API_KEY: check('ANTHROPIC_API_KEY'),
+    },
+    nodeVersion: process.version,
+    env: process.env.NODE_ENV,
+  });
+});
 
 // GET /api/debug/dashboard - Quick at-a-glance production status
 // Reads from Redis (persistent) when available, falls back to in-memory
