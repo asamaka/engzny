@@ -80,6 +80,9 @@ api/
     index.js                  # Provider factory
   lib/
     logger.js                 # Production logger (in-memory + Redis persistence)
+    live-reports.js           # Auto-generated pipeline reports (1hr TTL, PIN-protected)
+    report-store.js           # Test report storage (Redis + memory fallback)
+    screenshot-capture.js     # Screenshot capture & thumbnail generation
     vercel-logs.js            # Vercel runtime logs API client
 
 public/
@@ -88,7 +91,7 @@ public/
   canvas.html                 # GIUE canvas view
 
 tests/
-  unit/                       # 108 unit tests (mocked)
+  unit/                       # 115 unit tests (mocked)
   integration/                # 3 health checks (real API)
 ```
 
@@ -102,6 +105,16 @@ tests/
 | `/api/hub/v2/stream/:requestId` | GET | SSE stream for card population (step 2 of pipeline) |
 | `/api/hub/v2/analyze` | POST | Legacy single-request SSE (kept for backward compat) |
 | `/api/health` | GET | Health check |
+| `/r` | GET | Live reports index (4-digit PIN gate) |
+| `/r/:requestId` | GET | Individual pipeline report (4-digit PIN gate) |
+
+### Live Reports API (4-digit PIN via cookie)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/r/auth` | POST | Verify PIN `{"pin":"0427"}`, sets cookie |
+| `/api/r/list` | GET | List all live reports (summary only) |
+| `/api/r/:requestId/data` | GET | Full report data with card content |
+| `/api/r/:requestId/thumb` | GET | Screenshot thumbnail JPEG |
 
 ### Debug & Monitoring (require `?token=` auth)
 | Endpoint | Method | Description |
@@ -188,7 +201,7 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 
 ### Required secrets
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
-- **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`)
+- **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`), REPORT_PIN (optional, defaults to `0427`)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
 

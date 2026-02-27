@@ -119,4 +119,6 @@ async function listLiveReports() {
   }).filter(Boolean);
 }
 
-module.exports = { init, saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports };
+function _resetForTest() { mem.reports.clear(); mem.index.length = 0; }
+
+module.exports = { init, saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports, _resetForTest };

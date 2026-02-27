@@ -1246,6 +1246,23 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
           meta: populatedLayout._meta,
         });
         endStream();
+
+        // Auto-save live report (async, non-blocking)
+        liveReports.saveLiveReport(requestId, {
+          contentType: populatedLayout.contentAnalysis?.contentType,
+          platform: populatedLayout.contentAnalysis?.platform,
+          layoutType: populatedLayout.layout?.type,
+          cardCount: populatedLayout.cards?.length,
+          duration: populatedLayout._meta?.totalDuration,
+          designDuration: populatedLayout._meta?.designDuration,
+          outcome: 'success',
+          imageSize: `${imageSize}KB`,
+          mediaType: normalized.mediaType,
+          contentAnalysis: populatedLayout.contentAnalysis,
+          layout: populatedLayout.layout,
+          cards: populatedLayout.cards,
+          meta: populatedLayout._meta,
+        }).catch(() => {});
       },
 
       onError: (error) => {
@@ -1253,6 +1270,13 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
         logger.pipelineError(requestId, error, { phase: 'pipeline' });
         sendEvent('error', { message: error.message });
         endStream();
+
+        liveReports.saveLiveReport(requestId, {
+          outcome: 'error',
+          error: error.message,
+          imageSize: `${imageSize}KB`,
+          mediaType: normalized.mediaType,
+        }).catch(() => {});
       },
     });
   } catch (error) {
