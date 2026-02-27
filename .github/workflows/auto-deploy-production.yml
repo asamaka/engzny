@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'claude/**'
+      - 'cursor/**'
     paths:
       - '.github/workflows/auto-deploy-production.yml'
       - 'api/**'
