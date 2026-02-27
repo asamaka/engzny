@@ -14,19 +14,21 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const https = require('https');
 
 const DATASET_DIR = path.join(__dirname, '..', 'tests', 'dataset');
 const MANIFEST_PATH = path.join(DATASET_DIR, 'manifest.json');
 const REPORT_PATH = path.join(DATASET_DIR, 'pipeline-report.html');
 
 const DEFAULT_PORT = 3000;
+const DEFAULT_HOST = 'https://www.thinx.fun';
 const PIPELINE_TIMEOUT_MS = 90000;
 
 // ---------------------------------------------------------------------------
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opts = { count: 4, categories: null, port: DEFAULT_PORT, dryRun: false };
+  const opts = { count: 4, categories: null, port: DEFAULT_PORT, dryRun: false, production: false };
 
   for (let i = 0; i < args.length; i++) {
     switch (args[i]) {
@@ -34,6 +36,7 @@ function parseArgs() {
       case '--categories': opts.categories = args[++i].split(',').map(s => s.trim()); break;
       case '--port': opts.port = parseInt(args[++i], 10) || DEFAULT_PORT; break;
       case '--dry-run': opts.dryRun = true; break;
+      case '--production': opts.production = true; break;
       case '--help':
         console.log(`
 Usage: node scripts/run-dataset-pipeline.js [options]
@@ -45,10 +48,11 @@ Options:
   --count N            Number of screenshots to test (default: 4)
   --categories a,b     Limit to specific categories
   --port PORT          Server port (default: 3000)
+  --production         Use production server (https://www.thinx.fun)
   --dry-run            Generate report layout with just source images (no pipeline)
   --help               Show this help
 
-Requires ANTHROPIC_API_KEY env var set (unless --dry-run).
+Requires ANTHROPIC_API_KEY env var for local, or --production to use live server.
 `);
         process.exit(0);
     }
@@ -69,10 +73,11 @@ function imageToBase64DataUrl(filePath) {
 function postJSON(url, body) {
   return new Promise((resolve, reject) => {
     const urlObj = new URL(url);
+    const proto = urlObj.protocol === 'https:' ? https : http;
     const data = JSON.stringify(body);
-    const req = http.request({
+    const req = proto.request({
       hostname: urlObj.hostname,
-      port: urlObj.port,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
       path: urlObj.pathname,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) },
@@ -99,9 +104,10 @@ function listenSSE(url, timeoutMs) {
     let meta = null;
 
     const urlObj = new URL(url);
-    const req = http.get({
+    const proto = urlObj.protocol === 'https:' ? https : http;
+    const req = proto.get({
       hostname: urlObj.hostname,
-      port: urlObj.port,
+      port: urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80),
       path: urlObj.pathname,
       headers: { 'Accept': 'text/event-stream' },
     }, (res) => {
@@ -370,7 +376,7 @@ function generateReport(results) {
 
 async function main() {
   const opts = parseArgs();
-  const baseUrl = `http://localhost:${opts.port}`;
+  const baseUrl = opts.production ? DEFAULT_HOST : `http://localhost:${opts.port}`;
 
   if (!fs.existsSync(MANIFEST_PATH)) {
     console.error('No dataset manifest. Run: node scripts/fetch-screenshot-dataset.js');
@@ -425,35 +431,39 @@ async function main() {
     return;
   }
 
-  // Check for API key
-  if (!process.env.ANTHROPIC_API_KEY) {
-    log('\nERROR: ANTHROPIC_API_KEY environment variable is not set.');
-    log('Set it with: export ANTHROPIC_API_KEY=sk-ant-...');
-    log('Or run with --dry-run to generate report layout without pipeline execution.');
-    process.exit(1);
-  }
+  if (opts.production) {
+    log(`Using production server: ${baseUrl}`);
+  } else {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      log('\nERROR: ANTHROPIC_API_KEY environment variable is not set.');
+      log('Set it with: export ANTHROPIC_API_KEY=sk-ant-...');
+      log('Or use --production to test against the live server.');
+      log('Or use --dry-run to generate report layout without pipeline execution.');
+      process.exit(1);
+    }
 
-  // Verify server is running
-  try {
-    await new Promise((resolve, reject) => {
-      http.get(`${baseUrl}/api/health`, (res) => {
-        let d = '';
-        res.on('data', c => d += c);
-        res.on('end', () => resolve(d));
-      }).on('error', reject);
-    });
-    log(`Server is running at ${baseUrl}`);
-  } catch {
-    log(`Server not reachable at ${baseUrl}. Starting it...`);
-    const { spawn } = require('child_process');
-    const server = spawn('node', ['api/index.js'], {
-      env: { ...process.env, PORT: String(opts.port) },
-      stdio: 'pipe',
-      detached: true,
-    });
-    server.unref();
-    await new Promise(r => setTimeout(r, 3000));
-    log(`Server started (PID: ${server.pid})`);
+    // Verify local server is running
+    try {
+      await new Promise((resolve, reject) => {
+        http.get(`${baseUrl}/api/health`, (res) => {
+          let d = '';
+          res.on('data', c => d += c);
+          res.on('end', () => resolve(d));
+        }).on('error', reject);
+      });
+      log(`Server is running at ${baseUrl}`);
+    } catch {
+      log(`Server not reachable at ${baseUrl}. Starting it...`);
+      const { spawn } = require('child_process');
+      const server = spawn('node', ['api/index.js'], {
+        env: { ...process.env, PORT: String(opts.port) },
+        stdio: 'pipe',
+        detached: true,
+      });
+      server.unref();
+      await new Promise(r => setTimeout(r, 3000));
+      log(`Server started (PID: ${server.pid})`);
+    }
   }
 
   // Run each screenshot through the pipeline
