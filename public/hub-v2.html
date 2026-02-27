@@ -154,83 +154,110 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 16px;
             transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .screenshot-layer img {
-            max-width: 92%;
-            max-height: 85vh;
+            max-width: 100%;
+            max-height: 70vh;
             object-fit: contain;
             border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
             transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .screenshot-layer.scanning img {
-            opacity: 1;
-            filter: brightness(0.85);
+            opacity: 0.35;
+            filter: brightness(0.7) blur(2px);
         }
 
         .screenshot-layer.fading { opacity: 0.06; }
         .screenshot-layer.gone { opacity: 0; pointer-events: none; }
 
-        .scan-line {
-            position: fixed;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            box-shadow: 0 0 24px var(--accent), 0 0 60px rgba(108,159,255,0.2);
-            z-index: 5;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .scan-line.active {
-            opacity: 1;
-            animation: scanMove 2.5s ease-in-out infinite;
-        }
-
-        @keyframes scanMove {
-            0% { top: 8%; }
-            50% { top: 88%; }
-            100% { top: 8%; }
-        }
-
-        .scan-corners {
+        /* Progress overlay — replaces laser scan */
+        .progress-overlay {
             position: fixed;
             inset: 0;
-            z-index: 4;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.4s;
         }
 
-        .scan-corners.active { opacity: 1; }
+        .progress-overlay.active { opacity: 1; }
 
-        .scan-corner {
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border-color: var(--accent);
-            border-style: solid;
-            border-width: 0;
-            border-radius: 4px;
+        .progress-ring {
+            width: 80px;
+            height: 80px;
+            position: relative;
+            margin-bottom: 20px;
         }
 
-        .scan-corner.tl { top: 7%; left: 4%; border-top-width: 3px; border-left-width: 3px; }
-        .scan-corner.tr { top: 7%; right: 4%; border-top-width: 3px; border-right-width: 3px; }
-        .scan-corner.bl { bottom: 10%; left: 4%; border-bottom-width: 3px; border-left-width: 3px; }
-        .scan-corner.br { bottom: 10%; right: 4%; border-bottom-width: 3px; border-right-width: 3px; }
+        .progress-ring svg {
+            width: 80px;
+            height: 80px;
+            transform: rotate(-90deg);
+        }
 
-        /* === STATUS BAR === */
+        .progress-ring-bg {
+            fill: none;
+            stroke: var(--surface-3);
+            stroke-width: 4;
+        }
+
+        .progress-ring-fill {
+            fill: none;
+            stroke: url(#progressGradient);
+            stroke-width: 4;
+            stroke-linecap: round;
+            stroke-dasharray: 226;
+            stroke-dashoffset: 226;
+            transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .progress-pct {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .progress-label {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+            max-width: 240px;
+            line-height: 1.4;
+        }
+
+        .progress-phase {
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        /* Bottom status bar — secondary progress */
         .status-bar {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
             z-index: 50;
-            padding: 16px 20px;
-            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            padding: 12px 20px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
             background: linear-gradient(transparent, rgba(10,13,18,0.96) 30%);
             display: none;
         }
@@ -239,11 +266,10 @@
 
         .status-progress {
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: var(--surface-3);
             border-radius: 4px;
             overflow: hidden;
-            margin-bottom: 10px;
         }
 
         .status-progress-fill {
@@ -252,20 +278,6 @@
             border-radius: 4px;
             width: 0%;
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .status-text {
-            font-size: 0.72rem;
-            font-weight: 500;
-            letter-spacing: 0.05em;
-            color: var(--accent);
-            text-transform: uppercase;
-            animation: statusPulse 2s ease-in-out infinite;
-        }
-
-        @keyframes statusPulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         /* === RESULTS OVERLAY === */
@@ -1431,13 +1443,20 @@
             <img id="screenshotImg" alt="">
         </div>
 
-        <div class="scan-line" id="scanLine"></div>
-
-        <div class="scan-corners" id="scanCorners">
-            <div class="scan-corner tl"></div>
-            <div class="scan-corner tr"></div>
-            <div class="scan-corner bl"></div>
-            <div class="scan-corner br"></div>
+        <div class="progress-overlay" id="progressOverlay">
+            <div class="progress-ring">
+                <svg viewBox="0 0 80 80">
+                    <defs><linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stop-color="var(--accent)"/>
+                        <stop offset="100%" stop-color="var(--purple)"/>
+                    </linearGradient></defs>
+                    <circle class="progress-ring-bg" cx="40" cy="40" r="36"/>
+                    <circle class="progress-ring-fill" id="progressRingFill" cx="40" cy="40" r="36"/>
+                </svg>
+                <div class="progress-pct" id="progressPct">0%</div>
+            </div>
+            <div class="progress-phase" id="progressPhase">UPLOADING</div>
+            <div class="progress-label" id="progressLabel">Preparing analysis...</div>
         </div>
 
         <div class="results-overlay" id="resultsOverlay">
@@ -1486,8 +1505,20 @@
         const mainCanvas = document.getElementById('mainCanvas');
         const screenshotLayer = document.getElementById('screenshotLayer');
         const screenshotImg = document.getElementById('screenshotImg');
-        const scanLine = document.getElementById('scanLine');
-        const scanCorners = document.getElementById('scanCorners');
+        const progressOverlay = document.getElementById('progressOverlay');
+        const progressRingFill = document.getElementById('progressRingFill');
+        const progressPct = document.getElementById('progressPct');
+        const progressPhase = document.getElementById('progressPhase');
+        const progressLabel = document.getElementById('progressLabel');
+        const RING_CIRCUMFERENCE = 2 * Math.PI * 36; // r=36
+
+        function updateProgress(pct, phase, label) {
+            const offset = RING_CIRCUMFERENCE - (pct / 100) * RING_CIRCUMFERENCE;
+            progressRingFill.style.strokeDashoffset = offset;
+            progressPct.textContent = Math.round(pct) + '%';
+            if (phase) progressPhase.textContent = phase;
+            if (label) progressLabel.textContent = label;
+        }
         const resultsOverlay = document.getElementById('resultsOverlay');
         const statusBar = document.getElementById('statusBar');
         const statusProgressFill = document.getElementById('statusProgressFill');
@@ -1618,60 +1649,18 @@
             pasteState.classList.add('hidden');
             mainCanvas.classList.add('active');
             screenshotLayer.className = 'screenshot-layer scanning';
-            scanLine.classList.add('active');
-            scanCorners.classList.add('active');
+            progressOverlay.classList.add('active');
+            updateProgress(3, 'UPLOADING', 'Sending screenshot...');
             statusBar.classList.add('active');
             statusProgressFill.style.width = '5%';
-            statusText.textContent = 'optimizing screenshot';
+            statusText.textContent = 'analyzing screenshot';
 
-            compressImage(blob).then(dataUrl => {
-                currentImageBase64 = dataUrl;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                currentImageBase64 = reader.result;
                 startPipeline(currentImageBase64);
-            }).catch(() => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    currentImageBase64 = reader.result;
-                    startPipeline(currentImageBase64);
-                };
-                reader.readAsDataURL(blob);
-            });
-        }
-
-        const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
-        const MAX_DIMENSION = 2048;
-
-        function compressImage(blob) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        let { width, height } = img;
-                        const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
-                        width = Math.round(width * scale);
-                        height = Math.round(height * scale);
-
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-
-                        const qualities = [0.85, 0.7, 0.55, 0.4];
-                        for (const q of qualities) {
-                            const dataUrl = canvas.toDataURL('image/jpeg', q);
-                            const sizeBytes = Math.round((dataUrl.length - 23) * 0.75);
-                            if (sizeBytes <= MAX_UPLOAD_BYTES) {
-                                URL.revokeObjectURL(img.src);
-                                return resolve(dataUrl);
-                            }
-                        }
-                        URL.revokeObjectURL(img.src);
-                        resolve(canvas.toDataURL('image/jpeg', 0.3));
-                    } catch (e) { reject(e); }
-                };
-                img.onerror = reject;
-                img.src = URL.createObjectURL(blob);
-            });
+            };
+            reader.readAsDataURL(blob);
         }
 
         // === Telemetry ===
@@ -1808,7 +1797,7 @@
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             try {
-                statusText.textContent = 'uploading screenshot';
+                updateProgress(5, 'UPLOADING', 'Sending screenshot to server...');
                 telemetry.markUploadStart();
                 const startResp = await fetch('/api/hub/v2/start', {
                     method: 'POST',
@@ -1824,10 +1813,10 @@
 
                 const { requestId } = await startResp.json();
                 telemetry.requestId = requestId;
-                statusText.textContent = 'connecting to pipeline';
+                updateProgress(10, 'CONNECTING', 'Waiting for analysis stream...');
 
                 await new Promise((resolve, reject) => {
-                    const es = new EventSource(`/api/hub/v3/stream/${requestId}`);
+                    const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
                     currentEventSource = es;
 
                     pipelineTimeout = setTimeout(() => {
@@ -1838,7 +1827,7 @@
                         }
                     }, 30000);
 
-                    const events = ['connected', 'classify', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
+                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
                     events.forEach(evt => {
                         es.addEventListener(evt, (e) => {
                             try {
@@ -1899,16 +1888,13 @@
             switch (event) {
                 case 'connected':
                     statusProgressFill.style.width = '10%';
-                    statusText.textContent = 'connected — detecting content';
-                    break;
-
-                case 'classify':
-                    onClassifyReceived(data);
+                    updateProgress(10, 'ANALYZING', 'Detecting content type...');
                     break;
 
                 case 'progress':
                     statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
-                    statusText.textContent = data.message || 'processing';
+                    const phaseLabel = data.phase === 'designing' ? 'DESIGNING' : data.phase === 'researching' ? 'RESEARCHING' : 'ANALYZING';
+                    updateProgress(Math.min(data.progress, 95), phaseLabel, data.message || 'Processing...');
                     if (data.phase === 'researching') {
                         layoutProgressFill.style.width = data.progress + '%';
                         layoutProgressText.textContent = `${completedCards}/${totalCards}`;
@@ -1942,34 +1928,6 @@
             }
         }
 
-        function onClassifyReceived(data) {
-            blueprintReceived = true;
-            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
-
-            scanLine.classList.remove('active');
-            scanCorners.classList.remove('active');
-            screenshotLayer.className = 'screenshot-layer fading';
-
-            statusProgressFill.style.width = '20%';
-            statusText.textContent = data.summary || 'building layout...';
-
-            const ct = data.contentType || 'analyzing';
-            layoutBadge.textContent = ct.replace(/_/g, ' ');
-
-            if (data.summary) {
-                contentAnalysisEl.style.display = '';
-                contentAnalysisEl.querySelector('.analysis-content').textContent = data.summary;
-            }
-            if (data.topQuestions?.length) {
-                questionsEl.style.display = '';
-                questionsEl.innerHTML = data.topQuestions
-                    .map(q => `<span class="question-chip">${q}</span>`)
-                    .join('');
-            }
-
-            resultsOverlay.classList.add('visible');
-        }
-
         function onBlueprintReceived(blueprint) {
             blueprintReceived = true;
             if (pipelineTimeout) {
@@ -1992,12 +1950,10 @@
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
-            scanLine.classList.remove('active');
-            scanCorners.classList.remove('active');
+            progressOverlay.classList.remove('active');
             screenshotLayer.className = 'screenshot-layer fading';
 
             statusProgressFill.style.width = '8%';
-            statusText.textContent = 'detecting content type...';
 
             const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
@@ -2049,29 +2005,19 @@
                 }, 40 + index * 35);
             });
 
-            statusText.textContent = `${ct} detected — designing layout`;
+            updateProgress(20, 'DESIGNING', `${ct} detected — designing layout...`);
             layoutProgressFill.style.width = '15%';
             layoutProgressText.textContent = 'designing';
         }
 
         function onLayoutUpdate(blueprint) {
-            blueprintReceived = true;
-            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
-            if (!completionTimeout) {
-                completionTimeout = setTimeout(() => {
-                    if (!pipelineComplete) {
-                        telemetry.reportError('Analysis timed out (90s)', { type: 'timeout_post_layout', completedCards, totalCards });
-                        showError('Analysis is taking too long. Please try again.');
-                    }
-                }, 90000);
-            }
-
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
 
+            const ct = blueprint.contentAnalysis?.contentType || 'general';
+            layoutBadge.textContent = ct.replace(/_/g, ' ');
+
             if (blueprint.contentAnalysis) {
-                const ct = blueprint.contentAnalysis.contentType || 'general';
-                layoutBadge.textContent = ct.replace(/_/g, ' ');
                 contentAnalysisEl.style.display = '';
                 analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
                 topQuestionsEl.innerHTML = '';
@@ -2089,38 +2035,26 @@
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
                 const el = createCardElement(card);
-                if (card.gridColumn) el.style.gridColumn = card.gridColumn;
-                if (card.gridRow) el.style.gridRow = card.gridRow;
                 cardGrid.appendChild(el);
                 setTimeout(() => {
                     el.classList.add('visible');
                 }, 50 + index * 40);
             });
 
-            scanLine.classList.remove('active');
-            scanCorners.classList.remove('active');
-            screenshotLayer.className = 'screenshot-layer fading';
-            resultsOverlay.classList.add('visible');
-
-            statusText.textContent = `populating ${totalCards} cards`;
-            statusProgressFill.style.width = '30%';
+            progressOverlay.classList.remove('active');
             layoutProgressFill.style.width = '30%';
             layoutProgressText.textContent = `0/${totalCards}`;
         }
 
         function onCardReceived(data) {
-            completedCards = data.completedCount || (completedCards + 1);
-            if (data.totalCount) totalCards = data.totalCount;
+            completedCards++;
 
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
-            const cardType = data.cardType || el.dataset.cardType;
-            const cardData = data.data || data;
-
             el.classList.remove('loading');
             el.classList.add('populated', 'just-populated');
-            el.innerHTML = renderCardContent(cardType, cardData);
+            el.innerHTML = renderCardContent(data.cardType, data.data);
 
             setTimeout(() => {
                 el.classList.remove('just-populated');
@@ -2492,8 +2426,7 @@
             errorText.textContent = message;
             errorState.classList.add('active');
             statusBar.classList.remove('active');
-            scanLine.classList.remove('active');
-            scanCorners.classList.remove('active');
+            progressOverlay.classList.remove('active');
         }
 
         function reset() {
@@ -2515,8 +2448,8 @@
             pasteState.classList.remove('hidden');
             mainCanvas.classList.remove('active');
             screenshotLayer.className = 'screenshot-layer';
-            scanLine.classList.remove('active');
-            scanCorners.classList.remove('active');
+            progressOverlay.classList.remove('active');
+            updateProgress(0, 'UPLOADING', 'Preparing analysis...');
             resultsOverlay.classList.remove('visible');
             statusBar.classList.remove('active');
             errorState.classList.remove('active');
