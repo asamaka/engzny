@@ -385,13 +385,62 @@ app.post('/api/debug/client-report', (req, res) => {
 
 // ============================================
 // Test Report Storage & Admin Dashboard
-// Stores pipeline test reports with token + passkey auth
+// Auth: httpOnly session cookie — token never stored client-side
 // ============================================
 const reportStore = require('./lib/report-store');
 reportStore.init(getRedis);
 
-// POST /api/reports — Upload a new report
-app.post('/api/reports', requireDebugAuth, async (req, res) => {
+const SESSION_COOKIE = 'thinx_sid';
+const SESSION_MAX_AGE = 7 * 24 * 3600 * 1000;
+
+function signSession(id) {
+  return id + '.' + crypto.createHmac('sha256', DEBUG_TOKEN).update(id).digest('hex').slice(0, 16);
+}
+function verifySession(cookie) {
+  if (!cookie || !cookie.includes('.')) return false;
+  const [id, sig] = cookie.split('.');
+  return sig === crypto.createHmac('sha256', DEBUG_TOKEN).update(id).digest('hex').slice(0, 16);
+}
+function setSessionCookie(res) {
+  const signed = signSession(crypto.randomBytes(16).toString('hex'));
+  res.cookie(SESSION_COOKIE, signed, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: SESSION_MAX_AGE,
+    path: '/',
+  });
+}
+
+// Minimal cookie parser
+app.use((req, res, next) => {
+  req.cookies = {};
+  const raw = req.headers.cookie;
+  if (raw) raw.split(';').forEach(p => { const [k, ...v] = p.trim().split('='); if (k) req.cookies[k.trim()] = decodeURIComponent(v.join('=')); });
+  next();
+});
+
+function requireReportAuth(req, res, next) {
+  if (req.cookies[SESSION_COOKIE] && verifySession(req.cookies[SESSION_COOKIE])) return next();
+  if (req.headers['x-debug-token'] === DEBUG_TOKEN) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
+// POST /api/reports/session — Login: validate token in POST body, set httpOnly cookie
+app.post('/api/reports/session', (req, res) => {
+  if (req.body?.token !== DEBUG_TOKEN) return res.status(401).json({ error: 'Invalid token' });
+  setSessionCookie(res);
+  res.json({ ok: true });
+});
+
+// DELETE /api/reports/session — Logout: clear cookie
+app.delete('/api/reports/session', (req, res) => {
+  res.clearCookie(SESSION_COOKIE, { path: '/' });
+  res.json({ ok: true });
+});
+
+// POST /api/reports — Upload report (header auth for CLI tools)
+app.post('/api/reports', requireReportAuth, async (req, res) => {
   try {
     const { title, html, meta } = req.body || {};
     if (!html) return res.status(400).json({ error: 'html field is required' });
@@ -402,42 +451,29 @@ app.post('/api/reports', requireDebugAuth, async (req, res) => {
   }
 });
 
-// GET /api/reports — List all reports (JSON)
-app.get('/api/reports', requireDebugAuth, async (req, res) => {
+// GET /api/reports — List reports
+app.get('/api/reports', requireReportAuth, async (req, res) => {
   const reports = await reportStore.listReports();
-  res.json({ reports });
+  const storage = await reportStore.getStorageType();
+  res.json({ reports, storage });
 });
 
-// GET /api/reports/:id — Serve report HTML (or JSON metadata)
-app.get('/api/reports/:id', async (req, res) => {
-  const { id } = req.params;
-  const format = req.query.format;
-
-  // Auth: token OR valid session cookie
-  const hasToken = req.query.token === DEBUG_TOKEN || req.headers['x-debug-token'] === DEBUG_TOKEN;
-  const hasSession = req.cookies?.thinx_session === DEBUG_TOKEN || req.query.s === DEBUG_TOKEN;
-  if (!hasToken && !hasSession) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const report = await reportStore.getReport(id);
+// GET /api/reports/:id — View report HTML (cookie auth — no token in URL)
+app.get('/api/reports/:id', requireReportAuth, async (req, res) => {
+  const report = await reportStore.getReport(req.params.id);
   if (!report) return res.status(404).json({ error: 'Report not found' });
-
-  if (format === 'json') {
-    return res.json({ report: report.entry });
-  }
-
+  if (req.query.format === 'json') return res.json({ report: report.entry });
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.send(report.html);
 });
 
-// DELETE /api/reports/:id — Delete a report
-app.delete('/api/reports/:id', requireDebugAuth, async (req, res) => {
+// DELETE /api/reports/:id
+app.delete('/api/reports/:id', requireReportAuth, async (req, res) => {
   await reportStore.deleteReport(req.params.id);
   res.json({ ok: true });
 });
 
-// GET /reports — Admin dashboard for browsing reports
+// GET /reports — Admin dashboard (public page, auth happens via JS + cookie)
 app.get('/reports', (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.send(getReportsDashboardHtml());
@@ -458,8 +494,6 @@ function getReportsDashboardHtml() {
   .container { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
   h1 { font-size: 1.4rem; margin-bottom: 8px; }
   .subtitle { color: var(--text-2); font-size: 0.85rem; margin-bottom: 24px; }
-
-  /* Auth gate */
   .auth-gate { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px; text-align: center; max-width: 420px; margin: 80px auto; }
   .auth-gate h2 { font-size: 1.1rem; margin-bottom: 16px; }
   .auth-gate p { color: var(--text-2); font-size: 0.85rem; margin-bottom: 20px; }
@@ -470,12 +504,7 @@ function getReportsDashboardHtml() {
   .btn:hover { opacity: 0.85; }
   .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-2); }
   .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-danger { background: var(--red); }
-  .btn-passkey { background: linear-gradient(135deg, #6c9fff, #b48eff); margin-top: 12px; width: 100%; padding: 12px; font-size: 0.9rem; }
-  .or-divider { color: var(--text-3); font-size: 0.75rem; margin: 16px 0; }
   .auth-error { color: var(--red); font-size: 0.8rem; margin-top: 10px; display: none; }
-
-  /* Report list */
   .reports-list { display: flex; flex-direction: column; gap: 12px; }
   .report-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; display: flex; align-items: center; gap: 16px; transition: border-color 0.2s; cursor: pointer; text-decoration: none; color: inherit; }
   .report-card:hover { border-color: var(--accent); }
@@ -483,282 +512,106 @@ function getReportsDashboardHtml() {
   .report-info { flex: 1; min-width: 0; }
   .report-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .report-meta { color: var(--text-3); font-size: 0.75rem; display: flex; gap: 12px; flex-wrap: wrap; }
-  .report-meta span { white-space: nowrap; }
   .report-actions { display: flex; gap: 6px; }
   .empty-state { text-align: center; padding: 60px 20px; color: var(--text-3); }
   .empty-state p { margin-top: 8px; font-size: 0.85rem; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-  .passkey-status { font-size: 0.75rem; color: var(--green); }
-  .passkey-status.none { color: var(--text-3); }
   .badge { font-size: 0.65rem; padding: 2px 8px; border-radius: 100px; font-weight: 600; }
   .badge-count { background: rgba(108,159,255,0.15); color: var(--accent); }
+  .badge-warn { background: rgba(255,209,92,0.15); color: #ffd15c; font-size: 0.7rem; margin-left: 8px; }
 </style>
 </head>
 <body>
-<div class="container" id="app">
-  <!-- Auth gate -->
+<div class="container">
   <div id="auth-gate" class="auth-gate">
     <h2>Test Reports</h2>
-    <p>Authenticate to view pipeline test reports.</p>
-
-    <button class="btn btn-passkey" id="passkey-btn" onclick="authWithPasskey()" style="display:none">
-      Authenticate with Passkey
-    </button>
-
-    <div class="or-divider" id="or-divider" style="display:none">or enter token</div>
-
+    <p>Enter your admin token to access pipeline test reports.</p>
     <div class="auth-input">
-      <input type="password" id="token-input" placeholder="Debug token" onkeydown="if(event.key==='Enter')authWithToken()" />
-      <button class="btn" onclick="authWithToken()">Unlock</button>
+      <input type="password" id="token-input" placeholder="Admin token" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()" />
+      <button class="btn" onclick="login()">Unlock</button>
     </div>
-
     <div class="auth-error" id="auth-error">Invalid token</div>
-
-    <button class="btn btn-outline" id="register-passkey-btn" onclick="registerPasskey()" style="display:none; margin-top: 16px; width: 100%; font-size: 0.8rem;">
-      Register a passkey for this browser
-    </button>
   </div>
 
-  <!-- Dashboard (hidden until authed) -->
   <div id="dashboard" style="display:none">
     <h1>Test Reports</h1>
     <div class="subtitle">Pipeline test results against the screenshot dataset</div>
-
     <div class="toolbar">
       <div>
-        <span class="badge badge-count" id="report-count">0 reports</span>
-        <span class="passkey-status none" id="passkey-indicator"></span>
+        <span class="badge badge-count" id="report-count"></span>
+        <span class="badge badge-warn" id="storage-warn" style="display:none"></span>
       </div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-outline" onclick="registerPasskey()" id="add-passkey-btn" style="display:none; font-size:0.75rem; padding:6px 12px;">+ Passkey</button>
-        <button class="btn btn-outline" onclick="logout()" style="font-size:0.75rem; padding:6px 12px;">Logout</button>
-      </div>
+      <button class="btn btn-outline" onclick="logout()" style="font-size:0.75rem;padding:6px 12px;">Logout</button>
     </div>
-
     <div id="reports-list" class="reports-list"></div>
   </div>
 </div>
-
 <script>
-const API = window.location.origin;
-let authToken = null;
-
-// --- Session persistence ---
-function saveSession(token) {
-  authToken = token;
-  try { sessionStorage.setItem('thinx_reports_token', token); } catch {}
-}
-function loadSession() {
-  try { return sessionStorage.getItem('thinx_reports_token'); } catch { return null; }
-}
-function clearSession() {
-  authToken = null;
-  try { sessionStorage.removeItem('thinx_reports_token'); } catch {}
-}
-
-// --- Token auth ---
-async function authWithToken() {
-  const input = document.getElementById('token-input');
-  const token = input.value.trim();
+async function login() {
+  var input = document.getElementById('token-input');
+  var token = input.value.trim();
+  input.value = '';
   if (!token) return;
-
-  try {
-    const res = await fetch(API + '/api/reports?token=' + encodeURIComponent(token));
-    if (res.ok) {
-      saveSession(token);
-      showDashboard();
-    } else {
-      document.getElementById('auth-error').style.display = 'block';
-    }
-  } catch {
+  var res = await fetch('/api/reports/session', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({token: token}),
+    credentials: 'same-origin'
+  });
+  if (res.ok) { showDashboard(); }
+  else {
     document.getElementById('auth-error').style.display = 'block';
+    setTimeout(function(){ document.getElementById('auth-error').style.display='none'; }, 3000);
   }
 }
-
-// --- WebAuthn Passkey ---
-const PASSKEY_RP = { name: 'thinx.fun Reports', id: location.hostname };
-const PASSKEY_USER_ID = new TextEncoder().encode('thinx-admin');
-
-function hasPasskeySupport() {
-  return window.PublicKeyCredential !== undefined;
-}
-
-async function hasStoredCredential() {
-  try {
-    const cred = localStorage.getItem('thinx_passkey_cred');
-    return !!cred;
-  } catch { return false; }
-}
-
-async function registerPasskey() {
-  if (!hasPasskeySupport()) return alert('Passkeys not supported in this browser.');
-
-  const tokenToStore = authToken || document.getElementById('token-input').value.trim();
-  if (!tokenToStore) return alert('Enter a valid token first, then register a passkey.');
-
-  // Verify token is valid
-  const check = await fetch(API + '/api/reports?token=' + encodeURIComponent(tokenToStore));
-  if (!check.ok) return alert('Invalid token. Enter a valid token first.');
-
-  try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        rp: PASSKEY_RP,
-        user: { id: PASSKEY_USER_ID, name: 'thinx-admin', displayName: 'thinx.fun Admin' },
-        challenge,
-        pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-        authenticatorSelection: { residentKey: 'preferred', userVerification: 'preferred' },
-        timeout: 60000,
-      }
-    });
-
-    // Store credential ID and encrypted token
-    const credData = {
-      credId: btoa(String.fromCharCode(...new Uint8Array(credential.rawId))),
-      token: btoa(tokenToStore),
-      created: new Date().toISOString(),
-    };
-    localStorage.setItem('thinx_passkey_cred', JSON.stringify(credData));
-
-    saveSession(tokenToStore);
-    showDashboard();
-    updatePasskeyUI();
-  } catch (err) {
-    if (err.name !== 'NotAllowedError') alert('Passkey registration failed: ' + err.message);
-  }
-}
-
-async function authWithPasskey() {
-  try {
-    const stored = JSON.parse(localStorage.getItem('thinx_passkey_cred'));
-    if (!stored) return;
-
-    const credId = Uint8Array.from(atob(stored.credId), c => c.charCodeAt(0));
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-
-    await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        allowCredentials: [{ type: 'public-key', id: credId }],
-        userVerification: 'preferred',
-        timeout: 60000,
-      }
-    });
-
-    const token = atob(stored.token);
-    saveSession(token);
-    showDashboard();
-  } catch (err) {
-    if (err.name !== 'NotAllowedError') {
-      localStorage.removeItem('thinx_passkey_cred');
-      alert('Passkey auth failed. Please use token.');
-    }
-  }
-}
-
-function updatePasskeyUI() {
-  const hasPasskey = !!localStorage.getItem('thinx_passkey_cred');
-  const indicator = document.getElementById('passkey-indicator');
-  const addBtn = document.getElementById('add-passkey-btn');
-
-  if (hasPasskey) {
-    indicator.textContent = 'Passkey active';
-    indicator.className = 'passkey-status';
-    addBtn.style.display = 'none';
-  } else if (hasPasskeySupport()) {
-    indicator.textContent = 'No passkey';
-    indicator.className = 'passkey-status none';
-    addBtn.style.display = '';
-  }
-}
-
-// --- Dashboard ---
 async function showDashboard() {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
-  updatePasskeyUI();
   await loadReports();
 }
-
 async function loadReports() {
-  const res = await fetch(API + '/api/reports?token=' + encodeURIComponent(authToken));
-  if (!res.ok) { clearSession(); location.reload(); return; }
-  const { reports } = await res.json();
-
+  var res = await fetch('/api/reports', {credentials:'same-origin'});
+  if (res.status === 401) { logout(); return; }
+  if (!res.ok) return;
+  var data = await res.json();
+  var reports = data.reports;
   document.getElementById('report-count').textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '');
-
-  const list = document.getElementById('reports-list');
-  if (reports.length === 0) {
+  var warn = document.getElementById('storage-warn');
+  if (data.storage === 'memory') { warn.textContent = 'ephemeral — lost on redeploy'; warn.style.display = ''; }
+  else { warn.style.display = 'none'; }
+  var list = document.getElementById('reports-list');
+  if (!reports.length) {
     list.innerHTML = '<div class="empty-state"><div style="font-size:2rem;opacity:0.3">&#128202;</div><p>No reports yet.<br>Run: <code>npm run dataset:pipeline</code></p></div>';
     return;
   }
-
-  list.innerHTML = reports.map(r => {
-    const date = new Date(r.createdAt);
-    const ago = timeSince(date);
-    const sizeKB = Math.round(r.size / 1024);
-    const screenshots = r.meta?.screenshotCount || '?';
-    const succeeded = r.meta?.succeeded || '?';
-
-    return '<a class="report-card" href="/api/reports/' + r.id + '?s=' + encodeURIComponent(authToken) + '" target="_blank">' +
-      '<div class="report-icon">&#128196;</div>' +
-      '<div class="report-info">' +
-        '<div class="report-title">' + escapeHtml(r.title) + '</div>' +
-        '<div class="report-meta">' +
-          '<span>' + ago + '</span>' +
-          '<span>' + screenshots + ' screenshots</span>' +
-          '<span>' + succeeded + ' succeeded</span>' +
-          '<span>' + sizeKB + 'KB</span>' +
-        '</div>' +
-      '</div>' +
-      '<div class="report-actions" onclick="event.preventDefault();event.stopPropagation();">' +
-        '<button class="btn btn-outline" style="font-size:0.7rem;padding:4px 10px;" onclick="deleteReport(\\'' + r.id + '\\')">Delete</button>' +
-      '</div>' +
-    '</a>';
+  list.innerHTML = reports.map(function(r) {
+    var ago = timeSince(new Date(r.createdAt));
+    var kb = Math.round(r.size/1024);
+    var sc = r.meta&&r.meta.screenshotCount||'?';
+    var ok = r.meta&&r.meta.succeeded||'?';
+    return '<a class="report-card" href="/api/reports/'+esc(r.id)+'" target="_blank">' +
+      '<div class="report-icon">&#128196;</div><div class="report-info">' +
+      '<div class="report-title">'+esc(r.title)+'</div>' +
+      '<div class="report-meta"><span>'+ago+'</span><span>'+sc+' screenshots</span><span>'+ok+' ok</span><span>'+kb+'KB</span></div>' +
+      '</div><div class="report-actions" onclick="event.preventDefault();event.stopPropagation();">' +
+      '<button class="btn btn-outline" style="font-size:0.7rem;padding:4px 10px;" onclick="del(\\''+esc(r.id)+'\\')">Delete</button></div></a>';
   }).join('');
 }
-
-async function deleteReport(id) {
+async function del(id) {
   if (!confirm('Delete this report?')) return;
-  await fetch(API + '/api/reports/' + id + '?token=' + encodeURIComponent(authToken), { method: 'DELETE' });
+  await fetch('/api/reports/'+id, {method:'DELETE',credentials:'same-origin'});
   await loadReports();
 }
-
-function logout() {
-  clearSession();
+async function logout() {
+  await fetch('/api/reports/session', {method:'DELETE',credentials:'same-origin'});
   document.getElementById('auth-gate').style.display = '';
   document.getElementById('dashboard').style.display = 'none';
 }
-
-// --- Helpers ---
-function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function timeSince(date) {
-  const s = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (s < 60) return 'just now';
-  if (s < 3600) return Math.floor(s / 60) + 'm ago';
-  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
-  return Math.floor(s / 86400) + 'd ago';
-}
-
-// --- Init ---
-(async () => {
-  if (hasPasskeySupport()) {
-    const hasCred = await hasStoredCredential();
-    if (hasCred) {
-      document.getElementById('passkey-btn').style.display = '';
-      document.getElementById('or-divider').style.display = '';
-    }
-    document.getElementById('register-passkey-btn').style.display = '';
-  }
-
-  const saved = loadSession();
-  if (saved) {
-    authToken = saved;
-    const check = await fetch(API + '/api/reports?token=' + encodeURIComponent(saved));
-    if (check.ok) { showDashboard(); return; }
-    clearSession();
-  }
+function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function timeSince(d){var s=Math.floor((Date.now()-d.getTime())/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
+(async function(){
+  var res = await fetch('/api/reports',{credentials:'same-origin'});
+  if(res.ok) showDashboard();
 })();
 </script>
 </body>
@@ -1090,143 +943,6 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   } catch (error) {
     logger.pipelineError(requestId, error, { phase: 'catch' });
     if (keepAlive) clearInterval(keepAlive);
-    sendEvent('error', { message: error.message || 'Pipeline failed' });
-    endStream();
-  }
-});
-
-// ============================================
-// V3 Pipeline — Opus Tool-Calling (progressive UI updates)
-// ============================================
-const { runPipelineV3 } = require('./agents/orchestrator-v3');
-
-// Step 1: POST image, get requestId (shared with v2 — same endpoint)
-// Step 2: GET SSE stream for v3 pipeline
-app.get('/api/hub/v3/stream/:requestId', async (req, res) => {
-  const { requestId } = req.params;
-  const job = pipelineJobs.get(requestId);
-
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found or expired' });
-  }
-
-  pipelineJobs.delete(requestId);
-
-  let streamEnded = false;
-  let keepAlive = null;
-
-  const endStream = () => {
-    if (streamEnded) return;
-    streamEnded = true;
-    if (keepAlive) clearInterval(keepAlive);
-    if (!res.writableEnded && !res.destroyed) res.end();
-  };
-
-  const sendEvent = (event, data) => {
-    if (streamEnded || res.writableEnded) return;
-    try {
-      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      if (res.flush) res.flush();
-      logger.pipelineEvent(requestId, event);
-    } catch (err) {
-      logger.error('SSE', `v3 send ${event} failed`, { requestId, err: err.message });
-      endStream();
-    }
-  };
-
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
-
-  res.write(`:${' '.repeat(2048)}\n\n`);
-  if (res.flush) res.flush();
-  if (res.socket) res.socket.setNoDelay(true);
-
-  res.on('close', () => {
-    if (!streamEnded) logger.sseDisconnect(requestId);
-    streamEnded = true;
-  });
-
-  keepAlive = setInterval(() => {
-    if (!streamEnded) {
-      try { res.write(`: ping ${Date.now()}\n\n`); if (res.flush) res.flush(); } catch {}
-    }
-  }, 5000);
-
-  const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
-  logger.startPipeline(requestId, {
-    mediaType: job.mediaType,
-    imageSize: `${imageSize}KB`,
-    hasQuestion: !!job.question,
-    method: 'v3-tools',
-  });
-
-  sendEvent('connected', { message: 'Pipeline v3 started', requestId, timestamp: new Date().toISOString() });
-
-  let cardCount = 0;
-  let completedCards = 0;
-
-  try {
-    await runPipelineV3({
-      imageData: job.imageData,
-      mediaType: job.mediaType,
-      question: job.question,
-
-      onClassify: (classification) => {
-        logger.pipelinePhase(requestId, 'classify', { contentType: classification.contentType });
-        sendEvent('classify', classification);
-      },
-
-      onLayout: (layout) => {
-        cardCount = layout.cards?.length || 0;
-        logger.pipelinePhase(requestId, 'layout', { cardCount, layoutType: layout.layoutType });
-
-        const blueprint = {
-          layout: { type: layout.layoutType },
-          cards: layout.cards.map(c => ({
-            id: c.id,
-            cardType: c.cardType,
-            title: c.title,
-            gridColumn: c.gridColumn,
-            gridRow: c.gridRow,
-            data: null,
-          })),
-        };
-        sendEvent('layout_update', blueprint);
-      },
-
-      onCardContent: ({ cardId, data }) => {
-        completedCards++;
-        const cardDef = cardCount > 0 ? { completedCount: completedCards, totalCount: cardCount } : {};
-        logger.pipelineEvent(requestId, 'card', { cardId, completed: `${completedCards}/${cardCount}` });
-        sendEvent('card', { cardId, data, ...cardDef });
-      },
-
-      onComplete: (result) => {
-        logger.pipelineComplete(requestId, {
-          cardCount: result.cards?.length,
-          layoutType: result.layout?.layoutType,
-          toolCalls: result.toolCallOrder?.length,
-        });
-        sendEvent('complete', {
-          layout: result.layout,
-          classification: result.classification,
-          meta: result._meta,
-        });
-        endStream();
-      },
-
-      onError: (error) => {
-        logger.pipelineError(requestId, error, { phase: 'v3-pipeline' });
-        sendEvent('error', { message: error.message });
-        endStream();
-      },
-    });
-  } catch (error) {
-    logger.pipelineError(requestId, error, { phase: 'v3-catch' });
     sendEvent('error', { message: error.message || 'Pipeline failed' });
     endStream();
   }

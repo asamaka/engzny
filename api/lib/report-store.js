@@ -1,5 +1,5 @@
 /**
- * Report storage — uses a shared Redis client (injected from the server)
+ * Report storage — uses a shared Redis client (injected via init())
  * with in-memory fallback when Redis is unavailable.
  *
  * Storage layout:
@@ -10,36 +10,27 @@
 
 const crypto = require('crypto');
 
-const REPORT_TTL = 30 * 24 * 3600; // 30 days
+const REPORT_TTL = 30 * 24 * 3600;
 const MAX_REPORTS = 50;
-const MAX_REPORT_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_REPORT_SIZE = 5 * 1024 * 1024;
 
 let _getRedis = null;
-
-// In-memory fallback
 const mem = { reports: new Map(), index: [] };
 
-function init(getRedisFunc) {
-  _getRedis = getRedisFunc;
-}
+function init(getRedisFunc) { _getRedis = getRedisFunc; }
 
-async function redis() {
-  return _getRedis ? await _getRedis() : null;
-}
+async function redis() { return _getRedis ? await _getRedis() : null; }
 
-function generateId() {
-  return crypto.randomBytes(6).toString('hex');
-}
+function generateId() { return crypto.randomBytes(6).toString('hex'); }
 
-async function getStorageType() {
-  return (await redis()) ? 'redis' : 'memory';
-}
+async function getStorageType() { return (await redis()) ? 'redis' : 'memory'; }
+
+function tryParse(str, fallback) { try { return JSON.parse(str); } catch { return fallback; } }
 
 async function saveReport({ title, html, meta = {} }) {
   if (!html || html.length > MAX_REPORT_SIZE) {
-    throw new Error(`Report too large (${((html || '').length / 1024 / 1024).toFixed(1)}MB, max ${MAX_REPORT_SIZE / 1024 / 1024}MB)`);
+    throw new Error(`Report too large (max ${MAX_REPORT_SIZE / 1024 / 1024}MB)`);
   }
-
   const id = generateId();
   const entry = { id, title: title || `Report ${id}`, createdAt: new Date().toISOString(), size: html.length, meta };
 
@@ -47,20 +38,16 @@ async function saveReport({ title, html, meta = {} }) {
   if (r) {
     await r.setex(`report:${id}`, REPORT_TTL, JSON.stringify(entry));
     await r.setex(`report:${id}:html`, REPORT_TTL, html);
-
     let idx = await r.get('reports:index');
-    idx = Array.isArray(idx) ? idx : (typeof idx === 'string' ? tryParse(idx, []) : []);
+    idx = Array.isArray(idx) ? idx : tryParse(idx, []);
     idx.unshift(id);
     if (idx.length > MAX_REPORTS) idx = idx.slice(0, MAX_REPORTS);
     await r.set('reports:index', JSON.stringify(idx));
   } else {
     mem.reports.set(id, { entry, html });
     mem.index.unshift(id);
-    if (mem.index.length > MAX_REPORTS) {
-      mem.reports.delete(mem.index.pop());
-    }
+    if (mem.index.length > MAX_REPORTS) mem.reports.delete(mem.index.pop());
   }
-
   return entry;
 }
 
@@ -68,7 +55,7 @@ async function listReports() {
   const r = await redis();
   if (r) {
     let idx = await r.get('reports:index');
-    idx = Array.isArray(idx) ? idx : (typeof idx === 'string' ? tryParse(idx, []) : []);
+    idx = Array.isArray(idx) ? idx : tryParse(idx, []);
     const entries = [];
     for (const id of idx) {
       const raw = await r.get(`report:${id}`);
@@ -96,16 +83,12 @@ async function deleteReport(id) {
     await r.del(`report:${id}`);
     await r.del(`report:${id}:html`);
     let idx = await r.get('reports:index');
-    idx = Array.isArray(idx) ? idx : (typeof idx === 'string' ? tryParse(idx, []) : []);
+    idx = Array.isArray(idx) ? idx : tryParse(idx, []);
     await r.set('reports:index', JSON.stringify(idx.filter(i => i !== id)));
   } else {
     mem.reports.delete(id);
     mem.index = mem.index.filter(i => i !== id);
   }
-}
-
-function tryParse(str, fallback) {
-  try { return JSON.parse(str); } catch { return fallback; }
 }
 
 module.exports = { init, saveReport, listReports, getReport, deleteReport, getStorageType };
