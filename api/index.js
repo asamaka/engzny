@@ -404,7 +404,8 @@ app.post('/api/reports', requireDebugAuth, async (req, res) => {
 // GET /api/reports — List all reports (JSON)
 app.get('/api/reports', requireDebugAuth, async (req, res) => {
   const reports = await reportStore.listReports();
-  res.json({ reports });
+  const storage = await reportStore.getStorageType();
+  res.json({ reports, storage });
 });
 
 // GET /api/reports/:id — Serve report HTML (or JSON metadata)
@@ -683,9 +684,12 @@ async function showDashboard() {
 async function loadReports() {
   const res = await fetch(API + '/api/reports?token=' + encodeURIComponent(authToken));
   if (!res.ok) { clearSession(); location.reload(); return; }
-  const { reports } = await res.json();
+  const { reports, storage } = await res.json();
 
   document.getElementById('report-count').textContent = reports.length + ' report' + (reports.length !== 1 ? 's' : '');
+  if (storage === 'memory') {
+    document.getElementById('report-count').textContent += ' (in-memory — reports lost on redeploy)';
+  }
 
   const list = document.getElementById('reports-list');
   if (reports.length === 0) {

@@ -42,6 +42,11 @@ function generateId() {
   return crypto.randomBytes(6).toString('hex');
 }
 
+async function getStorageType() {
+  const redis = await getRedis();
+  return redis ? 'redis' : 'memory';
+}
+
 async function saveReport({ title, html, meta = {} }) {
   if (!html || html.length > MAX_REPORT_SIZE) {
     throw new Error(`Report too large (${((html || '').length / 1024 / 1024).toFixed(1)}MB, max ${MAX_REPORT_SIZE / 1024 / 1024}MB)`);
@@ -131,4 +136,4 @@ async function deleteReport(id) {
   }
 }
 
-module.exports = { saveReport, listReports, getReport, deleteReport };
+module.exports = { saveReport, listReports, getReport, deleteReport, getStorageType };
