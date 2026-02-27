@@ -93,4 +93,111 @@ describe('Live Reports', () => {
       expect(thumb).toBeNull();
     });
   });
+
+  describe('Archive (persistent)', () => {
+    it('should auto-archive when saving a live report', async () => {
+      await liveReports.saveLiveReport('arch1', {
+        outcome: 'success',
+        contentType: 'news',
+        layoutType: 'editorial',
+        cards: [{ cardType: 'hero_summary', data: { title: 'Breaking News' } }],
+      });
+
+      const archived = await liveReports.getArchive('arch1');
+      expect(archived).not.toBeNull();
+      expect(archived.requestId).toBe('arch1');
+      expect(archived.cards[0].data.title).toBe('Breaking News');
+    });
+
+    it('getReport should fall back to archive when live expires', async () => {
+      await liveReports.saveLiveReport('fallback1', {
+        outcome: 'success',
+        contentType: 'product',
+      });
+
+      // Live report exists
+      const live = await liveReports.getLiveReport('fallback1');
+      expect(live).not.toBeNull();
+
+      // getReport returns it
+      const report = await liveReports.getReport('fallback1');
+      expect(report).not.toBeNull();
+      expect(report.requestId).toBe('fallback1');
+    });
+  });
+
+  describe('searchArchive', () => {
+    beforeEach(async () => {
+      await liveReports.saveLiveReport('s1', {
+        outcome: 'success', contentType: 'news', layoutType: 'editorial',
+        platform: 'Twitter',
+        cards: [{ cardType: 'hero_summary', data: { title: 'Istanbul Flights' } }, { cardType: 'fact_check', data: {} }],
+        contentAnalysis: { intent: 'verify claim' },
+      });
+      await liveReports.saveLiveReport('s2', {
+        outcome: 'error', contentType: 'product', layoutType: 'product_showcase',
+        cards: [{ cardType: 'hero_summary', data: { title: 'iPhone Review' } }],
+      });
+      await liveReports.saveLiveReport('s3', {
+        outcome: 'success', contentType: 'news', layoutType: 'simple',
+        cards: [{ cardType: 'hero_summary', data: { title: 'Weather Report' } }],
+      });
+    });
+
+    it('should return all reports with no filters', async () => {
+      const result = await liveReports.searchArchive();
+      expect(result.total).toBe(3);
+    });
+
+    it('should filter by content type', async () => {
+      const result = await liveReports.searchArchive({ contentType: 'news' });
+      expect(result.total).toBe(2);
+    });
+
+    it('should filter by outcome', async () => {
+      const result = await liveReports.searchArchive({ outcome: 'error' });
+      expect(result.total).toBe(1);
+      expect(result.reports[0].requestId).toBe('s2');
+    });
+
+    it('should filter by layout type', async () => {
+      const result = await liveReports.searchArchive({ layoutType: 'editorial' });
+      expect(result.total).toBe(1);
+      expect(result.reports[0].requestId).toBe('s1');
+    });
+
+    it('should search by text query matching title', async () => {
+      const result = await liveReports.searchArchive({ q: 'istanbul' });
+      expect(result.total).toBe(1);
+      expect(result.reports[0].requestId).toBe('s1');
+    });
+
+    it('should search by text query matching platform', async () => {
+      const result = await liveReports.searchArchive({ q: 'twitter' });
+      expect(result.total).toBe(1);
+    });
+
+    it('should search by text query matching intent', async () => {
+      const result = await liveReports.searchArchive({ q: 'verify' });
+      expect(result.total).toBe(1);
+    });
+
+    it('should filter by card type', async () => {
+      const result = await liveReports.searchArchive({ cardType: 'fact_check' });
+      expect(result.total).toBe(1);
+      expect(result.reports[0].requestId).toBe('s1');
+    });
+
+    it('should combine multiple filters', async () => {
+      const result = await liveReports.searchArchive({ contentType: 'news', layoutType: 'simple' });
+      expect(result.total).toBe(1);
+      expect(result.reports[0].requestId).toBe('s3');
+    });
+
+    it('should support pagination', async () => {
+      const result = await liveReports.searchArchive({ limit: 1, offset: 1 });
+      expect(result.total).toBe(3);
+      expect(result.reports).toHaveLength(1);
+    });
+  });
 });

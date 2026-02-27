@@ -2424,19 +2424,29 @@ function requirePin(req, res, next) {
 
 // JSON API for report data (PIN-protected)
 app.get('/api/r/list', requirePin, async (req, res) => {
-  const reports = await liveReports.listLiveReports();
-  res.json({ reports });
+  const live = await liveReports.listLiveReports();
+  res.json({ reports: live });
+});
+
+app.get('/api/r/search', requirePin, async (req, res) => {
+  const { q, contentType, layoutType, outcome, from, to, cardType, limit, offset } = req.query;
+  const result = await liveReports.searchArchive({
+    q, contentType, layoutType, outcome, from, to, cardType,
+    limit: Math.min(parseInt(limit) || 50, 200),
+    offset: parseInt(offset) || 0,
+  });
+  res.json(result);
 });
 
 app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
-  const report = await liveReports.getLiveReport(req.params.requestId);
+  const report = await liveReports.getReport(req.params.requestId);
   if (!report) return res.status(404).json({ error: 'Report not found or expired' });
   const { thumb, ...data } = report;
   res.json({ report: data, hasThumb: !!thumb });
 });
 
 app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
-  const thumb = await liveReports.getLiveReportThumb(req.params.requestId);
+  const thumb = await liveReports.getReportThumb(req.params.requestId);
   if (!thumb) return res.status(404).json({ error: 'No thumbnail' });
   res.set('Content-Type', 'image/jpeg');
   res.send(Buffer.from(thumb, 'base64'));
@@ -2452,8 +2462,8 @@ app.get('/r/:requestId', async (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
   const authed = !!(req.cookies[RPIN_COOKIE] && verifyPin(req.cookies[RPIN_COOKIE]));
   if (authed) {
-    const report = await liveReports.getLiveReport(req.params.requestId);
-    const thumb = report ? await liveReports.getLiveReportThumb(req.params.requestId) : null;
+    const report = await liveReports.getReport(req.params.requestId);
+    const thumb = report ? await liveReports.getReportThumb(req.params.requestId) : null;
     res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true));
   } else {
     res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false));
@@ -2497,6 +2507,17 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
 .refresh-btn{background:var(--s);border:1px solid var(--b);color:var(--t2);padding:6px 14px;border-radius:100px;font-size:.75rem;cursor:pointer;transition:border-color .2s}
 .refresh-btn:hover{border-color:var(--a);color:var(--a)}
 .hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.tabs{display:flex;gap:4px;margin-bottom:14px;background:var(--s);border-radius:10px;padding:3px;border:1px solid var(--b)}
+.tab{flex:1;background:none;border:none;color:var(--t3);font-size:.78rem;font-weight:600;padding:8px 0;border-radius:8px;cursor:pointer;font-family:inherit;transition:all .2s}
+.tab.active{background:var(--a);color:#fff}
+.search-bar{margin-bottom:14px}
+.search-input{width:100%;background:var(--s);border:1px solid var(--b);border-radius:var(--rad);padding:10px 14px;color:var(--t);font-size:.84rem;font-family:inherit;outline:none;transition:border-color .2s}
+.search-input:focus{border-color:var(--a)}
+.search-input::placeholder{color:var(--t3)}
+.search-filters{display:flex;gap:8px;margin-top:8px}
+.search-filters select{background:var(--s);border:1px solid var(--b);border-radius:8px;padding:6px 10px;color:var(--t2);font-size:.74rem;font-family:inherit;outline:none;cursor:pointer;flex:1}
+.search-count{font-size:.74rem;color:var(--t3);text-align:center;padding:8px 0}
+.rcard .title{font-size:.78rem;color:var(--t);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head><body>
@@ -2513,10 +2534,13 @@ h1{font-size:1.4rem;font-weight:700;margin-bottom:4px}
 </div>
 <div id="content" class="content">
   <div class="hdr">
-    <div><h1>Live Reports</h1><div class="sub">Auto-generated for every pipeline run &middot; 1hr TTL</div></div>
-    <button class="refresh-btn" onclick="loadList()">Refresh</button>
+    <div><h1>Pipeline Reports</h1><div class="sub">Auto-generated for every production run</div></div>
+    <button class="refresh-btn" onclick="loadCurrent()">Refresh</button>
   </div>
+  <div class="tabs"><button class="tab active" id="tab-live" onclick="switchTab('live')">Live</button><button class="tab" id="tab-all" onclick="switchTab('all')">All Reports</button></div>
+  <div id="search-bar" class="search-bar" style="display:none"><input type="text" id="search-input" placeholder="Search by title, content type, platform..." class="search-input" oninput="debounceSearch()"><div class="search-filters"><select id="f-outcome" onchange="doSearch()"><option value="">Any outcome</option><option value="success">Success</option><option value="error">Error</option></select><select id="f-layout" onchange="doSearch()"><option value="">Any layout</option><option value="editorial">Editorial</option><option value="dashboard">Dashboard</option><option value="product_showcase">Product</option><option value="social_feed">Social</option><option value="investigation">Investigation</option><option value="simple">Simple</option></select></div></div>
   <div id="list" class="rlist"><div class="empty">Loading...</div></div>
+  <div id="search-count" class="search-count" style="display:none"></div>
 </div>
 </div>
 <script>
@@ -2543,28 +2567,63 @@ async function tryPin(){
   if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadList();}
   else{document.getElementById('pin-err').textContent='Wrong PIN';boxes.forEach(function(b){b.value='';});boxes[0].focus();}
 }
+function esc(s){var d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML;}
 function timeSince(d){var s=Math.floor((Date.now()-new Date(d).getTime())/1000);if(s<60)return'just now';if(s<3600)return Math.floor(s/60)+'m ago';if(s<86400)return Math.floor(s/3600)+'h ago';return Math.floor(s/86400)+'d ago';}
-function ttlLeft(d){var ms=new Date(d).getTime()-Date.now();if(ms<=0)return'expired';var m=Math.floor(ms/60000);return m+'m left';}
-async function loadList(){
+function ttlLeft(d){if(!d)return'';var ms=new Date(d).getTime()-Date.now();if(ms<=0)return'expired';return Math.floor(ms/60000)+'m left';}
+var currentTab='live';
+function switchTab(t){
+  currentTab=t;
+  document.getElementById('tab-live').className='tab'+(t==='live'?' active':'');
+  document.getElementById('tab-all').className='tab'+(t==='all'?' active':'');
+  document.getElementById('search-bar').style.display=t==='all'?'':'none';
+  document.getElementById('search-count').style.display='none';
+  loadCurrent();
+}
+function loadCurrent(){if(currentTab==='live')loadLive();else doSearch();}
+function renderCard(r,isLive){
+  var badge=r.outcome==='success'?'<span class="badge badge-g">success</span>':'<span class="badge badge-r">'+(r.outcome||'?')+'</span>';
+  var ttl=isLive&&r.expiresAt?'<span class="badge badge-y">'+ttlLeft(r.expiresAt)+'</span>':'';
+  return '<a class="rcard" href="/r/'+esc(r.requestId)+'">'
+    +(r.hasThumb?'<img class="thumb" src="/api/r/'+esc(r.requestId)+'/thumb" alt="">':'<div class="thumb"></div>')
+    +'<div class="info"><div class="rid">'+esc(r.requestId)+' '+badge+' '+ttl+'</div>'
+    +(r.heroTitle?'<div class="title">'+esc(r.heroTitle)+'</div>':'')
+    +'<div class="meta"><span>'+timeSince(r.createdAt)+'</span>'
+    +(r.contentType?'<span>'+esc(r.contentType)+'</span>':'')
+    +(r.layoutType?'<span>'+esc(r.layoutType)+'</span>':'')
+    +(r.cardCount?'<span>'+r.cardCount+' cards</span>':'')
+    +(r.duration?'<span>'+Math.round(r.duration/1000)+'s</span>':'')
+    +'</div></div><span class="arrow">&#8250;</span></a>';
+}
+async function loadLive(){
   var r=await fetch('/api/r/list',{credentials:'same-origin'});
   if(r.status===401){document.getElementById('gate').style.display='flex';document.getElementById('content').style.display='none';return;}
   var data=await r.json();
   var el=document.getElementById('list');
   if(!data.reports||!data.reports.length){el.innerHTML='<div class="empty">No live reports yet. Analyze a screenshot to generate one.</div>';return;}
-  el.innerHTML=data.reports.map(function(r){
-    var badge=r.outcome==='success'?'<span class="badge badge-g">success</span>':'<span class="badge badge-r">'+r.outcome+'</span>';
-    return '<a class="rcard" href="/r/'+r.requestId+'">'
-      +(r.hasThumb?'<img class="thumb" src="/api/r/'+r.requestId+'/thumb" alt="">':'<div class="thumb"></div>')
-      +'<div class="info"><div class="rid">'+r.requestId+' '+badge+'</div>'
-      +'<div class="meta"><span>'+timeSince(r.createdAt)+'</span>'
-      +(r.layoutType?'<span>'+r.layoutType+'</span>':'')
-      +(r.cardCount?'<span>'+r.cardCount+' cards</span>':'')
-      +(r.duration?'<span>'+Math.round(r.duration/1000)+'s</span>':'')
-      +'<span class="badge badge-y">'+ttlLeft(r.expiresAt)+'</span>'
-      +'</div></div><span class="arrow">&#8250;</span></a>';
-  }).join('');
+  el.innerHTML=data.reports.map(function(r){return renderCard(r,true);}).join('');
 }
-(async function(){var r=await fetch('/api/r/list',{credentials:'same-origin'});if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadList();}})();
+var searchTimer;
+function debounceSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(doSearch,300);}
+async function doSearch(){
+  var q=document.getElementById('search-input').value;
+  var outcome=document.getElementById('f-outcome').value;
+  var layout=document.getElementById('f-layout').value;
+  var params=new URLSearchParams();
+  if(q)params.set('q',q);
+  if(outcome)params.set('outcome',outcome);
+  if(layout)params.set('layoutType',layout);
+  params.set('limit','100');
+  var r=await fetch('/api/r/search?'+params.toString(),{credentials:'same-origin'});
+  if(r.status===401){document.getElementById('gate').style.display='flex';document.getElementById('content').style.display='none';return;}
+  var data=await r.json();
+  var el=document.getElementById('list');
+  var countEl=document.getElementById('search-count');
+  countEl.style.display='block';
+  countEl.textContent=data.total+' report'+(data.total!==1?'s':'')+' found';
+  if(!data.reports||!data.reports.length){el.innerHTML='<div class="empty">No reports match your search.</div>';return;}
+  el.innerHTML=data.reports.map(function(r){return renderCard(r,false);}).join('');
+}
+(async function(){var r=await fetch('/api/r/list',{credentials:'same-origin'});if(r.ok){document.getElementById('gate').style.display='none';document.getElementById('content').style.display='block';loadLive();}})();
 </script>
 </body></html>`;
 }

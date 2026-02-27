@@ -91,7 +91,7 @@ public/
   canvas.html                 # GIUE canvas view
 
 tests/
-  unit/                       # 115 unit tests (mocked)
+  unit/                       # 127 unit tests (mocked)
   integration/                # 3 health checks (real API)
 ```
 
@@ -112,9 +112,10 @@ tests/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/r/auth` | POST | Verify PIN `{"pin":"0427"}`, sets cookie |
-| `/api/r/list` | GET | List all live reports (summary only) |
-| `/api/r/:requestId/data` | GET | Full report data with card content |
-| `/api/r/:requestId/thumb` | GET | Screenshot thumbnail JPEG |
+| `/api/r/list` | GET | List live reports (1hr TTL, summary only) |
+| `/api/r/search` | GET | Search archived reports (30-day TTL). Params: `q`, `contentType`, `layoutType`, `outcome`, `cardType`, `from`, `to`, `limit`, `offset` |
+| `/api/r/:requestId/data` | GET | Full report data (live + archive fallback) |
+| `/api/r/:requestId/thumb` | GET | Screenshot thumbnail JPEG (live + archive fallback) |
 
 ### Debug & Monitoring (require `?token=` auth)
 | Endpoint | Method | Description |

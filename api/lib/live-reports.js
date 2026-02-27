@@ -1,20 +1,30 @@
 /**
- * Live Pipeline Reports — auto-generated on every production run.
+ * Pipeline Reports — live (1hr TTL) + persistent archive (30 days).
  *
- * Stores the full populatedLayout (with card content), screenshot thumbnail,
- * pipeline trace, and client report. Each report has a 1-hour TTL.
+ * Every pipeline run is saved twice:
+ *   1. Live report  — 1hr TTL for real-time monitoring
+ *   2. Archive copy — 30-day TTL for historical review + search
  *
  * Storage keys (Redis):
- *   livereport:{requestId}       → JSON report data   (TTL 1hr)
- *   livereport:{requestId}:thumb → base64 JPEG thumb  (TTL 1hr)
- *   livereports:index            → JSON array of IDs   (no TTL, pruned)
+ *   livereport:{id}        → JSON (TTL 1hr)
+ *   livereport:{id}:thumb  → JPEG base64 (TTL 1hr)
+ *   livereports:index      → JSON array of IDs
+ *
+ *   archive:{id}           → full JSON  (TTL 30d)
+ *   archive:{id}:thumb     → JPEG base64 (TTL 30d)
+ *   archives:index         → JSON array of summary objects (searchable)
  */
 
-const REPORT_TTL = 3600; // 1 hour
-const MAX_INDEX = 100;
+const LIVE_TTL = 3600;           // 1 hour
+const ARCHIVE_TTL = 30 * 86400;  // 30 days
+const MAX_LIVE_INDEX = 100;
+const MAX_ARCHIVE_INDEX = 500;
 
 let _getRedis = null;
-const mem = { reports: new Map(), index: [] };
+const mem = {
+  reports: new Map(), index: [],
+  archive: new Map(), archiveIndex: [],
+};
 
 function init(getRedisFunc) { _getRedis = getRedisFunc; }
 
@@ -22,38 +32,61 @@ async function redis() { return _getRedis ? await _getRedis() : null; }
 
 function tryParse(str, fb) { try { return JSON.parse(str); } catch { return fb; } }
 
+function buildSummary(entry) {
+  return {
+    requestId: entry.requestId,
+    createdAt: entry.createdAt,
+    contentType: entry.contentType || null,
+    platform: entry.platform || null,
+    layoutType: entry.layoutType || null,
+    cardCount: entry.cardCount || null,
+    cardTypes: (entry.cards || []).map(c => c.cardType).filter(Boolean),
+    duration: entry.duration || null,
+    outcome: entry.outcome || null,
+    imageSize: entry.imageSize || null,
+    hasThumb: !!entry.thumb,
+    heroTitle: entry.cards?.[0]?.data?.title || null,
+    intent: entry.contentAnalysis?.intent || null,
+  };
+}
+
+// ── Live reports (1hr TTL) ──────────────────────────────────
+
 async function saveLiveReport(requestId, data) {
   const entry = {
     requestId,
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + REPORT_TTL * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + LIVE_TTL * 1000).toISOString(),
     ...data,
   };
 
   const r = await redis();
   if (r) {
-    await r.setex(`livereport:${requestId}`, REPORT_TTL, JSON.stringify(entry));
+    await r.setex(`livereport:${requestId}`, LIVE_TTL, JSON.stringify(entry));
     if (data.thumb) {
-      await r.setex(`livereport:${requestId}:thumb`, REPORT_TTL, data.thumb);
+      await r.setex(`livereport:${requestId}:thumb`, LIVE_TTL, data.thumb);
     }
     let idx = await r.get('livereports:index');
     idx = Array.isArray(idx) ? idx : tryParse(idx, []);
     idx.unshift(requestId);
-    if (idx.length > MAX_INDEX) idx = idx.slice(0, MAX_INDEX);
+    if (idx.length > MAX_LIVE_INDEX) idx = idx.slice(0, MAX_LIVE_INDEX);
     await r.set('livereports:index', JSON.stringify(idx));
   } else {
     mem.reports.set(requestId, entry);
     mem.index.unshift(requestId);
-    if (mem.index.length > MAX_INDEX) {
-      const old = mem.index.splice(MAX_INDEX);
+    if (mem.index.length > MAX_LIVE_INDEX) {
+      const old = mem.index.splice(MAX_LIVE_INDEX);
       for (const id of old) mem.reports.delete(id);
     }
-    // In-memory TTL cleanup
     setTimeout(() => {
       mem.reports.delete(requestId);
       mem.index = mem.index.filter(i => i !== requestId);
-    }, REPORT_TTL * 1000);
+    }, LIVE_TTL * 1000);
   }
+
+  // Also save to persistent archive (non-blocking)
+  saveArchive(requestId, entry).catch(() => {});
+
   return entry;
 }
 
@@ -84,19 +117,7 @@ async function listLiveReports() {
       const raw = await r.get(`livereport:${id}`);
       if (raw) {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        // Return summary only (no full card data or thumb in listing)
-        entries.push({
-          requestId: parsed.requestId,
-          createdAt: parsed.createdAt,
-          expiresAt: parsed.expiresAt,
-          contentType: parsed.contentType,
-          layoutType: parsed.layoutType,
-          cardCount: parsed.cardCount,
-          duration: parsed.duration,
-          outcome: parsed.outcome,
-          imageSize: parsed.imageSize,
-          hasThumb: !!parsed.thumb,
-        });
+        entries.push({ ...buildSummary(parsed), expiresAt: parsed.expiresAt });
       }
     }
     return entries;
@@ -104,21 +125,125 @@ async function listLiveReports() {
   return mem.index.map(id => {
     const e = mem.reports.get(id);
     if (!e) return null;
-    return {
-      requestId: e.requestId,
-      createdAt: e.createdAt,
-      expiresAt: e.expiresAt,
-      contentType: e.contentType,
-      layoutType: e.layoutType,
-      cardCount: e.cardCount,
-      duration: e.duration,
-      outcome: e.outcome,
-      imageSize: e.imageSize,
-      hasThumb: !!e.thumb,
-    };
+    return { ...buildSummary(e), expiresAt: e.expiresAt };
   }).filter(Boolean);
 }
 
-function _resetForTest() { mem.reports.clear(); mem.index.length = 0; }
+// ── Archive (30-day persistent) ─────────────────────────────
 
-module.exports = { init, saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports, _resetForTest };
+async function saveArchive(requestId, entry) {
+  const summary = buildSummary(entry);
+  const r = await redis();
+  if (r) {
+    await r.setex(`archive:${requestId}`, ARCHIVE_TTL, JSON.stringify(entry));
+    if (entry.thumb) {
+      await r.setex(`archive:${requestId}:thumb`, ARCHIVE_TTL, entry.thumb);
+    }
+    let idx = await r.get('archives:index');
+    idx = Array.isArray(idx) ? idx : tryParse(idx, []);
+    // Don't duplicate
+    idx = idx.filter(s => s.requestId !== requestId);
+    idx.unshift(summary);
+    if (idx.length > MAX_ARCHIVE_INDEX) idx = idx.slice(0, MAX_ARCHIVE_INDEX);
+    await r.set('archives:index', JSON.stringify(idx));
+  } else {
+    mem.archive.set(requestId, entry);
+    mem.archiveIndex = mem.archiveIndex.filter(s => s.requestId !== requestId);
+    mem.archiveIndex.unshift(summary);
+    if (mem.archiveIndex.length > MAX_ARCHIVE_INDEX) {
+      const removed = mem.archiveIndex.splice(MAX_ARCHIVE_INDEX);
+      for (const s of removed) mem.archive.delete(s.requestId);
+    }
+  }
+}
+
+async function getArchive(requestId) {
+  const r = await redis();
+  if (r) {
+    const raw = await r.get(`archive:${requestId}`);
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  }
+  return mem.archive.get(requestId) || null;
+}
+
+async function getArchiveThumb(requestId) {
+  const r = await redis();
+  if (r) return await r.get(`archive:${requestId}:thumb`);
+  const entry = mem.archive.get(requestId);
+  return entry?.thumb || null;
+}
+
+/**
+ * Get a report from live store first, fall back to archive.
+ */
+async function getReport(requestId) {
+  const live = await getLiveReport(requestId);
+  if (live) return live;
+  return getArchive(requestId);
+}
+
+async function getReportThumb(requestId) {
+  const live = await getLiveReportThumb(requestId);
+  if (live) return live;
+  return getArchiveThumb(requestId);
+}
+
+/**
+ * Search/filter archived reports.
+ * Filters: q (text), contentType, layoutType, outcome, from, to, cardType
+ * All filters are optional, combined with AND.
+ */
+async function searchArchive({ q, contentType, layoutType, outcome, from, to, cardType, limit = 50, offset = 0 } = {}) {
+  const r = await redis();
+  let idx;
+  if (r) {
+    const raw = await r.get('archives:index');
+    idx = Array.isArray(raw) ? raw : tryParse(raw, []);
+  } else {
+    idx = [...mem.archiveIndex];
+  }
+
+  let filtered = idx;
+
+  if (q) {
+    const ql = q.toLowerCase();
+    filtered = filtered.filter(s =>
+      (s.heroTitle && s.heroTitle.toLowerCase().includes(ql)) ||
+      (s.intent && s.intent.toLowerCase().includes(ql)) ||
+      (s.contentType && s.contentType.toLowerCase().includes(ql)) ||
+      (s.platform && s.platform.toLowerCase().includes(ql)) ||
+      (s.requestId && s.requestId.toLowerCase().includes(ql))
+    );
+  }
+  if (contentType) filtered = filtered.filter(s => s.contentType === contentType);
+  if (layoutType) filtered = filtered.filter(s => s.layoutType === layoutType);
+  if (outcome) filtered = filtered.filter(s => s.outcome === outcome);
+  if (cardType) filtered = filtered.filter(s => s.cardTypes && s.cardTypes.includes(cardType));
+  if (from) {
+    const fromDate = new Date(from).getTime();
+    filtered = filtered.filter(s => new Date(s.createdAt).getTime() >= fromDate);
+  }
+  if (to) {
+    const toDate = new Date(to).getTime();
+    filtered = filtered.filter(s => new Date(s.createdAt).getTime() <= toDate);
+  }
+
+  return {
+    total: filtered.length,
+    reports: filtered.slice(offset, offset + limit),
+  };
+}
+
+function _resetForTest() {
+  mem.reports.clear(); mem.index.length = 0;
+  mem.archive.clear(); mem.archiveIndex.length = 0;
+}
+
+module.exports = {
+  init,
+  saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports,
+  getArchive, getArchiveThumb, getReport, getReportThumb,
+  searchArchive,
+  _resetForTest,
+};
