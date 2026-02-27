@@ -1622,14 +1622,56 @@
             scanCorners.classList.add('active');
             statusBar.classList.add('active');
             statusProgressFill.style.width = '5%';
-            statusText.textContent = 'analyzing screenshot';
+            statusText.textContent = 'optimizing screenshot';
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                currentImageBase64 = reader.result;
+            compressImage(blob).then(dataUrl => {
+                currentImageBase64 = dataUrl;
                 startPipeline(currentImageBase64);
-            };
-            reader.readAsDataURL(blob);
+            }).catch(() => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    currentImageBase64 = reader.result;
+                    startPipeline(currentImageBase64);
+                };
+                reader.readAsDataURL(blob);
+            });
+        }
+
+        const MAX_UPLOAD_BYTES = 3 * 1024 * 1024;
+        const MAX_DIMENSION = 2048;
+
+        function compressImage(blob) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        let { width, height } = img;
+                        const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+                        width = Math.round(width * scale);
+                        height = Math.round(height * scale);
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        const qualities = [0.85, 0.7, 0.55, 0.4];
+                        for (const q of qualities) {
+                            const dataUrl = canvas.toDataURL('image/jpeg', q);
+                            const sizeBytes = Math.round((dataUrl.length - 23) * 0.75);
+                            if (sizeBytes <= MAX_UPLOAD_BYTES) {
+                                URL.revokeObjectURL(img.src);
+                                return resolve(dataUrl);
+                            }
+                        }
+                        URL.revokeObjectURL(img.src);
+                        resolve(canvas.toDataURL('image/jpeg', 0.3));
+                    } catch (e) { reject(e); }
+                };
+                img.onerror = reject;
+                img.src = URL.createObjectURL(blob);
+            });
         }
 
         // === Telemetry ===
