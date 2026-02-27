@@ -161,53 +161,37 @@ async function runPipelineV3(opts) {
       messages: [{ role: 'user', content: userContent }],
     });
 
-    const pendingToolInputs = new Map();
-    let currentToolId = null;
-    let currentToolName = null;
-    let inputBuffer = '';
+    // Use 'contentBlock' event — fires for each completed content block
+    // (text or tool_use). This is the correct event name in the Anthropic SDK.
+    stream.on('contentBlock', (block) => {
+      if (block?.type !== 'tool_use') return;
 
-    stream.on('contentBlockStart', (block) => {
-      if (block.content_block?.type === 'tool_use') {
-        currentToolId = block.content_block.id;
-        currentToolName = block.content_block.name;
-        inputBuffer = '';
-      }
-    });
+      const toolName = block.name;
+      const input = block.input;
+      if (!toolName || !input) return;
 
-    stream.on('contentBlockDelta', (delta) => {
-      if (delta.delta?.type === 'input_json_delta' && delta.delta.partial_json) {
-        inputBuffer += delta.delta.partial_json;
-      }
-    });
+      toolCallOrder.push(toolName);
+      logger.info('PipelineV3', `Tool call: ${toolName}`, { requestId: opts._requestId });
 
-    stream.on('contentBlockStop', () => {
-      if (currentToolName && inputBuffer) {
-        try {
-          const input = JSON.parse(inputBuffer);
-          toolCallOrder.push(currentToolName);
-
-          if (currentToolName === 'classify') {
-            classification = input;
-            try { onClassify(input); } catch (e) { logger.error('PipelineV3', 'onClassify error', { err: e.message }); }
-          } else if (currentToolName === 'buildLayout') {
-            layout = input;
-            try { onLayout(input); } catch (e) { logger.error('PipelineV3', 'onLayout error', { err: e.message }); }
-          } else if (currentToolName === 'addContent') {
-            const { cardId, data } = input;
-            if (cardId && data) {
-              const existing = cardContents.get(cardId);
-              const merged = existing ? { ...existing, ...data } : data;
-              cardContents.set(cardId, merged);
-              try { onCardContent({ cardId, data: merged }); } catch (e) { logger.error('PipelineV3', 'onCardContent error', { err: e.message }); }
-            }
+      try {
+        if (toolName === 'classify') {
+          classification = input;
+          onClassify(input);
+        } else if (toolName === 'buildLayout') {
+          layout = input;
+          onLayout(input);
+        } else if (toolName === 'addContent') {
+          const { cardId, data } = input;
+          if (cardId && data) {
+            const existing = cardContents.get(cardId);
+            const merged = existing ? { ...existing, ...data } : data;
+            cardContents.set(cardId, merged);
+            onCardContent({ cardId, data: merged });
           }
-        } catch (e) {
-          logger.warn('PipelineV3', `Failed to parse tool input for ${currentToolName}`, { err: e.message });
         }
+      } catch (e) {
+        logger.error('PipelineV3', `Callback error for ${toolName}`, { err: e.message });
       }
-      currentToolId = null;
-      currentToolName = null;
-      inputBuffer = '';
     });
 
     await stream.finalMessage();
