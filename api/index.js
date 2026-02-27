@@ -38,18 +38,38 @@ const PROGRESS_MESSAGES = {
 };
 
 // Redis client (lazy loaded)
+// Supports multiple env var naming conventions:
+//   - UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (direct Upstash)
+//   - KV_REST_API_URL / KV_REST_API_TOKEN (Vercel KV integration)
+//   - REDIS_REST_URL / REDIS_REST_TOKEN (generic)
 let redis = null;
 let _loggerRedisInitialized = false;
+let _redisEnvSource = null;
+
+function getRedisEnv() {
+  const candidates = [
+    { url: process.env.UPSTASH_REDIS_REST_URL, token: process.env.UPSTASH_REDIS_REST_TOKEN, source: 'UPSTASH_REDIS_REST_*' },
+    { url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN, source: 'KV_REST_API_*' },
+    { url: process.env.KV_URL, token: process.env.KV_REST_API_TOKEN, source: 'KV_URL + KV_REST_API_TOKEN' },
+    { url: process.env.REDIS_REST_URL, token: process.env.REDIS_REST_TOKEN, source: 'REDIS_REST_*' },
+    { url: process.env.REDIS_URL, token: process.env.REDIS_TOKEN, source: 'REDIS_URL/TOKEN' },
+  ];
+  for (const c of candidates) {
+    if (c.url && c.token) return c;
+  }
+  return null;
+}
+
 const getRedis = async () => {
   if (redis) return redis;
   
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  const env = getRedisEnv();
+  if (env) {
     try {
       const { Redis } = require('@upstash/redis');
-      redis = new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-      });
+      redis = new Redis({ url: env.url, token: env.token });
+      _redisEnvSource = env.source;
+      logger.info('Redis', `Connected via ${env.source}`);
       if (!_loggerRedisInitialized) {
         _loggerRedisInitialized = true;
         logger.initRedis(redis).catch(err =>
@@ -437,8 +457,18 @@ app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
   res.json({
     redis: {
       status: redisStatus,
-      urlConfigured: !!process.env.UPSTASH_REDIS_REST_URL,
-      tokenConfigured: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+      envSource: _redisEnvSource || 'none',
+      envVarsDetected: {
+        UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
+        UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN,
+        KV_REST_API_URL: !!process.env.KV_REST_API_URL,
+        KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
+        KV_URL: !!process.env.KV_URL,
+        REDIS_REST_URL: !!process.env.REDIS_REST_URL,
+        REDIS_REST_TOKEN: !!process.env.REDIS_REST_TOKEN,
+        REDIS_URL: !!process.env.REDIS_URL,
+        REDIS_TOKEN: !!process.env.REDIS_TOKEN,
+      },
       loggerPersistence: logger.hasRedis ? 'active' : 'inactive',
     },
     anthropic: {
