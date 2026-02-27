@@ -498,8 +498,7 @@ async function main() {
   // Generate HTML report
   const html = generateReport(results);
   fs.writeFileSync(REPORT_PATH, html);
-  log(`\nReport saved: ${path.relative(process.cwd(), REPORT_PATH)}`);
-  log(`Open in browser to view side-by-side comparison.`);
+  log(`\nReport saved locally: ${path.relative(process.cwd(), REPORT_PATH)}`);
 
   // Summary
   const succeeded = results.filter(r => !r.error);
@@ -512,6 +511,29 @@ async function main() {
   if (succeeded.length > 0) {
     const avgDuration = succeeded.reduce((s, r) => s + r.elapsed, 0) / succeeded.length;
     log(`Avg duration: ${(avgDuration / 1000).toFixed(1)}s`);
+  }
+
+  // Upload to report storage
+  const uploadUrl = `${baseUrl}/api/reports`;
+  const title = `Pipeline Test — ${selected.length} screenshots — ${new Date().toISOString().split('T')[0]}`;
+  const reportMeta = {
+    screenshotCount: selected.length,
+    succeeded: succeeded.length,
+    failed: failed.length,
+    avgDuration: succeeded.length > 0 ? Math.round(succeeded.reduce((s, r) => s + r.elapsed, 0) / succeeded.length) : 0,
+    categories: [...new Set(selected.map(i => i.category))],
+  };
+
+  const debugToken = process.env.DEBUG_TOKEN || 'thinx-debug-2026';
+  try {
+    const uploadRes = await postJSON(`${uploadUrl}?token=${encodeURIComponent(debugToken)}`, { title, html, meta: reportMeta });
+    if (uploadRes.ok && uploadRes.report) {
+      log(`\nReport uploaded to storage: ${uploadRes.report.id}`);
+      log(`View at: ${baseUrl}/reports`);
+    }
+  } catch (err) {
+    log(`\nNote: Could not upload report to storage (${err.message})`);
+    log(`Report is available locally at: ${path.relative(process.cwd(), REPORT_PATH)}`);
   }
 }
 
