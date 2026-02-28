@@ -71,7 +71,9 @@ ${fieldDescriptions}
 4. For fact_check cards: assess based on visible information, mark confidence as "low" if you cannot verify
 5. For product_card: features and warnings MUST be arrays of plain strings, NOT objects
 6. Include any visible URLs in url/imageUrl/sourceUrl/mapUrl fields
-7. Return ONLY valid JSON with the card data fields - no markdown, no explanation${webSearchInstructions}
+7. Return ONLY valid JSON with the card data fields - no markdown, no explanation
+8. CRITICAL for breaking news: NEVER label a claim as "misleading" or "false" just because you cannot immediately verify it. Breaking news is fast-moving — use "unverified" or "needs_context" with low confidence instead. In military/conflict situations, events happen on MULTIPLE SIDES simultaneously (e.g. strikes AND retaliatory strikes). A report about events in one location does NOT mean events in another location didn't happen.
+9. For breaking news fact_check: state the claim neutrally, acknowledge you are working from a single screenshot without the full picture, and recommend checking multiple independent sources${webSearchInstructions}
 
 Return JSON:`;
 }

@@ -61,14 +61,14 @@ const CARD_TYPES = {
   },
 
   fact_check: {
-    description: 'Claim verification card with verdict',
+    description: 'Claim verification card with verdict. CRITICAL for breaking news: do NOT label claims as "misleading" or "false" unless you have strong contradicting evidence from multiple independent sources. For fast-moving events, prefer "unverified" or "needs_context" with low confidence. Breaking news often involves multi-sided events where BOTH sides of a conflict may be experiencing real events simultaneously.',
     schema: {
-      claim: { type: 'string', required: true, description: 'The claim being checked' },
-      verdict: { type: 'string', required: true, enum: ['verified', 'misleading', 'unverified', 'false', 'partially_true', 'needs_context'], description: 'Assessment' },
-      explanation: { type: 'string', required: true, description: 'Why this verdict was reached' },
+      claim: { type: 'string', required: true, description: 'The claim being checked — state it neutrally without prejudging' },
+      verdict: { type: 'string', required: true, enum: ['verified', 'misleading', 'unverified', 'false', 'partially_true', 'needs_context'], description: 'Assessment. For breaking news, strongly prefer "unverified" or "needs_context" over "misleading" or "false" unless contradicting evidence is overwhelming' },
+      explanation: { type: 'string', required: true, description: 'Why this verdict was reached. For breaking news, acknowledge the evolving nature of the situation and mention what would be needed to confirm or deny the claim' },
       source: { type: 'string', description: 'Source or basis for the check' },
       sourceUrl: { type: 'string', description: 'URL to source if available' },
-      confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Confidence in the verdict' },
+      confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Confidence in the verdict. For breaking news, this should almost always be "low"' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },

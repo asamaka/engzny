@@ -34,9 +34,11 @@ ${cardSummaries}
 **Research Goals:**
 1. Verify facts and claims visible in the screenshot
 2. Find additional context, background, or recent developments
-3. Identify any misleading or inaccurate information
+3. Identify any misleading or inaccurate information — but be EXTREMELY cautious with breaking news. A claim being unverified is NOT the same as it being false or misleading.
 4. Find related links, sources, and references
 5. Answer the user's likely questions with factual, sourced data
+6. For breaking news / conflict situations: research ALL SIDES of the event. If one side launched strikes, check whether the other side retaliated. A report about events at location A does not invalidate reports about events at location B — both can be true simultaneously.
+7. NEVER assume a breaking news report is misleading just because the primary story is about a different aspect of the same event. Military conflicts involve simultaneous actions by multiple parties.
 
 Return a structured JSON response:
 {
@@ -49,9 +51,9 @@ Return a structured JSON response:
       "sourceUrls": ["array of source URLs"],
       "relatedCardTypes": ["card types this could enhance"],
       "factCheck": {
-        "claim": "string (if applicable)",
-        "verdict": "verified|misleading|unverified|false|partially_true|needs_context",
-        "explanation": "string"
+        "claim": "string (if applicable — state neutrally)",
+        "verdict": "verified|misleading|unverified|false|partially_true|needs_context (for breaking news, prefer unverified or needs_context over misleading or false unless you have overwhelming evidence)",
+        "explanation": "string (for breaking news, acknowledge the fast-moving nature and recommend checking multiple sources)"
       }
     }
   ],

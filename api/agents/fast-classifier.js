@@ -41,6 +41,14 @@ ${getCardTypeDetailedSchemaForPrompt()}
 - For product_card: features and warnings must be PLAIN STRINGS
 - Set researchBrief for each card to guide deeper web research
 
+**CRITICAL — Breaking News Rules:**
+- For breaking news content: DO NOT label reports as "MISLEADING" or "MISINFORMATION" in hero_summary. Use neutral titles like "Breaking: [Topic]" and set badge to "Breaking News", not "MISINFORMATION"
+- A news report from a credible news organization (Al Jazeera, BBC, Reuters, CNN, etc.) should be presented neutrally, not prejudged as false
+- For fact_check cards on breaking news: use verdict "unverified" or "needs_context" with confidence "low" — NEVER "misleading" or "false" unless you have overwhelming contradicting evidence
+- In the hero_summary takeaway, present what is being reported factually rather than asserting it is true or false
+- For military/conflict breaking news: events happen simultaneously on multiple sides. Strikes AND retaliatory strikes can both be real. Do not dismiss one side's reports just because the other side also has news
+- Set researchBrief to explicitly ask for multi-source verification and checking all sides of the story
+
 Return ONLY valid JSON:
 {
   "contentAnalysis": {

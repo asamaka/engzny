@@ -145,7 +145,14 @@ ${getLayoutTypesSummaryForPrompt()}
 - Total cards should be 6-10 for a comprehensive dashboard
 - For fact_check: include real verdict, explanation, and confidence
 - For hero_summary: ALWAYS ensure badge, takeaway, and icon are populated
-- Include real URLs, citations, and source links wherever possible`;
+- Include real URLs, citations, and source links wherever possible
+
+**CRITICAL — Breaking News Accuracy:**
+- If the content is breaking news from a credible news source: DO NOT change hero_summary title to label it as "MISLEADING" or "MISINFORMATION". Present the news neutrally.
+- For fact_check cards on breaking news: prefer verdict "needs_context" or "unverified" over "misleading" or "false" unless you have strong multi-source evidence contradicting the claim.
+- In military/conflict situations, remember that events happen on MULTIPLE SIDES simultaneously. If one country strikes another, retaliatory strikes from the other side are expected and should not be dismissed.
+- A breaking news report about explosions/strikes in a city should NOT be labeled misleading just because strikes also occurred in a different city — both can be true.
+- If the initial analysis labeled breaking news as "MISLEADING", consider using update_card to correct this to a neutral presentation.`;
 
   if (researchData) {
     prompt += `\n\n**Deep research findings (from web search):**
@@ -156,7 +163,9 @@ Use this research to:
 - Add source URLs and citations
 - Create fact_check cards for claims that need verification
 - Update timeline_card with accurate dates
-- Enrich person_card or product_card with web-sourced details`;
+- Enrich person_card or product_card with web-sourced details
+- IMPORTANT: If research reveals the initial analysis was wrong (e.g. breaking news was labeled as misleading when it was accurate), use update_card to CORRECT the hero_summary and fact_check cards to reflect the truth
+- For breaking news: if research confirms the reported events are real, change any "misleading"/"false" verdicts to "verified" or "partially_true" and update the hero_summary to present the news neutrally`;
   }
 
   return prompt;
