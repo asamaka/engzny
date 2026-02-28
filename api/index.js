@@ -3030,7 +3030,8 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
 
       // LLM Transaction Traces
       + ((report.llmTraces && report.llmTraces.length) ?
-          '<h2>LLM Transaction Trace (' + report.llmTraces.length + ' calls)</h2>'
+          '<h2 style="display:flex;align-items:center;justify-content:space-between">LLM Transaction Trace (' + report.llmTraces.length + ' calls)'
+          + '<span style="display:flex;gap:6px"><button onclick="expandAllTraces()" class="trace-btn">Expand All</button><button onclick="collapseAllTraces()" class="trace-btn">Collapse All</button></span></h2>'
           + renderLlmTracesHtml(report)
         : '');
 
@@ -3268,6 +3269,8 @@ td{padding:6px 8px;border-bottom:1px solid rgba(30,39,54,.5);color:var(--t)}
 .trace-error-box{padding:10px 12px;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.15);border-radius:8px}
 .trace-tool-call{margin-bottom:8px;padding:8px;background:var(--s2);border-radius:6px}
 .trace-tool-name{font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px}
+.trace-btn{background:var(--s2);border:1px solid var(--b);color:var(--t2);font-size:.68rem;font-weight:600;padding:3px 10px;border-radius:var(--rad-pill);cursor:pointer;transition:all .2s}
+.trace-btn:hover{background:var(--s3);color:var(--t);border-color:var(--a)}
 
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--b);color:var(--t3);font-size:.72rem;text-align:center}
 </style>
