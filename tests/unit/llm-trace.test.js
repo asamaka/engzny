@@ -16,7 +16,7 @@ describe('TraceCollector', () => {
     const trace = collector.record({
       phase: 'classify',
       agent: 'FastClassifier',
-      model: 'claude-haiku-4-5-latest',
+      model: 'claude-haiku-4-5-20251001',
       duration: 2500,
       request: {
         userPrompt: 'Analyze this screenshot...',
@@ -35,7 +35,7 @@ describe('TraceCollector', () => {
     expect(trace.timestamp).toBeDefined();
     expect(trace.phase).toBe('classify');
     expect(trace.agent).toBe('FastClassifier');
-    expect(trace.model).toBe('claude-haiku-4-5-latest');
+    expect(trace.model).toBe('claude-haiku-4-5-20251001');
     expect(trace.duration).toBe(2500);
     expect(trace.request.userPrompt).toBe('Analyze this screenshot...');
     expect(trace.request.hasImage).toBe(true);
@@ -90,7 +90,7 @@ describe('TraceCollector', () => {
 
   test('should generate summary with model list and token counts', () => {
     collector.record({
-      phase: 'classify', agent: 'FastClassifier', model: 'claude-haiku-4-5-latest',
+      phase: 'classify', agent: 'FastClassifier', model: 'claude-haiku-4-5-20251001',
       duration: 2000, request: {},
       response: { usage: { input_tokens: 1000, output_tokens: 200 } },
     });
@@ -107,7 +107,7 @@ describe('TraceCollector', () => {
 
     const summary = collector.getSummary();
     expect(summary.traceCount).toBe(3);
-    expect(summary.models).toContain('claude-haiku-4-5-latest');
+    expect(summary.models).toContain('claude-haiku-4-5-20251001');
     expect(summary.models).toContain('claude-sonnet-4-20250514');
     expect(summary.totalInputTokens).toBe(6000);
     expect(summary.totalOutputTokens).toBe(1500);
