@@ -1,13 +1,13 @@
 /**
- * Pipeline Reports — live (1hr TTL) + persistent archive (30 days).
+ * Pipeline Reports — live (48hr TTL) + persistent archive (30 days).
  *
  * Every pipeline run is saved twice:
- *   1. Live report  — 1hr TTL for real-time monitoring
+ *   1. Live report  — 48hr TTL for real-time monitoring
  *   2. Archive copy — 30-day TTL for historical review + search
  *
  * Storage keys (Redis):
- *   livereport:{id}        → JSON (TTL 1hr)
- *   livereport:{id}:thumb  → JPEG base64 (TTL 1hr)
+ *   livereport:{id}        → JSON (TTL 48hr)
+ *   livereport:{id}:thumb  → JPEG base64 (TTL 48hr)
  *   livereports:index      → JSON array of IDs
  *
  *   archive:{id}           → full JSON  (TTL 30d)
@@ -15,7 +15,7 @@
  *   archives:index         → JSON array of summary objects (searchable)
  */
 
-const LIVE_TTL = 3600;           // 1 hour
+const LIVE_TTL = 48 * 3600;     // 48 hours
 const ARCHIVE_TTL = 30 * 86400;  // 30 days
 const MAX_LIVE_INDEX = 100;
 const MAX_ARCHIVE_INDEX = 500;

@@ -38,15 +38,15 @@ describe('Live Reports', () => {
       expect(report).toBeNull();
     });
 
-    it('should include expiry time 1 hour in the future', async () => {
+    it('should include expiry time 48 hours in the future', async () => {
       const before = Date.now();
       await liveReports.saveLiveReport('exp1', { outcome: 'success' });
       const after = Date.now();
 
       const report = await liveReports.getLiveReport('exp1');
       const expiresAt = new Date(report.expiresAt).getTime();
-      expect(expiresAt).toBeGreaterThanOrEqual(before + 3600 * 1000 - 100);
-      expect(expiresAt).toBeLessThanOrEqual(after + 3600 * 1000 + 100);
+      expect(expiresAt).toBeGreaterThanOrEqual(before + 48 * 3600 * 1000 - 100);
+      expect(expiresAt).toBeLessThanOrEqual(after + 48 * 3600 * 1000 + 100);
     });
   });
 
