@@ -49,6 +49,7 @@ Return a structured JSON response:
       "details": "string (detailed information)",
       "confidence": "high|medium|low",
       "sourceUrls": ["array of source URLs"],
+      "imageUrl": "string (relevant photo/image URL found during research — for people, locations, news)",
       "relatedCardTypes": ["card types this could enhance"],
       "factCheck": {
         "claim": "string (if applicable — state neutrally)",
@@ -57,6 +58,7 @@ Return a structured JSON response:
       }
     }
   ],
+  "followUpQuestions": [{"question": "string (question user would ask)", "answer": "string (brief 1-2 sentence answer based on research)"}],
   "additionalQuestions": ["questions that arose from research"],
   "overallContext": "string (brief overall context from research)"
 }`;

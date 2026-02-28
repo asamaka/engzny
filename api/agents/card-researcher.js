@@ -20,6 +20,8 @@ const WEB_RESEARCH_CARD_TYPES = new Set([
   'product_card',
   'comparison_card',
   'location_card',
+  'news_card',
+  'did_you_know_card',
 ]);
 
 /**
@@ -52,6 +54,15 @@ function buildResearchPrompt(card, contentAnalysis) {
 10. Include source URLs in the sourceUrl field when available from search results`
     : '';
 
+  const photoInstructions = ['person_card', 'location_card', 'news_card', 'did_you_know_card'].includes(card.cardType)
+    ? `\n\nIMPORTANT — FIND REAL IMAGES:
+- For person_card: Search for "${card.placeholderData?.name || 'the person'}" and find their Wikipedia/official photo URL. Set it in photoUrl.
+- For location_card: Search for a photo of "${card.placeholderData?.name || 'the location'}" and set it in imageUrl.
+- For news_card: Find the article's featured image URL. Set it in imageUrl.
+- For did_you_know_card: Find a related image URL. Set it in imageUrl.
+- Real photos make cards dramatically more engaging and useful.`
+    : '';
+
   return `You are a research specialist populating a card with accurate, concise data${needsWebResearch ? ' using web search' : ' from a screenshot'}.
 
 Context: ${contentAnalysis.contentType}${contentAnalysis.platform ? ` on ${contentAnalysis.platform}` : ''} — ${contentAnalysis.intent}
@@ -62,13 +73,14 @@ Fields:
 ${fieldDescriptions}
 
 Rules:
-1. Use ONLY visible information — never fabricate
+1. Use ONLY visible information — never fabricate text data
 2. OMIT unknown fields rather than writing "Not visible" or "N/A"
-3. Keep text SHORT — titles max 8 words, explanations max 2 sentences
+3. Keep text SHORT — titles max 8 words, explanations max 1-2 sentences
 4. For product_card: features/warnings must be plain strings
 5. Include visible URLs in url/sourceUrl/mapUrl fields
 6. For breaking news fact_check: use verdict "unverified" or "needs_context" with confidence "low" — never "misleading" or "false" without strong evidence
-7. Add emoji field where schema supports it for visual richness${webSearchInstructions}
+7. Add emoji field where schema supports it for visual richness
+8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${photoInstructions}
 
 Return ONLY valid JSON:`;
 }

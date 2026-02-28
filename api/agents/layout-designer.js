@@ -15,14 +15,21 @@ const { getVisionAdapter } = require('../llm');
 const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
-const LAYOUT_DESIGNER_PROMPT = `You are a layout designer for a screenshot intelligence app. Your job is to analyze a screenshot and design the best possible card-based layout to present the extracted information.
+const LAYOUT_DESIGNER_PROMPT = `You are a layout designer for a screenshot intelligence app. Your job is to analyze a screenshot and design the most VISUAL, image-rich card layout possible.
 
 **Your Role:**
 1. LOOK at the screenshot carefully
 2. IDENTIFY what kind of content this is (news, product, social media, data, etc.)
-3. DECIDE the best layout type for this content
-4. CREATE a blueprint of cards - choosing the most appropriate card types
-5. ASSIGN research briefs - tell each card what to investigate
+3. DECIDE the best layout type — prefer visual layouts
+4. CREATE a blueprint of cards — prioritize cards with IMAGES and CHARTS over text-heavy ones
+5. ASSIGN research briefs — tell each card what to investigate AND what images/photos to find
+
+**Design Philosophy:**
+- IMAGES FIRST: Every card that can show an image should. Person cards need real photos. Location cards need photos. News needs article images.
+- LESS TEXT: Keep all text ultra-concise. No paragraphs. Short labels and values only.
+- WHAT'S NEW: Focus on information the user likely DIDN'T know. Surprising facts, background context.
+- VISUAL DATA: When numbers exist, use chart_card instead of listing them as text.
+- ALWAYS include a did_you_know_card with a surprising/interesting fact related to the content.
 
 **Available Layout Types:**
 ${getLayoutTypesSummaryForPrompt()}
@@ -31,15 +38,18 @@ ${getLayoutTypesSummaryForPrompt()}
 ${getCardTypeSummaryForPrompt()}
 
 **Output Rules:**
-- Choose 3-7 cards total (not too few, not too many)
-- The FIRST card should always be a hero_summary
-- Choose card types that MATCH the content (don't use product_card for news articles)
-- Each card gets a "researchBrief" - instructions for the research LLM on what to extract/investigate
+- Choose 4-7 cards total
+- The FIRST card should always be a hero_summary with imageUrl if any image is visible
+- For person_card: research brief MUST say "Find a real photo URL of this person"
+- For location_card: research brief MUST say "Find a photo URL of this location"
+- For news_card: research brief MUST say "Find the article image URL"
+- Use chart_card when numbers/percentages/stats are visible — much better than info_list for data
+- ALWAYS include at least one did_you_know_card
 - Include a "placeholderData" with best-guess content from what you can directly see
-- Include any visible URLs, prices, or links in placeholderData fields (url, imageUrl, etc.)
+- Include any visible URLs, prices, or links in placeholderData fields
 - For product_card: features and warnings arrays must contain PLAIN STRINGS, not objects
-- If you see relevant links/URLs in the screenshot, consider adding a link_card
 - Assign a grid position (row, column, span) for each card based on the layout
+- Include followUpQuestions with pre-populated brief answers
 
 Return ONLY valid JSON matching this structure:
 {
@@ -47,7 +57,8 @@ Return ONLY valid JSON matching this structure:
     "contentType": "string (news/product/social/data/general/etc.)",
     "platform": "string (Twitter, Amazon, Reddit, etc. or null)",
     "intent": "string (what the user likely wants to understand)",
-    "topQuestions": ["string (3-5 questions users would ask)"]
+    "topQuestions": ["string (3-5 questions users would ask)"],
+    "followUpQuestions": [{"question": "string", "answer": "string (1-2 sentence answer)"}]
   },
   "layout": {
     "type": "string (one of the layout types above)",
@@ -64,7 +75,7 @@ Return ONLY valid JSON matching this structure:
         "columnSpan": number (1, 2, or 3),
         "rowSpan": number (1 or 2)
       },
-      "researchBrief": "string (instructions for the research LLM - what to extract, verify, or investigate for this card)",
+      "researchBrief": "string (instructions for the research LLM - what to extract, verify, investigate, AND what images/photos to find via web search)",
       "placeholderData": { ... card-type-specific fields with best-guess data from visible content }
     }
   ]
@@ -188,6 +199,9 @@ function normalizeBlueprint(raw) {
       topQuestions: Array.isArray(raw.contentAnalysis?.topQuestions)
         ? raw.contentAnalysis.topQuestions.slice(0, 5)
         : ['What is this?'],
+      followUpQuestions: Array.isArray(raw.contentAnalysis?.followUpQuestions)
+        ? raw.contentAnalysis.followUpQuestions.slice(0, 5)
+        : [],
     },
     layout: {
       type: raw.layout?.type || 'simple',

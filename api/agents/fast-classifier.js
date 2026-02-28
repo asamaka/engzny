@@ -18,31 +18,39 @@ const FAST_POPULATE_PROMPT = `Analyze this screenshot. Return a JSON card layout
 
 LAYOUTS: ${getLayoutTypesSummaryForPrompt()}
 
-CARD TYPES (fill ONLY required fields):
-- hero_summary: title*, subtitle*, emoji* (single emoji for content type)
+CARD TYPES (fill ONLY required fields, but include imageUrl/photoUrl when visible):
+- hero_summary: title*, subtitle*, emoji* (single emoji for content type). Include imageUrl if any image is visible.
 - key_metric: value*, label* (big numbers/stats visible)
 - info_list: title*, items*[{label*, value*}] (key-value pairs visible)
 - fact_check: claim*, verdict* [verified|misleading|unverified|false|partially_true|needs_context]
-- person_card: name*
-- product_card: name*
+- person_card: name*. Add photoUrl if a person's photo is visible in the screenshot.
+- product_card: name*. Add imageUrl if product image is visible.
 - timeline_card: title*, events*[{date*, event*}]
 - quote_card: quote*
+- comparison_card: title*, columns*[{header*, values*}]
 - warning_card: level* [critical|warning|info], title*
 - action_card: title*, actions*[{label*}]
 - text_extract: title*, text*
 - location_card: name*
 - link_card: title*, links*[{label*, url*}]
+- news_card: headline*, source*. Add imageUrl if news image visible. Use for news/article content.
+- chart_card: title*, chartType* [bar|pie|progress|comparison], data*[{label*, value*}]. Use when numbers can be visualized.
+- did_you_know_card: fact*, emoji*. A surprising fact about the content the user likely didn't know.
 
 RULES:
-- 3-5 cards max. First card MUST be hero_summary (columnSpan:2)
+- 4-6 cards max. First card MUST be hero_summary (columnSpan:2)
 - Use ONLY text visible in the screenshot
 - Keep text SHORT — titles under 8 words, values concise
-- Pick DIVERSE card types that match the content
+- Pick DIVERSE card types that match the content — prefer VISUAL cards (news_card, chart_card, person_card with photos)
+- ALWAYS include a did_you_know_card with something surprising/new about the content
+- For news screenshots: prefer news_card over generic info_list
+- For data/numbers: prefer chart_card over text listings
 - For breaking news: use neutral hero title, NOT "misleading" or "misinformation"
 - For fact_check on breaking news: verdict "unverified" or "needs_context", never "false"
+- Include followUpQuestions: 3-5 questions the user would want to ask, with brief pre-populated answers
 
 Return ONLY JSON:
-{"contentAnalysis":{"contentType":"...","platform":"...or null","intent":"...","topQuestions":["..."]},"layout":{"type":"...","columns":2,"reason":"..."},"cards":[{"id":"card-1","cardType":"hero_summary","gridPosition":{"row":1,"column":1,"columnSpan":2,"rowSpan":1},"researchBrief":"...","populatedData":{...}}]}`;
+{"contentAnalysis":{"contentType":"...","platform":"...or null","intent":"...","topQuestions":["..."],"followUpQuestions":[{"question":"...","answer":"Brief 1-2 sentence answer"}]},"layout":{"type":"...","columns":2,"reason":"..."},"cards":[{"id":"card-1","cardType":"hero_summary","gridPosition":{"row":1,"column":1,"columnSpan":2,"rowSpan":1},"researchBrief":"...","populatedData":{...}}]}`;
 
 async function fastClassify({ imageData, mediaType, question, adapterConfig = {} }) {
   const startTime = Date.now();
@@ -154,6 +162,9 @@ function normalizeQuickBlueprint(raw) {
       intent: raw.contentAnalysis?.intent || 'Analyzing screenshot...',
       topQuestions: Array.isArray(raw.contentAnalysis?.topQuestions)
         ? raw.contentAnalysis.topQuestions.slice(0, 5)
+        : [],
+      followUpQuestions: Array.isArray(raw.contentAnalysis?.followUpQuestions)
+        ? raw.contentAnalysis.followUpQuestions.slice(0, 5)
         : [],
     },
     layout: {

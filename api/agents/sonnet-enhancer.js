@@ -111,7 +111,7 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
     })),
   }, null, 2);
 
-  let prompt = `You are enhancing a screenshot analysis dashboard. A fast model created initial cards with minimal data. Your job: make it RICHER and more VISUAL while keeping text SHORT.
+  let prompt = `You are enhancing a screenshot analysis hub. A fast model created initial cards. Your job: make it RICHER, more VISUAL, and more INFORMATIVE while keeping text SHORT.
 
 **Current state:**
 ${currentState}
@@ -122,19 +122,30 @@ ${getCardTypeDetailedSchemaForPrompt()}
 **Available layouts:**
 ${getLayoutTypesSummaryForPrompt()}
 
-**Your tasks:**
-1. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, confidence, etc.
-2. For hero_summary: ensure badge, takeaway, and emoji are set
-3. For info_list items: add emoji to each item for visual variety
-4. ADD 1-3 new cards using diverse types for a richer dashboard (fact_check, warning_card, action_card, quote_card, location_card)
-5. Set proper columnSpan: 1 for compact cards, 2 for wide cards
+**Your tasks (PRIORITY ORDER):**
+1. ADD IMAGES: For person_card, add photoUrl. For location_card, add imageUrl. For news_card, add imageUrl. For hero_summary, add imageUrl. Images make the hub dramatically better.
+2. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, confidence, etc.
+3. ADD a did_you_know_card if one doesn't exist — the user shared this screenshot to learn something NEW
+4. ADD chart_card if there are numbers/stats that can be visualized — much better than text lists
+5. ADD news_card for any news content — it's purpose-built with image support
+6. REMOVE or merge boring filler cards — every card should add real value
+7. For hero_summary: ensure badge, takeaway (something they didn't know), and emoji are set
+8. Set proper columnSpan: 1 for compact cards, 2 for wide cards
+9. If followUpQuestions are missing from contentAnalysis, add 3-5 questions with brief answers
+
+**IMAGE RULES (CRITICAL):**
+- person_card: photoUrl field should be a real photo URL from Wikipedia, official site, or social media
+- location_card: imageUrl should be a real photo of the place
+- news_card: imageUrl should be the article's featured image
+- hero_summary: imageUrl for a banner image when relevant
 
 **Style rules:**
-- Keep ALL text concise — no walls of text
-- Titles: max 8 words. Values: max 15 words. Explanations: max 2 sentences
+- Keep ALL text ultra-concise — no walls of text
+- Titles: max 8 words. Values: max 10 words. Explanations: max 1-2 sentences
 - Use emoji liberally for visual interest
 - For product_card: features/warnings must be plain strings
-- Total cards 5-8 for a balanced dashboard
+- Total cards 5-8 for a balanced, visual hub
+- Every card should tell the user something they didn't already know from the screenshot
 
 **Breaking news rules:**
 - DO NOT label news as "MISLEADING"/"MISINFORMATION" in hero_summary
