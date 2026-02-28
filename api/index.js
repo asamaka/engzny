@@ -2741,6 +2741,21 @@ app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
   }
 });
 
+app.get('/api/r/:requestId/traces', requirePin, async (req, res) => {
+  try {
+    const report = await liveReports.getReport(req.params.requestId);
+    if (!report) return res.status(404).json({ error: 'Report not found or expired' });
+    res.json({
+      requestId: req.params.requestId,
+      traces: report.llmTraces || [],
+      summary: report.llmTraceSummary || null,
+    });
+  } catch (err) {
+    logger.error('Reports', 'traces fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load traces', detail: err.message });
+  }
+});
+
 app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
   try {
     const thumb = await liveReports.getReportThumb(req.params.requestId);

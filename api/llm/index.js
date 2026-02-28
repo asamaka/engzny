@@ -26,7 +26,8 @@ const instances = new Map();
  * @returns {LLMAdapter}
  */
 function getAdapter(provider = 'claude', config = {}) {
-  const cacheKey = `${provider}:${JSON.stringify(config)}`;
+  const { traceCollector, requestId, ...adapterConfig } = config;
+  const cacheKey = `${provider}:${JSON.stringify(adapterConfig)}`;
   
   if (instances.has(cacheKey)) {
     return instances.get(cacheKey);
@@ -37,7 +38,7 @@ function getAdapter(provider = 'claude', config = {}) {
     throw new Error(`Unknown LLM provider: ${provider}. Available: ${Object.keys(providers).join(', ')}`);
   }
   
-  const instance = new AdapterClass(config);
+  const instance = new AdapterClass(adapterConfig);
   instances.set(cacheKey, instance);
   
   return instance;
