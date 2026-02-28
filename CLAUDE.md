@@ -75,8 +75,9 @@ api/
     style-manager.js          # Theme/color extraction
   llm/
     adapter.js                # Base LLM interface
-    claude.js                 # Claude adapter (default: claude-opus-4-6)
+    claude.js                 # Claude adapter (default: claude-opus-4-6, supports web_search tool)
     gemini.js                 # Gemini adapter (fallback)
+    perplexity.js             # Perplexity Sonar adapter (web-grounded research, optional)
     index.js                  # Provider factory
   lib/
     logger.js                 # Production logger (in-memory + Redis persistence)
@@ -203,6 +204,7 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 ### Required secrets
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`), REPORT_PIN (optional, defaults to `0427`)
+- **Vercel env vars (optional, for web research):** PERPLEXITY_API_KEY (enables Sonar web-grounded research on fact_check, timeline, person, product, comparison, location cards)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
 
