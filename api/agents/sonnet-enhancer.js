@@ -180,45 +180,25 @@ async function enhance({
     maxTokens: 4096,
   };
 
-  const adapter = getVisionAdapter(config);
-  const traceCollector = adapterConfig.traceCollector;
-  const prompt = buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData);
-  const phase = researchData ? 'review' : 'enhance';
+    const adapter = getVisionAdapter(config);
+    const traceCollector = adapterConfig.traceCollector;
+    const prompt = buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData);
+    const phase = researchData ? 'review' : 'enhance';
 
-  logger.info('SonnetEnhancer', `Starting ${phase} pass`, {
-    model: config.model,
-    cardCount: currentCards.length,
-    hasResearch: !!researchData,
-  });
-
-  try {
-    const messages = [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: mediaType,
-              data: imageData,
-            },
-          },
-          {
-            type: 'text',
-            text: prompt,
-          },
-        ],
-      },
-    ];
-
-    const client = adapter.client;
-    const response = await client.messages.create({
+    logger.info('SonnetEnhancer', `Starting ${phase} pass`, {
       model: config.model,
-      max_tokens: config.maxTokens,
-      messages,
-      tools: ENHANCER_TOOLS,
+      cardCount: currentCards.length,
+      hasResearch: !!researchData,
     });
+
+    try {
+      const response = await adapter.analyzeImageWithTools({
+        imageData,
+        mediaType,
+        prompt,
+        tools: ENHANCER_TOOLS,
+        maxTokens: config.maxTokens,
+      });
 
     const duration = Date.now() - startTime;
     const actions = [];
@@ -298,7 +278,7 @@ async function enhance({
         response: {
           actions,
           usage: response.usage,
-          stopReason: response.stop_reason,
+          stopReason: response.stopReason,
         },
       });
     }

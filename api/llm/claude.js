@@ -177,6 +177,46 @@ class ClaudeAdapter extends LLMAdapter {
   }
 
   /**
+   * Analyze an image with tool_use enabled.
+   * Used by the Sonnet enhancer for progressive card operations.
+   */
+  async analyzeImageWithTools({ imageData, mediaType, prompt, tools, maxTokens }) {
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: imageData,
+            },
+          },
+          {
+            type: 'text',
+            text: prompt,
+          },
+        ],
+      },
+    ];
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: maxTokens || this.maxTokens,
+      messages,
+      tools,
+    });
+
+    return {
+      content: response.content,
+      usage: response.usage,
+      model: response.model,
+      stopReason: response.stop_reason,
+    };
+  }
+
+  /**
    * Generate text from a prompt
    */
   async generateText({ prompt, systemPrompt, context }) {

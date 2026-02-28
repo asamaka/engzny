@@ -3021,7 +3021,10 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
     const ca = report.contentAnalysis || {};
     const meta = report.meta || {};
     const duration = meta.totalDuration || report.duration;
-    const designDur = meta.designDuration || report.designDuration;
+    const haikuDur = meta.haikuDuration || null;
+    const designDur = meta.designDuration || report.designDuration || haikuDur;
+    const enhanceDur = meta.enhanceDuration || null;
+    const deepResearchDur = meta.researchDuration || null;
     const researchDur = duration && designDur ? duration - designDur : null;
     const reflectionLines = renderReflection(report);
 
@@ -3043,10 +3046,15 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
 
       // Pipeline timing bar
       + (duration && designDur ? '<div class="section-card"><div class="sec-title">Pipeline Timing</div>'
-        + '<div class="timing-bar"><div class="tb-design" style="width:' + Math.round(designDur / duration * 100) + '%"></div>'
-        + '<div class="tb-research" style="width:' + Math.round(researchDur / duration * 100) + '%"></div></div>'
-        + '<div class="timing-labels"><span class="tl-d">Design ' + fmtMs(designDur) + '</span>'
-        + '<span class="tl-r">Research ' + fmtMs(researchDur) + '</span>'
+        + '<div class="timing-bar">'
+        + (haikuDur ? '<div class="tb-design" style="width:' + Math.round(haikuDur / duration * 100) + '%"></div>' : '<div class="tb-design" style="width:' + Math.round(designDur / duration * 100) + '%"></div>')
+        + (enhanceDur ? '<div class="tb-enhance" style="width:' + Math.round(enhanceDur / duration * 100) + '%;background:linear-gradient(90deg,#ffc107,#ff9800)"></div>' : '')
+        + (deepResearchDur ? '<div class="tb-research" style="width:' + Math.round(deepResearchDur / duration * 100) + '%"></div>' : (researchDur ? '<div class="tb-research" style="width:' + Math.round(researchDur / duration * 100) + '%"></div>' : ''))
+        + '</div>'
+        + '<div class="timing-labels">'
+        + (haikuDur ? '<span class="tl-d">Haiku ' + fmtMs(haikuDur) + '</span>' : '<span class="tl-d">Design ' + fmtMs(designDur) + '</span>')
+        + (enhanceDur ? '<span class="tl-e" style="color:#ffc107">Enhance ' + fmtMs(enhanceDur) + '</span>' : '')
+        + (deepResearchDur ? '<span class="tl-r">Research ' + fmtMs(deepResearchDur) + '</span>' : (researchDur ? '<span class="tl-r">Research ' + fmtMs(researchDur) + '</span>' : ''))
         + '<span class="tl-t">Total ' + fmtMs(duration) + '</span></div></div>'
         : '')
 

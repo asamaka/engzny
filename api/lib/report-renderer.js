@@ -13,8 +13,10 @@ function renderReflection(report) {
   const ca = report.contentAnalysis || {};
   const meta = report.meta || {};
   const duration = meta.totalDuration || report.duration;
-  const designDur = meta.designDuration || report.designDuration;
-  const researchDur = duration && designDur ? duration - designDur : null;
+  const haikuDur = meta.haikuDuration || null;
+  const designDur = meta.designDuration || report.designDuration || haikuDur;
+  const enhanceDur = meta.enhanceDuration || null;
+  const researchDur = meta.researchDuration || (duration && designDur ? duration - designDur : null);
   const cardTypes = cards.map(c => c.cardType).filter(Boolean);
 
   const lines = [];
@@ -60,10 +62,19 @@ function renderReflection(report) {
   // Performance reflection
   if (duration) {
     let perf = `Total pipeline took <strong>${fmtMs(duration)}</strong>`;
-    if (designDur) perf += ` (${fmtMs(designDur)} designing layout, ${fmtMs(researchDur)} researching cards in parallel)`;
+    if (haikuDur) {
+      perf += ` (Haiku quick cards in ${fmtMs(haikuDur)}`;
+      if (enhanceDur) perf += `, Sonnet enhancement in ${fmtMs(enhanceDur)}`;
+      if (researchDur) perf += `, deep research in ${fmtMs(researchDur)}`;
+      perf += ')';
+    } else if (designDur) {
+      perf += ` (${fmtMs(designDur)} designing layout, ${fmtMs(researchDur)} researching cards in parallel)`;
+    }
     perf += '.';
-    if (duration > 30000) {
-      perf += ' This is on the slower side — the design phase could benefit from caching or a faster model.';
+    if (haikuDur && haikuDur < 5000) {
+      perf += ' Users saw real cards within seconds — great first-impression speed.';
+    } else if (duration > 30000) {
+      perf += ' This is on the slower side — but users saw initial cards quickly via Haiku.';
     } else if (duration < 15000) {
       perf += ' This is fast — good user experience with minimal wait time.';
     } else {
