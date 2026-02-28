@@ -272,4 +272,140 @@ function renderCardHtml(card) {
   return `<div class="card ${cardClass}"><div class="card-inner">${inner}</div></div>`;
 }
 
-module.exports = { renderCardHtml, renderReflection, esc, fmtMs };
+function renderLlmTracesHtml(report) {
+  const traces = report.llmTraces || [];
+  const summary = report.llmTraceSummary || {};
+  if (!traces.length) return '';
+
+  const phaseColors = {
+    classify: { bg: 'rgba(255,209,92,.1)', border: 'var(--y)', text: 'var(--y)', label: 'CLASSIFY' },
+    design: { bg: 'rgba(108,159,255,.1)', border: 'var(--a)', text: 'var(--a)', label: 'DESIGN' },
+    research: { bg: 'rgba(91,219,138,.1)', border: 'var(--g)', text: 'var(--g)', label: 'RESEARCH' },
+  };
+
+  const modelBadge = (model) => {
+    const short = (model || 'unknown')
+      .replace('claude-', '')
+      .replace('-20250514', '')
+      .replace('-latest', '');
+    const isHaiku = model && model.includes('haiku');
+    const isOpus = model && model.includes('opus');
+    const isSonnet = model && model.includes('sonnet');
+    const cls = isHaiku ? 'model-haiku' : isOpus ? 'model-opus' : isSonnet ? 'model-sonnet' : 'model-other';
+    return `<span class="model-badge ${cls}">${esc(short)}</span>`;
+  };
+
+  let summaryHtml = '<div class="trace-summary">';
+  summaryHtml += `<div class="trace-stat"><div class="trace-stat-val">${traces.length}</div><div class="trace-stat-label">LLM Calls</div></div>`;
+  summaryHtml += `<div class="trace-stat"><div class="trace-stat-val">${(summary.models || []).length}</div><div class="trace-stat-label">Models Used</div></div>`;
+  if (summary.totalInputTokens) {
+    summaryHtml += `<div class="trace-stat"><div class="trace-stat-val">${(summary.totalInputTokens / 1000).toFixed(1)}k</div><div class="trace-stat-label">Input Tokens</div></div>`;
+  }
+  if (summary.totalOutputTokens) {
+    summaryHtml += `<div class="trace-stat"><div class="trace-stat-val">${(summary.totalOutputTokens / 1000).toFixed(1)}k</div><div class="trace-stat-label">Output Tokens</div></div>`;
+  }
+  if (summary.totalLlmDuration) {
+    summaryHtml += `<div class="trace-stat"><div class="trace-stat-val">${fmtMs(summary.totalLlmDuration)}</div><div class="trace-stat-label">Total LLM Time</div></div>`;
+  }
+  summaryHtml += '</div>';
+
+  if (summary.models && summary.models.length) {
+    summaryHtml += '<div class="trace-models">';
+    for (const m of summary.models) {
+      summaryHtml += modelBadge(m);
+    }
+    summaryHtml += '</div>';
+  }
+
+  let tracesHtml = '';
+  traces.forEach((t, i) => {
+    const pc = phaseColors[t.phase] || phaseColors.research;
+    const usage = t.response?.usage;
+    const hasError = !!t.error;
+
+    tracesHtml += `<div class="trace-entry${hasError ? ' trace-error' : ''}" id="trace-${i}">`;
+
+    // Header row
+    tracesHtml += `<div class="trace-header" onclick="toggleTrace(${i})">`;
+    tracesHtml += `<div class="trace-header-left">`;
+    tracesHtml += `<span class="trace-phase" style="background:${pc.bg};color:${pc.text};border-color:${pc.border}">${pc.label}</span>`;
+    tracesHtml += modelBadge(t.model);
+    tracesHtml += `<span class="trace-agent">${esc(t.agent)}</span>`;
+    if (t.cardId) tracesHtml += `<span class="trace-card-id">${esc(t.cardId)}</span>`;
+    tracesHtml += `</div>`;
+    tracesHtml += `<div class="trace-header-right">`;
+    tracesHtml += `<span class="trace-dur">${fmtMs(t.duration)}</span>`;
+    if (usage) tracesHtml += `<span class="trace-tokens">${(usage.input_tokens || 0) + (usage.output_tokens || 0)} tok</span>`;
+    tracesHtml += `<span class="trace-chevron mi" id="chev-${i}">expand_more</span>`;
+    tracesHtml += `</div></div>`;
+
+    // Collapsible detail body
+    tracesHtml += `<div class="trace-body" id="tbody-${i}" style="display:none">`;
+
+    // Metadata
+    tracesHtml += '<div class="trace-meta-grid">';
+    tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Time</span><span class="trace-meta-v">${esc(t.timestamp)}</span></div>`;
+    tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Pipeline Offset</span><span class="trace-meta-v">+${fmtMs(t.pipelineOffset)}</span></div>`;
+    tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Duration</span><span class="trace-meta-v">${fmtMs(t.duration)}</span></div>`;
+    tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Model</span><span class="trace-meta-v">${esc(t.model)}</span></div>`;
+    if (usage) {
+      tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Input Tokens</span><span class="trace-meta-v">${usage.input_tokens || 0}</span></div>`;
+      tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Output Tokens</span><span class="trace-meta-v">${usage.output_tokens || 0}</span></div>`;
+    }
+    if (t.response?.stopReason) {
+      tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Stop Reason</span><span class="trace-meta-v">${esc(t.response.stopReason)}</span></div>`;
+    }
+    if (t.cardType) {
+      tracesHtml += `<div class="trace-meta-item"><span class="trace-meta-k">Card Type</span><span class="trace-meta-v">${esc(t.cardType)}</span></div>`;
+    }
+    tracesHtml += '</div>';
+
+    // Error
+    if (hasError) {
+      tracesHtml += `<div class="trace-section trace-error-box"><div class="trace-section-title">Error</div><pre class="trace-pre trace-pre-error">${esc(t.error)}</pre></div>`;
+    }
+
+    // Request: prompt
+    if (t.request?.userPrompt) {
+      tracesHtml += '<div class="trace-section">';
+      tracesHtml += `<div class="trace-section-title"><span class="mi" style="font-size:14px">arrow_upward</span> Prompt${t.request.hasImage ? ' <span class="trace-img-badge">+ IMAGE</span>' : ''}</div>`;
+      tracesHtml += `<pre class="trace-pre trace-pre-prompt">${esc(t.request.userPrompt)}</pre>`;
+      tracesHtml += '</div>';
+    }
+
+    if (t.request?.systemPrompt) {
+      tracesHtml += '<div class="trace-section">';
+      tracesHtml += '<div class="trace-section-title"><span class="mi" style="font-size:14px">settings</span> System Prompt</div>';
+      tracesHtml += `<pre class="trace-pre trace-pre-system">${esc(t.request.systemPrompt)}</pre>`;
+      tracesHtml += '</div>';
+    }
+
+    // Response: output
+    if (t.response?.text) {
+      tracesHtml += '<div class="trace-section">';
+      tracesHtml += '<div class="trace-section-title"><span class="mi" style="font-size:14px">arrow_downward</span> Output</div>';
+      tracesHtml += `<pre class="trace-pre trace-pre-output">${esc(t.response.text)}</pre>`;
+      tracesHtml += '</div>';
+    }
+
+    // Tool calls (if any)
+    if (t.toolCalls && t.toolCalls.length > 0) {
+      tracesHtml += '<div class="trace-section">';
+      tracesHtml += `<div class="trace-section-title"><span class="mi" style="font-size:14px">build</span> Tool Calls (${t.toolCalls.length})</div>`;
+      t.toolCalls.forEach((tc, j) => {
+        tracesHtml += `<div class="trace-tool-call">`;
+        tracesHtml += `<div class="trace-tool-name">${esc(tc.name || 'tool_' + j)}</div>`;
+        if (tc.input) tracesHtml += `<pre class="trace-pre trace-pre-tool">${esc(typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input, null, 2))}</pre>`;
+        if (tc.output) tracesHtml += `<pre class="trace-pre trace-pre-output">${esc(typeof tc.output === 'string' ? tc.output : JSON.stringify(tc.output, null, 2))}</pre>`;
+        tracesHtml += '</div>';
+      });
+      tracesHtml += '</div>';
+    }
+
+    tracesHtml += '</div></div>';
+  });
+
+  return summaryHtml + '<div class="trace-timeline">' + tracesHtml + '</div>';
+}
+
+module.exports = { renderCardHtml, renderReflection, renderLlmTracesHtml, esc, fmtMs };
