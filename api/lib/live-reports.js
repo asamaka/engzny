@@ -87,8 +87,12 @@ async function saveLiveReport(requestId, data) {
     }, LIVE_TTL * 1000);
   }
 
-  // Also save to persistent archive (non-blocking)
-  saveArchive(requestId, entry).catch(() => {});
+  // Save to persistent archive (30-day TTL).
+  // Awaited so it completes before the caller ends the HTTP response —
+  // on Vercel serverless, fire-and-forget work after res.end() is unreliable.
+  try {
+    await saveArchive(requestId, entry);
+  } catch (_) { /* archive is best-effort; live report is already saved */ }
 
   return entry;
 }
