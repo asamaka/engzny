@@ -1052,6 +1052,15 @@
         .card-list .list-item-link:hover { text-decoration: underline; }
 
         /* === FACT CHECK === */
+        .card-fact-check {
+            border-top: 3px solid var(--yellow);
+        }
+        .card-fact-check.verdict-verified { border-top-color: var(--green); }
+        .card-fact-check.verdict-false { border-top-color: var(--red); }
+        .card-fact-check.verdict-misleading { border-top-color: var(--yellow); }
+        .card-fact-check.verdict-unverified { border-top-color: var(--accent); }
+        .card-fact-check.verdict-needs_context { border-top-color: var(--purple); }
+
         .card-fact-check .fact-claim {
             font-size: 0.84rem;
             color: var(--text);
@@ -1061,6 +1070,17 @@
             border-radius: var(--radius-md);
             margin-bottom: 12px;
             font-style: italic;
+            position: relative;
+        }
+
+        .card-fact-check .fact-claim::before {
+            content: '"';
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            opacity: 0.3;
+            position: absolute;
+            top: 4px;
+            left: 8px;
         }
 
         .card-fact-check .fact-verdict {
@@ -1082,6 +1102,21 @@
         .fact-verdict.unverified { background: var(--accent-bg); color: var(--accent); }
         .fact-verdict.partially_true { background: var(--yellow-bg); color: var(--yellow); }
         .fact-verdict.needs_context { background: var(--purple-bg); color: var(--purple); }
+
+        .card-fact-check .fact-confidence {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 0.58rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 2px 8px;
+            border-radius: var(--radius-pill);
+            margin-left: 6px;
+            background: var(--surface-2);
+            color: var(--text-muted);
+        }
 
         .card-fact-check .fact-explanation {
             font-size: 0.8rem;
@@ -1376,15 +1411,17 @@
 
         /* === QUOTE === */
         .card-quote {
-            background: linear-gradient(135deg, var(--surface) 0%, rgba(180,142,255,0.04) 100%);
+            background: linear-gradient(135deg, var(--surface) 0%, rgba(180,142,255,0.06) 100%);
+            border-left: 3px solid var(--purple);
         }
 
         .card-quote .quote-mark {
-            font-size: 2rem;
+            font-size: 2.5rem;
             color: var(--purple);
-            opacity: 0.3;
+            opacity: 0.25;
             line-height: 1;
-            margin-bottom: -8px;
+            margin-bottom: -12px;
+            font-family: Georgia, serif;
         }
 
         .card-quote .quote-text {
@@ -1393,9 +1430,8 @@
             line-height: 1.7;
             font-style: italic;
             padding: 12px 14px;
-            border-left: 3px solid var(--purple);
             background: var(--surface-2);
-            border-radius: 0 var(--radius-md) var(--radius-md) 0;
+            border-radius: var(--radius-md);
         }
 
         .card-quote .quote-attribution {
@@ -1403,6 +1439,17 @@
             font-weight: 700;
             color: var(--purple);
             margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .card-quote .quote-attribution::before {
+            content: '';
+            width: 16px;
+            height: 2px;
+            background: var(--purple);
+            opacity: 0.5;
         }
 
         .card-quote .quote-context {
@@ -1505,6 +1552,10 @@
         }
 
         /* === ACTION CARD === */
+        .card-action {
+            border-left: 3px solid var(--accent);
+        }
+
         .card-action .action-title {
             font-size: 0.88rem;
             font-weight: 700;
@@ -2200,10 +2251,11 @@
                 const { requestId } = await startResp.json();
                 telemetry.requestId = requestId;
 
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 600));
                 progressOverlay.classList.remove('uploading');
                 progressOverlay.classList.add('analyzing');
-                updateProgress(0, 'ANALYZING', 'Quick analysis starting...');
+                progressRing.classList.remove('complete');
+                updateProgress(10, 'ANALYZING', 'Quick analysis starting...');
                 statusText.textContent = 'analyzing';
 
                 await new Promise((resolve, reject) => {
@@ -2715,6 +2767,11 @@
                 el.classList.add(`level-${level}`);
             }
 
+            if (card.cardType === 'fact_check') {
+                const verdict = card.populatedData?.verdict || card.placeholderData?.verdict || 'unverified';
+                el.classList.add(`verdict-${verdict}`);
+            }
+
             if (card.cardType === 'hero_summary') {
                 const hasImage = card.populatedData?.imageUrl || card.placeholderData?.imageUrl;
                 if (hasImage) el.classList.add('has-image');
@@ -2836,17 +2893,19 @@
                     return `<div class="card-inner">
                         ${getCardTypeLabel('fact_check')}
                         <div class="fact-claim">${linkify(d.claim || '')}</div>
-                        <div class="fact-verdict ${esc(d.verdict || 'unverified')}">
-                            <span class="material-symbols-rounded" style="font-size:13px">${
-                                d.verdict === 'verified' ? 'check_circle' :
-                                d.verdict === 'false' ? 'cancel' :
-                                d.verdict === 'misleading' ? 'warning' : 'help'
-                            }</span>
-                            ${esc(d.verdict || 'unverified')}
+                        <div>
+                            <span class="fact-verdict ${esc(d.verdict || 'unverified')}">
+                                <span class="material-symbols-rounded" style="font-size:13px">${
+                                    d.verdict === 'verified' ? 'check_circle' :
+                                    d.verdict === 'false' ? 'cancel' :
+                                    d.verdict === 'misleading' ? 'warning' : 'help'
+                                }</span>
+                                ${esc(d.verdict || 'unverified')}
+                            </span>
+                            ${d.confidence ? `<span class="fact-confidence">${esc(d.confidence)} confidence</span>` : ''}
                         </div>
                         <div class="fact-explanation">${linkify(d.explanation || '')}</div>
                         ${d.source ? `<div class="fact-source">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
-                        ${d.confidence ? `<div class="fact-source">Confidence: ${esc(d.confidence)}</div>` : ''}
                     </div>`;
 
                 case 'person_card':
