@@ -124,18 +124,29 @@ async function runPipeline({
       classifyModel: 'claude-haiku-4-5-20251001',
     });
 
+    const designMessages = [
+      'Detecting content type...',
+      'Reading text and visual elements...',
+      'Identifying key information...',
+      'Analyzing visual layout...',
+      'Mapping content structure...',
+      'Selecting best card types...',
+      'Designing card layout...',
+      'Preparing research briefs...',
+    ];
     let designProgress = 5;
+    let designMsgIdx = 0;
     const designHeartbeat = setInterval(() => {
-      designProgress = Math.min(designProgress + 3, 28);
+      designProgress = Math.min(designProgress + 2.5, 28);
+      designMsgIdx = Math.min(designMsgIdx + 1, designMessages.length - 1);
       if (onProgress) {
         onProgress({
           phase: 'designing',
           progress: designProgress,
-          message: designProgress < 12 ? 'Detecting content type...' :
-                   designProgress < 20 ? 'Reading screenshot content...' : 'Designing card layout...',
+          message: designMessages[designMsgIdx],
         });
       }
-    }, 3000);
+    }, 2500);
 
     // Wait for fast classifier first (should be much faster than layout designer)
     const quickBlueprint = await fastClassifyPromise;

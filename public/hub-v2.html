@@ -605,17 +605,95 @@
             background: linear-gradient(
                 90deg,
                 transparent 0%,
-                rgba(108,159,255,0.03) 35%,
-                rgba(108,159,255,0.06) 50%,
-                rgba(108,159,255,0.03) 65%,
+                rgba(108,159,255,0.04) 30%,
+                rgba(108,159,255,0.08) 50%,
+                rgba(108,159,255,0.04) 70%,
                 transparent 100%
             );
-            animation: shimmer 2s ease-in-out infinite;
+            animation: shimmer 1.8s ease-in-out infinite;
         }
+
+        .card.loading .placeholder-line {
+            animation: placeholderPulse 2s ease-in-out infinite;
+        }
+
+        .card.loading .placeholder-line:nth-child(2) { animation-delay: 0.15s; }
+        .card.loading .placeholder-line:nth-child(3) { animation-delay: 0.3s; }
 
         @keyframes shimmer {
             0% { transform: translateX(-100%); }
             100% { transform: translateX(100%); }
+        }
+
+        @keyframes placeholderPulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.7; }
+        }
+
+        .card.loading.researching {
+            border-color: rgba(108,159,255,0.15);
+        }
+
+        .card.loading.researching::before {
+            content: '';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            animation: researchDot 1s ease-in-out infinite;
+        }
+
+        @keyframes researchDot {
+            0%, 100% { opacity: 0.3; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .skeleton-status {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            opacity: 0;
+            transition: opacity 0.4s;
+            font-style: italic;
+        }
+
+        .card.loading.researching .skeleton-status {
+            opacity: 1;
+        }
+
+        .web-citations {
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .web-citations-label {
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .web-citation-link {
+            font-size: 0.6rem;
+            color: var(--accent-dim);
+            text-decoration: none;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: var(--accent-bg);
+        }
+
+        .web-citation-link:hover {
+            color: var(--accent);
+            background: var(--accent-bg-strong);
         }
 
         .card.populated {
@@ -2146,6 +2224,17 @@
             layoutProgressText.textContent = 'designing';
         }
 
+        const researchStatusMessages = [
+            'Searching the web...',
+            'Pulling latest data...',
+            'Cross-referencing sources...',
+            'Verifying information...',
+            'Gathering details...',
+            'Checking recent updates...',
+            'Compiling results...',
+        ];
+        let researchMsgInterval = null;
+
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
@@ -2174,12 +2263,35 @@
                 cardGrid.appendChild(el);
                 setTimeout(() => {
                     el.classList.add('visible');
+                    setTimeout(() => el.classList.add('researching'), 200);
                 }, 50 + index * 40);
             });
 
             progressOverlay.classList.remove('active');
             layoutProgressFill.style.width = '30%';
             layoutProgressText.textContent = `0/${totalCards}`;
+
+            startResearchStatusRotation();
+        }
+
+        function startResearchStatusRotation() {
+            if (researchMsgInterval) clearInterval(researchMsgInterval);
+            let msgIdx = 0;
+            researchMsgInterval = setInterval(() => {
+                const loadingCards = document.querySelectorAll('.card.loading.researching');
+                if (loadingCards.length === 0) {
+                    clearInterval(researchMsgInterval);
+                    researchMsgInterval = null;
+                    return;
+                }
+                msgIdx = (msgIdx + 1) % researchStatusMessages.length;
+                loadingCards.forEach(card => {
+                    const statusEl = card.querySelector('.skeleton-status');
+                    if (statusEl) {
+                        statusEl.textContent = researchStatusMessages[msgIdx];
+                    }
+                });
+            }, 3000);
         }
 
         function onCardReceived(data) {
@@ -2188,9 +2300,26 @@
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
-            el.classList.remove('loading');
+            el.classList.remove('loading', 'researching');
             el.classList.add('populated', 'just-populated');
             el.innerHTML = renderCardContent(data.cardType, data.data);
+
+            const citations = data.data?._researchMeta?.citations || data.data?._webCitations || [];
+            if (citations.length > 0) {
+                const inner = el.querySelector('.card-inner');
+                if (inner) {
+                    const citHtml = `<div class="web-citations">
+                        <span class="web-citations-label">Sources</span>
+                        ${citations.slice(0, 3).map((c, i) => {
+                            const url = typeof c === 'string' ? c : (c.url || c.cited_url || '');
+                            if (!url) return '';
+                            const domain = url.replace(/^https?:\/\//, '').split('/')[0];
+                            return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="web-citation-link">${esc(domain)}</a>`;
+                        }).join('')}
+                    </div>`;
+                    inner.insertAdjacentHTML('beforeend', citHtml);
+                }
+            }
 
             setTimeout(() => {
                 el.classList.remove('just-populated');
@@ -2212,6 +2341,10 @@
             if (stallTimer) {
                 clearTimeout(stallTimer);
                 stallTimer = null;
+            }
+            if (researchMsgInterval) {
+                clearInterval(researchMsgInterval);
+                researchMsgInterval = null;
             }
 
             screenshotLayer.className = 'screenshot-layer gone';
@@ -2301,6 +2434,7 @@
                 <div class="placeholder-line medium"></div>
                 <div class="placeholder-line short"></div>
                 <div class="placeholder-line"></div>
+                <div class="skeleton-status">Searching the web...</div>
             </div>`;
         }
 
