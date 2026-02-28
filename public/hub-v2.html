@@ -400,46 +400,7 @@
             transition: opacity 0.4s, transform 0.4s;
         }
 
-        /* Bottom status bar — secondary progress */
-        .status-bar {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 50;
-            padding: 12px 20px;
-            padding-bottom: max(12px, env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(10,13,18,0.96) 30%);
-            display: none;
-        }
-
-        .status-bar.active { display: block; }
-
-        .status-progress {
-            width: 100%;
-            height: 4px;
-            background: var(--surface-3);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .status-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), var(--purple));
-            border-radius: 4px;
-            width: 0%;
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .status-text {
-            font-size: 0.68rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-align: center;
-            margin-top: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
+        /* Bottom status bar removed — using circular progress only */
 
         /* === RESULTS OVERLAY === */
         .results-overlay {
@@ -1906,13 +1867,7 @@
         </div>
     </div>
 
-    <!-- Status Bar -->
-    <div class="status-bar" id="statusBar">
-        <div class="status-progress">
-            <div class="status-progress-fill" id="statusProgressFill"></div>
-        </div>
-        <div class="status-text" id="statusText">initializing</div>
-    </div>
+    <!-- Status bar removed — circular progress only -->
 
     <!-- Error State -->
     <div id="errorState">
@@ -1949,9 +1904,6 @@
             }
         }
         const resultsOverlay = document.getElementById('resultsOverlay');
-        const statusBar = document.getElementById('statusBar');
-        const statusProgressFill = document.getElementById('statusProgressFill');
-        const statusText = document.getElementById('statusText');
         const layoutBadge = document.getElementById('layoutBadge');
         const layoutProgressFill = document.getElementById('layoutProgressFill');
         const layoutProgressText = document.getElementById('layoutProgressText');
@@ -2073,6 +2025,26 @@
         }
 
         let uploadProgressInterval = null;
+        let analysisProgressInterval = null;
+        let currentContinuousPct = 0;
+
+        function startAnalysisProgressTick(fromPct) {
+            if (analysisProgressInterval) clearInterval(analysisProgressInterval);
+            currentContinuousPct = fromPct;
+            analysisProgressInterval = setInterval(() => {
+                if (currentContinuousPct < 88) {
+                    currentContinuousPct += (88 - currentContinuousPct) * 0.02;
+                    updateProgress(currentContinuousPct, null, null);
+                }
+            }, 300);
+        }
+
+        function stopAnalysisProgressTick() {
+            if (analysisProgressInterval) {
+                clearInterval(analysisProgressInterval);
+                analysisProgressInterval = null;
+            }
+        }
 
         function handleImage(blob) {
             currentImageUrl = URL.createObjectURL(blob);
@@ -2084,18 +2056,6 @@
             progressOverlay.classList.add('uploading');
             progressOverlay.classList.remove('analyzing', 'ready', 'hiding');
             updateProgress(0, 'UPLOADING', 'Sending screenshot...');
-            statusBar.classList.add('active');
-            statusProgressFill.style.width = '0%';
-            statusText.textContent = 'uploading';
-
-            let uploadPct = 0;
-            uploadProgressInterval = setInterval(() => {
-                if (uploadPct < 85) {
-                    uploadPct += (85 - uploadPct) * 0.08;
-                    updateProgress(uploadPct, 'UPLOADING', 'Sending screenshot...');
-                    statusProgressFill.style.width = uploadPct * 0.5 + '%';
-                }
-            }, 100);
 
             const reader = new FileReader();
             reader.onloadend = () => {
@@ -2213,7 +2173,7 @@
                     });
                     if (retryCount < MAX_RETRIES && currentImageBase64) {
                         retryCount++;
-                        statusText.textContent = `reconnecting (attempt ${retryCount})...`;
+                        progressLabel.textContent = `Reconnecting (attempt ${retryCount})...`;
                         startPipelineInner(currentImageBase64);
                     } else {
                         showError('Connection to server lost. Please try again.');
@@ -2237,36 +2197,56 @@
 
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
             if (uploadProgressInterval) { clearInterval(uploadProgressInterval); uploadProgressInterval = null; }
+            stopAnalysisProgressTick();
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             try {
                 telemetry.markUploadStart();
-                const startResp = await fetch('/api/hub/v2/start', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageDataUrl }),
+
+                const { requestId, status } = await new Promise((resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/hub/v2/start');
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+
+                    xhr.upload.addEventListener('progress', (e) => {
+                        if (e.lengthComputable) {
+                            const uploadPct = (e.loaded / e.total) * 30;
+                            updateProgress(uploadPct, 'UPLOADING', 'Sending screenshot...');
+                        }
+                    });
+
+                    xhr.addEventListener('load', () => {
+                        telemetry.markUploadEnd();
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                resolve(JSON.parse(xhr.responseText));
+                            } catch {
+                                reject(new Error('Invalid server response'));
+                            }
+                        } else {
+                            try {
+                                const err = JSON.parse(xhr.responseText);
+                                reject(new Error(err.error || `Upload failed (HTTP ${xhr.status})`));
+                            } catch {
+                                reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+                            }
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        telemetry.markUploadEnd();
+                        reject(new Error('Upload failed — network error'));
+                    });
+
+                    xhr.send(JSON.stringify({ image: imageDataUrl }));
                 });
-                telemetry.markUploadEnd();
 
-                if (uploadProgressInterval) { clearInterval(uploadProgressInterval); uploadProgressInterval = null; }
-                updateProgress(100, 'UPLOADED', 'Screenshot received');
-                statusProgressFill.style.width = '50%';
-                statusText.textContent = 'uploaded';
-
-                if (!startResp.ok) {
-                    const err = await startResp.json().catch(() => ({ error: `Upload failed (HTTP ${startResp.status})` }));
-                    throw new Error(err.error || `Upload failed (HTTP ${startResp.status})`);
-                }
-
-                const { requestId } = await startResp.json();
                 telemetry.requestId = requestId;
 
-                await new Promise(r => setTimeout(r, 600));
                 progressOverlay.classList.remove('uploading');
                 progressOverlay.classList.add('analyzing');
-                progressRing.classList.remove('complete');
-                updateProgress(10, 'ANALYZING', 'Quick analysis starting...');
-                statusText.textContent = 'analyzing';
+                updateProgress(32, 'ANALYZING', 'Quick analysis starting...');
+                startAnalysisProgressTick(32);
 
                 await new Promise((resolve, reject) => {
                     const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
@@ -2324,7 +2304,7 @@
             } catch (err) {
                 if (retryCount < MAX_RETRIES && currentImageBase64 && !pipelineComplete) {
                     retryCount++;
-                    statusText.textContent = `reconnecting (attempt ${retryCount})...`;
+                    progressLabel.textContent = `Reconnecting (attempt ${retryCount})...`;
                     startPipelineInner(currentImageBase64);
                     return;
                 }
@@ -2340,12 +2320,11 @@
         function handleSSEEvent(event, data) {
             switch (event) {
                 case 'connected':
-                    statusProgressFill.style.width = '10%';
-                    updateProgress(15, 'ANALYZING', 'Quick analysis starting...');
+                    currentContinuousPct = Math.max(currentContinuousPct, 35);
+                    updateProgress(currentContinuousPct, 'ANALYZING', 'Quick analysis starting...');
                     break;
 
                 case 'progress': {
-                    statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
                     const phaseLabels = {
                         classifying: 'ANALYZING',
                         designing: 'DESIGNING',
@@ -2354,7 +2333,9 @@
                         reviewing: 'REVIEWING',
                     };
                     const phaseLabel = phaseLabels[data.phase] || 'ANALYZING';
-                    updateProgress(Math.min(data.progress, 95), phaseLabel, data.message || 'Processing...');
+                    const mappedPct = 30 + Math.min(data.progress, 95) * 0.6;
+                    currentContinuousPct = Math.max(currentContinuousPct, mappedPct);
+                    updateProgress(currentContinuousPct, phaseLabel, data.message || 'Processing...');
                     if (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing') {
                         layoutProgressFill.style.width = data.progress + '%';
                         layoutProgressText.textContent = data.phase === 'enhancing' ? 'enhancing' : data.phase === 'reviewing' ? 'reviewing' : `${completedCards}/${totalCards}`;
@@ -2431,9 +2412,8 @@
             const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
             layoutBadge.textContent = ct.replace(/_/g, ' ');
 
-            updateProgress(30, 'ANALYZING', 'Reading your screenshot...');
-            statusProgressFill.style.width = '15%';
-            statusText.textContent = 'analyzing';
+            currentContinuousPct = Math.max(currentContinuousPct, 40);
+            updateProgress(currentContinuousPct, 'ANALYZING', 'Reading your screenshot...');
             layoutProgressFill.style.width = '10%';
             layoutProgressText.textContent = 'analyzing';
         }
@@ -2456,7 +2436,8 @@
                 });
             }
 
-            updateProgress(50, 'DESIGNING', `${ct} detected — designing layout...`);
+            currentContinuousPct = Math.max(currentContinuousPct, 55);
+            updateProgress(currentContinuousPct, 'DESIGNING', `${ct} detected — designing layout...`);
             layoutProgressFill.style.width = '15%';
             layoutProgressText.textContent = 'designing';
         }
@@ -2501,6 +2482,8 @@
 
             if (!firstCardShown && populatedCards.length > 0) {
                 firstCardShown = true;
+                stopAnalysisProgressTick();
+                updateProgress(95, 'READY', 'Cards ready');
                 progressOverlay.classList.add('hiding');
                 setTimeout(() => {
                     progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
@@ -2544,6 +2527,8 @@
             });
 
             if (!firstCardShown && populatedCards.length === 0) {
+                stopAnalysisProgressTick();
+                updateProgress(90, 'ANALYZING', 'Preparing cards...');
                 progressOverlay.classList.add('hiding');
                 setTimeout(() => {
                     progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
@@ -2588,6 +2573,8 @@
 
             if (!firstCardShown) {
                 firstCardShown = true;
+                stopAnalysisProgressTick();
+                updateProgress(95, 'READY', 'Cards ready');
                 progressOverlay.classList.add('hiding');
                 setTimeout(() => {
                     progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
@@ -2614,9 +2601,7 @@
                 el.classList.remove('just-populated');
             }, 1500);
 
-            const pct = 30 + Math.round((completedCards / totalCards) * 65);
-            statusProgressFill.style.width = pct + '%';
-            statusText.textContent = `${completedCards}/${totalCards} cards`;
+            const pct = 60 + Math.round((completedCards / totalCards) * 35);
             layoutProgressFill.style.width = pct + '%';
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
@@ -2682,9 +2667,7 @@
 
             appendCitations(el, data.data);
 
-            const pct = 30 + Math.round((completedCards / totalCards) * 65);
-            statusProgressFill.style.width = pct + '%';
-            statusText.textContent = `${completedCards}/${totalCards} cards`;
+            const pct = 60 + Math.round((completedCards / totalCards) * 35);
             layoutProgressFill.style.width = pct + '%';
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
@@ -2697,7 +2680,7 @@
             };
             const msg = phaseMessages[data.phase] || data.message || '';
             if (msg) {
-                statusText.textContent = msg;
+                progressLabel.textContent = msg;
             }
         }
 
@@ -2722,6 +2705,7 @@
 
         function onPipelineComplete() {
             pipelineComplete = true;
+            stopAnalysisProgressTick();
             if (completionTimeout) {
                 clearTimeout(completionTimeout);
                 completionTimeout = null;
@@ -2744,12 +2728,6 @@
             cardGrid.classList.remove('single-card');
 
             document.querySelectorAll('.card-source-tag').forEach(t => t.remove());
-
-            statusProgressFill.style.width = '100%';
-            statusText.textContent = 'complete';
-            setTimeout(() => {
-                statusBar.classList.remove('active');
-            }, 1500);
 
             layoutProgress.style.display = 'none';
 
@@ -3118,7 +3096,6 @@
         function showError(message) {
             errorText.textContent = message;
             errorState.classList.add('active');
-            statusBar.classList.remove('active');
             progressOverlay.classList.remove('active');
         }
 
@@ -3141,6 +3118,7 @@
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
             if (enhanceMsgInterval) { clearInterval(enhanceMsgInterval); enhanceMsgInterval = null; }
             if (uploadProgressInterval) { clearInterval(uploadProgressInterval); uploadProgressInterval = null; }
+            stopAnalysisProgressTick();
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             pasteState.classList.remove('hidden');
@@ -3150,14 +3128,12 @@
             progressRing.classList.remove('complete');
             updateProgress(0, 'UPLOADING', 'Sending screenshot...');
             resultsOverlay.classList.remove('visible');
-            statusBar.classList.remove('active');
             errorState.classList.remove('active');
             cardGrid.innerHTML = '';
             cardGrid.classList.remove('single-card');
             contentAnalysisEl.style.display = 'none';
             layoutProgress.style.display = '';
             layoutProgressFill.style.width = '0%';
-            statusProgressFill.style.width = '0%';
         }
 
         // === Event Listeners ===
