@@ -30,7 +30,10 @@ function init(getRedisFunc) { _getRedis = getRedisFunc; }
 
 async function redis() { return _getRedis ? await _getRedis() : null; }
 
-function tryParse(str, fb) { try { return JSON.parse(str); } catch { return fb; } }
+function tryParse(str, fb) {
+  if (str == null) return fb;
+  try { return JSON.parse(str); } catch { return fb; }
+}
 
 function buildSummary(entry) {
   return {

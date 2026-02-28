@@ -25,7 +25,10 @@ function generateId() { return crypto.randomBytes(6).toString('hex'); }
 
 async function getStorageType() { return (await redis()) ? 'redis' : 'memory'; }
 
-function tryParse(str, fallback) { try { return JSON.parse(str); } catch { return fallback; } }
+function tryParse(str, fallback) {
+  if (str == null) return fallback;
+  try { return JSON.parse(str); } catch { return fallback; }
+}
 
 async function saveReport({ title, html, meta = {} }) {
   if (!html || html.length > MAX_REPORT_SIZE) {
