@@ -13,7 +13,7 @@
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt, getCardSchema, validateCardData } = require('../contracts/card-types');
+const { getCardTypeSummaryForPrompt, getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt, getCardSchema, validateCardData } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
 const ENHANCER_TOOLS = [
@@ -115,32 +115,37 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
     })),
   }, null, 2);
 
-  let prompt = `You are an expert analyst enhancing a screenshot analysis. A fast model has already analyzed this screenshot and created initial cards. Your job is to IMPROVE the analysis.
+  let prompt = `You are an expert analyst enhancing a screenshot analysis into a rich, visually diverse dashboard. A fast model has created initial cards. Your job is to make the dashboard COMPREHENSIVE and BEAUTIFUL.
 
 **Current state (from fast initial analysis):**
 ${currentState}
 
-**Available Card Types:**
-${getCardTypeSummaryForPrompt()}
+**Card Type Library with Required/Optional Fields:**
+${getCardTypeDetailedSchemaForPrompt()}
 
 **Available Layouts:**
 ${getLayoutTypesSummaryForPrompt()}
 
 **Your tasks:**
-1. REVIEW each existing card — are the facts correct? Is data missing?
-2. UPDATE cards that need richer content, corrections, or additional fields
-3. ADD new cards for important information the initial analysis missed
-4. Consider adding fact_check, timeline_card, or comparison_card for richer analysis
-5. Only UPDATE_LAYOUT if the current layout is clearly wrong for the content
+1. REVIEW each existing card — fill in ALL optional fields you can determine
+2. UPDATE hero_summary: ensure it has badge, icon, takeaway, and imageUrl if applicable
+3. ADD 2-4 new cards using DIVERSE card types for a rich dashboard:
+   - fact_check: verify key claims with verdict + explanation
+   - timeline_card: create event timelines when chronology matters
+   - action_card: suggest actionable next steps
+   - warning_card: flag potential issues with appropriate severity level
+   - quote_card: highlight notable statements
+   - link_card: add relevant source URLs
+4. Set proper columnSpan in grid position: 1 for compact cards (key_metric), 2 for wide cards (timeline, info_list)
 
 **Rules:**
-- Focus on QUALITY improvements, not just cosmetic changes
-- Don't update a card unless you have genuinely better information
-- Add cards only if they provide real value (don't pad with fluff)
+- MAXIMIZE field population — every optional field you can fill makes cards richer
+- Use DIVERSE card types to create visual variety in the dashboard
 - For product_card: features and warnings must be plain strings
-- Keep card count reasonable (max 8 total)
-- For fact_check cards: assess based on visible information
-- Extract any URLs, prices, names, or dates you can see more clearly`;
+- Total cards should be 6-10 for a comprehensive dashboard
+- For fact_check: include real verdict, explanation, and confidence
+- For hero_summary: ALWAYS ensure badge, takeaway, and icon are populated
+- Include real URLs, citations, and source links wherever possible`;
 
   if (researchData) {
     prompt += `\n\n**Deep research findings (from web search):**
