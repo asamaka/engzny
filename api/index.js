@@ -1269,6 +1269,7 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       imageData: job.imageData,
       mediaType: job.mediaType,
       question: job.question,
+      adapterConfig: { requestId },
 
       onProgress: (progress) => {
         logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
@@ -1345,6 +1346,8 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
             layout: pl.layout,
             cards: pl.cards,
             meta: pl._meta,
+            llmTraces: pl._llmTraces || [],
+            llmTraceSummary: pl._llmTraceSummary || null,
             thumb,
           });
           logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
@@ -1456,6 +1459,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       imageData: normalized.imageData,
       mediaType: normalized.mediaType,
       question,
+      adapterConfig: { requestId },
 
       onProgress: (progress) => {
         logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
@@ -1534,6 +1538,8 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
             layout: pl.layout,
             cards: pl.cards,
             meta: pl._meta,
+            llmTraces: pl._llmTraces || [],
+            llmTraceSummary: pl._llmTraceSummary || null,
           });
           logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
         } else {
@@ -2735,6 +2741,21 @@ app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
   }
 });
 
+app.get('/api/r/:requestId/traces', requirePin, async (req, res) => {
+  try {
+    const report = await liveReports.getReport(req.params.requestId);
+    if (!report) return res.status(404).json({ error: 'Report not found or expired' });
+    res.json({
+      requestId: req.params.requestId,
+      traces: report.llmTraces || [],
+      summary: report.llmTraceSummary || null,
+    });
+  } catch (err) {
+    logger.error('Reports', 'traces fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load traces', detail: err.message });
+  }
+});
+
 app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
   try {
     const thumb = await liveReports.getReportThumb(req.params.requestId);
@@ -2944,7 +2965,7 @@ async function doSearch(){
 }
 
 function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated) {
-  const { renderCardHtml, renderReflection, esc, fmtMs } = reportRenderer;
+  const { renderCardHtml, renderReflection, renderLlmTracesHtml, esc, fmtMs } = reportRenderer;
 
   // If no report data, show just the PIN gate (client-side JS will redirect after auth)
   const hasReport = !!report;
@@ -3020,7 +3041,14 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<h2>Reflection</h2>'
       + '<div class="reflection">'
       + reflectionLines.map(l => '<p>' + l + '</p>').join('')
-      + '</div>';
+      + '</div>'
+
+      // LLM Transaction Traces
+      + ((report.llmTraces && report.llmTraces.length) ?
+          '<h2 style="display:flex;align-items:center;justify-content:space-between">LLM Transaction Trace (' + report.llmTraces.length + ' calls)'
+          + '<span style="display:flex;gap:6px"><button onclick="expandAllTraces()" class="trace-btn">Expand All</button><button onclick="collapseAllTraces()" class="trace-btn">Collapse All</button></span></h2>'
+          + renderLlmTracesHtml(report)
+        : '');
 
   }
 
@@ -3213,6 +3241,52 @@ table{width:100%;border-collapse:collapse;font-size:.78rem}
 th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--b);color:var(--t2);font-weight:600}
 td{padding:6px 8px;border-bottom:1px solid rgba(30,39,54,.5);color:var(--t)}
 
+/* LLM Trace styles */
+.trace-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px}
+.trace-stat{background:var(--s);border:1px solid var(--b);border-radius:var(--rad);padding:12px;text-align:center}
+.trace-stat-val{font-size:1.3rem;font-weight:700;color:var(--p)}
+.trace-stat-label{font-size:.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.trace-models{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.model-badge{display:inline-block;padding:3px 10px;border-radius:var(--rad-pill);font-size:.68rem;font-weight:700;letter-spacing:.02em}
+.model-haiku{background:rgba(255,209,92,.12);color:var(--y)}
+.model-sonnet{background:rgba(108,159,255,.12);color:var(--a)}
+.model-opus{background:rgba(180,142,255,.15);color:var(--p)}
+.model-other{background:var(--s2);color:var(--t2)}
+.trace-timeline{display:flex;flex-direction:column;gap:6px}
+.trace-entry{background:var(--s);border:1px solid var(--b);border-radius:var(--rad);overflow:hidden;transition:border-color .2s}
+.trace-entry:hover{border-color:var(--b2)}
+.trace-entry.trace-error{border-color:rgba(255,107,107,.3)}
+.trace-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;cursor:pointer;user-select:none;gap:8px}
+.trace-header:hover{background:rgba(255,255,255,.02)}
+.trace-header-left{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.trace-header-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.trace-phase{display:inline-block;padding:2px 8px;border-radius:var(--rad-pill);font-size:.6rem;font-weight:800;letter-spacing:.06em;border:1px solid}
+.trace-agent{font-size:.76rem;font-weight:600;color:var(--t)}
+.trace-card-id{font-size:.68rem;color:var(--t3);background:var(--s2);padding:1px 6px;border-radius:4px}
+.trace-dur{font-size:.76rem;font-weight:600;color:var(--t2)}
+.trace-tokens{font-size:.68rem;color:var(--t3)}
+.trace-chevron{font-size:18px;color:var(--t3);transition:transform .2s}
+.trace-chevron.open{transform:rotate(180deg)}
+.trace-body{padding:0 14px 14px}
+.trace-meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 12px;margin-bottom:12px;padding:10px 12px;background:var(--s2);border-radius:8px}
+.trace-meta-item{display:flex;justify-content:space-between;font-size:.72rem;padding:3px 0}
+.trace-meta-k{color:var(--t3)}
+.trace-meta-v{color:var(--t);font-weight:500;text-align:right}
+.trace-section{margin-top:12px}
+.trace-section-title{font-size:.72rem;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.trace-img-badge{display:inline-block;background:rgba(180,142,255,.12);color:var(--p);padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700;text-transform:uppercase}
+.trace-pre{font-family:'SF Mono','Cascadia Code','Fira Code',monospace;font-size:.7rem;line-height:1.55;color:var(--t);padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow-y:auto;margin:0}
+.trace-pre-prompt{background:rgba(108,159,255,.06);border:1px solid rgba(108,159,255,.15)}
+.trace-pre-system{background:rgba(180,142,255,.06);border:1px solid rgba(180,142,255,.15)}
+.trace-pre-output{background:rgba(91,219,138,.06);border:1px solid rgba(91,219,138,.15)}
+.trace-pre-error{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);color:var(--r)}
+.trace-pre-tool{background:rgba(255,209,92,.06);border:1px solid rgba(255,209,92,.15)}
+.trace-error-box{padding:10px 12px;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.15);border-radius:8px}
+.trace-tool-call{margin-bottom:8px;padding:8px;background:var(--s2);border-radius:6px}
+.trace-tool-name{font-size:.72rem;font-weight:700;color:var(--y);margin-bottom:4px}
+.trace-btn{background:var(--s2);border:1px solid var(--b);color:var(--t2);font-size:.68rem;font-weight:600;padding:3px 10px;border-radius:var(--rad-pill);cursor:pointer;transition:all .2s}
+.trace-btn:hover{background:var(--s3);color:var(--t);border-color:var(--a)}
+
 footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--b);color:var(--t3);font-size:.72rem;text-align:center}
 </style>
 </head><body>
@@ -3236,6 +3310,11 @@ async function tryPin(){
   else{document.getElementById('pin-err').textContent='Wrong PIN';boxes.forEach(function(b){b.value='';});boxes[0].focus();}
 }
 </script>` : ''}
+<script>
+function toggleTrace(i){var b=document.getElementById('tbody-'+i);var c=document.getElementById('chev-'+i);if(!b)return;if(b.style.display==='none'){b.style.display='block';c.classList.add('open');}else{b.style.display='none';c.classList.remove('open');}}
+function expandAllTraces(){document.querySelectorAll('[id^="tbody-"]').forEach(function(b){b.style.display='block';});document.querySelectorAll('[id^="chev-"]').forEach(function(c){c.classList.add('open');});}
+function collapseAllTraces(){document.querySelectorAll('[id^="tbody-"]').forEach(function(b){b.style.display='none';});document.querySelectorAll('[id^="chev-"]').forEach(function(c){c.classList.remove('open');});}
+</script>
 </body></html>`;
 }
 

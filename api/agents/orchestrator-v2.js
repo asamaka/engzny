@@ -14,6 +14,7 @@ const { designLayout } = require('./layout-designer');
 const { fastClassify } = require('./fast-classifier');
 const { researchCardsInParallel } = require('./card-researcher');
 const { logger } = require('../lib/logger');
+const { TraceCollector } = require('../lib/llm-trace');
 
 /**
  * Create a generic skeleton blueprint for instant display.
@@ -74,6 +75,9 @@ async function runPipeline({
   adapterConfig = {},
 }) {
   const startTime = Date.now();
+  const traceCollector = new TraceCollector(
+    adapterConfig.requestId || 'unknown'
+  );
 
   try {
     // =====================================================
@@ -100,7 +104,7 @@ async function runPipeline({
       imageData,
       mediaType,
       question,
-      adapterConfig,
+      adapterConfig: { ...adapterConfig, traceCollector },
     }).catch((err) => {
       logger.warn('Orchestrator', 'Fast classify failed', { err: err.message });
       return null;
@@ -161,7 +165,7 @@ async function runPipeline({
       imageData,
       mediaType,
       question,
-      adapterConfig: designAdapterConfig,
+      adapterConfig: { ...designAdapterConfig, traceCollector },
     });
 
     try {
@@ -212,6 +216,7 @@ async function runPipeline({
     const researchAdapterConfig = {
       ...adapterConfig,
       model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
+      traceCollector,
     };
 
     let completedCount = blueprint.cards.length - cardsToResearch.length;
@@ -263,6 +268,8 @@ async function runPipeline({
         classifyDuration,
         cardsResearched: cardsToResearch.length,
       },
+      _llmTraces: traceCollector.getTraces(),
+      _llmTraceSummary: traceCollector.getSummary(),
     };
 
     if (onProgress) {

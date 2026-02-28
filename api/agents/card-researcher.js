@@ -73,6 +73,7 @@ Return JSON:`;
 async function researchCard({ card, contentAnalysis, imageData, mediaType, adapterConfig = {} }) {
   const startTime = Date.now();
   logger.info('CardResearcher', `Starting ${card.id}`, { cardType: card.cardType });
+  const traceCollector = adapterConfig.traceCollector;
 
   try {
     const adapter = getVisionAdapter(adapterConfig);
@@ -88,11 +89,32 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
     const duration = Date.now() - startTime;
     logger.info('CardResearcher', `${card.id} complete`, { dur: duration, model: result.model });
 
-    // Validate against schema
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'research',
+        agent: 'CardResearcher',
+        model: result.model || adapterConfig.model || 'claude-sonnet-4-20250514',
+        duration,
+        request: {
+          userPrompt: prompt,
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: adapterConfig.maxTokens || 4096,
+        },
+        response: {
+          text: result.text,
+          structured: data,
+          usage: result.usage,
+          stopReason: result.stopReason,
+        },
+        cardId: card.id,
+        cardType: card.cardType,
+      });
+    }
+
     const validation = validateCardData(card.cardType, data);
     if (!validation.valid) {
       logger.warn('CardResearcher', `${card.id} validation issues`, { errors: validation.errors });
-      // Merge with placeholder data for missing required fields
       return {
         ...card.placeholderData,
         ...data,
@@ -112,12 +134,32 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
       },
     };
   } catch (error) {
+    const duration = Date.now() - startTime;
     logger.error('CardResearcher', `Failed ${card.id}`, { err: error.message, cardType: card.cardType });
-    // Return placeholder data on failure
+
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'research',
+        agent: 'CardResearcher',
+        model: adapterConfig.model || 'claude-sonnet-4-20250514',
+        duration,
+        request: {
+          userPrompt: buildResearchPrompt(card, contentAnalysis),
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: adapterConfig.maxTokens || 4096,
+        },
+        response: {},
+        cardId: card.id,
+        cardType: card.cardType,
+        error: error.message,
+      });
+    }
+
     return {
       ...card.placeholderData,
       _researchMeta: {
-        duration: Date.now() - startTime,
+        duration,
         error: error.message,
       },
     };
