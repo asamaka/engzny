@@ -1269,6 +1269,7 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       imageData: job.imageData,
       mediaType: job.mediaType,
       question: job.question,
+      adapterConfig: { requestId },
 
       onProgress: (progress) => {
         logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
@@ -1345,6 +1346,8 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
             layout: pl.layout,
             cards: pl.cards,
             meta: pl._meta,
+            llmTraces: pl._llmTraces || [],
+            llmTraceSummary: pl._llmTraceSummary || null,
             thumb,
           });
           logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
@@ -1456,6 +1459,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       imageData: normalized.imageData,
       mediaType: normalized.mediaType,
       question,
+      adapterConfig: { requestId },
 
       onProgress: (progress) => {
         logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
@@ -1534,6 +1538,8 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
             layout: pl.layout,
             cards: pl.cards,
             meta: pl._meta,
+            llmTraces: pl._llmTraces || [],
+            llmTraceSummary: pl._llmTraceSummary || null,
           });
           logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
         } else {

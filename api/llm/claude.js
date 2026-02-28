@@ -92,6 +92,7 @@ class ClaudeAdapter extends LLMAdapter {
       structured,
       usage: response.usage,
       model: response.model,
+      stopReason: response.stop_reason,
     };
   }
 
@@ -129,6 +130,7 @@ class ClaudeAdapter extends LLMAdapter {
       text,
       usage: response.usage,
       model: response.model,
+      stopReason: response.stop_reason,
     };
   }
 

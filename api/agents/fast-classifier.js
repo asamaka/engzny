@@ -77,6 +77,7 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
   };
 
   const adapter = getVisionAdapter(config);
+  const traceCollector = adapterConfig.traceCollector;
 
   let prompt = FAST_CLASSIFIER_PROMPT;
   if (question) {
@@ -99,10 +100,49 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
       usage: result.usage,
     });
 
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'classify',
+        agent: 'FastClassifier',
+        model: result.model || config.model,
+        duration,
+        request: {
+          userPrompt: prompt,
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: config.maxTokens,
+        },
+        response: {
+          text: result.text,
+          usage: result.usage,
+          stopReason: result.stopReason,
+        },
+      });
+    }
+
     const blueprint = parseQuickBlueprint(result.text);
     return normalizeQuickBlueprint(blueprint);
   } catch (error) {
+    const duration = Date.now() - startTime;
     logger.warn('FastClassifier', 'Classification failed, using fallback', { err: error.message });
+
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'classify',
+        agent: 'FastClassifier',
+        model: config.model,
+        duration,
+        request: {
+          userPrompt: prompt,
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: config.maxTokens,
+        },
+        response: {},
+        error: error.message,
+      });
+    }
+
     return null;
   }
 }

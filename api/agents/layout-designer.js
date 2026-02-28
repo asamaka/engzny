@@ -82,6 +82,7 @@ Return ONLY valid JSON matching this structure:
 async function designLayout({ imageData, mediaType, question, adapterConfig = {} }) {
   const startTime = Date.now();
   const adapter = getVisionAdapter(adapterConfig);
+  const traceCollector = adapterConfig.traceCollector;
 
   let prompt = LAYOUT_DESIGNER_PROMPT;
   if (question) {
@@ -90,21 +91,64 @@ async function designLayout({ imageData, mediaType, question, adapterConfig = {}
 
   logger.info('LayoutDesigner', 'Starting vision analysis', { model: adapterConfig.model || 'default' });
 
-  const result = await adapter.analyzeImage({
-    imageData,
-    mediaType,
-    prompt,
-  });
+  try {
+    const result = await adapter.analyzeImage({
+      imageData,
+      mediaType,
+      prompt,
+    });
 
-  const duration = Date.now() - startTime;
-  logger.info('LayoutDesigner', 'Vision analysis complete', {
-    dur: duration,
-    model: result.model,
-    usage: result.usage,
-  });
+    const duration = Date.now() - startTime;
+    logger.info('LayoutDesigner', 'Vision analysis complete', {
+      dur: duration,
+      model: result.model,
+      usage: result.usage,
+    });
 
-  const blueprint = parseBlueprint(result.text);
-  return normalizeBlueprint(blueprint);
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'design',
+        agent: 'LayoutDesigner',
+        model: result.model || adapterConfig.model || 'claude-sonnet-4-20250514',
+        duration,
+        request: {
+          userPrompt: prompt,
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: adapterConfig.maxTokens || 4096,
+        },
+        response: {
+          text: result.text,
+          usage: result.usage,
+          stopReason: result.stopReason,
+        },
+      });
+    }
+
+    const blueprint = parseBlueprint(result.text);
+    return normalizeBlueprint(blueprint);
+  } catch (error) {
+    const duration = Date.now() - startTime;
+
+    if (traceCollector) {
+      traceCollector.record({
+        phase: 'design',
+        agent: 'LayoutDesigner',
+        model: adapterConfig.model || 'claude-sonnet-4-20250514',
+        duration,
+        request: {
+          userPrompt: prompt,
+          hasImage: true,
+          imageMediaType: mediaType,
+          maxTokens: adapterConfig.maxTokens || 4096,
+        },
+        response: {},
+        error: error.message,
+      });
+    }
+
+    throw error;
+  }
 }
 
 /**
