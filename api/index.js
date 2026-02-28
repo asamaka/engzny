@@ -1259,6 +1259,11 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
 
   sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
 
+  // Store pipeline result so we can save the report BEFORE ending the stream.
+  // On Vercel, once res.end() is called the function can be terminated immediately,
+  // so any async work after endStream() is a race against the serverless freeze.
+  let pipelineResult = null;
+
   try {
     await runPipeline({
       imageData: job.imageData,
@@ -1304,57 +1309,62 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         clearInterval(keepAlive);
         logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, designDuration: populatedLayout._meta?.designDuration });
         sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
-        endStream();
-
-        // Auto-save live report (async, non-blocking)
-        (async () => {
-          try {
-            let thumb = null;
-            if (job._captureId) {
-              thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
-            }
-            await liveReports.saveLiveReport(requestId, {
-              contentType: populatedLayout.contentAnalysis?.contentType,
-              platform: populatedLayout.contentAnalysis?.platform,
-              layoutType: populatedLayout.layout?.type,
-              cardCount: populatedLayout.cards?.length,
-              duration: populatedLayout._meta?.totalDuration,
-              designDuration: populatedLayout._meta?.designDuration,
-              outcome: 'success',
-              imageSize: `${imageSize}KB`,
-              mediaType: job.mediaType,
-              contentAnalysis: populatedLayout.contentAnalysis,
-              layout: populatedLayout.layout,
-              cards: populatedLayout.cards,
-              meta: populatedLayout._meta,
-              thumb,
-            });
-            logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
-          } catch (err) {
-            logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
-          }
-        })();
+        pipelineResult = { success: true, populatedLayout };
       },
 
       onError: (error) => {
         clearInterval(keepAlive);
         logger.pipelineError(requestId, error, { phase: 'pipeline' });
         sendEvent('error', { message: error.message });
-        endStream();
-
-        // Save failed report too
-        liveReports.saveLiveReport(requestId, {
-          outcome: 'error',
-          error: error.message,
-          imageSize: `${imageSize}KB`,
-          mediaType: job.mediaType,
-        }).catch(() => {});
+        pipelineResult = { success: false, error };
       },
     });
+
+    // Save report to Redis BEFORE ending the stream.
+    // The client already received the complete/error SSE event above;
+    // we keep the HTTP connection open just long enough for the Redis write.
+    if (pipelineResult) {
+      try {
+        if (pipelineResult.success) {
+          const pl = pipelineResult.populatedLayout;
+          let thumb = null;
+          if (job._captureId) {
+            thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
+          }
+          await liveReports.saveLiveReport(requestId, {
+            contentType: pl.contentAnalysis?.contentType,
+            platform: pl.contentAnalysis?.platform,
+            layoutType: pl.layout?.type,
+            cardCount: pl.cards?.length,
+            duration: pl._meta?.totalDuration,
+            designDuration: pl._meta?.designDuration,
+            outcome: 'success',
+            imageSize: `${imageSize}KB`,
+            mediaType: job.mediaType,
+            contentAnalysis: pl.contentAnalysis,
+            layout: pl.layout,
+            cards: pl.cards,
+            meta: pl._meta,
+            thumb,
+          });
+          logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
+        } else {
+          await liveReports.saveLiveReport(requestId, {
+            outcome: 'error',
+            error: pipelineResult.error.message,
+            imageSize: `${imageSize}KB`,
+            mediaType: job.mediaType,
+          });
+        }
+      } catch (err) {
+        logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
+      }
+    }
   } catch (error) {
     logger.pipelineError(requestId, error, { phase: 'catch' });
     if (keepAlive) clearInterval(keepAlive);
     sendEvent('error', { message: error.message || 'Pipeline failed' });
+  } finally {
     endStream();
   }
 });
@@ -1440,6 +1450,8 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
 
     sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
 
+    let pipelineResult = null;
+
     await runPipeline({
       imageData: normalized.imageData,
       mediaType: normalized.mediaType,
@@ -1492,40 +1504,50 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
           contentAnalysis: populatedLayout.contentAnalysis,
           meta: populatedLayout._meta,
         });
-        endStream();
-
-        // Auto-save live report (async, non-blocking)
-        liveReports.saveLiveReport(requestId, {
-          contentType: populatedLayout.contentAnalysis?.contentType,
-          platform: populatedLayout.contentAnalysis?.platform,
-          layoutType: populatedLayout.layout?.type,
-          cardCount: populatedLayout.cards?.length,
-          duration: populatedLayout._meta?.totalDuration,
-          designDuration: populatedLayout._meta?.designDuration,
-          outcome: 'success',
-          imageSize: `${imageSize}KB`,
-          mediaType: normalized.mediaType,
-          contentAnalysis: populatedLayout.contentAnalysis,
-          layout: populatedLayout.layout,
-          cards: populatedLayout.cards,
-          meta: populatedLayout._meta,
-        }).catch(() => {});
+        pipelineResult = { success: true, populatedLayout };
       },
 
       onError: (error) => {
         clearInterval(keepAlive);
         logger.pipelineError(requestId, error, { phase: 'pipeline' });
         sendEvent('error', { message: error.message });
-        endStream();
-
-        liveReports.saveLiveReport(requestId, {
-          outcome: 'error',
-          error: error.message,
-          imageSize: `${imageSize}KB`,
-          mediaType: normalized.mediaType,
-        }).catch(() => {});
+        pipelineResult = { success: false, error };
       },
     });
+
+    // Save report to Redis BEFORE ending the stream (same fix as GET stream endpoint)
+    if (pipelineResult) {
+      try {
+        if (pipelineResult.success) {
+          const pl = pipelineResult.populatedLayout;
+          await liveReports.saveLiveReport(requestId, {
+            contentType: pl.contentAnalysis?.contentType,
+            platform: pl.contentAnalysis?.platform,
+            layoutType: pl.layout?.type,
+            cardCount: pl.cards?.length,
+            duration: pl._meta?.totalDuration,
+            designDuration: pl._meta?.designDuration,
+            outcome: 'success',
+            imageSize: `${imageSize}KB`,
+            mediaType: normalized.mediaType,
+            contentAnalysis: pl.contentAnalysis,
+            layout: pl.layout,
+            cards: pl.cards,
+            meta: pl._meta,
+          });
+          logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
+        } else {
+          await liveReports.saveLiveReport(requestId, {
+            outcome: 'error',
+            error: pipelineResult.error.message,
+            imageSize: `${imageSize}KB`,
+            mediaType: normalized.mediaType,
+          });
+        }
+      } catch (err) {
+        logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
+      }
+    }
   } catch (error) {
     logger.pipelineError(requestId, error, { phase: 'catch', headersSent: res.headersSent });
     if (keepAlive) clearInterval(keepAlive);
@@ -1533,8 +1555,9 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       res.status(500).json({ error: 'Pipeline failed', message: error.message });
     } else {
       sendEvent('error', { message: error.message || 'Pipeline failed' });
-      endStream();
     }
+  } finally {
+    endStream();
   }
 });
 
