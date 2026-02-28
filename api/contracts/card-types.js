@@ -270,6 +270,38 @@ function getCardTypeSummaryForPrompt() {
 }
 
 /**
+ * Build detailed schema for LLM prompts showing required and optional fields.
+ * Used by both Haiku (fast classifier) and Sonnet (enhancer) to build complete cards.
+ */
+function getCardTypeDetailedSchemaForPrompt() {
+  return Object.entries(CARD_TYPES).map(([name, def]) => {
+    const required = [];
+    const optional = [];
+    for (const [field, fieldDef] of Object.entries(def.schema)) {
+      const desc = fieldDef.description || '';
+      const enumStr = fieldDef.enum ? ` [${fieldDef.enum.join('|')}]` : '';
+      if (fieldDef.type === 'array' && fieldDef.items && typeof fieldDef.items === 'object' && !fieldDef.items.type) {
+        const subFields = Object.entries(fieldDef.items)
+          .map(([sf, sd]) => `${sf}${sd.required ? '*' : ''}`)
+          .join(', ');
+        const line = `${field}*: array of {${subFields}} — ${desc}`;
+        if (fieldDef.required) required.push(line);
+        else optional.push(line);
+      } else {
+        const line = `${field}: ${fieldDef.type}${enumStr} — ${desc}`;
+        if (fieldDef.required) required.push(line);
+        else optional.push(line);
+      }
+    }
+    const size = def.sizing?.defaultSpan === 'full' ? 'FULL WIDTH' : def.sizing?.minWidth >= 2 ? 'WIDE' : 'COMPACT';
+    return `## ${name} (${size})
+${def.description}
+Required: ${required.join('; ')}
+Optional: ${optional.join('; ')}`;
+  }).join('\n\n');
+}
+
+/**
  * Build layout types summary for the LLM prompt
  */
 function getLayoutTypesSummaryForPrompt() {
@@ -306,6 +338,7 @@ module.exports = {
   CARD_TYPES,
   LAYOUT_TYPES,
   getCardTypeSummaryForPrompt,
+  getCardTypeDetailedSchemaForPrompt,
   getLayoutTypesSummaryForPrompt,
   getCardSchema,
   validateCardData,

@@ -11,35 +11,35 @@
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { getCardTypeSummaryForPrompt, getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
-const FAST_POPULATE_PROMPT = `You are a fast screenshot analyzer. Look at this screenshot and produce FULLY POPULATED cards with real data.
+const FAST_POPULATE_PROMPT = `You are a fast screenshot analyzer building a rich dashboard of cards. Look at this screenshot and produce FULLY POPULATED cards with real data.
 
 **Your job:**
 1. IDENTIFY the content type and platform
-2. PICK the best layout
-3. CREATE 3-6 cards with REAL DATA extracted from the screenshot
-4. POPULATE every card field with actual content you can see — not placeholders
+2. PICK the best layout (always use columns: 2 for dashboard feel)
+3. CREATE 4-7 DIVERSE cards with REAL DATA from the screenshot
+4. POPULATE every required field + as many optional fields as possible
 
 **Available Layouts:**
 ${getLayoutTypesSummaryForPrompt()}
 
-**Available Card Types:**
-${getCardTypeSummaryForPrompt()}
+**Card Type Library — Required & Optional Fields:**
+${getCardTypeDetailedSchemaForPrompt()}
 
-**Critical Rules:**
-- Extract REAL text, numbers, names, dates from the screenshot
-- The first card MUST be hero_summary with a real title and subtitle
-- Fill ALL required fields with actual content
-- For info_list: include real items with real labels and values
-- For key_metric: include the actual number/value you see
-- For person_card: include the actual name and role
-- For product_card: features and warnings arrays must be PLAIN STRINGS
-- Include any visible URLs, prices, handles, or links
-- Don't say "Analyzing..." or "Loading..." — use real content
-- Be concise but accurate — this is what users see first
-- Set researchBrief for each card to guide deeper research later
+**Dashboard Design Rules:**
+- FIRST card: hero_summary (FULL WIDTH, columnSpan: 2) with title, subtitle, and takeaway
+- hero_summary: ALWAYS include a badge (content category), takeaway (key insight), and icon
+- If you see an image URL in the screenshot, include it as imageUrl in hero_summary
+- MIX card sizes: hero_summary spans full width, key_metric cards are compact (columnSpan: 1), info_list/timeline span 2 columns
+- Use DIVERSE card types — don't repeat the same type. Pick from: key_metric, info_list, fact_check, person_card, product_card, timeline_card, quote_card, warning_card, action_card, text_extract, location_card, link_card
+- For fact_check cards: include claim, verdict, and explanation with source info
+- For warning_card: include level, title, and details with advice
+- Fill ALL required fields with actual extracted content — never "N/A" or "Loading..."
+- Include visible URLs, prices, handles, dates, names
+- For product_card: features and warnings must be PLAIN STRINGS
+- Set researchBrief for each card to guide deeper web research
 
 Return ONLY valid JSON:
 {
@@ -51,7 +51,7 @@ Return ONLY valid JSON:
   },
   "layout": {
     "type": "string (one of the layout types)",
-    "columns": number (1-3),
+    "columns": 2,
     "reason": "string (why this layout)"
   },
   "cards": [
@@ -59,8 +59,8 @@ Return ONLY valid JSON:
       "id": "card-1",
       "cardType": "hero_summary",
       "gridPosition": { "row": 1, "column": 1, "columnSpan": 2, "rowSpan": 1 },
-      "researchBrief": "string (what to research deeper for enhancement)",
-      "populatedData": { ... REAL card data with all required fields filled }
+      "researchBrief": "string (what to research deeper)",
+      "populatedData": { "title": "...", "subtitle": "...", "badge": "...", "takeaway": "...", "icon": "..." }
     }
   ]
 }`;
