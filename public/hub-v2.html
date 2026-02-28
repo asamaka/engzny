@@ -431,6 +431,16 @@
             transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
+        .status-text {
+            font-size: 0.68rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
         /* === RESULTS OVERLAY === */
         .results-overlay {
             position: relative;
@@ -2393,6 +2403,7 @@
 
         let pendingBlueprint = null;
         let firstCardShown = false;
+        const populatedCardIds = new Set();
 
         function onBlueprintReceived(blueprint) {
             blueprintReceived = true;
@@ -2513,6 +2524,7 @@
 
                 if (hasData) {
                     completedCards++;
+                    populatedCardIds.add(card.id);
                     el.classList.remove('loading');
                     el.classList.add('populated');
                     el.innerHTML = renderCardContent(card.cardType, card.populatedData);
@@ -2568,6 +2580,10 @@
         }
 
         function onCardReceived(data) {
+            if (populatedCardIds.has(data.cardId)) {
+                return;
+            }
+            populatedCardIds.add(data.cardId);
             completedCards++;
 
             if (!firstCardShown) {
@@ -3118,6 +3134,7 @@
             pipelineComplete = false;
             firstCardShown = false;
             pendingBlueprint = null;
+            populatedCardIds.clear();
             retryCount = 0;
             if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
             if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
