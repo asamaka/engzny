@@ -9,9 +9,18 @@
  * Multiple instances run in parallel - one per card.
  */
 
-const { getVisionAdapter, getDefaultAdapter } = require('../llm');
+const { getVisionAdapter, getDefaultAdapter, getResearchAdapter, isPerplexityAvailable } = require('../llm');
 const { getCardSchema, validateCardData } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
+
+const WEB_RESEARCH_CARD_TYPES = new Set([
+  'fact_check',
+  'timeline_card',
+  'person_card',
+  'product_card',
+  'comparison_card',
+  'location_card',
+]);
 
 /**
  * Build the research prompt for a specific card
@@ -36,7 +45,14 @@ function buildResearchPrompt(card, contentAnalysis) {
     })
     .join('\n');
 
-  return `You are a research specialist. Your task is to populate a single card with accurate information extracted from a screenshot.
+  const needsWebResearch = WEB_RESEARCH_CARD_TYPES.has(card.cardType);
+  const webSearchInstructions = needsWebResearch
+    ? `\n8. You have web search access — use it to verify facts, find current prices, check recent events, or look up people/products visible in the screenshot
+9. When web search provides information, prefer it over guessing from the screenshot alone
+10. Include source URLs in the sourceUrl field when available from search results`
+    : '';
+
+  return `You are a research specialist. Your task is to populate a single card with accurate information${needsWebResearch ? ', using web search to verify and enrich data' : ' extracted from a screenshot'}.
 
 **Content Context:** ${contentAnalysis.contentType} ${contentAnalysis.platform ? `on ${contentAnalysis.platform}` : ''}
 **Intent:** ${contentAnalysis.intent}
@@ -55,7 +71,7 @@ ${fieldDescriptions}
 4. For fact_check cards: assess based on visible information, mark confidence as "low" if you cannot verify
 5. For product_card: features and warnings MUST be arrays of plain strings, NOT objects
 6. Include any visible URLs in url/imageUrl/sourceUrl/mapUrl fields
-7. Return ONLY valid JSON with the card data fields - no markdown, no explanation
+7. Return ONLY valid JSON with the card data fields - no markdown, no explanation${webSearchInstructions}
 
 Return JSON:`;
 }
@@ -72,40 +88,103 @@ Return JSON:`;
  */
 async function researchCard({ card, contentAnalysis, imageData, mediaType, adapterConfig = {} }) {
   const startTime = Date.now();
-  logger.info('CardResearcher', `Starting ${card.id}`, { cardType: card.cardType });
+  const needsWebResearch = WEB_RESEARCH_CARD_TYPES.has(card.cardType);
+  const usePerplexity = needsWebResearch && isPerplexityAvailable();
+
+  logger.info('CardResearcher', `Starting ${card.id}`, {
+    cardType: card.cardType,
+    webSearch: needsWebResearch,
+    perplexity: usePerplexity,
+  });
+
   const traceCollector = adapterConfig.traceCollector;
 
   try {
-    const adapter = getVisionAdapter(adapterConfig);
     const prompt = buildResearchPrompt(card, contentAnalysis);
+    let result;
+    let perplexityResult = null;
 
-    const result = await adapter.analyzeImage({
-      imageData,
-      mediaType,
-      prompt,
-    });
+    if (usePerplexity) {
+      const [visionResult, pplxResult] = await Promise.allSettled([
+        getVisionAdapter(adapterConfig).analyzeImage({ imageData, mediaType, prompt }),
+        researchWithPerplexity(card, contentAnalysis, adapterConfig),
+      ]);
 
-    const data = parseCardData(result.text);
+      result = visionResult.status === 'fulfilled' ? visionResult.value : null;
+      perplexityResult = pplxResult.status === 'fulfilled' ? pplxResult.value : null;
+
+      if (!result && !perplexityResult) {
+        throw visionResult.reason || new Error('Both vision and Perplexity research failed');
+      }
+
+      if (perplexityResult) {
+        logger.info('CardResearcher', `${card.id} Perplexity enrichment available`, {
+          citations: perplexityResult.citations?.length || 0,
+        });
+      }
+    } else if (needsWebResearch) {
+      const adapter = getVisionAdapter(adapterConfig);
+      if (typeof adapter.analyzeImageWithWebSearch === 'function') {
+        result = await adapter.analyzeImageWithWebSearch({
+          imageData,
+          mediaType,
+          prompt,
+          maxSearches: 3,
+        });
+        if (result.webSearchUsed) {
+          logger.info('CardResearcher', `${card.id} used Claude web search`, {
+            searchCount: result.searchResults?.length || 0,
+          });
+        }
+      } else {
+        result = await adapter.analyzeImage({ imageData, mediaType, prompt });
+      }
+    } else {
+      const adapter = getVisionAdapter(adapterConfig);
+      result = await adapter.analyzeImage({ imageData, mediaType, prompt });
+    }
+
+    let data = result ? parseCardData(result.text) : {};
+
+    if (perplexityResult) {
+      const pplxData = parseCardData(perplexityResult.text);
+      data = mergeResearchData(data, pplxData, perplexityResult.citations);
+    }
+
     const duration = Date.now() - startTime;
-    logger.info('CardResearcher', `${card.id} complete`, { dur: duration, model: result.model });
+    const modelUsed = result?.model || adapterConfig.model || 'claude-sonnet-4-20250514';
+
+    logger.info('CardResearcher', `${card.id} complete`, {
+      dur: duration,
+      model: modelUsed,
+      webSearch: result?.webSearchUsed || false,
+      perplexity: !!perplexityResult,
+    });
 
     if (traceCollector) {
       traceCollector.record({
         phase: 'research',
         agent: 'CardResearcher',
-        model: result.model || adapterConfig.model || 'claude-sonnet-4-20250514',
+        model: modelUsed,
         duration,
         request: {
           userPrompt: prompt,
           hasImage: true,
           imageMediaType: mediaType,
           maxTokens: adapterConfig.maxTokens || 4096,
+          webSearchEnabled: needsWebResearch,
+          perplexityUsed: !!perplexityResult,
         },
         response: {
-          text: result.text,
+          text: result?.text || '',
           structured: data,
-          usage: result.usage,
-          stopReason: result.stopReason,
+          usage: result?.usage,
+          stopReason: result?.stopReason,
+          webSearchUsed: result?.webSearchUsed || false,
+          citations: [
+            ...(result?.citations || []),
+            ...(perplexityResult?.citations || []),
+          ],
         },
         cardId: card.id,
         cardType: card.cardType,
@@ -120,8 +199,10 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
         ...data,
         _researchMeta: {
           duration,
-          model: result.model,
+          model: modelUsed,
           validationErrors: validation.errors,
+          webSearch: result?.webSearchUsed || false,
+          perplexity: !!perplexityResult,
         },
       };
     }
@@ -130,7 +211,13 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
       ...data,
       _researchMeta: {
         duration,
-        model: result.model,
+        model: modelUsed,
+        webSearch: result?.webSearchUsed || false,
+        perplexity: !!perplexityResult,
+        citations: [
+          ...(result?.citations || []),
+          ...(perplexityResult?.citations || []),
+        ],
       },
     };
   } catch (error) {
@@ -164,6 +251,61 @@ async function researchCard({ card, contentAnalysis, imageData, mediaType, adapt
       },
     };
   }
+}
+
+/**
+ * Use Perplexity Sonar to research a card topic with live web data
+ */
+async function researchWithPerplexity(card, contentAnalysis, adapterConfig) {
+  const adapter = getResearchAdapter({
+    ...adapterConfig,
+    model: 'sonar',
+  });
+
+  const schema = getCardSchema(card.cardType);
+  const fieldNames = schema ? Object.keys(schema.schema).join(', ') : '';
+
+  const query = `Research the following based on a ${contentAnalysis.contentType} screenshot${contentAnalysis.platform ? ` from ${contentAnalysis.platform}` : ''}.
+
+Card type: ${card.cardType}
+Research brief: ${card.researchBrief}
+Required fields: ${fieldNames}
+
+${card.placeholderData ? `Visible context: ${JSON.stringify(card.placeholderData)}` : ''}
+
+Return ONLY valid JSON with the card data fields. Include sourceUrl if you find relevant URLs.`;
+
+  return adapter.generateText({
+    prompt: query,
+    systemPrompt: `You are a research specialist. Return ONLY valid JSON with factual, verified information. No markdown, no explanation.`,
+  });
+}
+
+/**
+ * Merge vision-based data with Perplexity web research data.
+ * Vision data takes priority for visual fields; Perplexity enriches factual fields.
+ */
+function mergeResearchData(visionData, pplxData, citations = []) {
+  if (!pplxData || Object.keys(pplxData).length === 0) return visionData;
+  if (!visionData || Object.keys(visionData).length === 0) return { ...pplxData, _webCitations: citations };
+
+  const merged = { ...visionData };
+
+  for (const [key, value] of Object.entries(pplxData)) {
+    if (value === null || value === undefined) continue;
+    if (merged[key] === undefined || merged[key] === null || merged[key] === '') {
+      merged[key] = value;
+    }
+    if (key === 'sourceUrl' && value && !merged.sourceUrl) {
+      merged.sourceUrl = value;
+    }
+  }
+
+  if (citations.length > 0) {
+    merged._webCitations = citations;
+  }
+
+  return merged;
 }
 
 /**

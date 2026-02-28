@@ -7,13 +7,12 @@
 
 const { LLMAdapter } = require('./adapter');
 const { ClaudeAdapter } = require('./claude');
+const { PerplexityAdapter } = require('./perplexity');
 
 // Registry of available providers
 const providers = {
   claude: ClaudeAdapter,
-  // Future providers:
-  // openai: OpenAIAdapter,
-  // perplexity: PerplexityAdapter,
+  perplexity: PerplexityAdapter,
 };
 
 // Singleton instances cache
@@ -72,14 +71,22 @@ function getVisionAdapter(config = {}) {
 }
 
 /**
- * Get a research/deep-dive adapter
- * For MVP, falls back to Claude. Future: Perplexity
+ * Get a research/deep-dive adapter (Perplexity when configured, else Claude)
  * @param {Object} config - Optional configuration
  * @returns {LLMAdapter}
  */
 function getResearchAdapter(config = {}) {
-  const researchProvider = process.env.RESEARCH_LLM_PROVIDER || 'claude';
+  const researchProvider = process.env.RESEARCH_LLM_PROVIDER ||
+    (process.env.PERPLEXITY_API_KEY ? 'perplexity' : 'claude');
   return getAdapter(researchProvider, config);
+}
+
+/**
+ * Check if Perplexity is available for web-grounded research
+ * @returns {boolean}
+ */
+function isPerplexityAvailable() {
+  return !!process.env.PERPLEXITY_API_KEY;
 }
 
 /**
@@ -112,10 +119,12 @@ function clearCache() {
 module.exports = {
   LLMAdapter,
   ClaudeAdapter,
+  PerplexityAdapter,
   getAdapter,
   getDefaultAdapter,
   getVisionAdapter,
   getResearchAdapter,
+  isPerplexityAvailable,
   registerProvider,
   listProviders,
   clearCache,

@@ -97,6 +97,86 @@ class ClaudeAdapter extends LLMAdapter {
   }
 
   /**
+   * Analyze an image with web search tool enabled.
+   * Claude will autonomously search the web when it needs real-time data.
+   */
+  async analyzeImageWithWebSearch({ imageData, mediaType, prompt, responseFormat, maxSearches = 3 }) {
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: mediaType,
+              data: imageData,
+            },
+          },
+          {
+            type: 'text',
+            text: responseFormat
+              ? `${prompt}\n\nRespond with valid JSON matching this schema:\n${JSON.stringify(responseFormat, null, 2)}`
+              : prompt,
+          },
+        ],
+      },
+    ];
+
+    const response = await this.client.messages.create({
+      model: this.model,
+      max_tokens: this.maxTokens,
+      messages,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: maxSearches,
+        },
+      ],
+    });
+
+    const textBlocks = [];
+    const searchResults = [];
+    const citations = [];
+
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        textBlocks.push(block.text);
+        if (block.citations) {
+          citations.push(...block.citations);
+        }
+      } else if (block.type === 'web_search_tool_result') {
+        searchResults.push(block);
+      }
+    }
+
+    const text = textBlocks.join('\n');
+
+    let structured = null;
+    if (responseFormat) {
+      try {
+        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, text];
+        const jsonStr = jsonMatch[1] || text;
+        structured = JSON.parse(jsonStr.trim());
+      } catch (e) {
+        console.warn('Failed to parse structured response:', e.message);
+      }
+    }
+
+    return {
+      text,
+      structured,
+      usage: response.usage,
+      model: response.model,
+      stopReason: response.stop_reason,
+      webSearchUsed: searchResults.length > 0,
+      searchResults,
+      citations,
+    };
+  }
+
+  /**
    * Generate text from a prompt
    */
   async generateText({ prompt, systemPrompt, context }) {
