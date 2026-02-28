@@ -2674,9 +2674,10 @@
                 const card = document.createElement('div');
                 card.className = 'example-card';
                 card.dataset.index = i;
+                const thumbProxy = '/api/example-image?url=' + encodeURIComponent(example.thumbUrl);
                 card.innerHTML = `
                     <div class="example-thumb">
-                        <img src="${esc(example.thumbUrl)}" alt="${esc(example.label)}" loading="lazy"
+                        <img src="${esc(thumbProxy)}" alt="${esc(example.label)}" loading="lazy"
                              onerror="this.style.display='none';this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>image</span>'">
                     </div>
                     <span class="example-label">${esc(example.label)}</span>
@@ -2694,7 +2695,8 @@
             cardEl.classList.add('loading');
 
             try {
-                const resp = await fetch(example.fullUrl);
+                const proxyUrl = '/api/example-image?url=' + encodeURIComponent(example.fullUrl);
+                const resp = await fetch(proxyUrl);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const blob = await resp.blob();
                 if (!blob.type.startsWith('image/')) {

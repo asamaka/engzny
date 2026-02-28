@@ -364,6 +364,70 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// GET /api/example-image?url=... — Proxy for example screenshot images
+// Only allows fetching from upload.wikimedia.org to prevent open-relay abuse
+app.get('/api/example-image', async (req, res) => {
+  const url = req.query.url;
+  if (!url || typeof url !== 'string') {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname !== 'upload.wikimedia.org') {
+      return res.status(403).json({ error: 'Only Wikimedia images are allowed' });
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid URL' });
+  }
+
+  try {
+    const https = require('https');
+    const fetchImage = (imageUrl) => new Promise((resolve, reject) => {
+      const request = https.get(imageUrl, {
+        timeout: 15000,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; thinx-fun/1.0; +https://thinx.fun)' },
+      }, (response) => {
+        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          return fetchImage(response.headers.location).then(resolve, reject);
+        }
+        if (response.statusCode !== 200) {
+          response.resume();
+          return reject(new Error(`HTTP ${response.statusCode}`));
+        }
+        const contentType = response.headers['content-type'] || 'image/png';
+        if (!contentType.startsWith('image/')) {
+          response.resume();
+          return reject(new Error('Not an image'));
+        }
+        const chunks = [];
+        let size = 0;
+        response.on('data', (chunk) => {
+          size += chunk.length;
+          if (size > 5 * 1024 * 1024) {
+            response.destroy();
+            return reject(new Error('Image too large'));
+          }
+          chunks.push(chunk);
+        });
+        response.on('end', () => resolve({ buffer: Buffer.concat(chunks), contentType }));
+      });
+      request.on('error', reject);
+      request.on('timeout', () => { request.destroy(); reject(new Error('Timeout')); });
+    });
+
+    const { buffer, contentType } = await fetchImage(url);
+    res.set({
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=86400',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.send(buffer);
+  } catch (err) {
+    res.status(502).json({ error: 'Failed to fetch image' });
+  }
+});
+
 // ============================================
 // Debug & Monitoring Endpoints
 // ============================================
