@@ -137,6 +137,137 @@
             color: var(--text-muted);
         }
 
+        /* === EXAMPLE IMAGES === */
+        .examples-section {
+            margin-top: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+            padding: 0 16px;
+        }
+
+        .examples-divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .examples-divider::before,
+        .examples-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .examples-divider span {
+            font-size: 0.72rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            white-space: nowrap;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .example-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .example-card:hover {
+            border-color: var(--accent-dim);
+            background: var(--accent-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .example-card:active {
+            transform: scale(0.97);
+        }
+
+        .example-card.loading {
+            pointer-events: none;
+            opacity: 0.7;
+        }
+
+        .example-card.loading::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(
+                90deg,
+                transparent 0%,
+                rgba(108,159,255,0.06) 50%,
+                transparent 100%
+            );
+            animation: shimmer 1.5s ease-in-out infinite;
+        }
+
+        .example-thumb {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-sm);
+            background: var(--surface-2);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .example-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.3s;
+        }
+
+        .example-thumb .material-symbols-rounded {
+            font-size: 24px;
+            color: var(--text-muted);
+        }
+
+        .example-label {
+            font-size: 0.68rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .example-category {
+            font-size: 0.58rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            padding: 2px 6px;
+            background: var(--surface-2);
+            border-radius: var(--radius-pill);
+        }
+
+        @media (max-width: 360px) {
+            .examples-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
         /* === MAIN CANVAS === */
         #mainCanvas {
             position: relative;
@@ -1435,6 +1566,11 @@
             <span class="paste-text">Tap to paste screenshot</span>
         </div>
         <p class="paste-hint">or press Ctrl+V / Cmd+V</p>
+
+        <div class="examples-section">
+            <div class="examples-divider"><span>or try an example</span></div>
+            <div class="examples-grid" id="examplesGrid"></div>
+        </div>
     </div>
 
     <!-- Main Canvas -->
@@ -2491,6 +2627,87 @@
                 .then(r => { if (r.state === 'granted') readClipboard(); })
                 .catch(() => {});
         }
+
+        // === Example Images ===
+        const EXAMPLE_IMAGES = [
+            {
+                label: 'WhatsApp Chat',
+                category: 'messaging',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Image_in_a_spanish_whatsapp_chat.jpg/150px-Image_in_a_spanish_whatsapp_chat.jpg',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Image_in_a_spanish_whatsapp_chat.jpg/640px-Image_in_a_spanish_whatsapp_chat.jpg',
+            },
+            {
+                label: 'Instagram Post',
+                category: 'social',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Example_Instagram_CC_licence.png/150px-Example_Instagram_CC_licence.png',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/46/Example_Instagram_CC_licence.png/640px-Example_Instagram_CC_licence.png',
+            },
+            {
+                label: 'Emergency Alert',
+                category: 'alert',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Alerta_SAE_Rengo_20240204-0109.png/150px-Alerta_SAE_Rengo_20240204-0109.png',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a8/Alerta_SAE_Rengo_20240204-0109.png/640px-Alerta_SAE_Rengo_20240204-0109.png',
+            },
+            {
+                label: 'Social Media Meme',
+                category: 'social',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Dad_joke.jpg/150px-Dad_joke.jpg',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/Dad_joke.jpg/640px-Dad_joke.jpg',
+            },
+            {
+                label: 'Phone Settings',
+                category: 'android',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Asus_ZC500TG-1A024TW_about-the-mobile-phone_screenshot_20151021.png/150px-Asus_ZC500TG-1A024TW_about-the-mobile-phone_screenshot_20151021.png',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Asus_ZC500TG-1A024TW_about-the-mobile-phone_screenshot_20151021.png/640px-Asus_ZC500TG-1A024TW_about-the-mobile-phone_screenshot_20151021.png',
+            },
+            {
+                label: 'iOS App',
+                category: 'ios',
+                thumbUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Commons_app_for_iOS.PNG/150px-Commons_app_for_iOS.PNG',
+                fullUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Commons_app_for_iOS.PNG/640px-Commons_app_for_iOS.PNG',
+            },
+        ];
+
+        function renderExampleCards() {
+            const grid = document.getElementById('examplesGrid');
+            EXAMPLE_IMAGES.forEach((example, i) => {
+                const card = document.createElement('div');
+                card.className = 'example-card';
+                card.dataset.index = i;
+                card.innerHTML = `
+                    <div class="example-thumb">
+                        <img src="${esc(example.thumbUrl)}" alt="${esc(example.label)}" loading="lazy"
+                             onerror="this.style.display='none';this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>image</span>'">
+                    </div>
+                    <span class="example-label">${esc(example.label)}</span>
+                    <span class="example-category">${esc(example.category)}</span>
+                `;
+                card.addEventListener('click', () => loadExampleImage(i, card));
+                grid.appendChild(card);
+            });
+        }
+
+        async function loadExampleImage(index, cardEl) {
+            const example = EXAMPLE_IMAGES[index];
+            if (!example) return;
+
+            cardEl.classList.add('loading');
+
+            try {
+                const resp = await fetch(example.fullUrl);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const blob = await resp.blob();
+                if (!blob.type.startsWith('image/')) {
+                    throw new Error('Not an image');
+                }
+                handleImage(blob);
+            } catch (err) {
+                cardEl.classList.remove('loading');
+                showError('Could not load example image. Please try another or paste your own screenshot.');
+            }
+        }
+
+        renderExampleCards();
     </script>
 </body>
 </html>
