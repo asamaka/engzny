@@ -493,6 +493,44 @@ app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
   });
 });
 
+// GET /api/debug/redis-test - Diagnostic: test Redis read operations
+app.get('/api/debug/redis-test', requireDebugAuth, async (req, res) => {
+  const results = {};
+  try {
+    const r = await getRedis();
+    if (!r) return res.json({ error: 'Redis not configured' });
+
+    results.ping = { start: Date.now() };
+    await r.ping();
+    results.ping.ms = Date.now() - results.ping.start;
+
+    results.livereportsIndex = { start: Date.now() };
+    const liveIdx = await r.get('livereports:index');
+    results.livereportsIndex.ms = Date.now() - results.livereportsIndex.start;
+    results.livereportsIndex.type = typeof liveIdx;
+    results.livereportsIndex.isArray = Array.isArray(liveIdx);
+    results.livereportsIndex.length = Array.isArray(liveIdx) ? liveIdx.length : (typeof liveIdx === 'string' ? liveIdx.length : null);
+    results.livereportsIndex.preview = JSON.stringify(liveIdx)?.slice(0, 200);
+
+    results.archivesIndex = { start: Date.now() };
+    const archIdx = await r.get('archives:index');
+    results.archivesIndex.ms = Date.now() - results.archivesIndex.start;
+    results.archivesIndex.type = typeof archIdx;
+    results.archivesIndex.isArray = Array.isArray(archIdx);
+    results.archivesIndex.length = Array.isArray(archIdx) ? archIdx.length : (typeof archIdx === 'string' ? archIdx.length : null);
+    results.archivesIndex.preview = JSON.stringify(archIdx)?.slice(0, 200);
+
+    results.loggerCounters = { start: Date.now() };
+    const counters = await r.hgetall('thinx:logs:counters');
+    results.loggerCounters.ms = Date.now() - results.loggerCounters.start;
+    results.loggerCounters.data = counters;
+
+    res.json({ ok: true, results });
+  } catch (err) {
+    res.json({ ok: false, error: err.message, stack: err.stack?.split('\n').slice(0, 5), results });
+  }
+});
+
 // POST /api/debug/client-error - Client error reports (open, no auth)
 app.post('/api/debug/client-error', (req, res) => {
   const errorData = req.body || {};
@@ -2568,38 +2606,58 @@ function requirePin(req, res, next) {
 
 // JSON API for report data (PIN-protected)
 app.get('/api/r/list', requirePin, async (req, res) => {
-  const [live, storage] = await Promise.all([
-    liveReports.listLiveReports(),
-    liveReports.getStorageStatus(),
-  ]);
-  res.json({ reports: live, storage });
+  try {
+    const [live, storage] = await Promise.all([
+      liveReports.listLiveReports(),
+      liveReports.getStorageStatus(),
+    ]);
+    res.json({ reports: live, storage });
+  } catch (err) {
+    logger.error('Reports', 'list failed', { err: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
+    res.status(500).json({ error: 'Failed to load reports', detail: err.message });
+  }
 });
 
 app.get('/api/r/search', requirePin, async (req, res) => {
-  const { q, contentType, layoutType, outcome, from, to, cardType, limit, offset } = req.query;
-  const [result, storage] = await Promise.all([
-    liveReports.searchArchive({
-      q, contentType, layoutType, outcome, from, to, cardType,
-      limit: Math.min(parseInt(limit) || 50, 200),
-      offset: parseInt(offset) || 0,
-    }),
-    liveReports.getStorageStatus(),
-  ]);
-  res.json({ ...result, storage });
+  try {
+    const { q, contentType, layoutType, outcome, from, to, cardType, limit, offset } = req.query;
+    const [result, storage] = await Promise.all([
+      liveReports.searchArchive({
+        q, contentType, layoutType, outcome, from, to, cardType,
+        limit: Math.min(parseInt(limit) || 50, 200),
+        offset: parseInt(offset) || 0,
+      }),
+      liveReports.getStorageStatus(),
+    ]);
+    res.json({ ...result, storage });
+  } catch (err) {
+    logger.error('Reports', 'search failed', { err: err.message, stack: err.stack?.split('\n').slice(0, 3).join(' | ') });
+    res.status(500).json({ error: 'Failed to search reports', detail: err.message });
+  }
 });
 
 app.get('/api/r/:requestId/data', requirePin, async (req, res) => {
-  const report = await liveReports.getReport(req.params.requestId);
-  if (!report) return res.status(404).json({ error: 'Report not found or expired' });
-  const { thumb, ...data } = report;
-  res.json({ report: data, hasThumb: !!thumb });
+  try {
+    const report = await liveReports.getReport(req.params.requestId);
+    if (!report) return res.status(404).json({ error: 'Report not found or expired' });
+    const { thumb, ...data } = report;
+    res.json({ report: data, hasThumb: !!thumb });
+  } catch (err) {
+    logger.error('Reports', 'data fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load report', detail: err.message });
+  }
 });
 
 app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
-  const thumb = await liveReports.getReportThumb(req.params.requestId);
-  if (!thumb) return res.status(404).json({ error: 'No thumbnail' });
-  res.set('Content-Type', 'image/jpeg');
-  res.send(Buffer.from(thumb, 'base64'));
+  try {
+    const thumb = await liveReports.getReportThumb(req.params.requestId);
+    if (!thumb) return res.status(404).json({ error: 'No thumbnail' });
+    res.set('Content-Type', 'image/jpeg');
+    res.send(Buffer.from(thumb, 'base64'));
+  } catch (err) {
+    logger.error('Reports', 'thumb fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load thumbnail', detail: err.message });
+  }
 });
 
 // Public report pages (HTML — PIN gate is client-side JS calling /api/r/auth)
