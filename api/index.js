@@ -1306,9 +1306,24 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         sendEvent('card', cardUpdate);
       },
 
+      onCardUpdate: (cardUpdate) => {
+        logger.pipelineEvent(requestId, 'card_update', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, source: cardUpdate.source });
+        sendEvent('card_update', cardUpdate);
+      },
+
+      onCardAdd: (cardAdd) => {
+        logger.pipelineEvent(requestId, 'card_add', { cardId: cardAdd.cardId, cardType: cardAdd.cardType, source: cardAdd.source });
+        sendEvent('card_add', cardAdd);
+      },
+
+      onPhase: (phase) => {
+        logger.pipelinePhase(requestId, phase.phase, { message: phase.message });
+        sendEvent('phase', phase);
+      },
+
       onComplete: (populatedLayout) => {
         clearInterval(keepAlive);
-        logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, designDuration: populatedLayout._meta?.designDuration });
+        logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
         sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
         pipelineResult = { success: true, populatedLayout };
       },
@@ -1338,7 +1353,8 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
             layoutType: pl.layout?.type,
             cardCount: pl.cards?.length,
             duration: pl._meta?.totalDuration,
-            designDuration: pl._meta?.designDuration,
+            designDuration: pl._meta?.designDuration || pl._meta?.haikuDuration,
+            haikuDuration: pl._meta?.haikuDuration,
             outcome: 'success',
             imageSize: `${imageSize}KB`,
             mediaType: job.mediaType,
@@ -1496,12 +1512,27 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
         sendEvent('card', cardUpdate);
       },
 
+      onCardUpdate: (cardUpdate) => {
+        logger.pipelineEvent(requestId, 'card_update', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, source: cardUpdate.source });
+        sendEvent('card_update', cardUpdate);
+      },
+
+      onCardAdd: (cardAdd) => {
+        logger.pipelineEvent(requestId, 'card_add', { cardId: cardAdd.cardId, cardType: cardAdd.cardType, source: cardAdd.source });
+        sendEvent('card_add', cardAdd);
+      },
+
+      onPhase: (phase) => {
+        logger.pipelinePhase(requestId, phase.phase, { message: phase.message });
+        sendEvent('phase', phase);
+      },
+
       onComplete: (populatedLayout) => {
         clearInterval(keepAlive);
         logger.pipelineComplete(requestId, {
           cardCount: populatedLayout.cards?.length,
           layoutType: populatedLayout.layout?.type,
-          designDuration: populatedLayout._meta?.designDuration,
+          haikuDuration: populatedLayout._meta?.haikuDuration,
         });
         sendEvent('complete', {
           layout: populatedLayout.layout,

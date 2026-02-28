@@ -711,6 +711,57 @@
             box-shadow: var(--shadow-glow);
         }
 
+        .card.card-updating {
+            animation: cardUpdate 0.5s ease-out;
+            border-color: rgba(255,193,7,0.4);
+            box-shadow: 0 0 12px rgba(255,193,7,0.15);
+        }
+
+        @keyframes cardUpdate {
+            0% { transform: scale(1); }
+            30% { transform: scale(0.98); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .card.just-added {
+            animation: cardSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-color: rgba(76,175,80,0.4);
+            box-shadow: 0 0 12px rgba(76,175,80,0.15);
+        }
+
+        @keyframes cardSlideIn {
+            from { transform: translateY(20px) scale(0.95); opacity: 0; }
+            60% { transform: translateY(-4px) scale(1.01); }
+            to { transform: translateY(0) scale(1); opacity: 1; }
+        }
+
+        .card-update-badge, .card-add-badge {
+            font-size: 0.55rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            display: inline-block;
+            animation: badgeFadeIn 0.3s ease-out;
+        }
+
+        .card-update-badge {
+            color: #ffc107;
+            background: rgba(255,193,7,0.15);
+        }
+
+        .card-add-badge {
+            color: #4caf50;
+            background: rgba(76,175,80,0.15);
+        }
+
+        @keyframes badgeFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         .card-inner { padding: 16px; }
 
         .card-type-label {
@@ -2041,7 +2092,7 @@
                         }
                     }, 30000);
 
-                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'complete'];
+                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'card_update', 'card_add', 'phase', 'complete'];
                     events.forEach(evt => {
                         es.addEventListener(evt, (e) => {
                             try {
@@ -2102,18 +2153,26 @@
             switch (event) {
                 case 'connected':
                     statusProgressFill.style.width = '10%';
-                    updateProgress(10, 'ANALYZING', 'Detecting content type...');
+                    updateProgress(10, 'ANALYZING', 'Quick analysis starting...');
                     break;
 
-                case 'progress':
+                case 'progress': {
                     statusProgressFill.style.width = Math.min(data.progress, 95) + '%';
-                    const phaseLabel = data.phase === 'designing' ? 'DESIGNING' : data.phase === 'researching' ? 'RESEARCHING' : 'ANALYZING';
+                    const phaseLabels = {
+                        classifying: 'ANALYZING',
+                        designing: 'DESIGNING',
+                        researching: 'RESEARCHING',
+                        enhancing: 'ENHANCING',
+                        reviewing: 'REVIEWING',
+                    };
+                    const phaseLabel = phaseLabels[data.phase] || 'ANALYZING';
                     updateProgress(Math.min(data.progress, 95), phaseLabel, data.message || 'Processing...');
-                    if (data.phase === 'researching') {
+                    if (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing') {
                         layoutProgressFill.style.width = data.progress + '%';
-                        layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+                        layoutProgressText.textContent = data.phase === 'enhancing' ? 'enhancing' : data.phase === 'reviewing' ? 'reviewing' : `${completedCards}/${totalCards}`;
                     }
                     break;
+                }
 
                 case 'blueprint':
                     onBlueprintReceived(data);
@@ -2129,6 +2188,18 @@
 
                 case 'card':
                     onCardReceived(data);
+                    break;
+
+                case 'card_update':
+                    onCardUpdated(data);
+                    break;
+
+                case 'card_add':
+                    onCardAdded(data);
+                    break;
+
+                case 'phase':
+                    onPhaseChange(data);
                     break;
 
                 case 'complete':
@@ -2224,16 +2295,16 @@
             layoutProgressText.textContent = 'designing';
         }
 
-        const researchStatusMessages = [
-            'Searching the web...',
-            'Pulling latest data...',
-            'Cross-referencing sources...',
+        const enhanceStatusMessages = [
+            'Sonnet analyzing deeper...',
+            'Enriching card content...',
+            'Searching for more context...',
             'Verifying information...',
-            'Gathering details...',
-            'Checking recent updates...',
-            'Compiling results...',
+            'Cross-referencing sources...',
+            'Adding insights...',
+            'Compiling research...',
         ];
-        let researchMsgInterval = null;
+        let enhanceMsgInterval = null;
 
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
@@ -2259,36 +2330,46 @@
 
             cardGrid.innerHTML = '';
             (blueprint.cards || []).forEach((card, index) => {
+                const hasData = card.populatedData && Object.keys(card.populatedData).length > 0;
                 const el = createCardElement(card);
+
+                if (hasData) {
+                    el.classList.remove('loading');
+                    el.classList.add('populated');
+                    el.innerHTML = renderCardContent(card.cardType, card.populatedData);
+                }
+
                 cardGrid.appendChild(el);
                 setTimeout(() => {
                     el.classList.add('visible');
-                    setTimeout(() => el.classList.add('researching'), 200);
+                    if (!hasData) {
+                        setTimeout(() => el.classList.add('researching'), 200);
+                    }
                 }, 50 + index * 40);
             });
 
             progressOverlay.classList.remove('active');
-            layoutProgressFill.style.width = '30%';
-            layoutProgressText.textContent = `0/${totalCards}`;
+            layoutProgressFill.style.width = '25%';
+            layoutProgressText.textContent = 'enhancing';
 
-            startResearchStatusRotation();
+            startEnhanceStatusRotation();
         }
 
-        function startResearchStatusRotation() {
-            if (researchMsgInterval) clearInterval(researchMsgInterval);
+        function startEnhanceStatusRotation() {
+            if (enhanceMsgInterval) clearInterval(enhanceMsgInterval);
             let msgIdx = 0;
-            researchMsgInterval = setInterval(() => {
+            enhanceMsgInterval = setInterval(() => {
                 const loadingCards = document.querySelectorAll('.card.loading.researching');
-                if (loadingCards.length === 0) {
-                    clearInterval(researchMsgInterval);
-                    researchMsgInterval = null;
+                if (loadingCards.length === 0 && pipelineComplete) {
+                    clearInterval(enhanceMsgInterval);
+                    enhanceMsgInterval = null;
                     return;
                 }
-                msgIdx = (msgIdx + 1) % researchStatusMessages.length;
+                msgIdx = (msgIdx + 1) % enhanceStatusMessages.length;
                 loadingCards.forEach(card => {
                     const statusEl = card.querySelector('.skeleton-status');
                     if (statusEl) {
-                        statusEl.textContent = researchStatusMessages[msgIdx];
+                        statusEl.textContent = enhanceStatusMessages[msgIdx];
                     }
                 });
             }, 3000);
@@ -2304,7 +2385,96 @@
             el.classList.add('populated', 'just-populated');
             el.innerHTML = renderCardContent(data.cardType, data.data);
 
-            const citations = data.data?._researchMeta?.citations || data.data?._webCitations || [];
+            appendCitations(el, data.data);
+
+            setTimeout(() => {
+                el.classList.remove('just-populated');
+            }, 1500);
+
+            const pct = 30 + Math.round((completedCards / totalCards) * 65);
+            statusProgressFill.style.width = pct + '%';
+            statusText.textContent = `card ${completedCards}/${totalCards} complete`;
+            layoutProgressFill.style.width = pct + '%';
+            layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+        }
+
+        function onCardUpdated(data) {
+            const el = document.getElementById(`card-${data.cardId}`);
+            if (!el) return;
+
+            const existingData = el._cardData || {};
+            const mergedData = { ...existingData, ...data.data };
+            el._cardData = mergedData;
+
+            el.classList.remove('loading', 'researching');
+            el.classList.add('populated');
+            el.innerHTML = renderCardContent(data.cardType, mergedData);
+
+            el.classList.add('card-updating');
+            setTimeout(() => el.classList.remove('card-updating'), 800);
+
+            appendCitations(el, mergedData);
+
+            const source = data.source === 'review' ? 'research' : 'sonnet';
+            const badge = el.querySelector('.card-inner');
+            if (badge) {
+                const updateBadge = document.createElement('div');
+                updateBadge.className = 'card-update-badge';
+                updateBadge.textContent = source === 'research' ? 'Updated with research' : 'Enhanced';
+                badge.appendChild(updateBadge);
+                setTimeout(() => updateBadge.remove(), 3000);
+            }
+        }
+
+        function onCardAdded(data) {
+            totalCards++;
+            const cardId = data.cardId;
+            const card = {
+                id: cardId,
+                cardType: data.cardType,
+                gridPosition: data.gridPosition || { row: totalCards, column: 1, columnSpan: 1, rowSpan: 1 },
+                placeholderData: data.data,
+            };
+
+            const el = createCardElement(card);
+            el.classList.remove('loading');
+            el.classList.add('populated');
+            el.innerHTML = renderCardContent(data.cardType, data.data);
+            el._cardData = data.data;
+
+            cardGrid.appendChild(el);
+            setTimeout(() => {
+                el.classList.add('visible', 'just-added');
+                setTimeout(() => el.classList.remove('just-added'), 1500);
+            }, 50);
+
+            appendCitations(el, data.data);
+
+            const source = data.source === 'review' ? 'research' : 'sonnet';
+            const inner = el.querySelector('.card-inner');
+            if (inner) {
+                const addBadge = document.createElement('div');
+                addBadge.className = 'card-add-badge';
+                addBadge.textContent = source === 'research' ? 'From research' : 'New insight';
+                inner.appendChild(addBadge);
+                setTimeout(() => addBadge.remove(), 4000);
+            }
+        }
+
+        function onPhaseChange(data) {
+            const phaseMessages = {
+                haiku: 'Quick analysis...',
+                enhancing: 'Enhancing with Sonnet...',
+                reviewing: 'Incorporating research...',
+            };
+            const msg = phaseMessages[data.phase] || data.message || '';
+            if (msg) {
+                statusText.textContent = msg;
+            }
+        }
+
+        function appendCitations(el, data) {
+            const citations = data?._researchMeta?.citations || data?._webCitations || [];
             if (citations.length > 0) {
                 const inner = el.querySelector('.card-inner');
                 if (inner) {
@@ -2320,16 +2490,6 @@
                     inner.insertAdjacentHTML('beforeend', citHtml);
                 }
             }
-
-            setTimeout(() => {
-                el.classList.remove('just-populated');
-            }, 1500);
-
-            const pct = 30 + Math.round((completedCards / totalCards) * 65);
-            statusProgressFill.style.width = pct + '%';
-            statusText.textContent = `card ${completedCards}/${totalCards} complete`;
-            layoutProgressFill.style.width = pct + '%';
-            layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
 
         function onPipelineComplete() {
@@ -2342,9 +2502,9 @@
                 clearTimeout(stallTimer);
                 stallTimer = null;
             }
-            if (researchMsgInterval) {
-                clearInterval(researchMsgInterval);
-                researchMsgInterval = null;
+            if (enhanceMsgInterval) {
+                clearInterval(enhanceMsgInterval);
+                enhanceMsgInterval = null;
             }
 
             screenshotLayer.className = 'screenshot-layer gone';
@@ -2713,6 +2873,7 @@
             if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
             if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
             if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+            if (enhanceMsgInterval) { clearInterval(enhanceMsgInterval); enhanceMsgInterval = null; }
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             pasteState.classList.remove('hidden');

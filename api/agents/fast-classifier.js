@@ -1,25 +1,26 @@
 /**
- * Fast Classifier Agent
+ * Fast Classifier + Card Populator Agent
  *
- * Uses a cheap, fast model (Haiku) to quickly:
+ * Uses Haiku to quickly:
  * 1. Identify content type from screenshot
- * 2. Pick the right layout (dashboard, editorial, etc.)
- * 3. Generate a contextual card blueprint with filler data
+ * 2. Pick the right layout
+ * 3. Fully POPULATE cards with real data from the screenshot
  *
- * This runs in 2-4s vs 10-20s for the full layout designer,
- * giving users an instant contextual skeleton while the real
- * designer + researchers work in the background.
+ * This is the primary card source — users see real content in ~3-5s.
+ * Sonnet later enhances/adds cards, but Haiku's output is the baseline.
  */
 
 const { getVisionAdapter } = require('../llm');
 const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
-const FAST_CLASSIFIER_PROMPT = `You are a fast image classifier. Look at this screenshot and QUICKLY determine:
+const FAST_POPULATE_PROMPT = `You are a fast screenshot analyzer. Look at this screenshot and produce FULLY POPULATED cards with real data.
 
-1. What TYPE of content this is
-2. The best LAYOUT for displaying analysis cards
-3. Which CARDS to show (with approximate placeholder data from what you can see)
+**Your job:**
+1. IDENTIFY the content type and platform
+2. PICK the best layout
+3. CREATE 3-6 cards with REAL DATA extracted from the screenshot
+4. POPULATE every card field with actual content you can see — not placeholders
 
 **Available Layouts:**
 ${getLayoutTypesSummaryForPrompt()}
@@ -27,45 +28,46 @@ ${getLayoutTypesSummaryForPrompt()}
 **Available Card Types:**
 ${getCardTypeSummaryForPrompt()}
 
-**Rules:**
-- Be FAST - extract what's immediately visible, don't over-analyze
-- Choose 3-6 cards that match the content
-- First card MUST be hero_summary
-- Fill placeholderData with best-guess content from what you can directly SEE
-- For product content: include product_card, key_metric for price/specs
-- For news/articles: include fact_check, quote_card, timeline_card
-- For social media: include person_card, quote_card
-- For data/dashboards: include key_metric cards, comparison_card
-- Include any visible URLs, links, or prices in placeholder data
-- Set gridPosition with proper columnSpan for the layout
+**Critical Rules:**
+- Extract REAL text, numbers, names, dates from the screenshot
+- The first card MUST be hero_summary with a real title and subtitle
+- Fill ALL required fields with actual content
+- For info_list: include real items with real labels and values
+- For key_metric: include the actual number/value you see
+- For person_card: include the actual name and role
+- For product_card: features and warnings arrays must be PLAIN STRINGS
+- Include any visible URLs, prices, handles, or links
+- Don't say "Analyzing..." or "Loading..." — use real content
+- Be concise but accurate — this is what users see first
+- Set researchBrief for each card to guide deeper research later
 
 Return ONLY valid JSON:
 {
   "contentAnalysis": {
-    "contentType": "string",
-    "platform": "string or null",
-    "intent": "string (what user wants to know)",
-    "topQuestions": ["3-5 questions"]
+    "contentType": "string (news/product/social/data/general/etc.)",
+    "platform": "string or null (Twitter, Amazon, Reddit, etc.)",
+    "intent": "string (what the user likely wants to understand)",
+    "topQuestions": ["3-5 questions users would ask about this"]
   },
   "layout": {
-    "type": "string (layout type)",
+    "type": "string (one of the layout types)",
     "columns": number (1-3),
-    "reason": "string"
+    "reason": "string (why this layout)"
   },
   "cards": [
     {
       "id": "card-1",
       "cardType": "hero_summary",
       "gridPosition": { "row": 1, "column": 1, "columnSpan": 2, "rowSpan": 1 },
-      "researchBrief": "string (what to research deeper)",
-      "placeholderData": { ... visible content as placeholder }
+      "researchBrief": "string (what to research deeper for enhancement)",
+      "populatedData": { ... REAL card data with all required fields filled }
     }
   ]
 }`;
 
 /**
- * Fast-classify a screenshot using Haiku
- * @returns {Promise<Object>} Quick layout blueprint
+ * Fast-classify AND populate cards using Haiku.
+ * Returns fully populated cards ready for immediate display.
  */
 async function fastClassify({ imageData, mediaType, question, adapterConfig = {} }) {
   const startTime = Date.now();
@@ -73,18 +75,18 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
   const config = {
     ...adapterConfig,
     model: 'claude-haiku-4-5-20251001',
-    maxTokens: 2048,
+    maxTokens: 4096,
   };
 
   const adapter = getVisionAdapter(config);
   const traceCollector = adapterConfig.traceCollector;
 
-  let prompt = FAST_CLASSIFIER_PROMPT;
+  let prompt = FAST_POPULATE_PROMPT;
   if (question) {
-    prompt += `\n\n**User's question:** "${question}"\nInclude a card that addresses this.`;
+    prompt += `\n\n**User's question:** "${question}"\nMake sure at least one card directly addresses this question with real data.`;
   }
 
-  logger.info('FastClassifier', 'Starting quick classification', { model: config.model });
+  logger.info('FastClassifier', 'Starting quick classification + population', { model: config.model });
 
   try {
     const result = await adapter.analyzeImage({
@@ -94,7 +96,7 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
     });
 
     const duration = Date.now() - startTime;
-    logger.info('FastClassifier', 'Classification complete', {
+    logger.info('FastClassifier', 'Classification + population complete', {
       dur: duration,
       model: result.model,
       usage: result.usage,
@@ -198,8 +200,9 @@ function normalizeQuickBlueprint(raw) {
         rowSpan: card.gridPosition?.rowSpan || 1,
       },
       researchBrief: card.researchBrief || 'Extract relevant information',
-      placeholderData: card.placeholderData || {},
-      status: 'placeholder',
+      populatedData: card.populatedData || card.placeholderData || {},
+      placeholderData: card.populatedData || card.placeholderData || {},
+      status: card.populatedData ? 'populated' : 'placeholder',
     }));
   }
 
@@ -209,6 +212,7 @@ function normalizeQuickBlueprint(raw) {
       cardType: 'hero_summary',
       gridPosition: { row: 0, column: 1, columnSpan: blueprint.layout.columns, rowSpan: 1 },
       researchBrief: 'Summarize the screenshot content',
+      populatedData: { title: 'Analyzing...', subtitle: 'Detecting content type...' },
       placeholderData: { title: 'Analyzing...', subtitle: 'Detecting content type...' },
       status: 'placeholder',
     });

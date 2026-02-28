@@ -1,24 +1,30 @@
 /**
- * Orchestrator v2
+ * Orchestrator v2 — Progressive Enhancement Pipeline
  *
- * Pipeline with instant feedback + fast classification:
+ * Three-phase architecture optimized for speed-to-first-card:
  *
- * 1. Immediate: Send generic skeleton (user sees cards in <1ms)
- * 2. Fast Classifier (Haiku, 2-4s): Contextual skeleton with correct layout + card types
- * 3. Layout Designer LLM (Sonnet, 10-20s): Full blueprint with research briefs
- * 4. Parallel Card Researchers → each card populates as it completes
- * 5. All complete → final event
+ * Phase 1 — Haiku Quick Cards (~3-5s):
+ *   Haiku analyzes screenshot, picks layout, and POPULATES cards with real data.
+ *   User sees actual content within seconds, not placeholders.
+ *
+ * Phase 2 — Parallel Enhancement + Research:
+ *   2a. Sonnet Enhancement: Reviews Haiku's cards via tool_use,
+ *       updates/adds/modifies cards progressively.
+ *   2b. Sonar Deep Research: Web-grounded research running in parallel.
+ *
+ * Phase 3 — Sonnet Review (after Sonar responds):
+ *   Sonnet reviews all displayed info + Sonar research findings,
+ *   makes final corrections and additions.
  */
 
-const { designLayout } = require('./layout-designer');
 const { fastClassify } = require('./fast-classifier');
-const { researchCardsInParallel } = require('./card-researcher');
+const { enhance } = require('./sonnet-enhancer');
+const { deepResearch } = require('./deep-researcher');
 const { logger } = require('../lib/logger');
 const { TraceCollector } = require('../lib/llm-trace');
 
 /**
  * Create a generic skeleton blueprint for instant display.
- * Shows hero + 2 shimmer cards while the fast classifier runs.
  */
 function createSkeletonBlueprint() {
   return {
@@ -59,7 +65,19 @@ function createSkeletonBlueprint() {
 }
 
 /**
- * Run the full v2 pipeline with SSE callbacks
+ * Run the progressive enhancement pipeline with SSE callbacks.
+ *
+ * Callback contract (all optional):
+ *   onBlueprint(blueprint)       — Instant skeleton for immediate display
+ *   onLayoutUpdate(blueprint)    — Layout with populated cards (from Haiku)
+ *   onLayoutPreview(blueprint)   — Kept for backward compat (same as onLayoutUpdate in new flow)
+ *   onCardPopulated(cardUpdate)  — A card has been populated with real data
+ *   onCardUpdate(cardUpdate)     — Sonnet updated an existing card
+ *   onCardAdd(cardAdd)           — Sonnet added a new card
+ *   onPhase(phase)               — Phase transition notification
+ *   onComplete(result)           — Pipeline finished
+ *   onError(error)               — Pipeline error
+ *   onProgress(progress)         — Progress updates
  */
 async function runPipeline({
   imageData,
@@ -69,6 +87,9 @@ async function runPipeline({
   onLayoutUpdate,
   onLayoutPreview,
   onCardPopulated,
+  onCardUpdate,
+  onCardAdd,
+  onPhase,
   onComplete,
   onError,
   onProgress,
@@ -78,6 +99,8 @@ async function runPipeline({
   const traceCollector = new TraceCollector(
     adapterConfig.requestId || 'unknown'
   );
+
+  const currentCards = new Map();
 
   try {
     // =====================================================
@@ -92,192 +115,338 @@ async function runPipeline({
       onProgress({
         phase: 'classifying',
         progress: 5,
-        message: 'Detecting content type...',
+        message: 'Analyzing screenshot...',
       });
     }
 
     // =====================================================
-    // Phase 0.5: Fast Classification (Haiku, 2-4s)
-    // Runs in parallel with the start of Phase 1
+    // Phase 1: Haiku Quick Cards (~3-5s)
+    // Haiku analyzes, picks layout, and POPULATES cards
     // =====================================================
-    const fastClassifyPromise = fastClassify({
+    if (onPhase) {
+      onPhase({ phase: 'haiku', message: 'Quick analysis with Haiku...' });
+    }
+
+    logger.info('Orchestrator', 'Phase 1: Haiku Quick Cards', {
+      model: 'claude-haiku-4-5-20251001',
+    });
+
+    const haikuBlueprint = await fastClassify({
       imageData,
       mediaType,
       question,
       adapterConfig: { ...adapterConfig, traceCollector },
-    }).catch((err) => {
-      logger.warn('Orchestrator', 'Fast classify failed', { err: err.message });
-      return null;
     });
 
-    // =====================================================
-    // Phase 1: Layout Design (Sonnet vision, 10-20s)
-    // Start immediately - don't wait for fast classifier
-    // =====================================================
-    const designAdapterConfig = {
-      ...adapterConfig,
-      model: adapterConfig.designModel || 'claude-sonnet-4-20250514',
-    };
+    const haikuDuration = Date.now() - startTime;
 
-    logger.info('Orchestrator', 'Phase 1: Layout Design + Fast Classify (parallel)', {
-      designModel: designAdapterConfig.model,
-      classifyModel: 'claude-haiku-4-5-20251001',
-    });
+    if (!haikuBlueprint) {
+      logger.warn('Orchestrator', 'Haiku failed, using fallback skeleton');
+      if (onProgress) {
+        onProgress({ phase: 'enhancing', progress: 15, message: 'Enhancing analysis...' });
+      }
+    } else {
+      logger.info('Orchestrator', 'Haiku cards ready', {
+        dur: haikuDuration,
+        contentType: haikuBlueprint.contentAnalysis?.contentType,
+        layoutType: haikuBlueprint.layout?.type,
+        cardCount: haikuBlueprint.cards?.length,
+      });
 
-    const designMessages = [
-      'Detecting content type...',
-      'Reading text and visual elements...',
-      'Identifying key information...',
-      'Analyzing visual layout...',
-      'Mapping content structure...',
-      'Selecting best card types...',
-      'Designing card layout...',
-      'Preparing research briefs...',
+      if (onLayoutUpdate) {
+        onLayoutUpdate(haikuBlueprint);
+      }
+
+      for (const card of haikuBlueprint.cards) {
+        currentCards.set(card.id, card);
+        const data = card.populatedData || card.placeholderData;
+        if (data && Object.keys(data).length > 0 && onCardPopulated) {
+          onCardPopulated({
+            cardId: card.id,
+            cardType: card.cardType,
+            data,
+            completedCount: currentCards.size,
+            totalCount: haikuBlueprint.cards.length,
+          });
+        }
+      }
+
+      if (onProgress) {
+        onProgress({
+          phase: 'enhancing',
+          progress: 25,
+          message: `${haikuBlueprint.cards.length} cards ready — enhancing...`,
+        });
+      }
+    }
+
+    const blueprint = haikuBlueprint || skeleton;
+
+    // =====================================================
+    // Phase 2: Parallel Enhancement + Deep Research
+    // =====================================================
+    if (onPhase) {
+      onPhase({ phase: 'enhancing', message: 'Sonnet enhancing + deep research...' });
+    }
+
+    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement + Research');
+
+    const enhanceProgressMessages = [
+      'Sonnet reviewing analysis...',
+      'Enhancing card content...',
+      'Adding deeper insights...',
+      'Verifying information...',
     ];
-    let designProgress = 5;
-    let designMsgIdx = 0;
-    const designHeartbeat = setInterval(() => {
-      designProgress = Math.min(designProgress + 2.5, 28);
-      designMsgIdx = Math.min(designMsgIdx + 1, designMessages.length - 1);
+    let enhanceMsgIdx = 0;
+    const enhanceHeartbeat = setInterval(() => {
+      enhanceMsgIdx = Math.min(enhanceMsgIdx + 1, enhanceProgressMessages.length - 1);
       if (onProgress) {
         onProgress({
-          phase: 'designing',
-          progress: designProgress,
-          message: designMessages[designMsgIdx],
+          phase: 'enhancing',
+          progress: 25 + enhanceMsgIdx * 8,
+          message: enhanceProgressMessages[enhanceMsgIdx],
         });
       }
-    }, 2500);
+    }, 3000);
 
-    // Wait for fast classifier first (should be much faster than layout designer)
-    const quickBlueprint = await fastClassifyPromise;
-    const classifyDuration = Date.now() - startTime;
-
-    if (quickBlueprint && onLayoutPreview) {
-      logger.info('Orchestrator', 'Fast classification ready', {
-        dur: classifyDuration,
-        contentType: quickBlueprint.contentAnalysis?.contentType,
-        layoutType: quickBlueprint.layout?.type,
-        cardCount: quickBlueprint.cards?.length,
-      });
-      onLayoutPreview(quickBlueprint);
-
-      if (onProgress) {
-        onProgress({
-          phase: 'designing',
-          progress: 15,
-          message: `${quickBlueprint.contentAnalysis?.contentType || 'Content'} detected — designing detailed layout...`,
-        });
-      }
-    }
-
-    // Now wait for the full layout designer
-    let blueprint;
-    const designPromise = designLayout({
+    const sonnetEnhancePromise = enhance({
       imageData,
       mediaType,
-      question,
-      adapterConfig: { ...designAdapterConfig, traceCollector },
-    });
-
-    try {
-      blueprint = await designPromise;
-    } finally {
-      clearInterval(designHeartbeat);
-    }
-
-    const designDuration = Date.now() - startTime;
-    logger.info('Orchestrator', 'Blueprint ready', {
-      dur: designDuration,
-      layoutType: blueprint.layout.type,
-      cardCount: blueprint.cards.length,
-    });
-
-    if (onLayoutUpdate) {
-      onLayoutUpdate(blueprint);
-    }
-
-    if (onProgress) {
-      onProgress({
-        phase: 'researching',
-        progress: 30,
-        message: `Researching ${blueprint.cards.length} cards...`,
-      });
-    }
-
-    // =====================================================
-    // Phase 2: Parallel Card Research (Sonnet, 5-10s)
-    // =====================================================
-    const cardsToResearch = blueprint.cards.filter((c, i) => {
-      if (i === 0 && c.cardType === 'hero_summary' && c.placeholderData?.title && c.placeholderData?.subtitle) {
-        if (onCardPopulated) {
-          onCardPopulated({
-            cardId: c.id,
-            cardType: c.cardType,
-            data: c.placeholderData,
-            completedCount: 1,
-            totalCount: blueprint.cards.length,
-          });
-        }
-        return false;
-      }
-      return true;
-    });
-
-    logger.info('Orchestrator', 'Phase 2: Parallel Card Research', { cardCount: cardsToResearch.length });
-    const researchAdapterConfig = {
-      ...adapterConfig,
-      model: adapterConfig.researchModel || 'claude-sonnet-4-20250514',
-      traceCollector,
-    };
-
-    let completedCount = blueprint.cards.length - cardsToResearch.length;
-
-    const researchResults = await researchCardsInParallel({
-      cards: cardsToResearch,
+      currentCards: blueprint.cards,
       contentAnalysis: blueprint.contentAnalysis,
-      imageData,
-      mediaType,
-      adapterConfig: researchAdapterConfig,
-      onCardComplete: (result) => {
-        completedCount++;
+      layout: blueprint.layout,
+      onCardUpdate: (action) => {
+        logger.info('Orchestrator', 'Sonnet updated card', {
+          cardId: action.cardId,
+          reason: action.reason,
+        });
 
-        if (onCardPopulated) {
-          onCardPopulated({
-            ...result,
-            completedCount,
-            totalCount: blueprint.cards.length,
-          });
+        const existing = currentCards.get(action.cardId);
+        if (existing) {
+          const mergedData = {
+            ...(existing.populatedData || existing.data || existing.placeholderData || {}),
+            ...action.data,
+          };
+          existing.populatedData = mergedData;
+          existing.data = mergedData;
+          currentCards.set(action.cardId, existing);
         }
 
-        if (onProgress) {
-          const pct = 30 + Math.round((completedCount / blueprint.cards.length) * 65);
-          onProgress({
-            phase: 'researching',
-            progress: pct,
-            message: `Card ${completedCount}/${blueprint.cards.length} complete`,
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId: action.cardId,
+            cardType: action.cardType,
+            data: action.data,
+            reason: action.reason,
+            source: 'sonnet',
           });
         }
       },
+      onCardAdd: (action) => {
+        logger.info('Orchestrator', 'Sonnet added card', {
+          cardId: action.cardId,
+          cardType: action.cardType,
+          reason: action.reason,
+        });
+
+        const newCard = {
+          id: action.cardId,
+          cardType: action.cardType,
+          gridPosition: action.gridPosition,
+          populatedData: action.data,
+          data: action.data,
+          status: 'populated',
+        };
+        currentCards.set(action.cardId, newCard);
+
+        if (onCardAdd) {
+          onCardAdd({
+            cardId: action.cardId,
+            cardType: action.cardType,
+            data: action.data,
+            gridPosition: action.gridPosition,
+            reason: action.reason,
+            source: 'sonnet',
+          });
+        }
+      },
+      onLayoutUpdate: (action) => {
+        logger.info('Orchestrator', 'Sonnet changed layout', {
+          type: action.layoutType,
+          reason: action.reason,
+        });
+        if (onProgress) {
+          onProgress({
+            phase: 'enhancing',
+            progress: 50,
+            message: `Layout changed to ${action.layoutType}`,
+          });
+        }
+      },
+      adapterConfig: {
+        ...adapterConfig,
+        model: adapterConfig.enhanceModel || 'claude-sonnet-4-20250514',
+        traceCollector,
+      },
+    }).catch(err => {
+      logger.warn('Orchestrator', 'Sonnet enhancement failed (non-fatal)', { err: err.message });
+      return { actions: [], duration: Date.now() - startTime };
+    });
+
+    const deepResearchPromise = deepResearch({
+      contentAnalysis: blueprint.contentAnalysis,
+      cards: blueprint.cards,
+      imageData,
+      mediaType,
+      adapterConfig: { ...adapterConfig, traceCollector },
+    }).catch(err => {
+      logger.warn('Orchestrator', 'Deep research failed (non-fatal)', { err: err.message });
+      return { findings: [], duration: Date.now() - startTime };
+    });
+
+    const [enhanceResult, researchResult] = await Promise.all([
+      sonnetEnhancePromise,
+      deepResearchPromise,
+    ]);
+
+    clearInterval(enhanceHeartbeat);
+
+    const phase2Duration = Date.now() - startTime;
+    logger.info('Orchestrator', 'Phase 2 complete', {
+      dur: phase2Duration,
+      enhanceActions: enhanceResult.actions?.length || 0,
+      researchFindings: researchResult.findings?.length || 0,
     });
 
     // =====================================================
-    // Phase 3: Assemble final layout
+    // Phase 3: Sonnet Review (with research data)
+    // Only runs if we got meaningful research findings
+    // =====================================================
+    const hasResearchFindings = researchResult.findings && researchResult.findings.length > 0;
+
+    if (hasResearchFindings) {
+      if (onPhase) {
+        onPhase({ phase: 'reviewing', message: 'Reviewing with research findings...' });
+      }
+
+      if (onProgress) {
+        onProgress({
+          phase: 'reviewing',
+          progress: 70,
+          message: 'Incorporating research findings...',
+        });
+      }
+
+      logger.info('Orchestrator', 'Phase 3: Sonnet Review with research', {
+        findings: researchResult.findings.length,
+      });
+
+      const reviewResult = await enhance({
+        imageData,
+        mediaType,
+        currentCards: Array.from(currentCards.values()),
+        contentAnalysis: blueprint.contentAnalysis,
+        layout: blueprint.layout,
+        researchData: researchResult,
+        onCardUpdate: (action) => {
+          logger.info('Orchestrator', 'Review updated card', {
+            cardId: action.cardId,
+            reason: action.reason,
+          });
+
+          const existing = currentCards.get(action.cardId);
+          if (existing) {
+            const mergedData = {
+              ...(existing.populatedData || existing.data || existing.placeholderData || {}),
+              ...action.data,
+            };
+            existing.populatedData = mergedData;
+            existing.data = mergedData;
+            currentCards.set(action.cardId, existing);
+          }
+
+          if (onCardUpdate) {
+            onCardUpdate({
+              cardId: action.cardId,
+              cardType: action.cardType,
+              data: action.data,
+              reason: action.reason,
+              source: 'review',
+            });
+          }
+        },
+        onCardAdd: (action) => {
+          logger.info('Orchestrator', 'Review added card', {
+            cardId: action.cardId,
+            cardType: action.cardType,
+          });
+
+          const newCard = {
+            id: action.cardId,
+            cardType: action.cardType,
+            gridPosition: action.gridPosition,
+            populatedData: action.data,
+            data: action.data,
+            status: 'populated',
+          };
+          currentCards.set(action.cardId, newCard);
+
+          if (onCardAdd) {
+            onCardAdd({
+              cardId: action.cardId,
+              cardType: action.cardType,
+              data: action.data,
+              gridPosition: action.gridPosition,
+              reason: action.reason,
+              source: 'review',
+            });
+          }
+        },
+        onLayoutUpdate: (action) => {
+          logger.info('Orchestrator', 'Review changed layout', {
+            type: action.layoutType,
+          });
+        },
+        adapterConfig: {
+          ...adapterConfig,
+          model: adapterConfig.reviewModel || 'claude-sonnet-4-20250514',
+          traceCollector,
+        },
+      }).catch(err => {
+        logger.warn('Orchestrator', 'Sonnet review failed (non-fatal)', { err: err.message });
+        return { actions: [], duration: 0 };
+      });
+
+      logger.info('Orchestrator', 'Phase 3 complete', {
+        reviewActions: reviewResult.actions?.length || 0,
+      });
+    } else {
+      logger.info('Orchestrator', 'Skipping Phase 3 (no research findings)');
+    }
+
+    // =====================================================
+    // Final: Assemble result
     // =====================================================
     const totalDuration = Date.now() - startTime;
     logger.info('Orchestrator', 'Pipeline complete', { dur: totalDuration });
 
+    const finalCards = Array.from(currentCards.values()).map(card => ({
+      ...card,
+      status: 'populated',
+      data: card.populatedData || card.data || card.placeholderData,
+    }));
+
     const populatedLayout = {
       ...blueprint,
-      cards: blueprint.cards.map((card) => ({
-        ...card,
-        status: 'populated',
-        data: researchResults.get(card.id) || card.placeholderData,
-      })),
+      cards: finalCards,
       _meta: {
         totalDuration,
-        designDuration,
-        classifyDuration,
-        cardsResearched: cardsToResearch.length,
+        haikuDuration,
+        enhanceDuration: enhanceResult.duration || 0,
+        researchDuration: researchResult.duration || 0,
+        enhanceActions: enhanceResult.actions?.length || 0,
+        researchFindings: researchResult.findings?.length || 0,
+        cardsResearched: finalCards.length,
       },
       _llmTraces: traceCollector.getTraces(),
       _llmTraceSummary: traceCollector.getSummary(),
@@ -293,7 +462,10 @@ async function runPipeline({
 
     return populatedLayout;
   } catch (error) {
-    logger.error('Orchestrator', 'Pipeline error', { err: error.message, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
+    logger.error('Orchestrator', 'Pipeline error', {
+      err: error.message,
+      stack: error.stack?.split('\n').slice(0, 3).join(' | '),
+    });
     if (onError) {
       onError(error);
     } else {
