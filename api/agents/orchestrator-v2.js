@@ -442,6 +442,7 @@ async function runPipeline({
       _meta: {
         totalDuration,
         haikuDuration,
+        designDuration: haikuDuration,
         enhanceDuration: enhanceResult.duration || 0,
         researchDuration: researchResult.duration || 0,
         enhanceActions: enhanceResult.actions?.length || 0,

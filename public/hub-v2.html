@@ -2337,6 +2337,7 @@
                     el.classList.remove('loading');
                     el.classList.add('populated');
                     el.innerHTML = renderCardContent(card.cardType, card.populatedData);
+                    el._cardData = card.populatedData;
                 }
 
                 cardGrid.appendChild(el);
@@ -2384,6 +2385,7 @@
             el.classList.remove('loading', 'researching');
             el.classList.add('populated', 'just-populated');
             el.innerHTML = renderCardContent(data.cardType, data.data);
+            el._cardData = data.data;
 
             appendCitations(el, data.data);
 
