@@ -1,59 +1,58 @@
 /**
- * Card Type Contracts
+ * Card Type Contracts v2 — Visual-First Design
  *
- * Defines the predefined contract between the orchestration LLM (layout designer)
- * and the individual research LLMs. Both sides agree on the card types, their
- * data shapes, and how they render.
+ * Each card type defines:
+ *   - required fields: minimum for a meaningful quick render (Haiku fills these)
+ *   - optional fields: enrichment data (Sonnet/research fills these progressively)
+ *   - visual hints: emoji, colors, sizing for the frontend
  *
- * The layout designer chooses which card types to use and creates placeholders.
- * Research LLMs populate the cards by returning data matching the contract.
+ * Design principle: required fields should be fillable from screenshot text alone
+ * in under 3 seconds. Optional fields require deeper analysis or web research.
  */
 
-// All available card types with their schemas and rendering hints
 const CARD_TYPES = {
-  // === Content Cards ===
   hero_summary: {
-    description: 'Large summary card at the top - headline, subtitle, and key takeaway',
+    description: 'Large headline card — icon, title, one-line subtitle, optional takeaway',
     schema: {
-      title: { type: 'string', required: true, description: 'Main headline (3-8 words)' },
-      subtitle: { type: 'string', required: true, description: 'One-line context' },
-      badge: { type: 'string', description: 'Category badge (e.g. "Breaking News", "Product", "Social")' },
+      title: { type: 'string', required: true, description: 'Headline (3-8 words)' },
+      subtitle: { type: 'string', required: true, description: 'One-line context sentence' },
+      emoji: { type: 'string', required: true, description: 'Single emoji representing content (e.g. "📰", "🛒", "⚠️")' },
+      badge: { type: 'string', description: 'Category label (e.g. "Breaking News", "Product")' },
       badgeColor: { type: 'string', description: 'Badge accent color hex' },
-      icon: { type: 'string', description: 'Unicode emoji or symbol' },
-      takeaway: { type: 'string', description: 'Key takeaway in 1-2 sentences' },
-      imageUrl: { type: 'string', description: 'URL to a relevant image if visible in screenshot' },
-      url: { type: 'string', description: 'Primary URL/link if visible in screenshot' },
+      takeaway: { type: 'string', description: 'Key takeaway 1-2 sentences max' },
+      imageUrl: { type: 'string', description: 'Image URL if visible in screenshot' },
+      url: { type: 'string', description: 'Primary source URL if visible' },
     },
     sizing: { minWidth: 2, minHeight: 1, defaultSpan: 'full' },
   },
 
   key_metric: {
-    description: 'Single prominent number/stat with label and context',
+    description: 'Single big number/stat — visual focus on the value',
     schema: {
-      label: { type: 'string', required: true, description: 'What this metric measures' },
-      value: { type: 'string', required: true, description: 'The metric value (number, price, rating, etc.)' },
-      unit: { type: 'string', description: 'Unit if applicable ($, %, stars, etc.)' },
-      trend: { type: 'string', enum: ['up', 'down', 'stable', 'none'], description: 'Direction indicator' },
-      context: { type: 'string', description: 'Brief context (e.g. "vs $299 last month")' },
-      color: { type: 'string', description: 'Accent color for the value' },
-      url: { type: 'string', description: 'Link to source if visible' },
+      value: { type: 'string', required: true, description: 'The number or stat (e.g. "$299", "4.8★", "92%")' },
+      label: { type: 'string', required: true, description: 'What this measures (2-4 words)' },
+      emoji: { type: 'string', description: 'Decorative emoji' },
+      unit: { type: 'string', description: 'Unit symbol ($, %, etc.)' },
+      trend: { type: 'string', enum: ['up', 'down', 'stable', 'none'], description: 'Direction' },
+      context: { type: 'string', description: 'Brief context (under 15 words)' },
+      color: { type: 'string', description: 'Accent color for value' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   info_list: {
-    description: 'List of key-value pairs for structured information',
+    description: 'Compact key-value list — icons, labels, values',
     schema: {
-      title: { type: 'string', required: true, description: 'List heading' },
+      title: { type: 'string', required: true, description: 'Section heading (2-4 words)' },
       items: {
         type: 'array',
         required: true,
         items: {
+          emoji: { type: 'string', description: 'Item emoji' },
           label: { type: 'string', required: true },
           value: { type: 'string', required: true },
-          icon: { type: 'string' },
-          highlight: { type: 'boolean', description: 'Emphasize this item' },
-          url: { type: 'string', description: 'Link if this item is clickable' },
+          highlight: { type: 'boolean' },
+          url: { type: 'string' },
         },
       },
     },
@@ -61,48 +60,50 @@ const CARD_TYPES = {
   },
 
   fact_check: {
-    description: 'Claim verification card with verdict. CRITICAL for breaking news: do NOT label claims as "misleading" or "false" unless you have strong contradicting evidence from multiple independent sources. For fast-moving events, prefer "unverified" or "needs_context" with low confidence. Breaking news often involves multi-sided events where BOTH sides of a conflict may be experiencing real events simultaneously.',
+    description: 'Claim + visual verdict. For breaking news: prefer "unverified" with low confidence over "misleading"/"false"',
     schema: {
-      claim: { type: 'string', required: true, description: 'The claim being checked — state it neutrally without prejudging' },
-      verdict: { type: 'string', required: true, enum: ['verified', 'misleading', 'unverified', 'false', 'partially_true', 'needs_context'], description: 'Assessment. For breaking news, strongly prefer "unverified" or "needs_context" over "misleading" or "false" unless contradicting evidence is overwhelming' },
-      explanation: { type: 'string', required: true, description: 'Why this verdict was reached. For breaking news, acknowledge the evolving nature of the situation and mention what would be needed to confirm or deny the claim' },
-      source: { type: 'string', description: 'Source or basis for the check' },
-      sourceUrl: { type: 'string', description: 'URL to source if available' },
-      confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Confidence in the verdict. For breaking news, this should almost always be "low"' },
+      claim: { type: 'string', required: true, description: 'The claim (one sentence, neutral wording)' },
+      verdict: { type: 'string', required: true, enum: ['verified', 'misleading', 'unverified', 'false', 'partially_true', 'needs_context'], description: 'For breaking news strongly prefer "unverified" or "needs_context"' },
+      confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'For breaking news, almost always "low"' },
+      explanation: { type: 'string', description: 'Why this verdict (2-3 sentences max)' },
+      source: { type: 'string', description: 'Source name' },
+      sourceUrl: { type: 'string', description: 'Source URL' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   person_card: {
-    description: 'Card about a person mentioned or shown',
+    description: 'Person mentioned or shown — avatar, name, role',
     schema: {
-      name: { type: 'string', required: true, description: 'Person name' },
-      role: { type: 'string', description: 'Title, role, or brief descriptor' },
-      handle: { type: 'string', description: 'Social media handle if visible' },
-      profileUrl: { type: 'string', description: 'Profile URL if visible' },
-      context: { type: 'string', required: true, description: 'Why this person is relevant here' },
-      details: { type: 'array', items: { type: 'string' }, description: 'Additional details' },
+      name: { type: 'string', required: true, description: 'Full name' },
+      role: { type: 'string', description: 'Title or descriptor (under 6 words)' },
+      emoji: { type: 'string', description: 'Representing emoji (flag, role symbol, etc.)' },
+      handle: { type: 'string', description: 'Social handle' },
+      profileUrl: { type: 'string', description: 'Profile URL' },
+      context: { type: 'string', description: 'Relevance (1-2 sentences)' },
+      details: { type: 'array', items: { type: 'string' }, description: 'Extra facts (max 3)' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   product_card: {
-    description: 'Product information with price and key features. IMPORTANT: features array must contain plain strings, not objects.',
+    description: 'Product with price, rating, features',
     schema: {
       name: { type: 'string', required: true, description: 'Product name' },
       price: { type: 'string', description: 'Price if visible' },
-      rating: { type: 'string', description: 'Rating if visible (e.g. "4.5/5")' },
-      features: { type: 'array', items: { type: 'string' }, description: 'Key features or specs as plain strings (e.g. "128GB RAM", "1 PFLOPS AI performance")' },
-      verdict: { type: 'string', description: 'Quick assessment' },
-      warnings: { type: 'array', items: { type: 'string' }, description: 'Things to watch out for as plain strings' },
-      url: { type: 'string', description: 'Product page URL if visible' },
-      imageUrl: { type: 'string', description: 'Product image URL if visible' },
+      rating: { type: 'string', description: 'Rating (e.g. "4.5/5")' },
+      emoji: { type: 'string', description: 'Product category emoji' },
+      features: { type: 'array', items: { type: 'string' }, description: 'Key features as plain strings (max 5)' },
+      verdict: { type: 'string', description: 'One-line assessment' },
+      warnings: { type: 'array', items: { type: 'string' }, description: 'Concerns as plain strings (max 3)' },
+      url: { type: 'string', description: 'Product URL' },
+      imageUrl: { type: 'string', description: 'Product image URL' },
     },
     sizing: { minWidth: 1, minHeight: 2, defaultSpan: '1' },
   },
 
   timeline_card: {
-    description: 'Sequence of events or dates',
+    description: 'Sequence of events — dates and one-line descriptions',
     schema: {
       title: { type: 'string', required: true, description: 'Timeline heading' },
       events: {
@@ -112,7 +113,7 @@ const CARD_TYPES = {
           date: { type: 'string', required: true },
           event: { type: 'string', required: true },
           highlight: { type: 'boolean' },
-          url: { type: 'string', description: 'Link if this event has a source' },
+          url: { type: 'string' },
         },
       },
     },
@@ -120,18 +121,18 @@ const CARD_TYPES = {
   },
 
   quote_card: {
-    description: 'Notable quote or statement extracted from the content',
+    description: 'Notable quote — large stylish text',
     schema: {
       quote: { type: 'string', required: true, description: 'The quoted text' },
       attribution: { type: 'string', description: 'Who said it' },
-      context: { type: 'string', description: 'Context for the quote' },
-      sourceUrl: { type: 'string', description: 'URL to original source if known' },
+      context: { type: 'string', description: 'Brief context' },
+      sourceUrl: { type: 'string', description: 'Source URL' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   comparison_card: {
-    description: 'Side-by-side comparison of two or more items',
+    description: 'Side-by-side comparison table',
     schema: {
       title: { type: 'string', required: true },
       columns: {
@@ -148,18 +149,18 @@ const CARD_TYPES = {
   },
 
   warning_card: {
-    description: 'Alert for misleading content, scams, or things to be cautious about',
+    description: 'Visual alert — prominent icon and colored severity',
     schema: {
       level: { type: 'string', required: true, enum: ['critical', 'warning', 'info'], description: 'Severity' },
-      title: { type: 'string', required: true, description: 'Warning headline' },
-      details: { type: 'string', required: true, description: 'What to watch out for' },
-      advice: { type: 'string', description: 'What to do about it' },
+      title: { type: 'string', required: true, description: 'Warning headline (under 8 words)' },
+      details: { type: 'string', description: 'Brief explanation (2 sentences max)' },
+      advice: { type: 'string', description: 'What to do' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: 'full' },
   },
 
   action_card: {
-    description: 'Actionable next steps or recommendations',
+    description: 'Actionable next steps — numbered items',
     schema: {
       title: { type: 'string', required: true },
       actions: {
@@ -168,7 +169,7 @@ const CARD_TYPES = {
         items: {
           label: { type: 'string', required: true },
           description: { type: 'string' },
-          url: { type: 'string', description: 'Link for this action if applicable' },
+          url: { type: 'string' },
           priority: { type: 'string', enum: ['high', 'medium', 'low'] },
         },
       },
@@ -177,38 +178,39 @@ const CARD_TYPES = {
   },
 
   text_extract: {
-    description: 'Important text extracted verbatim from the screenshot',
+    description: 'Verbatim text extracted from screenshot',
     schema: {
       title: { type: 'string', required: true, description: 'What this text is' },
       text: { type: 'string', required: true, description: 'The extracted text' },
-      source: { type: 'string', description: 'Where in the image this came from' },
+      source: { type: 'string', description: 'Where in the image' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   location_card: {
-    description: 'Location or place information',
+    description: 'Place or location with pin visual',
     schema: {
       name: { type: 'string', required: true, description: 'Place name' },
-      address: { type: 'string', description: 'Address if known' },
-      context: { type: 'string', required: true, description: 'Why this location is relevant' },
-      details: { type: 'array', items: { type: 'string' }, description: 'Additional info' },
-      mapUrl: { type: 'string', description: 'Google Maps or similar URL' },
+      emoji: { type: 'string', description: 'Country flag or location emoji' },
+      address: { type: 'string', description: 'Address' },
+      context: { type: 'string', description: 'Why relevant (1-2 sentences)' },
+      details: { type: 'array', items: { type: 'string' }, description: 'Extra info (max 3)' },
+      mapUrl: { type: 'string', description: 'Map link' },
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
 
   link_card: {
-    description: 'Collection of relevant links extracted or inferred from the screenshot',
+    description: 'Collection of relevant links',
     schema: {
-      title: { type: 'string', required: true, description: 'Section heading (e.g. "Related Links")' },
+      title: { type: 'string', required: true, description: 'Section heading' },
       links: {
         type: 'array',
         required: true,
         items: {
-          label: { type: 'string', required: true, description: 'Link text' },
-          url: { type: 'string', required: true, description: 'The URL' },
-          description: { type: 'string', description: 'Brief context about this link' },
+          label: { type: 'string', required: true },
+          url: { type: 'string', required: true },
+          description: { type: 'string' },
         },
       },
     },
@@ -216,50 +218,45 @@ const CARD_TYPES = {
   },
 };
 
-// Layout types the designer can choose from
 const LAYOUT_TYPES = {
   editorial: {
-    description: 'News/article layout - hero at top, 2-column body with facts and context',
+    description: 'News/article — hero at top, 2-column body',
     columns: 2,
     areas: ['hero', 'main', 'sidebar'],
     bestFor: ['news', 'articles', 'blog posts', 'reports'],
   },
   dashboard: {
-    description: 'Metrics-focused grid - KPIs at top, detail cards below',
+    description: 'Metrics grid — KPIs at top, detail cards below',
     columns: 3,
     areas: ['metrics', 'details'],
     bestFor: ['analytics', 'dashboards', 'financial data', 'statistics'],
   },
   product_showcase: {
-    description: 'Product-focused - large product card, specs, pricing, warnings',
+    description: 'Product-focused — large product card, specs, pricing',
     columns: 2,
     areas: ['product', 'details', 'warnings'],
-    bestFor: ['shopping', 'product pages', 'reviews', 'marketplace listings'],
+    bestFor: ['shopping', 'product pages', 'reviews', 'marketplace'],
   },
   social_feed: {
-    description: 'Social media layout - person card, quote, fact-check, context',
+    description: 'Social media — person card, quote, fact-check',
     columns: 1,
     areas: ['person', 'content', 'context'],
-    bestFor: ['tweets', 'social media posts', 'comments', 'chat messages'],
+    bestFor: ['tweets', 'social posts', 'comments', 'chat messages'],
   },
   investigation: {
-    description: 'Fact-checking layout - claims, verdicts, timeline, sources',
+    description: 'Fact-checking — claims, verdicts, timeline',
     columns: 2,
     areas: ['claims', 'evidence', 'timeline'],
     bestFor: ['claims', 'misinformation', 'controversial content'],
   },
   simple: {
-    description: 'Clean single-column - hero summary followed by key cards',
+    description: 'Clean single-column — hero + key cards',
     columns: 1,
     areas: ['hero', 'cards'],
     bestFor: ['simple screenshots', 'menus', 'settings', 'messages', 'general'],
   },
 };
 
-/**
- * Build a compact schema description for the LLM prompt
- * Only includes card type names and their descriptions
- */
 function getCardTypeSummaryForPrompt() {
   return Object.entries(CARD_TYPES).map(([name, def]) => {
     const requiredFields = Object.entries(def.schema)
@@ -269,10 +266,6 @@ function getCardTypeSummaryForPrompt() {
   }).join('\n');
 }
 
-/**
- * Build detailed schema for LLM prompts showing required and optional fields.
- * Used by both Haiku (fast classifier) and Sonnet (enhancer) to build complete cards.
- */
 function getCardTypeDetailedSchemaForPrompt() {
   return Object.entries(CARD_TYPES).map(([name, def]) => {
     const required = [];
@@ -301,25 +294,16 @@ Optional: ${optional.join('; ')}`;
   }).join('\n\n');
 }
 
-/**
- * Build layout types summary for the LLM prompt
- */
 function getLayoutTypesSummaryForPrompt() {
   return Object.entries(LAYOUT_TYPES).map(([name, def]) => {
     return `- ${name}: ${def.description} | best for: ${def.bestFor.join(', ')}`;
   }).join('\n');
 }
 
-/**
- * Get the full schema for a specific card type (used by research LLMs)
- */
 function getCardSchema(cardType) {
   return CARD_TYPES[cardType] || null;
 }
 
-/**
- * Validate card data against its type schema
- */
 function validateCardData(cardType, data) {
   const cardDef = CARD_TYPES[cardType];
   if (!cardDef) return { valid: false, errors: [`Unknown card type: ${cardType}`] };

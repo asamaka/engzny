@@ -52,30 +52,25 @@ function buildResearchPrompt(card, contentAnalysis) {
 10. Include source URLs in the sourceUrl field when available from search results`
     : '';
 
-  return `You are a research specialist. Your task is to populate a single card with accurate information${needsWebResearch ? ', using web search to verify and enrich data' : ' extracted from a screenshot'}.
+  return `You are a research specialist populating a card with accurate, concise data${needsWebResearch ? ' using web search' : ' from a screenshot'}.
 
-**Content Context:** ${contentAnalysis.contentType} ${contentAnalysis.platform ? `on ${contentAnalysis.platform}` : ''}
-**Intent:** ${contentAnalysis.intent}
+Context: ${contentAnalysis.contentType}${contentAnalysis.platform ? ` on ${contentAnalysis.platform}` : ''} — ${contentAnalysis.intent}
 
-**Your Card Assignment:**
-- Card Type: ${card.cardType}
-- Research Brief: ${card.researchBrief}
+Card: ${card.cardType} — ${card.researchBrief}
 
-**Required Output Fields:**
+Fields:
 ${fieldDescriptions}
 
-**Rules:**
-1. ONLY use information visible in the screenshot - do not fabricate
-2. If a field cannot be determined, OMIT it rather than using "Not visible"
-3. Be concise - this is a card, not an essay
-4. For fact_check cards: assess based on visible information, mark confidence as "low" if you cannot verify
-5. For product_card: features and warnings MUST be arrays of plain strings, NOT objects
-6. Include any visible URLs in url/imageUrl/sourceUrl/mapUrl fields
-7. Return ONLY valid JSON with the card data fields - no markdown, no explanation
-8. CRITICAL for breaking news: NEVER label a claim as "misleading" or "false" just because you cannot immediately verify it. Breaking news is fast-moving — use "unverified" or "needs_context" with low confidence instead. In military/conflict situations, events happen on MULTIPLE SIDES simultaneously (e.g. strikes AND retaliatory strikes). A report about events in one location does NOT mean events in another location didn't happen.
-9. For breaking news fact_check: state the claim neutrally, acknowledge you are working from a single screenshot without the full picture, and recommend checking multiple independent sources${webSearchInstructions}
+Rules:
+1. Use ONLY visible information — never fabricate
+2. OMIT unknown fields rather than writing "Not visible" or "N/A"
+3. Keep text SHORT — titles max 8 words, explanations max 2 sentences
+4. For product_card: features/warnings must be plain strings
+5. Include visible URLs in url/sourceUrl/mapUrl fields
+6. For breaking news fact_check: use verdict "unverified" or "needs_context" with confidence "low" — never "misleading" or "false" without strong evidence
+7. Add emoji field where schema supports it for visual richness${webSearchInstructions}
 
-Return JSON:`;
+Return ONLY valid JSON:`;
 }
 
 /**

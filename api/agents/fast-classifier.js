@@ -4,86 +4,53 @@
  * Uses Haiku to quickly:
  * 1. Identify content type from screenshot
  * 2. Pick the right layout
- * 3. Fully POPULATE cards with real data from the screenshot
+ * 3. Populate cards with ONLY required fields from visible text
  *
- * This is the primary card source — users see real content in ~3-5s.
- * Sonnet later enhances/adds cards, but Haiku's output is the baseline.
+ * Target: real populated cards in < 3 seconds from upload.
+ * Sonnet later enriches with optional fields and web research.
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeSummaryForPrompt, getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
-const FAST_POPULATE_PROMPT = `You are a fast screenshot analyzer building a rich dashboard of cards. Look at this screenshot and produce FULLY POPULATED cards with real data.
+const FAST_POPULATE_PROMPT = `Analyze this screenshot. Return a JSON card layout with REAL DATA from the visible text. Be fast — only fill required fields.
 
-**Your job:**
-1. IDENTIFY the content type and platform
-2. PICK the best layout (always use columns: 2 for dashboard feel)
-3. CREATE 4-7 DIVERSE cards with REAL DATA from the screenshot
-4. POPULATE every required field + as many optional fields as possible
+LAYOUTS: ${getLayoutTypesSummaryForPrompt()}
 
-**Available Layouts:**
-${getLayoutTypesSummaryForPrompt()}
+CARD TYPES (fill ONLY required fields):
+- hero_summary: title*, subtitle*, emoji* (single emoji for content type)
+- key_metric: value*, label* (big numbers/stats visible)
+- info_list: title*, items*[{label*, value*}] (key-value pairs visible)
+- fact_check: claim*, verdict* [verified|misleading|unverified|false|partially_true|needs_context]
+- person_card: name*
+- product_card: name*
+- timeline_card: title*, events*[{date*, event*}]
+- quote_card: quote*
+- warning_card: level* [critical|warning|info], title*
+- action_card: title*, actions*[{label*}]
+- text_extract: title*, text*
+- location_card: name*
+- link_card: title*, links*[{label*, url*}]
 
-**Card Type Library — Required & Optional Fields:**
-${getCardTypeDetailedSchemaForPrompt()}
+RULES:
+- 3-5 cards max. First card MUST be hero_summary (columnSpan:2)
+- Use ONLY text visible in the screenshot
+- Keep text SHORT — titles under 8 words, values concise
+- Pick DIVERSE card types that match the content
+- For breaking news: use neutral hero title, NOT "misleading" or "misinformation"
+- For fact_check on breaking news: verdict "unverified" or "needs_context", never "false"
 
-**Dashboard Design Rules:**
-- FIRST card: hero_summary (FULL WIDTH, columnSpan: 2) with title, subtitle, and takeaway
-- hero_summary: ALWAYS include a badge (content category), takeaway (key insight), and icon
-- If you see an image URL in the screenshot, include it as imageUrl in hero_summary
-- MIX card sizes: hero_summary spans full width, key_metric cards are compact (columnSpan: 1), info_list/timeline span 2 columns
-- Use DIVERSE card types — don't repeat the same type. Pick from: key_metric, info_list, fact_check, person_card, product_card, timeline_card, quote_card, warning_card, action_card, text_extract, location_card, link_card
-- For fact_check cards: include claim, verdict, and explanation with source info
-- For warning_card: include level, title, and details with advice
-- Fill ALL required fields with actual extracted content — never "N/A" or "Loading..."
-- Include visible URLs, prices, handles, dates, names
-- For product_card: features and warnings must be PLAIN STRINGS
-- Set researchBrief for each card to guide deeper web research
+Return ONLY JSON:
+{"contentAnalysis":{"contentType":"...","platform":"...or null","intent":"...","topQuestions":["..."]},"layout":{"type":"...","columns":2,"reason":"..."},"cards":[{"id":"card-1","cardType":"hero_summary","gridPosition":{"row":1,"column":1,"columnSpan":2,"rowSpan":1},"researchBrief":"...","populatedData":{...}}]}`;
 
-**CRITICAL — Breaking News Rules:**
-- For breaking news content: DO NOT label reports as "MISLEADING" or "MISINFORMATION" in hero_summary. Use neutral titles like "Breaking: [Topic]" and set badge to "Breaking News", not "MISINFORMATION"
-- A news report from a credible news organization (Al Jazeera, BBC, Reuters, CNN, etc.) should be presented neutrally, not prejudged as false
-- For fact_check cards on breaking news: use verdict "unverified" or "needs_context" with confidence "low" — NEVER "misleading" or "false" unless you have overwhelming contradicting evidence
-- In the hero_summary takeaway, present what is being reported factually rather than asserting it is true or false
-- For military/conflict breaking news: events happen simultaneously on multiple sides. Strikes AND retaliatory strikes can both be real. Do not dismiss one side's reports just because the other side also has news
-- Set researchBrief to explicitly ask for multi-source verification and checking all sides of the story
-
-Return ONLY valid JSON:
-{
-  "contentAnalysis": {
-    "contentType": "string (news/product/social/data/general/etc.)",
-    "platform": "string or null (Twitter, Amazon, Reddit, etc.)",
-    "intent": "string (what the user likely wants to understand)",
-    "topQuestions": ["3-5 questions users would ask about this"]
-  },
-  "layout": {
-    "type": "string (one of the layout types)",
-    "columns": 2,
-    "reason": "string (why this layout)"
-  },
-  "cards": [
-    {
-      "id": "card-1",
-      "cardType": "hero_summary",
-      "gridPosition": { "row": 1, "column": 1, "columnSpan": 2, "rowSpan": 1 },
-      "researchBrief": "string (what to research deeper)",
-      "populatedData": { "title": "...", "subtitle": "...", "badge": "...", "takeaway": "...", "icon": "..." }
-    }
-  ]
-}`;
-
-/**
- * Fast-classify AND populate cards using Haiku.
- * Returns fully populated cards ready for immediate display.
- */
 async function fastClassify({ imageData, mediaType, question, adapterConfig = {} }) {
   const startTime = Date.now();
 
   const config = {
     ...adapterConfig,
     model: 'claude-haiku-4-5-20251001',
-    maxTokens: 4096,
+    maxTokens: 2048,
   };
 
   const adapter = getVisionAdapter(config);
@@ -91,10 +58,10 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
 
   let prompt = FAST_POPULATE_PROMPT;
   if (question) {
-    prompt += `\n\n**User's question:** "${question}"\nMake sure at least one card directly addresses this question with real data.`;
+    prompt += `\n\nUser question: "${question}" — address it in one card.`;
   }
 
-  logger.info('FastClassifier', 'Starting quick classification + population', { model: config.model });
+  logger.info('FastClassifier', 'Starting quick classification', { model: config.model });
 
   try {
     const result = await adapter.analyzeImage({
@@ -104,7 +71,7 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
     });
 
     const duration = Date.now() - startTime;
-    logger.info('FastClassifier', 'Classification + population complete', {
+    logger.info('FastClassifier', 'Classification complete', {
       dur: duration,
       model: result.model,
       usage: result.usage,
@@ -220,8 +187,8 @@ function normalizeQuickBlueprint(raw) {
       cardType: 'hero_summary',
       gridPosition: { row: 0, column: 1, columnSpan: blueprint.layout.columns, rowSpan: 1 },
       researchBrief: 'Summarize the screenshot content',
-      populatedData: { title: 'Analyzing...', subtitle: 'Detecting content type...' },
-      placeholderData: { title: 'Analyzing...', subtitle: 'Detecting content type...' },
+      populatedData: { title: 'Analyzing...', subtitle: 'Detecting content type...', emoji: '🔍' },
+      placeholderData: { title: 'Analyzing...', subtitle: 'Detecting content type...', emoji: '🔍' },
       status: 'placeholder',
     });
   }

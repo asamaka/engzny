@@ -3,7 +3,7 @@
  *
  * Uses Claude Sonnet with tool_use to progressively enhance the card layout.
  * Sonnet can see the screenshot + what Haiku has already rendered, then:
- * 1. Update existing cards with richer data
+ * 1. Update existing cards with richer data (fill optional fields)
  * 2. Add new cards that Haiku missed
  * 3. Change the layout if a better one fits
  *
@@ -13,13 +13,13 @@
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeSummaryForPrompt, getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt, getCardSchema, validateCardData } = require('../contracts/card-types');
+const { getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
 const ENHANCER_TOOLS = [
   {
     name: 'update_card',
-    description: 'Update an existing card with richer or corrected data. Use this to improve cards that Haiku populated with basic information.',
+    description: 'Update an existing card — fill optional fields, correct data, enrich content. Keep text concise.',
     input_schema: {
       type: 'object',
       properties: {
@@ -45,7 +45,7 @@ const ENHANCER_TOOLS = [
   },
   {
     name: 'add_card',
-    description: 'Add a new card to the layout. Use this for information that Haiku missed or for deeper analysis cards.',
+    description: 'Add a new card. Fill ALL required fields and as many optional fields as possible. Keep text concise.',
     input_schema: {
       type: 'object',
       properties: {
@@ -99,10 +99,6 @@ const ENHANCER_TOOLS = [
   },
 ];
 
-/**
- * Build the enhancement prompt for Sonnet.
- * Includes screenshot context + what Haiku has already rendered.
- */
 function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData) {
   const currentState = JSON.stringify({
     contentAnalysis,
@@ -115,66 +111,51 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
     })),
   }, null, 2);
 
-  let prompt = `You are an expert analyst enhancing a screenshot analysis into a rich, visually diverse dashboard. A fast model has created initial cards. Your job is to make the dashboard COMPREHENSIVE and BEAUTIFUL.
+  let prompt = `You are enhancing a screenshot analysis dashboard. A fast model created initial cards with minimal data. Your job: make it RICHER and more VISUAL while keeping text SHORT.
 
-**Current state (from fast initial analysis):**
+**Current state:**
 ${currentState}
 
-**Card Type Library with Required/Optional Fields:**
+**Card schemas (fill optional fields that the fast model skipped):**
 ${getCardTypeDetailedSchemaForPrompt()}
 
-**Available Layouts:**
+**Available layouts:**
 ${getLayoutTypesSummaryForPrompt()}
 
 **Your tasks:**
-1. REVIEW each existing card — fill in ALL optional fields you can determine
-2. UPDATE hero_summary: ensure it has badge, icon, takeaway, and imageUrl if applicable
-3. ADD 2-4 new cards using DIVERSE card types for a rich dashboard:
-   - fact_check: verify key claims with verdict + explanation
-   - timeline_card: create event timelines when chronology matters
-   - action_card: suggest actionable next steps
-   - warning_card: flag potential issues with appropriate severity level
-   - quote_card: highlight notable statements
-   - link_card: add relevant source URLs
-4. Set proper columnSpan in grid position: 1 for compact cards (key_metric), 2 for wide cards (timeline, info_list)
+1. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, confidence, etc.
+2. For hero_summary: ensure badge, takeaway, and emoji are set
+3. For info_list items: add emoji to each item for visual variety
+4. ADD 1-3 new cards using diverse types for a richer dashboard (fact_check, warning_card, action_card, quote_card, location_card)
+5. Set proper columnSpan: 1 for compact cards, 2 for wide cards
 
-**Rules:**
-- MAXIMIZE field population — every optional field you can fill makes cards richer
-- Use DIVERSE card types to create visual variety in the dashboard
-- For product_card: features and warnings must be plain strings
-- Total cards should be 6-10 for a comprehensive dashboard
-- For fact_check: include real verdict, explanation, and confidence
-- For hero_summary: ALWAYS ensure badge, takeaway, and icon are populated
-- Include real URLs, citations, and source links wherever possible
+**Style rules:**
+- Keep ALL text concise — no walls of text
+- Titles: max 8 words. Values: max 15 words. Explanations: max 2 sentences
+- Use emoji liberally for visual interest
+- For product_card: features/warnings must be plain strings
+- Total cards 5-8 for a balanced dashboard
 
-**CRITICAL — Breaking News Accuracy:**
-- If the content is breaking news from a credible news source: DO NOT change hero_summary title to label it as "MISLEADING" or "MISINFORMATION". Present the news neutrally.
-- For fact_check cards on breaking news: prefer verdict "needs_context" or "unverified" over "misleading" or "false" unless you have strong multi-source evidence contradicting the claim.
-- In military/conflict situations, remember that events happen on MULTIPLE SIDES simultaneously. If one country strikes another, retaliatory strikes from the other side are expected and should not be dismissed.
-- A breaking news report about explosions/strikes in a city should NOT be labeled misleading just because strikes also occurred in a different city — both can be true.
-- If the initial analysis labeled breaking news as "MISLEADING", consider using update_card to correct this to a neutral presentation.`;
+**Breaking news rules:**
+- DO NOT label news as "MISLEADING"/"MISINFORMATION" in hero_summary
+- fact_check on breaking news: prefer "unverified"/"needs_context" over "misleading"/"false"
+- Present breaking news neutrally with factual titles`;
 
   if (researchData) {
-    prompt += `\n\n**Deep research findings (from web search):**
+    prompt += `\n\n**Web research findings:**
 ${JSON.stringify(researchData, null, 2)}
 
-Use this research to:
-- Verify or correct facts in existing cards
+Use research to:
 - Add source URLs and citations
-- Create fact_check cards for claims that need verification
-- Update timeline_card with accurate dates
-- Enrich person_card or product_card with web-sourced details
-- IMPORTANT: If research reveals the initial analysis was wrong (e.g. breaking news was labeled as misleading when it was accurate), use update_card to CORRECT the hero_summary and fact_check cards to reflect the truth
-- For breaking news: if research confirms the reported events are real, change any "misleading"/"false" verdicts to "verified" or "partially_true" and update the hero_summary to present the news neutrally`;
+- Verify or correct facts
+- Create fact_check cards for claims
+- Enrich cards with web data
+- If research shows initial analysis was wrong, correct it`;
   }
 
   return prompt;
 }
 
-/**
- * Run Sonnet enhancement pass.
- * Returns an array of actions (update_card, add_card, update_layout) via callbacks.
- */
 async function enhance({
   imageData,
   mediaType,

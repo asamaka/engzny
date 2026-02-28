@@ -12,39 +12,42 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         :root {
-            --bg: #0a0d12;
-            --bg-raised: #0f1319;
-            --surface: #151a22;
-            --surface-2: #1b222c;
-            --surface-3: #222a36;
-            --surface-bright: #2a3444;
-            --border: #1e2736;
-            --border-bright: #2d3a4e;
-            --text: #e8ecf2;
-            --text-secondary: #8d99ae;
-            --text-muted: #5c6878;
-            --accent: #6c9fff;
-            --accent-dim: #3d6cc7;
-            --accent-bg: rgba(108,159,255,0.08);
-            --accent-bg-strong: rgba(108,159,255,0.15);
-            --green: #5bdb8a;
-            --green-bg: rgba(91,219,138,0.1);
-            --green-dim: #2a7a4a;
-            --red: #ff6b6b;
-            --red-bg: rgba(255,107,107,0.1);
-            --yellow: #ffd15c;
-            --yellow-bg: rgba(255,209,92,0.08);
-            --purple: #b48eff;
-            --purple-bg: rgba(180,142,255,0.08);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
-            --radius-xl: 20px;
+            --bg: #08090d;
+            --bg-raised: #0d0f14;
+            --surface: #12151c;
+            --surface-2: #181c26;
+            --surface-3: #1f2533;
+            --surface-bright: #283040;
+            --border: #1a1f2e;
+            --border-bright: #252d40;
+            --text: #e4e8f0;
+            --text-secondary: #8892a6;
+            --text-muted: #545e72;
+            --accent: #5b8af5;
+            --accent-dim: #3b6ad5;
+            --accent-bg: rgba(91,138,245,0.10);
+            --accent-bg-strong: rgba(91,138,245,0.18);
+            --green: #4cd68a;
+            --green-bg: rgba(76,214,138,0.12);
+            --green-dim: #2a8a50;
+            --red: #f06060;
+            --red-bg: rgba(240,96,96,0.12);
+            --yellow: #f0c040;
+            --yellow-bg: rgba(240,192,64,0.10);
+            --purple: #a07ef0;
+            --purple-bg: rgba(160,126,240,0.10);
+            --orange: #f09040;
+            --orange-bg: rgba(240,144,64,0.10);
+            --radius-sm: 10px;
+            --radius-md: 14px;
+            --radius-lg: 18px;
+            --radius-xl: 24px;
             --radius-pill: 100px;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-            --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
-            --shadow-glow: 0 0 20px rgba(108,159,255,0.15);
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+            --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
+            --glass: rgba(18,21,28,0.75);
+            --glass-border: rgba(255,255,255,0.06);
         }
 
         html, body { height: 100%; }
@@ -80,13 +83,13 @@
         }
 
         .paste-zone {
-            width: 280px;
-            height: 280px;
+            width: 260px;
+            height: 260px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-direction: column;
-            gap: 16px;
+            gap: 14px;
             border: 2px dashed var(--border-bright);
             border-radius: var(--radius-xl);
             cursor: pointer;
@@ -98,12 +101,12 @@
             border-color: var(--accent);
             background: var(--accent-bg);
             transform: scale(1.02);
-            box-shadow: var(--shadow-glow);
+            box-shadow: 0 0 30px rgba(91,138,245,0.12);
         }
 
         .paste-icon {
-            width: 64px;
-            height: 64px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background: var(--accent-bg-strong);
             display: flex;
@@ -113,7 +116,7 @@
         }
 
         .paste-icon .material-symbols-rounded {
-            font-size: 32px;
+            font-size: 30px;
             color: var(--accent);
         }
 
@@ -126,14 +129,14 @@
         }
 
         .paste-text {
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             font-weight: 500;
             color: var(--text);
         }
 
         .paste-hint {
             margin-top: 1.5rem;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             color: var(--text-muted);
         }
 
@@ -161,7 +164,7 @@
         }
 
         .examples-divider span {
-            font-size: 0.72rem;
+            font-size: 0.7rem;
             font-weight: 500;
             color: var(--text-muted);
             white-space: nowrap;
@@ -197,9 +200,7 @@
             box-shadow: var(--shadow-sm);
         }
 
-        .example-card:active {
-            transform: scale(0.97);
-        }
+        .example-card:active { transform: scale(0.97); }
 
         .example-card.loading {
             pointer-events: none;
@@ -210,12 +211,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(108,159,255,0.06) 50%,
-                transparent 100%
-            );
+            background: linear-gradient(90deg, transparent 0%, rgba(91,138,245,0.06) 50%, transparent 100%);
             animation: shimmer 1.5s ease-in-out infinite;
         }
 
@@ -252,7 +248,7 @@
         }
 
         .example-category {
-            font-size: 0.58rem;
+            font-size: 0.56rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.06em;
@@ -306,7 +302,7 @@
         .screenshot-layer.fading { opacity: 0.06; }
         .screenshot-layer.gone { opacity: 0; pointer-events: none; }
 
-        /* Progress overlay — replaces laser scan */
+        /* Progress overlay */
         .progress-overlay {
             position: fixed;
             inset: 0;
@@ -323,15 +319,15 @@
         .progress-overlay.active { opacity: 1; }
 
         .progress-ring {
-            width: 100px;
-            height: 100px;
+            width: 96px;
+            height: 96px;
             position: relative;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
         }
 
         .progress-ring svg {
-            width: 100px;
-            height: 100px;
+            width: 96px;
+            height: 96px;
             transform: rotate(-90deg);
         }
 
@@ -357,7 +353,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.3rem;
+            font-size: 1.2rem;
             font-weight: 800;
             color: var(--text);
             letter-spacing: -0.02em;
@@ -368,12 +364,10 @@
             transition: stroke-dashoffset 0.3s ease-out, stroke 0.3s;
         }
 
-        .progress-ring.complete .progress-pct {
-            color: var(--green);
-        }
+        .progress-ring.complete .progress-pct { color: var(--green); }
 
         .progress-label {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 500;
             color: var(--text-secondary);
             text-align: center;
@@ -382,7 +376,7 @@
         }
 
         .progress-phase {
-            font-size: 0.7rem;
+            font-size: 0.68rem;
             font-weight: 600;
             letter-spacing: 0.08em;
             text-transform: uppercase;
@@ -400,8 +394,6 @@
             transition: opacity 0.4s, transform 0.4s;
         }
 
-        /* Bottom status bar removed — using circular progress only */
-
         /* === RESULTS OVERLAY === */
         .results-overlay {
             position: relative;
@@ -409,7 +401,7 @@
             min-height: 100vh;
             width: 100%;
             opacity: 0;
-            transform: translateY(24px);
+            transform: translateY(20px);
             transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
             padding-bottom: 80px;
         }
@@ -424,10 +416,10 @@
             position: sticky;
             top: 0;
             z-index: 100;
-            background: rgba(10, 13, 18, 0.92);
+            background: rgba(8, 9, 13, 0.88);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--glass-border);
             padding: 10px 16px;
             display: flex;
             align-items: center;
@@ -444,7 +436,7 @@
             background: none;
             border: none;
             color: var(--text-secondary);
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             cursor: pointer;
             font-family: inherit;
             padding: 6px 8px;
@@ -461,7 +453,7 @@
         }
 
         .layout-badge {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
@@ -487,28 +479,28 @@
 
         .layout-progress-fill {
             height: 100%;
-            background: var(--accent);
+            background: linear-gradient(90deg, var(--accent), var(--purple));
             transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             width: 0%;
         }
 
         .layout-progress-text {
-            font-size: 0.68rem;
+            font-size: 0.65rem;
             font-weight: 500;
             color: var(--text-muted);
         }
 
         /* === CONTENT ANALYSIS === */
         .content-analysis {
-            padding: 16px 16px 12px;
+            padding: 14px 16px 10px;
         }
 
         .content-analysis-intent {
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             font-weight: 400;
             color: var(--text);
-            margin-bottom: 12px;
-            line-height: 1.6;
+            margin-bottom: 10px;
+            line-height: 1.5;
         }
 
         .top-questions {
@@ -518,9 +510,9 @@
         }
 
         .top-question {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             font-weight: 500;
-            padding: 5px 12px;
+            padding: 5px 11px;
             background: var(--surface-2);
             border: 1px solid var(--border);
             border-radius: var(--radius-pill);
@@ -535,20 +527,20 @@
             color: var(--text);
         }
 
-        /* === CARD GRID — Dashboard Layout === */
+        /* === CARD GRID === */
         .card-grid {
-            padding: 10px;
+            padding: 8px;
             display: grid;
-            gap: 10px;
+            gap: 8px;
             grid-template-columns: repeat(2, 1fr);
         }
 
         @media (min-width: 768px) {
-            .card-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 12px; }
+            .card-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 10px; }
         }
 
         @media (min-width: 1200px) {
-            .card-grid { grid-template-columns: repeat(4, 1fr); gap: 14px; }
+            .card-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
         }
 
         .card-grid .span-full { grid-column: 1 / -1; }
@@ -560,22 +552,23 @@
         .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
         .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
 
-        /* Single-card intro state */
         .card-grid.single-card {
             grid-template-columns: 1fr;
             max-width: 520px;
             margin: 0 auto;
         }
 
-        /* === CARD BASE === */
+        /* === CARD BASE — Glassmorphism === */
         .card {
-            background: var(--surface);
+            background: var(--glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
             border-radius: var(--radius-lg);
-            border: 1px solid var(--border);
+            border: 1px solid var(--glass-border);
             overflow: hidden;
             position: relative;
             opacity: 0;
-            transform: translateY(12px) scale(0.98);
+            transform: translateY(10px) scale(0.98);
             transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                         transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
                         border-color 0.3s ease,
@@ -588,33 +581,23 @@
         }
 
         .card:hover {
-            border-color: var(--border-bright);
-            box-shadow: var(--shadow-sm);
+            border-color: rgba(255,255,255,0.10);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         }
 
-        .card.loading {
-            min-height: 80px;
-        }
+        .card.loading { min-height: 72px; }
 
         .card.loading::after {
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(
-                90deg,
-                transparent 0%,
-                rgba(108,159,255,0.04) 30%,
-                rgba(108,159,255,0.08) 50%,
-                rgba(108,159,255,0.04) 70%,
-                transparent 100%
-            );
+            background: linear-gradient(90deg, transparent 0%, rgba(91,138,245,0.04) 30%, rgba(91,138,245,0.08) 50%, rgba(91,138,245,0.04) 70%, transparent 100%);
             animation: shimmer 1.8s ease-in-out infinite;
         }
 
         .card.loading .placeholder-line {
             animation: placeholderPulse 2s ease-in-out infinite;
         }
-
         .card.loading .placeholder-line:nth-child(2) { animation-delay: 0.15s; }
         .card.loading .placeholder-line:nth-child(3) { animation-delay: 0.3s; }
 
@@ -629,7 +612,7 @@
         }
 
         .card.loading.researching {
-            border-color: rgba(108,159,255,0.15);
+            border-color: rgba(91,138,245,0.15);
         }
 
         .card.loading.researching::before {
@@ -650,22 +633,20 @@
         }
 
         .skeleton-status {
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             color: var(--text-muted);
-            margin-top: 8px;
+            margin-top: 6px;
             opacity: 0;
             transition: opacity 0.4s;
             font-style: italic;
         }
 
-        .card.loading.researching .skeleton-status {
-            opacity: 1;
-        }
+        .card.loading.researching .skeleton-status { opacity: 1; }
 
         .web-citations {
-            margin-top: 10px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border);
+            margin-top: 8px;
+            padding-top: 6px;
+            border-top: 1px solid var(--glass-border);
             display: flex;
             align-items: center;
             gap: 4px;
@@ -673,7 +654,7 @@
         }
 
         .web-citations-label {
-            font-size: 0.6rem;
+            font-size: 0.56rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
@@ -681,7 +662,7 @@
         }
 
         .web-citation-link {
-            font-size: 0.6rem;
+            font-size: 0.56rem;
             color: var(--accent-dim);
             text-decoration: none;
             padding: 1px 5px;
@@ -694,9 +675,7 @@
             background: var(--accent-bg-strong);
         }
 
-        .card.populated {
-            animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
+        .card.populated { animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
 
         @keyframes cardPop {
             from { transform: scale(0.96); opacity: 0.7; }
@@ -705,14 +684,14 @@
         }
 
         .card.just-populated {
-            border-color: rgba(108,159,255,0.3);
-            box-shadow: var(--shadow-glow);
+            border-color: rgba(91,138,245,0.25);
+            box-shadow: 0 0 24px rgba(91,138,245,0.1);
         }
 
         .card.card-updating {
             animation: cardUpdate 0.5s ease-out;
-            border-color: rgba(255,193,7,0.4);
-            box-shadow: 0 0 12px rgba(255,193,7,0.15);
+            border-color: rgba(240,192,64,0.3);
+            box-shadow: 0 0 16px rgba(240,192,64,0.1);
         }
 
         @keyframes cardUpdate {
@@ -723,8 +702,8 @@
 
         .card.just-added {
             animation: cardSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            border-color: rgba(76,175,80,0.4);
-            box-shadow: 0 0 12px rgba(76,175,80,0.15);
+            border-color: rgba(76,214,138,0.3);
+            box-shadow: 0 0 16px rgba(76,214,138,0.1);
         }
 
         @keyframes cardSlideIn {
@@ -734,26 +713,19 @@
         }
 
         .card-update-badge, .card-add-badge {
-            font-size: 0.55rem;
+            font-size: 0.52rem;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             padding: 2px 8px;
             border-radius: 4px;
-            margin-top: 8px;
+            margin-top: 6px;
             display: inline-block;
             animation: badgeFadeIn 0.3s ease-out;
         }
 
-        .card-update-badge {
-            color: #ffc107;
-            background: rgba(255,193,7,0.15);
-        }
-
-        .card-add-badge {
-            color: #4caf50;
-            background: rgba(76,175,80,0.15);
-        }
+        .card-update-badge { color: var(--yellow); background: var(--yellow-bg); }
+        .card-add-badge { color: var(--green); background: var(--green-bg); }
 
         @keyframes badgeFadeIn {
             from { opacity: 0; transform: translateY(-4px); }
@@ -762,23 +734,21 @@
 
         .card-inner { padding: 14px; }
 
-        /* Progressive entrance — cards fade in sequentially */
         .card.entering {
             animation: cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
 
         @keyframes cardEnter {
-            from { opacity: 0; transform: translateY(16px) scale(0.95); }
+            from { opacity: 0; transform: translateY(14px) scale(0.95); }
             60% { transform: translateY(-2px) scale(1.01); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
-        /* Phase indicator on cards */
         .card .card-source-tag {
             position: absolute;
             top: 6px;
             right: 6px;
-            font-size: 0.5rem;
+            font-size: 0.48rem;
             font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
@@ -794,21 +764,22 @@
         .card .card-source-tag.source-sonar { background: var(--green-bg); color: var(--green); }
         .card .card-source-tag.source-review { background: var(--purple-bg); color: var(--purple); }
 
+        /* Card type header with icon */
         .card-type-label {
-            font-size: 0.6rem;
+            font-size: 0.56rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
             color: var(--text-muted);
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
         }
 
         .card-type-icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             border-radius: 6px;
             display: flex;
             align-items: center;
@@ -816,13 +787,11 @@
             flex-shrink: 0;
         }
 
-        .card-type-icon .material-symbols-rounded {
-            font-size: 14px;
-        }
+        .card-type-icon .material-symbols-rounded { font-size: 13px; }
 
-        /* === HERO SUMMARY === */
+        /* === HERO SUMMARY — Large visual card === */
         .card-hero {
-            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+            background: linear-gradient(145deg, var(--surface) 0%, var(--surface-2) 60%, rgba(91,138,245,0.06) 100%);
             border-color: var(--border-bright);
         }
 
@@ -834,19 +803,19 @@
 
         .card-hero .hero-image {
             width: 100%;
-            height: 140px;
+            height: 130px;
             object-fit: cover;
             display: block;
         }
 
         @media (min-width: 768px) {
-            .card-hero .hero-image { height: 180px; }
+            .card-hero .hero-image { height: 170px; }
         }
 
         .card-hero .hero-image-overlay {
             position: absolute;
             inset: 0;
-            background: linear-gradient(to top, var(--surface) 0%, transparent 60%);
+            background: linear-gradient(to top, var(--surface) 0%, transparent 70%);
         }
 
         .card-hero .hero-image-badge {
@@ -856,47 +825,54 @@
             z-index: 2;
         }
 
-        .card-hero .card-inner { padding: 20px 16px; }
-        .card-hero.has-image .card-inner { padding-top: 12px; }
+        .card-hero .card-inner { padding: 16px; }
+        .card-hero.has-image .card-inner { padding-top: 10px; }
+
+        .card-hero .hero-emoji {
+            font-size: 2rem;
+            margin-bottom: 6px;
+            display: block;
+            line-height: 1;
+        }
 
         .card-hero .hero-badge {
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            font-size: 0.65rem;
+            font-size: 0.6rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            padding: 4px 12px;
+            padding: 3px 10px;
             border-radius: var(--radius-pill);
             background: var(--accent-bg-strong);
             color: var(--accent);
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-hero .hero-title {
-            font-size: 1.3rem;
+            font-size: 1.25rem;
             font-weight: 800;
             color: #fff;
-            margin-bottom: 6px;
-            line-height: 1.25;
+            margin-bottom: 4px;
+            line-height: 1.2;
             letter-spacing: -0.02em;
         }
 
         .card-hero .hero-subtitle {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 400;
             color: var(--text-secondary);
-            margin-bottom: 14px;
-            line-height: 1.5;
+            margin-bottom: 10px;
+            line-height: 1.45;
         }
 
         .card-hero .hero-takeaway {
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             color: var(--text);
-            line-height: 1.6;
-            padding: 12px 14px;
-            background: var(--surface-3);
+            line-height: 1.5;
+            padding: 10px 12px;
+            background: rgba(91,138,245,0.06);
             border-radius: var(--radius-md);
             border-left: 3px solid var(--accent);
         }
@@ -905,12 +881,12 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            margin-top: 12px;
-            font-size: 0.78rem;
+            margin-top: 10px;
+            font-size: 0.72rem;
             font-weight: 600;
             color: var(--accent);
             text-decoration: none;
-            padding: 6px 12px;
+            padding: 5px 10px;
             background: var(--accent-bg);
             border-radius: var(--radius-sm);
             transition: background 0.2s;
@@ -918,9 +894,9 @@
 
         .card-hero .hero-link:hover { background: var(--accent-bg-strong); }
 
-        /* === KEY METRIC === */
+        /* === KEY METRIC — Big number focus === */
         .card-metric {
-            background: linear-gradient(135deg, var(--surface) 0%, rgba(108,159,255,0.03) 100%);
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(91,138,245,0.05) 100%);
         }
 
         .card-metric .card-inner {
@@ -930,30 +906,35 @@
             padding: 14px;
         }
 
+        .card-metric .metric-emoji {
+            font-size: 1.3rem;
+            margin-bottom: 2px;
+        }
+
         .card-metric .metric-value {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: 800;
             color: var(--accent);
-            line-height: 1.1;
-            letter-spacing: -0.03em;
-            margin: 4px 0;
+            line-height: 1.05;
+            letter-spacing: -0.04em;
+            margin: 2px 0;
         }
 
         .card-metric .metric-label {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             font-weight: 500;
             color: var(--text-secondary);
-            margin-top: 4px;
+            margin-top: 3px;
         }
 
         .card-metric .metric-context {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: var(--text-muted);
-            margin-top: 8px;
-            padding: 5px 8px;
+            margin-top: 6px;
+            padding: 4px 8px;
             background: var(--surface-2);
             border-radius: var(--radius-sm);
-            line-height: 1.4;
+            line-height: 1.35;
             width: 100%;
         }
 
@@ -961,36 +942,42 @@
             display: inline-flex;
             align-items: center;
             gap: 3px;
-            font-size: 0.62rem;
+            font-size: 0.58rem;
             font-weight: 700;
             padding: 2px 7px;
             border-radius: var(--radius-pill);
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
         .card-metric .metric-trend.up { background: var(--green-bg); color: var(--green); }
         .card-metric .metric-trend.down { background: var(--red-bg); color: var(--red); }
         .card-metric .metric-trend.stable { background: var(--accent-bg); color: var(--accent); }
 
-        /* === INFO LIST === */
+        /* === INFO LIST — Clean, compact === */
         .card-list .list-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-list .list-item {
             display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
-            font-size: 0.8rem;
-            gap: 12px;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--glass-border);
+            font-size: 0.76rem;
         }
 
         .card-list .list-item:last-child { border-bottom: none; }
+
+        .card-list .list-item-emoji {
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+        }
 
         .card-list .list-item-label {
             color: var(--text-secondary);
@@ -998,16 +985,18 @@
             font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
+            min-width: 0;
         }
 
-        .card-list .list-item-icon { font-size: 0.9rem; }
+        .card-list .list-item-icon { font-size: 0.85rem; }
 
         .card-list .list-item-value {
             color: var(--text);
             text-align: right;
             word-break: break-word;
             font-weight: 400;
+            margin-left: auto;
         }
 
         .card-list .list-item.highlight .list-item-value {
@@ -1022,129 +1011,128 @@
         }
         .card-list .list-item-link:hover { text-decoration: underline; }
 
-        /* === FACT CHECK === */
+        /* === FACT CHECK — Visual verdict === */
         .card-fact-check {
-            border-top: 3px solid var(--yellow);
+            border-left: 3px solid var(--yellow);
+            border-top: none;
         }
-        .card-fact-check.verdict-verified { border-top-color: var(--green); }
-        .card-fact-check.verdict-false { border-top-color: var(--red); }
-        .card-fact-check.verdict-misleading { border-top-color: var(--yellow); }
-        .card-fact-check.verdict-unverified { border-top-color: var(--accent); }
-        .card-fact-check.verdict-needs_context { border-top-color: var(--purple); }
+        .card-fact-check.verdict-verified { border-left-color: var(--green); }
+        .card-fact-check.verdict-false { border-left-color: var(--red); }
+        .card-fact-check.verdict-misleading { border-left-color: var(--yellow); }
+        .card-fact-check.verdict-unverified { border-left-color: var(--accent); }
+        .card-fact-check.verdict-needs_context { border-left-color: var(--purple); }
+        .card-fact-check.verdict-partially_true { border-left-color: var(--orange); }
 
-        .card-fact-check .fact-claim {
-            font-size: 0.84rem;
-            color: var(--text);
-            line-height: 1.6;
-            padding: 12px 14px;
-            background: var(--surface-2);
-            border-radius: var(--radius-md);
-            margin-bottom: 12px;
-            font-style: italic;
-            position: relative;
-        }
-
-        .card-fact-check .fact-claim::before {
-            content: '"';
-            font-size: 1.5rem;
-            color: var(--text-muted);
-            opacity: 0.3;
-            position: absolute;
-            top: 4px;
-            left: 8px;
-        }
-
-        .card-fact-check .fact-verdict {
-            display: inline-flex;
+        .card-fact-check .fact-verdict-visual {
+            display: flex;
             align-items: center;
-            gap: 5px;
-            font-size: 0.65rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            padding: 5px 12px;
-            border-radius: var(--radius-pill);
+            gap: 10px;
             margin-bottom: 10px;
         }
 
-        .fact-verdict.verified { background: var(--green-bg); color: var(--green); }
-        .fact-verdict.misleading { background: var(--yellow-bg); color: var(--yellow); }
-        .fact-verdict.false { background: var(--red-bg); color: var(--red); }
-        .fact-verdict.unverified { background: var(--accent-bg); color: var(--accent); }
-        .fact-verdict.partially_true { background: var(--yellow-bg); color: var(--yellow); }
-        .fact-verdict.needs_context { background: var(--purple-bg); color: var(--purple); }
-
-        .card-fact-check .fact-confidence {
-            display: inline-flex;
+        .card-fact-check .fact-verdict-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
             align-items: center;
-            gap: 3px;
-            font-size: 0.58rem;
-            font-weight: 600;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .card-fact-check .fact-verdict-icon .material-symbols-rounded {
+            font-size: 20px;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .card-fact-check .fact-verdict-icon.verified { background: var(--green-bg); color: var(--green); }
+        .card-fact-check .fact-verdict-icon.false { background: var(--red-bg); color: var(--red); }
+        .card-fact-check .fact-verdict-icon.misleading { background: var(--yellow-bg); color: var(--yellow); }
+        .card-fact-check .fact-verdict-icon.unverified { background: var(--accent-bg); color: var(--accent); }
+        .card-fact-check .fact-verdict-icon.needs_context { background: var(--purple-bg); color: var(--purple); }
+        .card-fact-check .fact-verdict-icon.partially_true { background: var(--orange-bg); color: var(--orange); }
+
+        .card-fact-check .fact-verdict-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .card-fact-check .fact-verdict-label {
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .card-fact-check .fact-confidence-label {
+            font-size: 0.56rem;
+            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            padding: 2px 8px;
-            border-radius: var(--radius-pill);
-            margin-left: 6px;
-            background: var(--surface-2);
-            color: var(--text-muted);
+        }
+
+        .card-fact-check .fact-claim {
+            font-size: 0.78rem;
+            color: var(--text);
+            line-height: 1.5;
+            margin-bottom: 8px;
+            font-style: italic;
         }
 
         .card-fact-check .fact-explanation {
-            font-size: 0.8rem;
-            color: var(--text);
-            line-height: 1.6;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
 
         .card-fact-check .fact-source {
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             color: var(--text-muted);
-            margin-top: 8px;
+            margin-top: 6px;
         }
 
         .card-fact-check .fact-source a {
             color: var(--accent);
             text-decoration: none;
         }
-
         .card-fact-check .fact-source a:hover { text-decoration: underline; }
 
-        /* === PERSON CARD === */
+        /* === PERSON CARD — Avatar focus === */
         .card-person .person-header {
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-person .person-avatar {
-            width: 44px;
-            height: 44px;
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
             background: linear-gradient(135deg, var(--accent-bg-strong), var(--purple-bg));
             border: 2px solid var(--border-bright);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--accent);
+            font-size: 1.3rem;
             flex-shrink: 0;
         }
 
         .card-person .person-name {
-            font-size: 0.95rem;
+            font-size: 0.9rem;
             font-weight: 700;
             color: #fff;
         }
 
         .card-person .person-role {
-            font-size: 0.74rem;
+            font-size: 0.7rem;
             color: var(--text-secondary);
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         .card-person .person-handle {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--accent);
             margin-top: 1px;
         }
@@ -1153,43 +1141,42 @@
             color: var(--accent);
             text-decoration: none;
         }
-
         .card-person .person-handle a:hover { text-decoration: underline; }
 
         .card-person .person-context {
-            font-size: 0.8rem;
-            color: var(--text);
-            line-height: 1.6;
+            font-size: 0.74rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
 
         .card-person .person-details {
-            margin-top: 10px;
+            margin-top: 8px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
         }
 
         .card-person .person-detail-item {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
-            padding: 3px 0 3px 10px;
+            padding: 2px 0 2px 8px;
             border-left: 2px solid var(--border);
         }
 
         /* === PRODUCT CARD === */
         .card-product {
-            background: linear-gradient(135deg, var(--surface) 0%, rgba(91,219,138,0.04) 100%);
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(76,214,138,0.04) 100%);
         }
 
         .card-product .product-header {
             display: flex;
-            gap: 14px;
-            margin-bottom: 12px;
+            gap: 12px;
+            margin-bottom: 10px;
         }
 
         .card-product .product-image {
-            width: 80px;
-            height: 80px;
+            width: 72px;
+            height: 72px;
             border-radius: var(--radius-md);
             background: var(--surface-2);
             overflow: hidden;
@@ -1206,26 +1193,31 @@
         }
 
         .card-product .product-image .material-symbols-rounded {
-            font-size: 32px;
+            font-size: 28px;
             color: var(--text-muted);
         }
 
+        .card-product .product-emoji {
+            font-size: 1.5rem;
+            margin-bottom: 2px;
+        }
+
         .card-product .product-name {
-            font-size: 1rem;
+            font-size: 0.92rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
 
         .card-product .product-price {
-            font-size: 1.35rem;
+            font-size: 1.3rem;
             font-weight: 800;
             color: var(--green);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .card-product .product-rating {
-            font-size: 0.76rem;
+            font-size: 0.72rem;
             color: var(--yellow);
             display: flex;
             align-items: center;
@@ -1236,61 +1228,61 @@
             list-style: none;
             display: flex;
             flex-wrap: wrap;
-            gap: 6px;
-            margin: 12px 0;
+            gap: 5px;
+            margin: 8px 0;
         }
 
         .card-product .product-features li {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--text);
-            padding: 4px 10px;
+            padding: 3px 8px;
             background: var(--surface-2);
             border-radius: var(--radius-pill);
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
         }
 
         .card-product .product-features li::before {
             content: '';
-            width: 5px;
-            height: 5px;
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
             background: var(--green);
             flex-shrink: 0;
         }
 
         .card-product .product-verdict {
-            font-size: 0.8rem;
+            font-size: 0.72rem;
             color: var(--text);
-            line-height: 1.6;
-            padding: 10px 12px;
-            background: var(--surface-3);
+            line-height: 1.5;
+            padding: 8px 10px;
+            background: rgba(76,214,138,0.06);
             border-radius: var(--radius-md);
             border-left: 3px solid var(--green);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .card-product .product-warnings {
             list-style: none;
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
         .card-product .product-warnings li {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--yellow);
-            padding: 4px 0;
+            padding: 3px 0;
             display: flex;
             align-items: flex-start;
-            gap: 6px;
+            gap: 5px;
         }
 
         .card-product .product-warnings li::before {
             content: '!';
             font-weight: 800;
-            font-size: 0.6rem;
-            width: 16px;
-            height: 16px;
+            font-size: 0.55rem;
+            width: 14px;
+            height: 14px;
             border-radius: 50%;
             background: var(--yellow-bg);
             color: var(--yellow);
@@ -1305,12 +1297,12 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            margin-top: 10px;
-            font-size: 0.76rem;
+            margin-top: 8px;
+            font-size: 0.7rem;
             font-weight: 600;
             color: var(--accent);
             text-decoration: none;
-            padding: 6px 12px;
+            padding: 5px 10px;
             background: var(--accent-bg);
             border-radius: var(--radius-sm);
             transition: background 0.2s;
@@ -1318,28 +1310,28 @@
 
         .card-product .product-link:hover { background: var(--accent-bg-strong); }
 
-        /* === TIMELINE === */
+        /* === TIMELINE — Visual dots === */
         .card-timeline .timeline-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .card-timeline .timeline-event {
             display: flex;
-            gap: 12px;
-            padding: 8px 0;
-            font-size: 0.78rem;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.72rem;
             position: relative;
         }
 
         .card-timeline .timeline-event::before {
             content: '';
             position: absolute;
-            left: 55px;
-            top: 26px;
-            bottom: -8px;
+            left: 52px;
+            top: 22px;
+            bottom: -6px;
             width: 2px;
             background: var(--border);
             border-radius: 1px;
@@ -1349,11 +1341,11 @@
 
         .card-timeline .timeline-date {
             color: var(--accent);
-            min-width: 48px;
+            min-width: 44px;
             flex-shrink: 0;
             text-align: right;
             font-weight: 600;
-            font-size: 0.72rem;
+            font-size: 0.66rem;
         }
 
         .card-timeline .timeline-dot {
@@ -1361,55 +1353,54 @@
             height: 8px;
             border-radius: 50%;
             background: var(--border-bright);
-            margin-top: 5px;
+            margin-top: 4px;
             flex-shrink: 0;
             z-index: 1;
         }
 
         .card-timeline .timeline-event.highlight .timeline-dot {
             background: var(--accent);
-            box-shadow: 0 0 6px rgba(108,159,255,0.4);
+            box-shadow: 0 0 8px rgba(91,138,245,0.4);
         }
 
-        .card-timeline .timeline-text { color: var(--text); line-height: 1.5; }
+        .card-timeline .timeline-text { color: var(--text); line-height: 1.45; }
 
         .card-timeline .timeline-text a {
             color: var(--accent);
             text-decoration: none;
         }
-
         .card-timeline .timeline-text a:hover { text-decoration: underline; }
 
-        /* === QUOTE === */
+        /* === QUOTE — Stylish === */
         .card-quote {
-            background: linear-gradient(135deg, var(--surface) 0%, rgba(180,142,255,0.06) 100%);
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(160,126,240,0.06) 100%);
             border-left: 3px solid var(--purple);
         }
 
         .card-quote .quote-mark {
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             color: var(--purple);
-            opacity: 0.25;
+            opacity: 0.3;
             line-height: 1;
-            margin-bottom: -12px;
+            margin-bottom: -8px;
             font-family: Georgia, serif;
         }
 
         .card-quote .quote-text {
-            font-size: 0.92rem;
+            font-size: 0.84rem;
             color: var(--text);
-            line-height: 1.7;
+            line-height: 1.6;
             font-style: italic;
-            padding: 12px 14px;
-            background: var(--surface-2);
+            padding: 8px 10px;
+            background: rgba(160,126,240,0.05);
             border-radius: var(--radius-md);
         }
 
         .card-quote .quote-attribution {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             font-weight: 700;
             color: var(--purple);
-            margin-top: 10px;
+            margin-top: 8px;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -1417,41 +1408,41 @@
 
         .card-quote .quote-attribution::before {
             content: '';
-            width: 16px;
+            width: 14px;
             height: 2px;
             background: var(--purple);
             opacity: 0.5;
         }
 
         .card-quote .quote-context {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
-            margin-top: 4px;
-            line-height: 1.5;
+            margin-top: 3px;
+            line-height: 1.4;
         }
 
         /* === COMPARISON === */
         .card-comparison .comparison-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
         }
 
         .card-comparison table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            font-size: 0.76rem;
+            font-size: 0.7rem;
         }
 
         .card-comparison th {
             text-align: left;
-            padding: 8px 10px;
+            padding: 6px 8px;
             color: var(--accent);
             font-weight: 700;
             background: var(--surface-2);
-            font-size: 0.72rem;
+            font-size: 0.66rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
@@ -1460,30 +1451,30 @@
         .card-comparison th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
 
         .card-comparison td {
-            padding: 8px 10px;
+            padding: 6px 8px;
             color: var(--text);
-            border-bottom: 1px solid var(--border);
+            border-bottom: 1px solid var(--glass-border);
         }
 
         .card-comparison tr:last-child td { border-bottom: none; }
 
-        /* === WARNING === */
+        /* === WARNING — Bold visual severity === */
         .card-warning { border-left: 3px solid var(--yellow); border-top: none; }
-        .card-warning.level-critical { border-left-color: var(--red); background: linear-gradient(135deg, var(--surface) 0%, rgba(255,107,107,0.04) 100%); }
-        .card-warning.level-warning { background: linear-gradient(135deg, var(--surface) 0%, rgba(255,209,92,0.03) 100%); }
-        .card-warning.level-info { border-left-color: var(--accent); background: linear-gradient(135deg, var(--surface) 0%, rgba(108,159,255,0.03) 100%); }
+        .card-warning.level-critical { border-left-color: var(--red); background: linear-gradient(145deg, var(--surface) 0%, rgba(240,96,96,0.05) 100%); }
+        .card-warning.level-warning { background: linear-gradient(145deg, var(--surface) 0%, rgba(240,192,64,0.04) 100%); }
+        .card-warning.level-info { border-left-color: var(--accent); background: linear-gradient(145deg, var(--surface) 0%, rgba(91,138,245,0.04) 100%); }
 
         .card-warning .warning-header {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .card-warning .warning-icon-wrap {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -1491,14 +1482,19 @@
             flex-shrink: 0;
         }
 
-        .card-warning .warning-icon-wrap .material-symbols-rounded { color: var(--yellow); font-size: 18px; }
+        .card-warning .warning-icon-wrap .material-symbols-rounded {
+            color: var(--yellow);
+            font-size: 20px;
+            font-variation-settings: 'FILL' 1;
+        }
+
         .card-warning.level-critical .warning-icon-wrap { background: var(--red-bg); }
         .card-warning.level-critical .warning-icon-wrap .material-symbols-rounded { color: var(--red); }
         .card-warning.level-info .warning-icon-wrap { background: var(--accent-bg); }
         .card-warning.level-info .warning-icon-wrap .material-symbols-rounded { color: var(--accent); }
 
         .card-warning .warning-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: var(--yellow);
         }
@@ -1507,19 +1503,19 @@
         .card-warning.level-info .warning-title { color: var(--accent); }
 
         .card-warning .warning-details {
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             color: var(--text);
-            line-height: 1.6;
-            margin-bottom: 10px;
+            line-height: 1.5;
+            margin-bottom: 8px;
         }
 
         .card-warning .warning-advice {
-            font-size: 0.76rem;
+            font-size: 0.7rem;
             color: var(--text);
-            padding: 10px 12px;
+            padding: 8px 10px;
             background: var(--surface-2);
             border-radius: var(--radius-md);
-            line-height: 1.5;
+            line-height: 1.4;
         }
 
         /* === ACTION CARD === */
@@ -1528,29 +1524,29 @@
         }
 
         .card-action .action-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-action .action-item {
             display: flex;
             align-items: flex-start;
-            gap: 12px;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border);
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--glass-border);
         }
 
         .card-action .action-item:last-child { border-bottom: none; }
 
         .card-action .action-bullet {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             background: var(--accent-bg-strong);
             color: var(--accent);
-            font-size: 0.68rem;
+            font-size: 0.62rem;
             font-weight: 800;
             display: flex;
             align-items: center;
@@ -1560,7 +1556,7 @@
         }
 
         .card-action .action-label {
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             color: var(--text);
             font-weight: 600;
         }
@@ -1572,21 +1568,21 @@
         .card-action .action-label a:hover { text-decoration: underline; }
 
         .card-action .action-desc {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
-            margin-top: 3px;
-            line-height: 1.5;
+            margin-top: 2px;
+            line-height: 1.4;
         }
 
         .card-action .action-priority {
             display: inline-block;
-            font-size: 0.58rem;
+            font-size: 0.54rem;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.08em;
-            padding: 2px 7px;
+            padding: 2px 6px;
             border-radius: var(--radius-pill);
-            margin-top: 4px;
+            margin-top: 3px;
         }
 
         .action-priority.high { background: var(--red-bg); color: var(--red); }
@@ -1595,42 +1591,86 @@
 
         /* === TEXT EXTRACT === */
         .card-extract .extract-title {
-            font-size: 0.84rem;
+            font-size: 0.78rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
         }
 
         .card-extract .extract-text {
-            font-size: 0.8rem;
+            font-size: 0.74rem;
             color: var(--text);
-            line-height: 1.7;
-            padding: 12px 14px;
+            line-height: 1.6;
+            padding: 10px 12px;
             background: var(--surface-2);
             border-radius: var(--radius-md);
             border-left: 3px solid var(--border-bright);
             white-space: pre-wrap;
             font-family: 'Inter', sans-serif;
+            max-height: 140px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .card-extract .extract-text::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, var(--surface-2));
+            pointer-events: none;
         }
 
         .card-extract .extract-source {
-            font-size: 0.68rem;
+            font-size: 0.62rem;
             color: var(--text-muted);
-            margin-top: 6px;
+            margin-top: 4px;
         }
 
-        /* === LOCATION === */
+        /* === LOCATION — Pin visual === */
+        .card-location {
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(91,138,245,0.04) 100%);
+        }
+
+        .card-location .location-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .card-location .location-pin {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-bg-strong);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .card-location .location-pin .material-symbols-rounded {
+            font-size: 20px;
+            color: var(--accent);
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .card-location .location-emoji {
+            font-size: 1.3rem;
+        }
+
         .card-location .location-name {
-            font-size: 0.95rem;
+            font-size: 0.88rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 4px;
         }
 
         .card-location .location-address {
-            font-size: 0.76rem;
+            font-size: 0.7rem;
             color: var(--accent);
-            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 4px;
@@ -1640,66 +1680,65 @@
             color: var(--accent);
             text-decoration: none;
         }
-
         .card-location .location-address a:hover { text-decoration: underline; }
 
         .card-location .location-context {
-            font-size: 0.8rem;
-            color: var(--text);
-            line-height: 1.6;
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
 
         .card-location .location-details {
-            margin-top: 10px;
+            margin-top: 6px;
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
         }
 
         .card-location .location-detail-item {
-            font-size: 0.74rem;
+            font-size: 0.68rem;
             color: var(--text-secondary);
-            padding: 3px 0 3px 10px;
+            padding: 2px 0 2px 8px;
             border-left: 2px solid var(--border);
         }
 
         /* === LINK CARD === */
         .card-links .links-title {
-            font-size: 0.88rem;
+            font-size: 0.82rem;
             font-weight: 700;
             color: #fff;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
 
         .card-links .link-item {
             display: flex;
             align-items: flex-start;
-            gap: 10px;
-            padding: 8px 0;
-            border-bottom: 1px solid var(--border);
+            gap: 8px;
+            padding: 6px 0;
+            border-bottom: 1px solid var(--glass-border);
         }
 
         .card-links .link-item:last-child { border-bottom: none; }
 
         .card-links .link-icon {
-            width: 28px;
-            height: 28px;
+            width: 26px;
+            height: 26px;
             border-radius: 6px;
             background: var(--accent-bg);
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
-            margin-top: 2px;
+            margin-top: 1px;
         }
 
         .card-links .link-icon .material-symbols-rounded {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--accent);
         }
 
         .card-links .link-label {
-            font-size: 0.82rem;
+            font-size: 0.76rem;
             font-weight: 600;
         }
 
@@ -1707,14 +1746,13 @@
             color: var(--accent);
             text-decoration: none;
         }
-
         .card-links .link-label a:hover { text-decoration: underline; }
 
         .card-links .link-desc {
-            font-size: 0.7rem;
+            font-size: 0.64rem;
             color: var(--text-secondary);
-            margin-top: 2px;
-            line-height: 1.4;
+            margin-top: 1px;
+            line-height: 1.35;
         }
 
         /* === ERROR STATE === */
@@ -1734,8 +1772,8 @@
         #errorState.active { display: flex; }
 
         .error-icon {
-            width: 64px;
-            height: 64px;
+            width: 60px;
+            height: 60px;
             border-radius: 50%;
             background: var(--red-bg);
             display: flex;
@@ -1744,11 +1782,11 @@
             margin-bottom: 20px;
         }
 
-        .error-icon .material-symbols-rounded { font-size: 32px; color: var(--red); }
+        .error-icon .material-symbols-rounded { font-size: 28px; color: var(--red); }
 
         .error-text {
             color: var(--red);
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             font-weight: 500;
             margin-bottom: 24px;
             line-height: 1.5;
@@ -1761,7 +1799,7 @@
             border-radius: var(--radius-pill);
             color: var(--text);
             font-family: inherit;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
@@ -1775,10 +1813,10 @@
 
         /* === PLACEHOLDERS === */
         .placeholder-line {
-            height: 12px;
+            height: 10px;
             background: var(--surface-2);
             border-radius: var(--radius-sm);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
         .placeholder-line.short { width: 55%; }
         .placeholder-line.medium { width: 78%; }
@@ -1795,7 +1833,6 @@
             75% { content: '...'; }
         }
 
-        /* === AUTO-LINKIFY === */
         .auto-link {
             color: var(--accent);
             text-decoration: none;
@@ -1867,8 +1904,6 @@
         </div>
     </div>
 
-    <!-- Status bar removed — circular progress only -->
-
     <!-- Error State -->
     <div id="errorState">
         <div class="error-icon">
@@ -1889,7 +1924,7 @@
         const progressPhase = document.getElementById('progressPhase');
         const progressLabel = document.getElementById('progressLabel');
         const progressRing = document.getElementById('progressRing');
-        const RING_CIRCUMFERENCE = 2 * Math.PI * 45; // r=45
+        const RING_CIRCUMFERENCE = 2 * Math.PI * 45;
 
         function updateProgress(pct, phase, label) {
             const offset = RING_CIRCUMFERENCE - (pct / 100) * RING_CIRCUMFERENCE;
@@ -2523,7 +2558,7 @@
                     } else {
                         setTimeout(() => el.classList.add('researching'), 200);
                     }
-                }, 80 + index * 100);
+                }, 60 + index * 80);
             });
 
             if (!firstCardShown && populatedCards.length === 0) {
@@ -2781,6 +2816,7 @@
 
             if (type === 'hero_summary') {
                 return `<div class="card-inner">
+                    ${pd.emoji ? `<span class="hero-emoji">${esc(pd.emoji)}</span>` : ''}
                     ${pd.badge ? `<span class="hero-badge">${esc(pd.badge)}</span>` : ''}
                     <div class="hero-title">${esc(pd.title || 'Analyzing...')}</div>
                     <div class="hero-subtitle">${esc(pd.subtitle || 'Identifying content...')}</div>
@@ -2811,7 +2847,7 @@
                 return `<div class="card-inner">
                     ${getCardTypeLabel(type)}
                     <div class="person-header">
-                        <div class="person-avatar" style="opacity:0.5">${esc(pd.name ? pd.name[0].toUpperCase() : '?')}</div>
+                        <div class="person-avatar" style="opacity:0.5">${esc(pd.emoji || (pd.name ? pd.name[0].toUpperCase() : '?'))}</div>
                         <div>
                             <div class="person-name" style="opacity:0.6">${esc(pd.name)}</div>
                             ${pd.role ? `<div class="person-role">${esc(pd.role)}</div>` : ''}
@@ -2842,22 +2878,22 @@
                         ${d.badge ? `<div class="hero-image-badge"><span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}15;color:${esc(d.badgeColor)};backdrop-filter:blur(8px)"` : 'style="backdrop-filter:blur(8px)"'}>${esc(d.badge)}</span></div>` : ''}
                     </div>` : ''}
                     <div class="card-inner">
+                        ${!hasImage && d.emoji ? `<span class="hero-emoji">${esc(d.emoji)}</span>` : ''}
                         ${!hasImage && d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}15;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
-                        ${d.icon ? `<span style="font-size:1.4rem;margin-bottom:6px;display:inline-block">${esc(d.icon)}</span>` : ''}
                         <div class="hero-title">${esc(d.title || 'Analysis')}</div>
                         <div class="hero-subtitle">${linkify(d.subtitle || '')}</div>
                         ${d.takeaway ? `<div class="hero-takeaway">${linkify(d.takeaway)}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="hero-link"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View Source</a>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="hero-link"><span class="material-symbols-rounded" style="font-size:13px">open_in_new</span> Source</a>` : ''}
                     </div>`;
                 }
 
                 case 'key_metric':
                     return `<div class="card-inner">
-                        ${getCardTypeLabel('key_metric')}
+                        ${d.emoji ? `<span class="metric-emoji">${esc(d.emoji)}</span>` : getCardTypeLabel('key_metric')}
                         <div class="metric-value" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
                         <div class="metric-label">${esc(d.label || '')}</div>
                         ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">
-                            <span class="material-symbols-rounded" style="font-size:12px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
+                            <span class="material-symbols-rounded" style="font-size:11px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
                             ${esc(d.trend)}
                         </span>` : ''}
                         ${d.context ? `<div class="metric-context">${linkify(d.context)}</div>` : ''}
@@ -2872,8 +2908,10 @@
                                 const label = item.label || item.name || item.key || '';
                                 const value = item.value || item.description || item.text || '';
                                 const hasUrl = item.url && typeof item.url === 'string' && item.url.startsWith('http');
+                                const emoji = item.emoji || item.icon || '';
                                 return `<div class="list-item${item.highlight ? ' highlight' : ''}">
-                                    <span class="list-item-label">${item.icon ? `<span class="list-item-icon">${esc(item.icon)}</span>` : ''}${esc(label)}</span>
+                                    ${emoji ? `<span class="list-item-emoji">${esc(emoji)}</span>` : ''}
+                                    <span class="list-item-label">${esc(label)}</span>
                                     <span class="list-item-value">${hasUrl ? renderLink(item.url, value, 'list-item-link') : linkify(value)}</span>
                                 </div>`;
                             }
@@ -2883,57 +2921,69 @@
                         }).join('')}
                     </div>`;
 
-                case 'fact_check':
+                case 'fact_check': {
+                    const verdict = d.verdict || 'unverified';
+                    const verdictIcon = verdict === 'verified' ? 'check_circle' :
+                                       verdict === 'false' ? 'cancel' :
+                                       verdict === 'misleading' ? 'warning' :
+                                       verdict === 'partially_true' ? 'change_circle' : 'help';
+                    const verdictColor = verdict === 'verified' ? 'var(--green)' :
+                                        verdict === 'false' ? 'var(--red)' :
+                                        verdict === 'misleading' ? 'var(--yellow)' :
+                                        verdict === 'partially_true' ? 'var(--orange)' :
+                                        verdict === 'needs_context' ? 'var(--purple)' : 'var(--accent)';
                     return `<div class="card-inner">
                         ${getCardTypeLabel('fact_check')}
-                        <div class="fact-claim">${linkify(d.claim || '')}</div>
-                        <div>
-                            <span class="fact-verdict ${esc(d.verdict || 'unverified')}">
-                                <span class="material-symbols-rounded" style="font-size:13px">${
-                                    d.verdict === 'verified' ? 'check_circle' :
-                                    d.verdict === 'false' ? 'cancel' :
-                                    d.verdict === 'misleading' ? 'warning' : 'help'
-                                }</span>
-                                ${esc(d.verdict || 'unverified')}
-                            </span>
-                            ${d.confidence ? `<span class="fact-confidence">${esc(d.confidence)} confidence</span>` : ''}
+                        <div class="fact-verdict-visual">
+                            <div class="fact-verdict-icon ${esc(verdict)}">
+                                <span class="material-symbols-rounded">${verdictIcon}</span>
+                            </div>
+                            <div class="fact-verdict-text">
+                                <span class="fact-verdict-label" style="color:${verdictColor}">${esc(verdict.replace(/_/g, ' '))}</span>
+                                ${d.confidence ? `<span class="fact-confidence-label">${esc(d.confidence)} confidence</span>` : ''}
+                            </div>
                         </div>
-                        <div class="fact-explanation">${linkify(d.explanation || '')}</div>
+                        <div class="fact-claim">${linkify(d.claim || '')}</div>
+                        ${d.explanation ? `<div class="fact-explanation">${linkify(d.explanation)}</div>` : ''}
                         ${d.source ? `<div class="fact-source">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
                     </div>`;
+                }
 
-                case 'person_card':
+                case 'person_card': {
+                    const avatar = d.emoji || (d.name ? d.name[0].toUpperCase() : '?');
                     return `<div class="card-inner">
                         ${getCardTypeLabel('person_card')}
                         <div class="person-header">
-                            <div class="person-avatar">${esc(d.name ? d.name[0].toUpperCase() : '?')}</div>
+                            <div class="person-avatar">${esc(avatar)}</div>
                             <div>
                                 <div class="person-name">${esc(d.name || 'Unknown')}</div>
                                 ${d.role ? `<div class="person-role">${esc(d.role)}</div>` : ''}
                                 ${d.handle ? `<div class="person-handle">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
                             </div>
                         </div>
-                        <div class="person-context">${linkify(d.context || '')}</div>
-                        ${(d.details || []).length ? `<div class="person-details">${d.details.map(det =>
+                        ${d.context ? `<div class="person-context">${linkify(d.context)}</div>` : ''}
+                        ${(d.details || []).length ? `<div class="person-details">${d.details.slice(0, 3).map(det =>
                             `<div class="person-detail-item">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
                     </div>`;
+                }
 
                 case 'product_card': {
-                    const features = (d.features || []).map(normalizeFeature);
-                    const warnings = (d.warnings || []).map(normalizeFeature);
+                    const features = (d.features || []).map(normalizeFeature).slice(0, 5);
+                    const warnings = (d.warnings || []).map(normalizeFeature).slice(0, 3);
                     const hasRating = d.rating && d.rating !== 'Not visible' && d.rating !== 'N/A';
                     const hasPrice = d.price && d.price !== 'Not visible' && d.price !== 'N/A';
 
                     return `<div class="card-inner">
                         ${getCardTypeLabel('product_card')}
                         <div class="product-header">
-                            ${d.imageUrl ? `<div class="product-image"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>inventory_2</span>'"></div>` : ''}
+                            ${d.imageUrl ? `<div class="product-image"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>inventory_2</span>'"></div>` :
+                              d.emoji ? `<span class="product-emoji">${esc(d.emoji)}</span>` : ''}
                             <div>
                                 <div class="product-name">${esc(d.name || 'Product')}</div>
                                 ${hasPrice ? `<div class="product-price">${esc(d.price)}</div>` : ''}
                                 ${hasRating ? `<div class="product-rating">
-                                    <span class="material-symbols-rounded" style="font-size:14px;font-variation-settings:'FILL' 1">star</span>
+                                    <span class="material-symbols-rounded" style="font-size:13px;font-variation-settings:'FILL' 1">star</span>
                                     ${esc(d.rating)}
                                 </div>` : ''}
                             </div>
@@ -2945,7 +2995,7 @@
                         ${warnings.length ? `<ul class="product-warnings">${warnings.map(w =>
                             `<li>${esc(w)}</li>`
                         ).join('')}</ul>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="product-link"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View Product</a>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="product-link"><span class="material-symbols-rounded" style="font-size:13px">open_in_new</span> View</a>` : ''}
                     </div>`;
                 }
 
@@ -2967,15 +3017,15 @@
                 case 'quote_card':
                     return `<div class="card-inner">
                         ${getCardTypeLabel('quote_card')}
-                        <div class="quote-mark">"</div>
+                        <div class="quote-mark">\u201C</div>
                         <div class="quote-text">${linkify(d.quote || '')}</div>
-                        ${d.attribution ? `<div class="quote-attribution">— ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>` : ''}
+                        ${d.attribution ? `<div class="quote-attribution">\u2014 ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>` : ''}
                         ${d.context ? `<div class="quote-context">${linkify(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'comparison_card':
                     if (!d.columns || !d.columns.length) {
-                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-muted);font-size:0.78rem">No data available</div></div>`;
+                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-muted);font-size:0.72rem">No data available</div></div>`;
                     }
                     const cols = Array.isArray(d.columns) ? d.columns : [];
                     const maxRows = Math.max(...cols.map(c => (Array.isArray(c.values) ? c.values : []).length), 0);
@@ -3006,7 +3056,7 @@
                             </div>
                             <span class="warning-title">${esc(d.title || 'Warning')}</span>
                         </div>
-                        <div class="warning-details">${linkify(d.details || '')}</div>
+                        ${d.details ? `<div class="warning-details">${linkify(d.details)}</div>` : ''}
                         ${d.advice ? `<div class="warning-advice">${linkify(d.advice)}</div>` : ''}
                     </div>`;
                 }
@@ -3036,19 +3086,27 @@
                         ${d.source ? `<div class="extract-source">${esc(d.source)}</div>` : ''}
                     </div>`;
 
-                case 'location_card':
+                case 'location_card': {
+                    const locEmoji = d.emoji || '';
                     return `<div class="card-inner">
                         ${getCardTypeLabel('location_card')}
-                        <div class="location-name">${esc(d.name || 'Location')}</div>
-                        ${d.address ? `<div class="location-address">
-                            <span class="material-symbols-rounded" style="font-size:14px">place</span>
-                            ${d.mapUrl ? renderLink(d.mapUrl, d.address) : linkify(d.address)}
-                        </div>` : ''}
-                        <div class="location-context">${linkify(d.context || '')}</div>
-                        ${(d.details || []).length ? `<div class="location-details">${d.details.map(det =>
+                        <div class="location-header">
+                            <div class="location-pin">
+                                ${locEmoji ? `<span class="location-emoji">${esc(locEmoji)}</span>` : `<span class="material-symbols-rounded">location_on</span>`}
+                            </div>
+                            <div>
+                                <div class="location-name">${esc(d.name || 'Location')}</div>
+                                ${d.address ? `<div class="location-address">
+                                    ${d.mapUrl ? renderLink(d.mapUrl, d.address) : linkify(d.address)}
+                                </div>` : ''}
+                            </div>
+                        </div>
+                        ${d.context ? `<div class="location-context">${linkify(d.context)}</div>` : ''}
+                        ${(d.details || []).length ? `<div class="location-details">${d.details.slice(0, 3).map(det =>
                             `<div class="location-detail-item">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
                     </div>`;
+                }
 
                 case 'link_card':
                     return `<div class="card-inner">
@@ -3072,20 +3130,20 @@
                         ${Object.entries(d).filter(([k]) => !k.startsWith('_')).map(([key, val]) => {
                             if (val === null || val === undefined) return '';
                             if (Array.isArray(val)) {
-                                return `<div style="margin-bottom:6px">
-                                    <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                    ${val.map(v => `<div style="font-size:0.78rem;color:var(--text);padding:3px 0 3px 10px;border-left:2px solid var(--border)">${renderItemValue(v)}</div>`).join('')}
+                                return `<div style="margin-bottom:5px">
+                                    <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                    ${val.slice(0, 5).map(v => `<div style="font-size:0.72rem;color:var(--text);padding:2px 0 2px 8px;border-left:2px solid var(--border)">${renderItemValue(v)}</div>`).join('')}
                                 </div>`;
                             }
                             if (typeof val === 'object') {
-                                return `<div style="margin-bottom:6px">
-                                    <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                    <div style="font-size:0.78rem;color:var(--text)">${renderItemValue(val)}</div>
+                                return `<div style="margin-bottom:5px">
+                                    <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                    <div style="font-size:0.72rem;color:var(--text)">${renderItemValue(val)}</div>
                                 </div>`;
                             }
-                            return `<div style="margin-bottom:6px">
-                                <div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                <div style="font-size:0.78rem;color:var(--text)">${linkify(val)}</div>
+                            return `<div style="margin-bottom:5px">
+                                <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
+                                <div style="font-size:0.72rem;color:var(--text)">${linkify(val)}</div>
                             </div>`;
                         }).join('')}
                     </div>`;
