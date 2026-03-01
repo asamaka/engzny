@@ -492,16 +492,18 @@
 
         /* === CONTENT ANALYSIS === */
         .content-analysis {
-            padding: 14px 16px 10px;
+            padding: 10px 16px 4px;
         }
 
         .content-analysis-intent {
-            font-size: 0.88rem;
+            font-size: 0.78rem;
             font-weight: 400;
-            color: var(--text);
-            margin-bottom: 10px;
-            line-height: 1.5;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            line-height: 1.45;
         }
+
+        .content-analysis-intent:empty { display: none; }
 
         /* top-questions moved to follow-up section at bottom */
 
@@ -742,30 +744,31 @@
         .card .card-source-tag.source-sonar { background: var(--green-bg); color: var(--green); }
         .card .card-source-tag.source-review { background: var(--purple-bg); color: var(--purple); }
 
-        /* Card type header with icon */
+        /* Card type header — subtle, small */
         .card-type-label {
-            font-size: 0.56rem;
-            font-weight: 700;
+            font-size: 0.5rem;
+            font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.08em;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 4px;
+            opacity: 0.7;
         }
 
         .card-type-icon {
-            width: 22px;
-            height: 22px;
-            border-radius: 6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
         }
 
-        .card-type-icon .material-symbols-rounded { font-size: 13px; }
+        .card-type-icon .material-symbols-rounded { font-size: 10px; }
 
         /* === HERO SUMMARY — Large visual card === */
         .card-hero {
@@ -829,30 +832,36 @@
         }
 
         .card-hero .hero-title {
-            font-size: 1.25rem;
+            font-size: 1.3rem;
             font-weight: 800;
             color: #fff;
-            margin-bottom: 4px;
-            line-height: 1.2;
-            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+            line-height: 1.15;
+            letter-spacing: -0.03em;
+            max-height: 3.5em;
+            overflow: hidden;
         }
 
         .card-hero .hero-subtitle {
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 400;
             color: var(--text-secondary);
             margin-bottom: 10px;
             line-height: 1.45;
+            max-height: 2.9em;
+            overflow: hidden;
         }
 
         .card-hero .hero-takeaway {
-            font-size: 0.78rem;
+            font-size: 0.74rem;
             color: var(--text);
-            line-height: 1.5;
-            padding: 10px 12px;
+            line-height: 1.45;
+            padding: 8px 12px;
             background: rgba(91,138,245,0.06);
             border-radius: var(--radius-md);
             border-left: 3px solid var(--accent);
+            max-height: 4.5em;
+            overflow: hidden;
         }
 
         .card-hero .hero-link {
@@ -1085,15 +1094,17 @@
         }
 
         .card-person .person-avatar {
-            width: 48px;
-            height: 48px;
+            width: 52px;
+            height: 52px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--accent-bg-strong), var(--purple-bg));
+            background: linear-gradient(135deg, var(--accent), var(--purple));
             border: 2px solid var(--border-bright);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.3rem;
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
             flex-shrink: 0;
         }
 
@@ -1737,6 +1748,7 @@
         .card-news {
             background: linear-gradient(145deg, var(--surface) 0%, rgba(240,96,96,0.04) 100%);
             overflow: hidden;
+            border-top: 3px solid var(--red);
         }
 
         .card-news .news-image-wrap {
@@ -2045,12 +2057,13 @@
 
         /* === PERSON CARD — Photo support === */
         .card-person .person-photo {
-            width: 56px;
-            height: 56px;
+            width: 52px;
+            height: 52px;
             border-radius: 50%;
             object-fit: cover;
             border: 2px solid var(--border-bright);
             flex-shrink: 0;
+            background: var(--surface-2);
         }
 
         .card-person .person-notable {
@@ -2117,6 +2130,190 @@
         .card-metric .metric-sparkline .sparkline-area {
             fill: var(--accent-bg);
             opacity: 0.5;
+        }
+
+        /* === VERIFICATION CARD — Live source tracking === */
+        .card-verification {
+            background: linear-gradient(145deg, var(--surface) 0%, rgba(91,138,245,0.06) 100%);
+            border: 1px solid rgba(91,138,245,0.2);
+        }
+
+        .card-verification .verify-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .card-verification .verify-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .card-verification .verify-icon .material-symbols-rounded {
+            font-size: 20px;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .card-verification .verify-icon.searching {
+            background: var(--accent-bg-strong);
+            color: var(--accent);
+            animation: verifyPulse 2s ease-in-out infinite;
+        }
+        .card-verification .verify-icon.partially_verified { background: var(--yellow-bg); color: var(--yellow); }
+        .card-verification .verify-icon.verified { background: var(--green-bg); color: var(--green); }
+        .card-verification .verify-icon.denied { background: var(--red-bg); color: var(--red); }
+        .card-verification .verify-icon.unconfirmed { background: var(--surface-3); color: var(--text-muted); }
+        .card-verification .verify-icon.conflicting { background: var(--orange-bg); color: var(--orange); }
+
+        @keyframes verifyPulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .card-verification .verify-status-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .card-verification .verify-status-label {
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .card-verification .verify-status-label.searching { color: var(--accent); }
+        .card-verification .verify-status-label.partially_verified { color: var(--yellow); }
+        .card-verification .verify-status-label.verified { color: var(--green); }
+        .card-verification .verify-status-label.denied { color: var(--red); }
+        .card-verification .verify-status-label.unconfirmed { color: var(--text-muted); }
+        .card-verification .verify-status-label.conflicting { color: var(--orange); }
+
+        .card-verification .verify-claim {
+            font-size: 0.82rem;
+            color: var(--text);
+            line-height: 1.45;
+            margin-bottom: 14px;
+            font-weight: 500;
+        }
+
+        .card-verification .verify-sources {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .card-verification .verify-source {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 10px;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            transition: background 0.2s;
+        }
+
+        .card-verification .verify-source-status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .card-verification .verify-source-status .material-symbols-rounded {
+            font-size: 13px;
+            font-variation-settings: 'FILL' 1;
+        }
+
+        .card-verification .verify-source-status.checking {
+            background: var(--accent-bg);
+            animation: sourcePulse 1.5s ease-in-out infinite;
+        }
+        .card-verification .verify-source-status.checking .material-symbols-rounded { color: var(--accent); }
+        .card-verification .verify-source-status.confirmed { background: var(--green-bg); }
+        .card-verification .verify-source-status.confirmed .material-symbols-rounded { color: var(--green); }
+        .card-verification .verify-source-status.denied { background: var(--red-bg); }
+        .card-verification .verify-source-status.denied .material-symbols-rounded { color: var(--red); }
+        .card-verification .verify-source-status.not_yet_reported { background: var(--surface-3); }
+        .card-verification .verify-source-status.not_yet_reported .material-symbols-rounded { color: var(--text-muted); }
+        .card-verification .verify-source-status.no_info { background: var(--surface-3); }
+        .card-verification .verify-source-status.no_info .material-symbols-rounded { color: var(--text-muted); }
+
+        @keyframes sourcePulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .card-verification .verify-source-name {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .card-verification .verify-source-snippet {
+            font-size: 0.66rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-top: 2px;
+        }
+
+        .card-verification .verify-source-link {
+            font-size: 0.58rem;
+            color: var(--accent);
+            text-decoration: none;
+            margin-top: 2px;
+            display: inline-block;
+        }
+        .card-verification .verify-source-link:hover { text-decoration: underline; }
+
+        .card-verification .verify-summary {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            margin-top: 12px;
+            padding: 8px 10px;
+            background: var(--surface-2);
+            border-radius: var(--radius-md);
+            border-left: 3px solid var(--accent);
+            line-height: 1.45;
+        }
+
+        .card-verification .verify-last-checked {
+            font-size: 0.56rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        .card-verification .verify-searching-bar {
+            height: 3px;
+            background: var(--surface-2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 14px;
+        }
+
+        .card-verification .verify-searching-bar-fill {
+            height: 100%;
+            width: 30%;
+            background: linear-gradient(90deg, var(--accent), var(--purple));
+            border-radius: 2px;
+            animation: searchSweep 2s ease-in-out infinite;
+        }
+
+        @keyframes searchSweep {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
         }
 
         /* === FOLLOW-UP QUESTIONS — Interactive at bottom === */
@@ -2505,6 +2702,7 @@
             news_card: { icon: 'newspaper', bg: 'var(--red-bg)', color: 'var(--red)' },
             chart_card: { icon: 'bar_chart', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
             did_you_know_card: { icon: 'lightbulb', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
+            verification_card: { icon: 'verified', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
         };
 
         const CHART_COLORS = ['#5b8af5', '#4cd68a', '#f0c040', '#f06060', '#a07ef0', '#f09040', '#60d0f0', '#f060a0'];
@@ -2578,7 +2776,42 @@
             </svg>`;
         }
 
+        const CONTENT_TYPE_LABELS = {
+            breaking_news: 'Breaking News',
+            news: 'News',
+            product: 'Product',
+            social_media: 'Social Media',
+            social: 'Social',
+            tech: 'Tech',
+            sports: 'Sports',
+            data: 'Data',
+            analytics: 'Analytics',
+            general: 'Analysis',
+            article: 'Article',
+            report_significant_event: 'Breaking News',
+            significant_event: 'Breaking News',
+            messaging: 'Messaging',
+            chat: 'Chat',
+            settings: 'Settings',
+            finance: 'Finance',
+            health: 'Health',
+            science: 'Science',
+            entertainment: 'Entertainment',
+            analyzing: 'Analyzing...',
+        };
+
+        function humanizeContentType(ct) {
+            if (!ct) return 'Analysis';
+            if (CONTENT_TYPE_LABELS[ct]) return CONTENT_TYPE_LABELS[ct];
+            return ct.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).substring(0, 20);
+        }
+
+        const CARDS_WITHOUT_LABEL = new Set([
+            'hero_summary', 'verification_card', 'did_you_know_card', 'news_card', 'chart_card', 'warning_card',
+        ]);
+
         function getCardTypeLabel(cardType) {
+            if (CARDS_WITHOUT_LABEL.has(cardType)) return '';
             const info = CARD_ICONS[cardType] || { icon: 'info', bg: 'var(--surface-3)', color: 'var(--text-secondary)' };
             return `<div class="card-type-label">
                 <div class="card-type-icon" style="background:${info.bg}">
@@ -2996,7 +3229,7 @@
             completedCards = 0;
 
             const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
-            layoutBadge.textContent = ct.replace(/_/g, ' ');
+            layoutBadge.textContent = humanizeContentType(ct);
 
             currentContinuousPct = Math.max(currentContinuousPct, 40);
             updateProgress(currentContinuousPct, 'ANALYZING', 'Reading your screenshot...');
@@ -3008,11 +3241,14 @@
             totalCards = (blueprint.cards || []).length;
 
             const ct = blueprint.contentAnalysis?.contentType || 'general';
-            layoutBadge.textContent = ct.replace(/_/g, ' ');
+            layoutBadge.textContent = humanizeContentType(ct);
 
             if (blueprint.contentAnalysis) {
                 contentAnalysisEl.style.display = '';
-                analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
+                const intent = blueprint.contentAnalysis.intent || '';
+                const looksLikeLabel = /^[a-z_]+$/.test(intent) || intent.length < 10;
+                analysisIntent.textContent = looksLikeLabel ? '' : intent;
+                contentAnalysisEl.style.display = looksLikeLabel && !intent ? 'none' : '';
                 renderFollowUpQuestions(blueprint.contentAnalysis);
             }
 
@@ -3037,11 +3273,14 @@
             totalCards = (blueprint.cards || []).length;
 
             const ct = blueprint.contentAnalysis?.contentType || 'general';
-            layoutBadge.textContent = ct.replace(/_/g, ' ');
+            layoutBadge.textContent = humanizeContentType(ct);
 
             if (blueprint.contentAnalysis) {
                 contentAnalysisEl.style.display = '';
-                analysisIntent.textContent = blueprint.contentAnalysis.intent || '';
+                const intent = blueprint.contentAnalysis.intent || '';
+                const looksLikeLabel = /^[a-z_]+$/.test(intent) || intent.length < 10;
+                analysisIntent.textContent = looksLikeLabel ? '' : intent;
+                contentAnalysisEl.style.display = looksLikeLabel && !intent ? 'none' : '';
                 renderFollowUpQuestions(blueprint.contentAnalysis);
             }
 
@@ -3316,13 +3555,13 @@
             const el = document.createElement('div');
             el.id = `card-${card.id}`;
 
-            const cssClassMap = { link_card: 'links', did_you_know_card: 'did-you-know' };
+            const cssClassMap = { link_card: 'links', did_you_know_card: 'did-you-know', verification_card: 'verification' };
             const cssClass = cssClassMap[card.cardType] || card.cardType.replace(/_/g, '-');
             el.className = `card card-${cssClass} loading`;
             el.dataset.cardType = card.cardType;
 
             const span = card.gridPosition?.columnSpan || 1;
-            const fullWidthTypes = ['hero_summary', 'comparison_card'];
+            const fullWidthTypes = ['hero_summary', 'comparison_card', 'verification_card'];
             const twoColTypes = ['timeline_card', 'info_list', 'action_card', 'text_extract', 'link_card', 'news_card'];
 
             if (span >= 3 || fullWidthTypes.includes(card.cardType)) {
@@ -3806,6 +4045,73 @@
                         </div>
                         <div class="dyk-fact">${linkify(d.fact || '')}</div>
                         ${dykSourceHtml}
+                    </div>`;
+                }
+
+                case 'verification_card': {
+                    const vStatus = d.status || 'searching';
+                    const isSearching = vStatus === 'searching';
+                    const statusIcons = {
+                        searching: 'search',
+                        partially_verified: 'pending',
+                        verified: 'check_circle',
+                        denied: 'cancel',
+                        unconfirmed: 'help',
+                        conflicting: 'warning',
+                    };
+                    const statusLabels = {
+                        searching: 'Searching sources...',
+                        partially_verified: 'Partially verified',
+                        verified: 'Verified by multiple sources',
+                        denied: 'Denied by sources',
+                        unconfirmed: 'No confirmation found',
+                        conflicting: 'Conflicting reports',
+                    };
+                    const sourceStatusIcons = {
+                        checking: 'hourglass_top',
+                        confirmed: 'check_circle',
+                        denied: 'cancel',
+                        not_yet_reported: 'schedule',
+                        no_info: 'remove_circle_outline',
+                    };
+                    const sourceStatusLabels = {
+                        checking: 'Checking...',
+                        confirmed: 'Confirms',
+                        denied: 'Denies',
+                        not_yet_reported: 'Not yet reported',
+                        no_info: 'No info found',
+                    };
+
+                    return `<div class="card-inner">
+                        <div class="verify-header">
+                            <div class="verify-icon ${esc(vStatus)}">
+                                <span class="material-symbols-rounded">${statusIcons[vStatus] || 'search'}</span>
+                            </div>
+                            <div class="verify-status-text">
+                                <span class="verify-status-label ${esc(vStatus)}">${statusLabels[vStatus] || 'Checking'}</span>
+                            </div>
+                        </div>
+                        ${isSearching ? `<div class="verify-searching-bar"><div class="verify-searching-bar-fill"></div></div>` : ''}
+                        <div class="verify-claim">${linkify(d.claim || '')}</div>
+                        <div class="verify-sources">
+                            ${(d.sources || []).map(src => {
+                                const sObj = typeof src === 'object' ? src : { name: String(src), status: 'checking' };
+                                const sStatus = sObj.status || 'checking';
+                                const hasUrl = sObj.url && typeof sObj.url === 'string' && sObj.url.startsWith('http');
+                                return `<div class="verify-source">
+                                    <div class="verify-source-status ${esc(sStatus)}">
+                                        <span class="material-symbols-rounded">${sourceStatusIcons[sStatus] || 'hourglass_top'}</span>
+                                    </div>
+                                    <div>
+                                        <div class="verify-source-name">${esc(sObj.name || 'Source')}</div>
+                                        ${sObj.snippet ? `<div class="verify-source-snippet">${linkify(sObj.snippet)}</div>` : `<div class="verify-source-snippet" style="color:var(--text-muted);font-style:italic">${sourceStatusLabels[sStatus] || 'Checking...'}</div>`}
+                                        ${hasUrl ? `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="verify-source-link">${esc(new URL(sObj.url).hostname)}</a>` : ''}
+                                    </div>
+                                </div>`;
+                            }).join('')}
+                        </div>
+                        ${d.summary ? `<div class="verify-summary">${linkify(d.summary)}</div>` : ''}
+                        ${d.lastChecked ? `<div class="verify-last-checked">Last checked: ${esc(d.lastChecked)}</div>` : ''}
                     </div>`;
                 }
 

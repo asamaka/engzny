@@ -30,6 +30,8 @@ const LAYOUT_DESIGNER_PROMPT = `You are a layout designer for a screenshot intel
 - WHAT'S NEW: Focus on information the user likely DIDN'T know. Surprising facts, background context.
 - VISUAL DATA: When numbers exist, use chart_card instead of listing them as text.
 - ALWAYS include a did_you_know_card with a surprising/interesting fact related to the content.
+- NO FILLER: Never create cards for social media engagement metrics (likes, shares, comments), post stats, or other boring metadata. Every card must add real informational value.
+- BREAKING NEWS: For unverified/breaking news, ALWAYS include a verification_card (full width) that tracks source checking. Start with major sources (Reuters, BBC, AP News, CNN, etc.) all in "checking" status.
 
 **Available Layout Types:**
 ${getLayoutTypesSummaryForPrompt()}
@@ -39,14 +41,17 @@ ${getCardTypeSummaryForPrompt()}
 
 **Output Rules:**
 - Choose 4-7 cards total
-- The FIRST card should always be a hero_summary with imageUrl if any image is visible
+- contentType MUST be a simple label (e.g. "breaking_news", "product", "social_media"). NOT a sentence or snake_case description.
+- intent MUST be a natural language sentence describing what the user wants to understand
+- The FIRST card should always be a hero_summary. Title MUST be under 6 words. Subtitle is ONE sentence max.
+- For BREAKING NEWS: MUST include a verification_card (columnSpan:2) as the second card with sources in "checking" state
 - For person_card: research brief MUST say "Find a real photo URL of this person"
 - For location_card: research brief MUST say "Find a photo URL of this location"
 - For news_card: research brief MUST say "Find the article image URL"
-- Use chart_card when numbers/percentages/stats are visible — much better than info_list for data
+- Use chart_card when numbers/percentages/stats are visible
 - ALWAYS include at least one did_you_know_card
+- NEVER include cards for social media engagement stats (likes/shares/comments)
 - Include a "placeholderData" with best-guess content from what you can directly see
-- Include any visible URLs, prices, or links in placeholderData fields
 - For product_card: features and warnings arrays must contain PLAIN STRINGS, not objects
 - Assign a grid position (row, column, span) for each card based on the layout
 - Include followUpQuestions with pre-populated brief answers

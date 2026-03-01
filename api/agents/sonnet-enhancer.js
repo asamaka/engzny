@@ -123,45 +123,45 @@ ${getCardTypeDetailedSchemaForPrompt()}
 ${getLayoutTypesSummaryForPrompt()}
 
 **Your tasks (PRIORITY ORDER):**
-1. ADD IMAGES: For person_card, add photoUrl. For location_card, add imageUrl. For news_card, add imageUrl. For hero_summary, add imageUrl. Images make the hub dramatically better.
-2. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, confidence, etc.
-3. ADD a did_you_know_card if one doesn't exist — the user shared this screenshot to learn something NEW
-4. ADD chart_card if there are numbers/stats that can be visualized — much better than text lists
-5. ADD news_card for any news content — it's purpose-built with image support
-6. REMOVE or merge boring filler cards — every card should add real value
-7. For hero_summary: ensure badge, takeaway (something they didn't know), and emoji are set
-8. Set proper columnSpan: 1 for compact cards, 2 for wide cards
-9. If followUpQuestions are missing from contentAnalysis, add 3-5 questions with brief answers
+1. VERIFICATION FIRST: If there's a verification_card, UPDATE it with real source data. Search the web and set each source's status to confirmed/denied/not_yet_reported based on what you find. Include source URLs and snippets.
+2. ADD IMAGES: For person_card add photoUrl, for location_card add imageUrl, for news_card add imageUrl, for hero_summary add imageUrl.
+3. REMOVE FILLER: Delete cards that show social media metrics (likes, shares, comments), post engagement stats, or other boring metadata. Every card must add real informational value.
+4. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, etc.
+5. ADD a did_you_know_card if one doesn't exist
+6. For hero_summary: ensure badge and takeaway are set. Title MUST be under 6 words. Subtitle MUST be 1 sentence max.
+7. Set proper columnSpan: 1 for compact cards, 2 for wide/verification cards
+8. For breaking news: if no verification_card exists, ADD one with sources
 
 **IMAGE RULES (CRITICAL):**
-- person_card: photoUrl field should be a real photo URL from Wikipedia, official site, or social media
-- location_card: imageUrl should be a real photo of the place
-- news_card: imageUrl should be the article's featured image
-- hero_summary: imageUrl for a banner image when relevant
+- person_card: photoUrl must be a real photo URL from Wikipedia or official source
+- location_card: imageUrl must be a real photo of the place
+- news_card: imageUrl must be the article's featured image
+- hero_summary: imageUrl for a banner when relevant
 
 **Style rules:**
-- Keep ALL text ultra-concise — no walls of text
-- Titles: max 8 words. Values: max 10 words. Explanations: max 1-2 sentences
-- Use emoji liberally for visual interest
+- Keep ALL text ultra-concise — no paragraphs, no walls of text
+- Hero title: max 6 words. Hero subtitle: 1 sentence. Card values: max 10 words.
+- Use emoji for visual interest
 - For product_card: features/warnings must be plain strings
-- Total cards 5-8 for a balanced, visual hub
-- Every card should tell the user something they didn't already know from the screenshot
+- Total cards 4-7 — quality over quantity
 
 **Breaking news rules:**
-- DO NOT label news as "MISLEADING"/"MISINFORMATION" in hero_summary
-- fact_check on breaking news: prefer "unverified"/"needs_context" over "misleading"/"false"
-- Present breaking news neutrally with factual titles`;
+- NEVER label news as "MISLEADING"/"MISINFORMATION" in hero_summary
+- Present breaking news neutrally with short factual titles
+- ALWAYS use verification_card (not fact_check) for breaking news
+- verification_card: update source statuses based on real web search results`;
 
   if (researchData) {
     prompt += `\n\n**Web research findings:**
 ${JSON.stringify(researchData, null, 2)}
 
 Use research to:
-- Add source URLs and citations
+- UPDATE verification_card sources with actual findings — this is the #1 priority
+- Add source URLs and citations to all cards
 - Verify or correct facts
-- Create fact_check cards for claims
 - Enrich cards with web data
-- If research shows initial analysis was wrong, correct it`;
+- If research shows initial analysis was wrong, correct it
+- Remove any filler/boring cards that research makes redundant`;
   }
 
   return prompt;

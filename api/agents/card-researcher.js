@@ -22,6 +22,7 @@ const WEB_RESEARCH_CARD_TYPES = new Set([
   'location_card',
   'news_card',
   'did_you_know_card',
+  'verification_card',
 ]);
 
 /**
@@ -63,6 +64,21 @@ function buildResearchPrompt(card, contentAnalysis) {
 - Real photos make cards dramatically more engaging and useful.`
     : '';
 
+  const verificationInstructions = card.cardType === 'verification_card'
+    ? `\n\nVERIFICATION CARD — CRITICAL INSTRUCTIONS:
+- This card tracks live verification of a breaking news claim.
+- You MUST search the web for this claim RIGHT NOW.
+- Check major news sources: Reuters, AP News, BBC, CNN, Al Jazeera, etc.
+- For EACH source, report what you find:
+  - "confirmed" = source explicitly reports this event
+  - "denied" = source explicitly denies this event
+  - "not_yet_reported" = source exists but hasn't covered this yet
+  - "no_info" = couldn't find relevant info from this source
+- Set status to "searching" if still looking, "partially_verified" if some sources confirm, "verified" if major sources confirm, "denied" if major sources deny, "unconfirmed" if no sources report it.
+- Include source URLs for every source you check.
+- Be HONEST about what you find. If nothing confirms it, say so clearly.`
+    : '';
+
   return `You are a research specialist populating a card with accurate, concise data${needsWebResearch ? ' using web search' : ' from a screenshot'}.
 
 Context: ${contentAnalysis.contentType}${contentAnalysis.platform ? ` on ${contentAnalysis.platform}` : ''} — ${contentAnalysis.intent}
@@ -80,7 +96,7 @@ Rules:
 5. Include visible URLs in url/sourceUrl/mapUrl fields
 6. For breaking news fact_check: use verdict "unverified" or "needs_context" with confidence "low" — never "misleading" or "false" without strong evidence
 7. Add emoji field where schema supports it for visual richness
-8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${photoInstructions}
+8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${photoInstructions}${verificationInstructions}
 
 Return ONLY valid JSON:`;
 }

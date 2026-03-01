@@ -271,6 +271,27 @@ const CARD_TYPES = {
     },
     sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
   },
+
+  verification_card: {
+    description: 'REQUIRED for breaking news. Live verification tracker — shows which sources have been checked and what they say. Starts in "searching" state, progressively updated as web search finds sources. ALWAYS use this instead of fact_check for breaking/unverified news.',
+    schema: {
+      claim: { type: 'string', required: true, description: 'The claim being verified (1 neutral sentence)' },
+      status: { type: 'string', required: true, enum: ['searching', 'partially_verified', 'verified', 'denied', 'unconfirmed', 'conflicting'], description: 'Start with "searching", updated as sources are found' },
+      sources: {
+        type: 'array',
+        required: true,
+        items: {
+          name: { type: 'string', required: true, description: 'Source name (e.g. "Reuters", "BBC", "AP News")' },
+          status: { type: 'string', required: true, description: 'checking|confirmed|denied|no_info|not_yet_reported' },
+          snippet: { type: 'string', description: 'What this source says (1 sentence)' },
+          url: { type: 'string', description: 'Source URL' },
+        },
+      },
+      lastChecked: { type: 'string', description: 'Timestamp of last check' },
+      summary: { type: 'string', description: 'Brief verification summary based on sources found so far' },
+    },
+    sizing: { minWidth: 2, minHeight: 2, defaultSpan: 'full' },
+  },
 };
 
 const LAYOUT_TYPES = {

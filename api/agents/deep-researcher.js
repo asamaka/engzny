@@ -32,13 +32,15 @@ ${(contentAnalysis.topQuestions || []).map(q => `- ${q}`).join('\n')}
 ${cardSummaries}
 
 **Research Goals:**
-1. Verify facts and claims visible in the screenshot
-2. Find additional context, background, or recent developments
-3. Identify any misleading or inaccurate information — but be EXTREMELY cautious with breaking news. A claim being unverified is NOT the same as it being false or misleading.
-4. Find related links, sources, and references
-5. Answer the user's likely questions with factual, sourced data
-6. For breaking news / conflict situations: research ALL SIDES of the event. If one side launched strikes, check whether the other side retaliated. A report about events at location A does not invalidate reports about events at location B — both can be true simultaneously.
-7. NEVER assume a breaking news report is misleading just because the primary story is about a different aspect of the same event. Military conflicts involve simultaneous actions by multiple parties.
+1. VERIFICATION PRIORITY: If any card is a verification_card, your #1 goal is to check the claim against major news sources (Reuters, AP, BBC, CNN, Al Jazeera, etc.). For EACH source, report whether they confirm, deny, or haven't reported the claim. Include source URLs.
+2. Verify facts and claims visible in the screenshot
+3. Find additional context, background, or recent developments
+4. Identify any misleading or inaccurate information — but be EXTREMELY cautious with breaking news. A claim being unverified is NOT the same as it being false or misleading.
+5. Find related links, sources, and references
+6. Answer the user's likely questions with factual, sourced data
+7. For breaking news / conflict situations: research ALL SIDES of the event. If one side launched strikes, check whether the other side retaliated. A report about events at location A does not invalidate reports about events at location B — both can be true simultaneously.
+8. NEVER assume a breaking news report is misleading just because the primary story is about a different aspect of the same event. Military conflicts involve simultaneous actions by multiple parties.
+9. For verification findings, structure each source as a separate finding with the source name, what they report, and the source URL.
 
 Return a structured JSON response:
 {
