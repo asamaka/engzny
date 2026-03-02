@@ -144,8 +144,9 @@ tests/
 | `/api/debug/env` | GET | Diagnostic: which integrations are configured |
 | `/api/debug/client-error` | POST | Client error reports (open, no auth) |
 | `/api/debug/client-report` | POST | Client session telemetry (open, no auth) |
-| `/api/debug/improvement` | GET | Continuous improvement trigger status & history |
+| `/api/debug/improvement` | GET | Continuous improvement trigger status, history & skipped report count |
 | `/api/debug/improvement/trigger` | POST | Manually trigger an improvement agent. Body: `{"focus":"area to improve","force":true}` |
+| `/api/debug/improvement/healthcheck` | POST | Pick up rate-limited reports and dispatch improvement agent if any are queued |
 
 ## Pipeline Flow
 
@@ -255,10 +256,15 @@ If the Vercel runtime is compromised, the attacker gets a GitHub PAT that can tr
 ```
 Pipeline completes → saveLiveReport() → evaluateReport()
     │
-    ├─ Error?  → Dispatch to GitHub Actions
-    ├─ Slow?   → Dispatch to GitHub Actions
-    ├─ Every Nth report? → Dispatch to GitHub Actions
-    └─ None match → No action
+    ├─ ALL mode: every report triggers (default)
+    │   ├─ Error → reason: pipeline_error
+    │   ├─ Slow (>25s) → reason: slow_pipeline
+    │   ├─ Every Nth → reason: periodic_review
+    │   └─ Normal → reason: report_review
+    │
+    ├─ Rate limit check (15 min between dispatches)
+    │   ├─ Allowed → Dispatch to GitHub Actions
+    │   └─ Rate limited → Queue in Redis (skipped_reports)
     │
     v
 GitHub workflow_dispatch → continuous-improvement.yml workflow
@@ -267,11 +273,30 @@ GitHub workflow_dispatch → continuous-improvement.yml workflow
 Reads CURSOR_API_KEY from GitHub Secrets → POST api.cursor.com/v0/agents
     │
     v
-Agent reviews report → Investigates code → Makes fix → Pushes to cursor/*
+Agent reads .cursor/improvement-backlog.md → Reviews recent changes →
+Investigates code → Makes fix → Updates backlog → Pushes to cursor/*
     │
     v
 auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
+
+--- Healthcheck (scheduled, picks up rate-limited reports) ---
+
+improvement-healthcheck.yml (cron: every 15 min)
+    │
+    v
+POST /api/debug/improvement/healthcheck
+    │
+    ├─ Skipped reports in Redis? → Dispatch improvement workflow (batch)
+    └─ No skipped reports? → Exit (no cost)
 ```
+
+### Persistent backlog
+
+The file `.cursor/improvement-backlog.md` provides continuity between agent runs. Each agent:
+1. Reads the backlog at the start of every run
+2. Continues incomplete work from previous agents (highest priority)
+3. Updates the backlog with completed items and new discoveries
+4. Includes the backlog update in its commit
 
 ### Configuration
 
@@ -281,8 +306,8 @@ auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
 |----------|---------|-------------|
 | `IMPROVEMENT_ENABLED` | `false` | Set to `true` to enable auto-triggering |
 | `GITHUB_DISPATCH_TOKEN` | (required) | GitHub fine-grained PAT with `contents:write` scope |
-| `IMPROVEMENT_MIN_INTERVAL` | `1800` | Minimum seconds between triggers (30 min) |
-| `IMPROVEMENT_TRIGGER_ON` | `error,slow` | Comma-separated: `error`, `slow`, `periodic`, `all` |
+| `IMPROVEMENT_MIN_INTERVAL` | `900` | Minimum seconds between triggers (15 min) |
+| `IMPROVEMENT_TRIGGER_ON` | `all` | Comma-separated: `error`, `slow`, `periodic`, `all` |
 | `IMPROVEMENT_SLOW_THRESHOLD` | `25000` | Pipeline duration (ms) to be considered "slow" |
 | `IMPROVEMENT_PERIODIC_EVERY` | `20` | Trigger every Nth successful report |
 
@@ -325,6 +350,12 @@ curl -X POST 'https://www.thinx.fun/api/debug/improvement/trigger?token=thinx-de
 
 ```bash
 curl 'https://www.thinx.fun/api/debug/improvement?token=thinx-debug-2026'
+```
+
+### Manually run healthcheck (pick up rate-limited reports)
+
+```bash
+curl -X POST 'https://www.thinx.fun/api/debug/improvement/healthcheck?token=thinx-debug-2026'
 ```
 
 ## Runtime Monitoring & Logs
