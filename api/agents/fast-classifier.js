@@ -1,70 +1,72 @@
 /**
- * Fast Classifier + Card Populator Agent
+ * Fast Classifier Agent (v2 — Title + Layout Only)
  *
  * Uses Haiku to quickly:
  * 1. Identify content type from screenshot
- * 2. Pick the right layout
- * 3. Populate cards with ONLY required fields from visible text
+ * 2. Pick the best layout
+ * 3. Generate a short title + subtitle
  *
- * Target: real populated cards in < 3 seconds from upload.
- * Sonnet later enriches with optional fields and web research.
+ * Target: classification in 1-2 seconds.
+ * Does NOT populate cards — Sonnet does that progressively.
+ *
+ * After classification, buildSkeletonFromClassification() creates
+ * a layout blueprint with skeleton cards based on the layout's
+ * suggestedCards, plus a hero card pre-populated with the title.
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeSummaryForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { LAYOUT_TYPES, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
-const FAST_POPULATE_PROMPT = `Analyze this screenshot. Return a JSON card layout with REAL DATA from the visible text. Be fast — only fill required fields.
+const FAST_CLASSIFY_PROMPT = `Look at this screenshot. Classify it and return ONLY this JSON:
+{
+  "contentType": "breaking_news|news|social_media|product|food_delivery|messaging|settings|photo|dashboard|travel|emergency|tech|sports|entertainment|other",
+  "platform": "Facebook|X|Instagram|WhatsApp|Telegram|TikTok|Reddit|YouTube|UberEats|Google|Apple|null",
+  "title": "3-6 word headline",
+  "subtitle": "one sentence summary",
+  "emoji": "single emoji",
+  "layoutType": "breaking_news|editorial|social_feed|simple|food_order|messaging|location_explorer|media_analysis|product_showcase|dashboard|encyclopedia|travel_planner"
+}
 
-LAYOUTS: ${getLayoutTypesSummaryForPrompt()}
+LAYOUT GUIDE:
+- breaking_news: unverified claims, developing stories, crisis events
+- editorial: verified news articles, blog posts, reports
+- social_feed: tweets, facebook/instagram posts, social media content
+- simple: settings, menus, general screenshots
+- food_order: delivery apps, restaurant orders, receipts
+- messaging: WhatsApp, Telegram, SMS, chat conversations
+- location_explorer: places, restaurants, hotels, maps
+- media_analysis: photos, art, memes, infographics
+- product_showcase: shopping, product pages, reviews
+- dashboard: analytics, financial data, statistics
+- encyclopedia: famous people, historical events, educational topics
+- travel_planner: itineraries, flights, hotel bookings
 
-CARD TYPES (fill ONLY required fields, but include imageUrl/photoUrl when visible):
-- hero_summary: title*, subtitle*, emoji*. Keep title under 6 words. Subtitle is ONE sentence. Include imageUrl if visible.
-- key_metric: value*, label*
-- info_list: title*, items*[{label*, value*}]
-- person_card: name*. Add photoUrl if a person's photo is visible.
-- product_card: name*. Add imageUrl if product image is visible.
-- timeline_card: title*, events*[{date*, event*}]
-- quote_card: quote*
-- comparison_card: title*, columns*[{header*, values*}]
-- warning_card: level* [critical|warning|info], title*
-- action_card: title*, actions*[{label*}]
-- location_card: name*
-- news_card: headline*, source*. Add imageUrl if news image visible. Use for news/article content.
-- chart_card: title*, chartType* [bar|pie|progress|comparison], data*[{label*, value*}]
-- did_you_know_card: fact*, emoji*. A surprising fact the user likely didn't know.
-- verification_card: claim*, status* ("searching"), sources*[{name*, status*("checking")}]. REQUIRED for breaking/unverified news — starts in "searching" state. Web search will populate it later.
+RULES:
+- title: SHORT headline, max 6 words. Not a sentence.
+- subtitle: ONE sentence explaining what the screenshot shows
+- If non-English: translate title and subtitle to English
+- Return ONLY valid JSON, nothing else`;
 
-CRITICAL RULES:
-- 4-6 cards max. First card MUST be hero_summary (columnSpan:2)
-- contentType MUST be a simple label like "breaking_news", "product", "social_media", "tech", "sports" etc. NOT a sentence.
-- intent MUST be a natural sentence like "Understand what happened in this breaking news event"
-- Keep ALL text ultra-short — hero title max 6 words, subtitle max 1 sentence
-- NO FILLER CARDS: Do NOT create cards for social media metrics (likes, shares, comments), post engagement stats, or other boring metadata. Every card must add real information value.
-- For BREAKING NEWS or UNVERIFIED CLAIMS: ALWAYS create a verification_card (columnSpan:2) with the claim and sources like [{name:"Reuters",status:"checking"},{name:"BBC",status:"checking"},{name:"AP News",status:"checking"}]. Do NOT use fact_check for breaking news.
-- For news: prefer news_card over info_list
-- For data/numbers: prefer chart_card over info_list
-- hero_summary title should be a SHORT headline, NOT a long sentence. Put details in subtitle.
-- Include followUpQuestions: 3-5 questions with brief answers
-
-Return ONLY JSON:
-{"contentAnalysis":{"contentType":"...","platform":"...or null","intent":"Human-readable sentence","topQuestions":["..."],"followUpQuestions":[{"question":"...","answer":"Brief answer"}]},"layout":{"type":"...","columns":2,"reason":"..."},"cards":[{"id":"card-1","cardType":"hero_summary","gridPosition":{"row":1,"column":1,"columnSpan":2,"rowSpan":1},"researchBrief":"...","populatedData":{...}}]}`;
-
+/**
+ * Fast classify a screenshot — returns title + layout choice only.
+ * Target: 1-2 seconds with Haiku.
+ */
 async function fastClassify({ imageData, mediaType, question, adapterConfig = {} }) {
   const startTime = Date.now();
 
   const config = {
     ...adapterConfig,
     model: 'claude-haiku-4-5-20251001',
-    maxTokens: 2048,
+    maxTokens: 512, // Much smaller — just need a few fields
   };
 
   const adapter = getVisionAdapter(config);
   const traceCollector = adapterConfig.traceCollector;
 
-  let prompt = FAST_POPULATE_PROMPT;
+  let prompt = FAST_CLASSIFY_PROMPT;
   if (question) {
-    prompt += `\n\nUser question: "${question}" — address it in one card.`;
+    prompt += `\n\nUser asks: "${question}"`;
   }
 
   logger.info('FastClassifier', 'Starting quick classification', { model: config.model });
@@ -103,8 +105,11 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
       });
     }
 
-    const blueprint = parseQuickBlueprint(result.text);
-    return normalizeQuickBlueprint(blueprint);
+    const classification = parseClassification(result.text);
+    if (!classification) return null;
+
+    // Build a full blueprint from the classification
+    return buildSkeletonFromClassification(classification);
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.warn('FastClassifier', 'Classification failed, using fallback', { err: error.message });
@@ -130,7 +135,10 @@ async function fastClassify({ imageData, mediaType, question, adapterConfig = {}
   }
 }
 
-function parseQuickBlueprint(text) {
+/**
+ * Parse the classification JSON from Haiku's response
+ */
+function parseClassification(text) {
   try {
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
@@ -145,64 +153,104 @@ function parseQuickBlueprint(text) {
 
     return JSON.parse(text.trim());
   } catch (e) {
-    logger.warn('FastClassifier', 'Failed to parse response', { err: e.message });
+    logger.warn('FastClassifier', 'Failed to parse classification', { err: e.message });
     return null;
   }
 }
 
-function normalizeQuickBlueprint(raw) {
-  if (!raw) return null;
+/**
+ * Build a full layout blueprint from a classification result.
+ * No LLM needed — uses the layout's suggestedCards to create skeleton cards.
+ * Hero card is pre-populated with the title from classification.
+ */
+function buildSkeletonFromClassification(classification) {
+  const layoutType = classification.layoutType || 'simple';
+  const layoutDef = LAYOUT_TYPES[layoutType] || LAYOUT_TYPES.simple;
+  const suggestedCards = layoutDef.suggestedCards || ['hero_summary', 'info_list', 'action_card'];
+  const columns = layoutDef.columns || 1;
 
-  const blueprint = {
+  // Normalize content type
+  const contentType = classification.contentType || 'general';
+  const title = classification.title || 'Analyzing...';
+  const subtitle = classification.subtitle || 'Processing screenshot...';
+  const emoji = classification.emoji || '🔍';
+  const platform = classification.platform || null;
+
+  // Build cards from suggestedCards
+  const cards = suggestedCards.map((cardType, i) => {
+    const isHero = cardType === 'hero_summary';
+    const isWide = ['hero_summary', 'verification_card', 'comparison_card', 'map_card', 'stats_grid_card', 'gallery_card', 'chat_card'].includes(cardType);
+
+    const card = {
+      id: `card-${i + 1}`,
+      cardType,
+      gridPosition: {
+        row: Math.floor(i / columns) + 1,
+        column: (i % columns) + 1,
+        columnSpan: isWide ? Math.min(2, columns) : 1,
+        rowSpan: 1,
+      },
+      researchBrief: `Populate this ${cardType} with relevant data from the screenshot`,
+      populatedData: {},
+      placeholderData: {},
+      status: 'placeholder',
+    };
+
+    // Pre-populate hero with title from classification
+    if (isHero) {
+      card.populatedData = {
+        title,
+        subtitle,
+        emoji,
+        badge: humanizeContentType(contentType),
+      };
+      card.placeholderData = card.populatedData;
+      card.status = 'populated';
+    }
+
+    return card;
+  });
+
+  return {
     contentAnalysis: {
-      contentType: raw.contentAnalysis?.contentType || 'general',
-      platform: raw.contentAnalysis?.platform || null,
-      intent: raw.contentAnalysis?.intent || 'Analyzing screenshot...',
-      topQuestions: Array.isArray(raw.contentAnalysis?.topQuestions)
-        ? raw.contentAnalysis.topQuestions.slice(0, 5)
-        : [],
-      followUpQuestions: Array.isArray(raw.contentAnalysis?.followUpQuestions)
-        ? raw.contentAnalysis.followUpQuestions.slice(0, 5)
-        : [],
+      contentType,
+      platform,
+      intent: subtitle,
+      topQuestions: [],
+      followUpQuestions: [],
     },
     layout: {
-      type: raw.layout?.type || 'simple',
-      columns: Math.min(raw.layout?.columns || 1, 3),
-      reason: raw.layout?.reason || '',
+      type: layoutType,
+      columns,
+      reason: `${layoutType} layout for ${contentType} content`,
     },
-    cards: [],
+    cards,
   };
-
-  if (Array.isArray(raw.cards)) {
-    blueprint.cards = raw.cards.map((card, index) => ({
-      id: card.id || `card-${index + 1}`,
-      cardType: card.cardType || 'info_list',
-      gridPosition: {
-        row: card.gridPosition?.row || index + 1,
-        column: card.gridPosition?.column || 1,
-        columnSpan: Math.min(card.gridPosition?.columnSpan || 1, blueprint.layout.columns),
-        rowSpan: card.gridPosition?.rowSpan || 1,
-      },
-      researchBrief: card.researchBrief || 'Extract relevant information',
-      populatedData: card.populatedData || card.placeholderData || {},
-      placeholderData: card.populatedData || card.placeholderData || {},
-      status: card.populatedData ? 'populated' : 'placeholder',
-    }));
-  }
-
-  if (blueprint.cards.length === 0 || blueprint.cards[0].cardType !== 'hero_summary') {
-    blueprint.cards.unshift({
-      id: 'card-hero',
-      cardType: 'hero_summary',
-      gridPosition: { row: 0, column: 1, columnSpan: blueprint.layout.columns, rowSpan: 1 },
-      researchBrief: 'Summarize the screenshot content',
-      populatedData: { title: 'Analyzing...', subtitle: 'Detecting content type...', emoji: '🔍' },
-      placeholderData: { title: 'Analyzing...', subtitle: 'Detecting content type...', emoji: '🔍' },
-      status: 'placeholder',
-    });
-  }
-
-  return blueprint;
 }
 
-module.exports = { fastClassify };
+/**
+ * Human-readable content type label
+ */
+function humanizeContentType(ct) {
+  const labels = {
+    breaking_news: 'Breaking News',
+    news: 'News',
+    social_media: 'Social Media',
+    product: 'Product',
+    food_delivery: 'Food Delivery',
+    messaging: 'Messaging',
+    settings: 'Settings',
+    photo: 'Photo',
+    dashboard: 'Dashboard',
+    travel: 'Travel',
+    emergency: 'Emergency',
+    tech: 'Tech',
+    sports: 'Sports',
+    entertainment: 'Entertainment',
+    other: 'Screenshot',
+    general: 'Screenshot',
+  };
+  return labels[ct] || ct.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+module.exports = { fastClassify, buildSkeletonFromClassification, humanizeContentType };

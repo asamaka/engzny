@@ -3,13 +3,13 @@
  *
  * Three-phase architecture optimized for speed-to-first-card:
  *
- * Phase 1 — Haiku Quick Cards (~3-5s):
- *   Haiku analyzes screenshot, picks layout, and POPULATES cards with real data.
- *   User sees actual content within seconds, not placeholders.
+ * Phase 1 — Haiku Classification (~1-2s):
+ *   Haiku glances at screenshot, returns title + layout choice.
+ *   User sees hero card with title + layout skeleton within 2-3 seconds.
  *
  * Phase 2 — Parallel Enhancement + Research:
- *   2a. Sonnet Enhancement: Reviews Haiku's cards via tool_use,
- *       updates/adds/modifies cards progressively.
+ *   2a. Sonnet Enhancement: Sees screenshot + Haiku's classification,
+ *       populates each card one-by-one via tool_use (each fires SSE event).
  *   2b. Sonar Deep Research: Web-grounded research running in parallel.
  *
  * Phase 3 — Sonnet Review (after Sonar responds):
@@ -69,8 +69,8 @@ function createSkeletonBlueprint() {
  *
  * Callback contract (all optional):
  *   onBlueprint(blueprint)       — Instant skeleton for immediate display
- *   onLayoutUpdate(blueprint)    — Layout with populated cards (from Haiku)
- *   onLayoutPreview(blueprint)   — Kept for backward compat (same as onLayoutUpdate in new flow)
+ *   onLayoutUpdate(blueprint)    — Layout with hero title (from Haiku classification)
+ *   onLayoutPreview(blueprint)   — Kept for backward compat (same as onLayoutUpdate)
  *   onCardPopulated(cardUpdate)  — A card has been populated with real data
  *   onCardUpdate(cardUpdate)     — Sonnet updated an existing card
  *   onCardAdd(cardAdd)           — Sonnet added a new card
@@ -120,14 +120,14 @@ async function runPipeline({
     }
 
     // =====================================================
-    // Phase 1: Haiku Quick Cards (~3-5s)
-    // Haiku analyzes, picks layout, and POPULATES cards
+    // Phase 1: Haiku Classification (~1-2s)
+    // Returns title + layout choice. No card population.
     // =====================================================
     if (onPhase) {
-      onPhase({ phase: 'haiku', message: 'Quick analysis with Haiku...' });
+      onPhase({ phase: 'haiku', message: 'Quick classification...' });
     }
 
-    logger.info('Orchestrator', 'Phase 1: Haiku Quick Cards', {
+    logger.info('Orchestrator', 'Phase 1: Haiku Classification', {
       model: 'claude-haiku-4-5-20251001',
     });
 
@@ -146,7 +146,7 @@ async function runPipeline({
         onProgress({ phase: 'enhancing', progress: 15, message: 'Enhancing analysis...' });
       }
     } else {
-      logger.info('Orchestrator', 'Haiku cards ready', {
+      logger.info('Orchestrator', 'Haiku classification ready', {
         dur: haikuDuration,
         contentType: haikuBlueprint.contentAnalysis?.contentType,
         layoutType: haikuBlueprint.layout?.type,
@@ -157,15 +157,16 @@ async function runPipeline({
         onLayoutUpdate(haikuBlueprint);
       }
 
+      // Register all cards (hero is populated, rest are skeletons)
       for (const card of haikuBlueprint.cards) {
         currentCards.set(card.id, card);
         const data = card.populatedData || card.placeholderData;
-        if (data && Object.keys(data).length > 0 && onCardPopulated) {
+        if (data && Object.keys(data).length > 0 && card.status === 'populated' && onCardPopulated) {
           onCardPopulated({
             cardId: card.id,
             cardType: card.cardType,
             data,
-            completedCount: currentCards.size,
+            completedCount: 1,
             totalCount: haikuBlueprint.cards.length,
           });
         }
@@ -174,8 +175,8 @@ async function runPipeline({
       if (onProgress) {
         onProgress({
           phase: 'enhancing',
-          progress: 25,
-          message: `${haikuBlueprint.cards.length} cards ready — enhancing...`,
+          progress: 20,
+          message: `${haikuBlueprint.contentAnalysis?.contentType} detected — populating cards...`,
         });
       }
     }
@@ -184,17 +185,19 @@ async function runPipeline({
 
     // =====================================================
     // Phase 2: Parallel Enhancement + Deep Research
+    // Sonnet populates cards, Sonar researches in parallel
     // =====================================================
     if (onPhase) {
-      onPhase({ phase: 'enhancing', message: 'Sonnet enhancing + deep research...' });
+      onPhase({ phase: 'enhancing', message: 'Sonnet populating cards + deep research...' });
     }
 
     logger.info('Orchestrator', 'Phase 2: Parallel Enhancement + Research');
 
     const enhanceProgressMessages = [
-      'Sonnet reviewing analysis...',
-      'Enhancing card content...',
-      'Adding deeper insights...',
+      'Sonnet analyzing screenshot...',
+      'Populating card content...',
+      'Adding details and context...',
+      'Searching for images...',
       'Verifying information...',
     ];
     let enhanceMsgIdx = 0;
@@ -203,7 +206,7 @@ async function runPipeline({
       if (onProgress) {
         onProgress({
           phase: 'enhancing',
-          progress: 25 + enhanceMsgIdx * 8,
+          progress: 25 + enhanceMsgIdx * 10,
           message: enhanceProgressMessages[enhanceMsgIdx],
         });
       }
@@ -317,6 +320,118 @@ async function runPipeline({
       enhanceActions: enhanceResult.actions?.length || 0,
       researchFindings: researchResult.findings?.length || 0,
     });
+
+    // =====================================================
+    // Phase 2.5: Wire research findings to verification cards
+    // If any card is a verification_card, map research findings
+    // to its sources. This ensures sources don't stay "checking".
+    // =====================================================
+    const verificationCards = Array.from(currentCards.values())
+      .filter(c => c.cardType === 'verification_card');
+    
+    if (verificationCards.length > 0 && researchResult.findings && researchResult.findings.length > 0) {
+      for (const vCard of verificationCards) {
+        const cardData = vCard.populatedData || vCard.data || vCard.placeholderData || {};
+        const sources = cardData.sources || [];
+        let updated = false;
+
+        // Try to match research findings to verification sources
+        for (const source of sources) {
+          if (source.status === 'checking') {
+            // Find a research finding that mentions this source
+            const finding = researchResult.findings.find(f => {
+              const text = `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
+              return text.includes(source.name.toLowerCase());
+            });
+
+            if (finding) {
+              const fc = finding.factCheck;
+              if (fc && (fc.verdict === 'verified' || fc.verdict === 'partially_true')) {
+                source.status = 'confirmed';
+              } else if (fc && (fc.verdict === 'false' || fc.verdict === 'misleading')) {
+                source.status = 'denied';
+              } else {
+                source.status = 'not_yet_reported';
+              }
+              source.snippet = finding.summary || '';
+              if (finding.sourceUrls && finding.sourceUrls.length > 0) {
+                source.url = finding.sourceUrls[0];
+              }
+              updated = true;
+            } else {
+              // No finding for this source — mark as not yet reported
+              source.status = 'not_yet_reported';
+              updated = true;
+            }
+          }
+        }
+
+        if (updated) {
+          // Determine overall status
+          const statuses = sources.map(s => s.status);
+          let overallStatus = 'unconfirmed';
+          if (statuses.every(s => s === 'confirmed')) overallStatus = 'verified';
+          else if (statuses.some(s => s === 'confirmed') && statuses.some(s => s !== 'confirmed')) overallStatus = 'partially_verified';
+          else if (statuses.every(s => s === 'denied')) overallStatus = 'denied';
+          else if (statuses.some(s => s === 'confirmed') && statuses.some(s => s === 'denied')) overallStatus = 'conflicting';
+
+          const updatedData = { ...cardData, sources, status: overallStatus, lastChecked: new Date().toISOString() };
+          
+          // Add research summary
+          const researchSummary = researchResult.findings
+            .filter(f => f.factCheck)
+            .map(f => f.factCheck.explanation || f.summary)
+            .filter(Boolean)
+            .join('. ');
+          if (researchSummary) {
+            updatedData.summary = researchSummary.slice(0, 200);
+          }
+
+          vCard.populatedData = updatedData;
+          vCard.data = updatedData;
+          currentCards.set(vCard.id, vCard);
+
+          if (onCardUpdate) {
+            onCardUpdate({
+              cardId: vCard.id,
+              cardType: 'verification_card',
+              data: updatedData,
+              reason: 'Research findings applied to verification sources',
+              source: 'research',
+            });
+          }
+        }
+      }
+    }
+
+    // Also apply a timeout for verification cards still in "checking" state
+    for (const vCard of verificationCards) {
+      const cardData = vCard.populatedData || vCard.data || {};
+      const sources = cardData.sources || [];
+      let anyStillChecking = false;
+      for (const source of sources) {
+        if (source.status === 'checking') {
+          source.status = 'not_yet_reported';
+          source.snippet = 'Unable to verify — check source directly';
+          anyStillChecking = true;
+        }
+      }
+      if (anyStillChecking) {
+        const updatedData = { ...cardData, sources, status: cardData.status === 'searching' ? 'unconfirmed' : cardData.status };
+        vCard.populatedData = updatedData;
+        vCard.data = updatedData;
+        currentCards.set(vCard.id, vCard);
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId: vCard.id,
+            cardType: 'verification_card',
+            data: updatedData,
+            reason: 'Verification timeout — sources set to not_yet_reported',
+            source: 'timeout',
+          });
+        }
+      }
+    }
 
     // =====================================================
     // Phase 3: Sonnet Review (with research data)

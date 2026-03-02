@@ -111,45 +111,42 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
     })),
   }, null, 2);
 
-  let prompt = `You are enhancing a screenshot analysis hub. A fast model created initial cards. Your job: make it RICHER, more VISUAL, and more INFORMATIVE while keeping text SHORT.
+  let prompt = `You are populating a screenshot analysis hub. A fast classifier identified the content and chose a layout with skeleton cards. YOUR JOB: populate each card with REAL DATA from the screenshot, making the hub informative, visual, and concise.
+
+**The user already sees these cards as loading skeletons. Populate them in order of importance — each call you make instantly appears on screen.**
 
 **Current state:**
 ${currentState}
 
-**Card schemas (fill optional fields that the fast model skipped):**
+**Card schemas:**
 ${getCardTypeDetailedSchemaForPrompt()}
 
 **Available layouts:**
 ${getLayoutTypesSummaryForPrompt()}
 
-**Your tasks (PRIORITY ORDER):**
-1. VERIFICATION FIRST: If there's a verification_card, UPDATE it with real source data. Search the web and set each source's status to confirmed/denied/not_yet_reported based on what you find. Include source URLs and snippets.
-2. ADD IMAGES: For person_card add photoUrl, for location_card add imageUrl, for news_card add imageUrl, for hero_summary add imageUrl.
-3. REMOVE FILLER: Delete cards that show social media metrics (likes, shares, comments), post engagement stats, or other boring metadata. Every card must add real informational value.
-4. UPDATE each card — fill optional fields: emoji, badge, badgeColor, context, etc.
-5. ADD a did_you_know_card if one doesn't exist
-6. For hero_summary: ensure badge and takeaway are set. Title MUST be under 6 words. Subtitle MUST be 1 sentence max.
-7. Set proper columnSpan: 1 for compact cards, 2 for wide/verification cards
-8. For breaking news: if no verification_card exists, ADD one with sources
+**YOUR TASKS (PRIORITY ORDER):**
+1. POPULATE HERO: Update hero_summary with a proper takeaway, imageUrl if relevant, and ensure title is under 6 words. Add badge and badgeColor.
+2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
+3. VERIFICATION: If there's a verification_card, set each source status to confirmed/denied/not_yet_reported. Include snippets and URLs.
+4. ADD IMAGES: person_card needs photoUrl, location_card needs imageUrl, news_card needs imageUrl.
+5. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
+6. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
+7. REMOVE UNNECESSARY: If a skeleton card type doesn't fit the content, replace it with something better via add_card.
 
-**IMAGE RULES (CRITICAL):**
-- person_card: photoUrl must be a real photo URL from Wikipedia or official source
-- location_card: imageUrl must be a real photo of the place
-- news_card: imageUrl must be the article's featured image
-- hero_summary: imageUrl for a banner when relevant
-
-**Style rules:**
-- Keep ALL text ultra-concise — no paragraphs, no walls of text
-- Hero title: max 6 words. Hero subtitle: 1 sentence. Card values: max 10 words.
-- Use emoji for visual interest
-- For product_card: features/warnings must be plain strings
+**CRITICAL RULES:**
+- POPULATE ALL CARDS — skeleton cards with no data look broken to the user
+- Keep ALL text ultra-concise — no paragraphs. Titles: max 6 words. Values: max 10 words.
+- For person_card: ALWAYS include name, role, and context even if sparse
+- For location_card: ALWAYS include name, context, and a Google Maps URL in mapUrl
+- For verification_card: set sources to "not_yet_reported" if you can't verify (NEVER leave as "checking")
+- Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
+- For product_card: features/warnings must be plain strings
 
 **Breaking news rules:**
 - NEVER label news as "MISLEADING"/"MISINFORMATION" in hero_summary
 - Present breaking news neutrally with short factual titles
-- ALWAYS use verification_card (not fact_check) for breaking news
-- verification_card: update source statuses based on real web search results`;
+- ALWAYS use verification_card (not fact_check) for breaking news`;
 
   if (researchData) {
     prompt += `\n\n**Web research findings:**
