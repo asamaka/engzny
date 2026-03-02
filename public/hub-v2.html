@@ -2009,6 +2009,8 @@
             const cssClassMap = { link_card: 'links', did_you_know_card: 'did-you-know', verification_card: 'verification' };
             const cssClass = cssClassMap[card.cardType] || card.cardType.replace(/_/g, '-');
             el.className = `card card-${cssClass} bg-base-200 border border-base-300 rounded-2xl overflow-hidden loading`;
+            // Inline style fallback for dark background in case DaisyUI theme hasn't loaded
+            el.style.cssText = 'background:#12151c;border-color:#1a1f2e;border-radius:16px;overflow:hidden';
             el.dataset.cardType = card.cardType;
 
             const span = card.gridPosition?.columnSpan || 1;
