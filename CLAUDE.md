@@ -59,13 +59,14 @@ This project uses specialized agents with clear responsibilities. Each agent has
 ### 4. Continuous Improvement Agent (auto-spawned)
 
 **Spec:** `.claude/agents/continuous-improvement.md`
-**Scope:** Autonomous agent spawned by the Cursor Cloud Agent API when pipeline reports meet trigger criteria.
+**Scope:** Autonomous agent spawned by the Cursor Cloud Agent API when pipeline reports meet trigger criteria. **Must always ship code — analysis without implementation is a failure.**
 
 **Responsibilities:**
-- Review flagged pipeline reports (errors, slow performance, periodic)
-- Investigate root causes in the codebase
-- Make targeted, safe code improvements
+- Quickly assess the trigger (error, slow pipeline, periodic review)
+- Prioritize by customer value (P0 broken > P1 degraded > P2 polish > P3 resilience)
+- **Implement the highest-ROI fix** — not just analyze it
 - Run tests and push to `cursor/improvement-*` branches (auto-deploys)
+- Spend at most 20% of time reading, 80% implementing
 
 **When to use:** Spawned automatically — not manually invoked. Can also be triggered manually via `POST /api/debug/improvement/trigger`.
 

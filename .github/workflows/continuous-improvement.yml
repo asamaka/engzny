@@ -1,4 +1,4 @@
-name: 🔄 Continuous Improvement Agent
+name: Continuous Improvement Agent
 
 # Triggered via workflow_dispatch from the Vercel runtime.
 # Uses Actions:write permission (NOT Contents:write) so the dispatch token
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📋 Parse trigger payload
+      - name: Parse trigger payload
         id: payload
         run: |
           echo "Trigger reason: ${{ inputs.reason }}"
@@ -40,14 +40,14 @@ jobs:
             echo "Report: $(echo '${{ inputs.report }}' | jq -r '.requestId // "none"' 2>/dev/null || echo 'none')"
           fi
 
-      - name: 🔑 Verify secrets
+      - name: Verify secrets
         run: |
           if [ -z "${{ secrets.FIX_IT }}" ]; then
             echo "::error::FIX_IT secret (Cursor API key) not configured"
             exit 1
           fi
 
-      - name: 🤖 Build agent prompt
+      - name: Build agent prompt
         env:
           REASON: ${{ inputs.reason }}
           DETAIL: ${{ inputs.detail }}
@@ -57,9 +57,13 @@ jobs:
             cat > /tmp/agent-prompt.txt << 'PROMPT_END'
           You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
+          ## Prime Directive
+
+          **You MUST ship at least one code change this session.** Analysis without implementation is a failure. You are not a research agent — you are an improvement agent that makes the product better for users every time you run.
+
           ## Context
 
-          You have been manually triggered to review the codebase and make improvements.
+          You have been manually triggered. Your focus area is below.
 
           ## Focus Area
 
@@ -67,32 +71,38 @@ jobs:
             echo "$DETAIL" >> /tmp/agent-prompt.txt
             cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
 
-          ## Your Instructions
+          ## Your Instructions — Plan, Implement, Ship
 
-          1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
-          2. **Read the agent spec** at `.claude/agents/continuous-improvement.md` for detailed guidelines.
-          3. **Check the debug dashboard** for recent errors, slow pipelines, and patterns:
-             `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
-          4. **Identify the highest-impact improvement** you can make.
-          5. **Make targeted improvements** — small, safe changes.
-          6. **Run tests** (`npm test`) to verify nothing breaks.
-          7. **Commit and push** to a `cursor/improvement-*` branch.
+          Follow this exact sequence. Spend at most 20% of your time on steps 1-3. The rest goes to implementation.
 
-          ## Safety Rules
+          1. **Quick context** — Read `CLAUDE.md` for architecture. Read `.claude/agents/continuous-improvement.md` for your full operating spec.
+          2. **Check production** — `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
+          3. **Pick the highest customer-value improvement:**
+             - P0 (broken): errors, crashes, failed pipelines → fix first
+             - P1 (degraded): slow pipelines, bad results → fix second
+             - P2 (polish): UX friction, confusing output → fix third
+             - P3 (resilience): logging, edge cases, retry logic → fix last
+             If the focus area is vague (e.g., "health check", "test"), treat it as a periodic review and find the most impactful thing to fix.
+          4. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal.
+          5. **Test** — `npm test` (must pass)
+          6. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body.
 
-          - Make ONE focused improvement per trigger.
+          ## Hard Rules
+
+          - You MUST commit and push code. An invocation without a code change is a wasted invocation.
           - Never change test expectations to make tests pass — fix the actual code.
-          - Never modify environment variables or secrets.
+          - Never modify environment variables, secrets, or deployment workflows.
           - Never remove existing features or endpoints.
-          - If unsure, document findings in the commit message and skip the change.
+          - Always preserve backward compatibility.
+          - Do NOT spend your time writing up findings. Spend it writing code.
           PROMPT_END
           else
             cat > /tmp/agent-prompt.txt << PROMPT_END
           You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
-          ## Context
+          ## Prime Directive
 
-          A pipeline report has been flagged for review. Your job is to analyze the report, identify what went wrong or what could be better, and make targeted code improvements.
+          **You MUST ship at least one code change this session.** Analysis without implementation is a failure. You are not a research agent — you are an improvement agent that makes the product better for users every time you run.
 
           ## Trigger
 
@@ -105,31 +115,38 @@ jobs:
           ${REPORT}
           \`\`\`
 
-          ## Your Instructions
+          ## Your Instructions — Plan, Implement, Ship
 
-          1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
-          2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
-          3. **Analyze the report** to understand what happened.
-          4. **Investigate the relevant code** based on the trigger reason:
-             - For \`pipeline_error\`: trace the error through the pipeline code
-             - For \`slow_pipeline\`: profile the slow phases and look for optimization opportunities
-             - For \`periodic_review\`: review recent patterns, look for recurring issues
-          5. **Make targeted improvements** — small, safe changes that address the specific issue.
-          6. **Run tests** (\`npm test\`) to verify your changes don't break anything.
-          7. **Commit and push** to a \`cursor/improvement-*\` branch. The auto-deploy workflow will handle the rest.
+          Follow this exact sequence. Spend at most 20% of your time on steps 1-3. The rest goes to implementation.
 
-          ## Safety Rules
+          1. **Quick context** — Read \`CLAUDE.md\` for architecture. Read \`.claude/agents/continuous-improvement.md\` for your full operating spec including the customer-value prioritization framework.
+          2. **Analyze the report** — Understand what went wrong or what's slow. For \`pipeline_error\`: trace the error. For \`slow_pipeline\`: identify the slow phase. For \`periodic_review\`: check the dashboard for patterns.
+          3. **Pick the fix with highest customer ROI:**
+             - P0 (broken): errors, crashes, failed pipelines → fix first
+             - P1 (degraded): slow pipelines, bad results → fix second
+             - P2 (polish): UX friction, confusing output → fix third
+             - P3 (resilience): logging, edge cases, retry logic → fix last
+          4. **Implement the fix** — Go directly to the relevant code. Key files:
+             - \`api/agents/orchestrator-v2.js\` — Pipeline coordinator
+             - \`api/agents/layout-designer.js\` — Vision LLM (layout)
+             - \`api/agents/card-researcher.js\` — Card population LLM
+             - \`public/hub-v2.html\` — Frontend (card rendering, SSE)
+             - \`api/index.js\` — Express server, endpoints
+          5. **Test** — \`npm test\` (must pass)
+          6. **Commit and push** — Use format: \`fix(<area>): <what>\` with customer impact in the body.
 
-          - Make ONE focused improvement per trigger. Don't refactor the world.
+          ## Hard Rules
+
+          - You MUST commit and push code. An invocation without a code change is a wasted invocation.
           - Never change test expectations to make tests pass — fix the actual code.
-          - Never modify environment variables or secrets.
+          - Never modify environment variables, secrets, or deployment workflows.
           - Never remove existing features or endpoints.
-          - If unsure about a change, skip it and document your findings in the commit message.
-          - Prefer adding error handling, improving prompts, or optimizing performance over structural changes.
+          - Always preserve backward compatibility.
+          - Do NOT spend your time writing up findings. Spend it writing code.
           PROMPT_END
           fi
 
-      - name: 🚀 Launch Cursor Cloud Agent
+      - name: Launch Cursor Cloud Agent
         id: launch
         run: |
           PROMPT=$(cat /tmp/agent-prompt.txt)
@@ -165,9 +182,9 @@ jobs:
             exit 1
           fi
 
-      - name: 📊 Summary
+      - name: Summary
         run: |
-          echo "### 🔄 Continuous Improvement Agent Launched" >> $GITHUB_STEP_SUMMARY
+          echo "### Continuous Improvement Agent Launched" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
