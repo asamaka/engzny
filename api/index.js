@@ -550,6 +550,7 @@ app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
       configured: !!process.env.REPORT_PIN,
       usingDefault: !process.env.REPORT_PIN,
     },
+    improvement: improvementTrigger.getStatus(),
     node: process.version,
     env: process.env.NODE_ENV || 'development',
     vercel: !!process.env.VERCEL,
