@@ -1281,6 +1281,57 @@
         }
 
         // === Image Handling ===
+
+        // Vercel serverless has a 4.5MB body limit. Base64 adds ~33% overhead,
+        // so we target 3.2MB binary to keep the JSON payload under 4.3MB.
+        const UPLOAD_TARGET_SIZE = 3.2 * 1024 * 1024;
+
+        function loadImageEl(src) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+
+        async function compressImage(blob) {
+            if (blob.size <= UPLOAD_TARGET_SIZE) return blob;
+
+            const url = URL.createObjectURL(blob);
+            try {
+                const img = await loadImageEl(url);
+                const MAX_DIM = 1920;
+                let w = img.naturalWidth, h = img.naturalHeight;
+                if (w > MAX_DIM || h > MAX_DIM) {
+                    const s = Math.min(MAX_DIM / w, MAX_DIM / h);
+                    w = Math.round(w * s);
+                    h = Math.round(h * s);
+                }
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const tryCompress = (tw, th, quality) => {
+                    canvas.width = tw;
+                    canvas.height = th;
+                    ctx.drawImage(img, 0, 0, tw, th);
+                    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+                };
+
+                for (const q of [0.85, 0.7, 0.55, 0.4]) {
+                    const result = await tryCompress(w, h, q);
+                    if (result && result.size <= UPLOAD_TARGET_SIZE) return result;
+                }
+                for (const ds of [0.75, 0.5, 0.35]) {
+                    const result = await tryCompress(Math.round(w * ds), Math.round(h * ds), 0.7);
+                    if (result && result.size <= UPLOAD_TARGET_SIZE) return result;
+                }
+                return await tryCompress(Math.round(w * 0.3), Math.round(h * 0.3), 0.5);
+            } finally {
+                URL.revokeObjectURL(url);
+            }
+        }
+
         async function readClipboard() {
             try {
                 const items = await navigator.clipboard.read();
@@ -1324,7 +1375,7 @@
             }
         }
 
-        function handleImage(blob) {
+        async function handleImage(blob) {
             currentImageUrl = URL.createObjectURL(blob);
             screenshotImg.src = currentImageUrl;
             pasteState.classList.add('hidden');
@@ -1333,7 +1384,15 @@
             progressOverlay.classList.add('active');
             progressOverlay.classList.add('uploading');
             progressOverlay.classList.remove('analyzing', 'ready', 'hiding');
-            updateProgress(0, 'UPLOADING', 'Sending screenshot...');
+            updateProgress(0, 'UPLOADING', 'Compressing...');
+
+            try {
+                blob = await compressImage(blob);
+            } catch (e) {
+                console.warn('Compression failed, using original:', e);
+            }
+
+            updateProgress(5, 'UPLOADING', 'Sending screenshot...');
 
             const reader = new FileReader();
             reader.onloadend = () => {
