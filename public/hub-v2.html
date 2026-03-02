@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="thinx">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -8,6 +8,35 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+    <!-- DaisyUI 5 + Tailwind CSS 4 (CDN, no build step) -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style type="text/tailwindcss">
+      /* Custom thinx dark theme for DaisyUI */
+      @theme {
+        --color-base-100: #08090d;
+        --color-base-200: #12151c;
+        --color-base-300: #1a1f2e;
+        --color-base-content: #e4e8f0;
+        --color-primary: #5b8af5;
+        --color-primary-content: #ffffff;
+        --color-secondary: #a07ef0;
+        --color-secondary-content: #ffffff;
+        --color-accent: #4cd68a;
+        --color-accent-content: #000000;
+        --color-neutral: #181c26;
+        --color-neutral-content: #8892a6;
+        --color-info: #5b8af5;
+        --color-info-content: #ffffff;
+        --color-success: #4cd68a;
+        --color-success-content: #000000;
+        --color-warning: #f0c040;
+        --color-warning-content: #000000;
+        --color-error: #f06060;
+        --color-error-content: #ffffff;
+      }
+    </style>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 

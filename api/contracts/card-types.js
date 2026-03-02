@@ -292,46 +292,186 @@ const CARD_TYPES = {
     },
     sizing: { minWidth: 2, minHeight: 2, defaultSpan: 'full' },
   },
+
+  chat_card: {
+    description: 'Chat/messaging conversation extract with message bubbles — use for WhatsApp, Telegram, SMS, iMessage screenshots',
+    schema: {
+      title: { type: 'string', required: true, description: 'Conversation topic or participants' },
+      messages: {
+        type: 'array',
+        required: true,
+        items: {
+          sender: { type: 'string', required: true, description: 'Who sent this message' },
+          text: { type: 'string', required: true, description: 'Message content' },
+          time: { type: 'string', description: 'Timestamp' },
+          isUser: { type: 'boolean', description: 'True if this is the screenshot owner' },
+        },
+      },
+    },
+    sizing: { minWidth: 1, minHeight: 2, defaultSpan: 'full' },
+  },
+
+  map_card: {
+    description: 'Map or location visualization — static map image or link to interactive map',
+    schema: {
+      name: { type: 'string', required: true, description: 'Location name' },
+      latitude: { type: 'number', description: 'Latitude coordinate' },
+      longitude: { type: 'number', description: 'Longitude coordinate' },
+      mapImageUrl: { type: 'string', description: 'Static map image URL' },
+      mapUrl: { type: 'string', description: 'Link to interactive map (Google Maps, etc.)' },
+      zoom: { type: 'number', description: 'Map zoom level 1-18' },
+      context: { type: 'string', description: 'Why this location matters (1 sentence)' },
+    },
+    sizing: { minWidth: 2, minHeight: 1, defaultSpan: 'full' },
+  },
+
+  order_card: {
+    description: 'Order/receipt card — for food delivery, shopping orders, invoices. Shows itemized list with totals.',
+    schema: {
+      title: { type: 'string', required: true, description: 'Order title or restaurant/store name' },
+      items: {
+        type: 'array',
+        required: true,
+        items: {
+          name: { type: 'string', required: true, description: 'Item name' },
+          quantity: { type: 'number', description: 'Quantity ordered' },
+          price: { type: 'string', description: 'Item price' },
+        },
+      },
+      total: { type: 'string', description: 'Order total amount' },
+      status: { type: 'string', description: 'Order status (placed, preparing, delivered, etc.)' },
+      emoji: { type: 'string', description: 'Category emoji' },
+      deliveryTime: { type: 'string', description: 'Estimated or actual delivery time' },
+    },
+    sizing: { minWidth: 1, minHeight: 2, defaultSpan: '1' },
+  },
+
+  stats_grid_card: {
+    description: 'Grid of 2-6 mini stat/metric items in one compact card — use instead of multiple key_metric cards',
+    schema: {
+      title: { type: 'string', description: 'Section title' },
+      stats: {
+        type: 'array',
+        required: true,
+        items: {
+          label: { type: 'string', required: true, description: 'Stat label (2-4 words)' },
+          value: { type: 'string', required: true, description: 'Stat value' },
+          emoji: { type: 'string', description: 'Decorative emoji' },
+          trend: { type: 'string', enum: ['up', 'down', 'stable'], description: 'Trend direction' },
+        },
+      },
+    },
+    sizing: { minWidth: 2, minHeight: 1, defaultSpan: 'full' },
+  },
+
+  gallery_card: {
+    description: 'Image gallery showing multiple related images in a grid',
+    schema: {
+      title: { type: 'string', required: true, description: 'Gallery title' },
+      images: {
+        type: 'array',
+        required: true,
+        items: {
+          url: { type: 'string', required: true, description: 'Image URL' },
+          caption: { type: 'string', description: 'Image caption' },
+        },
+      },
+    },
+    sizing: { minWidth: 2, minHeight: 2, defaultSpan: 'full' },
+  },
+
+  source_card: {
+    description: 'News source or social media account credibility information',
+    schema: {
+      name: { type: 'string', required: true, description: 'Source/account name' },
+      type: { type: 'string', description: 'Source type: official, news_agency, social_media, blog, etc.' },
+      credibility: { type: 'string', enum: ['high', 'medium', 'low', 'unknown'], description: 'Credibility rating' },
+      followers: { type: 'string', description: 'Follower/subscriber count' },
+      context: { type: 'string', description: 'Why this source matters (1 sentence)' },
+      profileUrl: { type: 'string', description: 'Profile URL' },
+      imageUrl: { type: 'string', description: 'Source avatar/logo URL' },
+    },
+    sizing: { minWidth: 1, minHeight: 1, defaultSpan: '1' },
+  },
 };
 
 const LAYOUT_TYPES = {
+  breaking_news: {
+    description: 'Breaking/developing news — verification first, source tracking, key people and locations',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'verification_card', 'person_card', 'location_card', 'timeline_card', 'news_card'],
+    bestFor: ['breaking news', 'developing stories', 'unverified claims', 'crisis', 'military events'],
+  },
   editorial: {
-    description: 'News/article — hero image at top, news cards, fact checks, timeline',
+    description: 'News article analysis — hero with image, key details, fact-check, context',
     columns: 2,
-    areas: ['hero', 'main', 'sidebar'],
-    bestFor: ['news', 'articles', 'blog posts', 'reports'],
-  },
-  dashboard: {
-    description: 'Metrics grid — chart cards, KPIs at top, detail cards below',
-    columns: 3,
-    areas: ['metrics', 'details'],
-    bestFor: ['analytics', 'dashboards', 'financial data', 'statistics'],
-  },
-  product_showcase: {
-    description: 'Product-focused — large product image, specs, pricing, comparison',
-    columns: 2,
-    areas: ['product', 'details', 'warnings'],
-    bestFor: ['shopping', 'product pages', 'reviews', 'marketplace'],
+    suggestedCards: ['hero_summary', 'news_card', 'fact_check', 'person_card', 'info_list', 'did_you_know_card'],
+    bestFor: ['news articles', 'blog posts', 'press releases', 'reports', 'verified news'],
   },
   social_feed: {
-    description: 'Social media — person photo card, quote, fact-check',
+    description: 'Social media post — person profile, quote/post content, fact-check, context',
     columns: 1,
-    areas: ['person', 'content', 'context'],
-    bestFor: ['tweets', 'social posts', 'comments', 'chat messages'],
-  },
-  investigation: {
-    description: 'Fact-checking — claims, verdicts, timeline, did-you-know',
-    columns: 2,
-    areas: ['claims', 'evidence', 'timeline'],
-    bestFor: ['claims', 'misinformation', 'controversial content'],
+    suggestedCards: ['hero_summary', 'person_card', 'quote_card', 'fact_check', 'did_you_know_card'],
+    bestFor: ['tweets', 'facebook posts', 'instagram', 'social media', 'memes', 'viral content'],
   },
   simple: {
-    description: 'Clean single-column — hero + key cards',
+    description: 'Clean single-column for straightforward content',
     columns: 1,
-    areas: ['hero', 'cards'],
-    bestFor: ['simple screenshots', 'menus', 'settings', 'messages', 'general'],
+    suggestedCards: ['hero_summary', 'info_list', 'action_card'],
+    bestFor: ['settings', 'menus', 'simple screenshots', 'general', 'unknown content'],
+  },
+  food_order: {
+    description: 'Food delivery / restaurant order — order details, location, timing, total',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'order_card', 'location_card', 'key_metric', 'warning_card', 'action_card'],
+    bestFor: ['food delivery', 'uber eats', 'doordash', 'restaurant order', 'grocery delivery', 'shopping cart'],
+  },
+  messaging: {
+    description: 'Chat/messaging conversation — message bubbles, context, action items',
+    columns: 1,
+    suggestedCards: ['hero_summary', 'chat_card', 'info_list', 'action_card'],
+    bestFor: ['whatsapp', 'telegram', 'sms', 'imessage', 'messenger', 'chat', 'text messages', 'email'],
+  },
+  location_explorer: {
+    description: 'Place/location focus — photos, map, details, reviews, context',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'location_card', 'map_card', 'gallery_card', 'info_list', 'did_you_know_card'],
+    bestFor: ['restaurants', 'hotels', 'tourist spots', 'places', 'travel destinations', 'maps', 'addresses'],
+  },
+  media_analysis: {
+    description: 'Photo/media analysis — image details, artistic analysis, context',
+    columns: 1,
+    suggestedCards: ['hero_summary', 'gallery_card', 'info_list', 'quote_card', 'did_you_know_card'],
+    bestFor: ['photos', 'art', 'memes', 'infographics', 'screenshots of images', 'photography'],
+  },
+  product_showcase: {
+    description: 'Product-focused — product image, specs, pricing, reviews, comparison',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'product_card', 'stats_grid_card', 'comparison_card', 'warning_card', 'action_card'],
+    bestFor: ['shopping', 'product pages', 'reviews', 'marketplace', 'amazon', 'price comparison'],
+  },
+  dashboard: {
+    description: 'Data/metrics grid — KPIs, charts, trends, detail tables',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'stats_grid_card', 'chart_card', 'key_metric', 'info_list'],
+    bestFor: ['analytics', 'dashboards', 'financial data', 'statistics', 'reports', 'stocks', 'crypto'],
+  },
+  encyclopedia: {
+    description: 'Deep dive / Wikipedia-like — background, timeline, facts, context',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'person_card', 'timeline_card', 'info_list', 'did_you_know_card', 'gallery_card'],
+    bestFor: ['famous people', 'historical events', 'topics', 'educational', 'wikipedia', 'research'],
+  },
+  travel_planner: {
+    description: 'Travel / itinerary — timeline of events, locations, costs, tips',
+    columns: 2,
+    suggestedCards: ['hero_summary', 'timeline_card', 'location_card', 'map_card', 'stats_grid_card', 'action_card'],
+    bestFor: ['travel itinerary', 'trip planning', 'flight booking', 'hotel booking', 'vacation'],
   },
 };
+
+// Backward compatibility aliases
+LAYOUT_TYPES.investigation = LAYOUT_TYPES.breaking_news;
 
 function getCardTypeSummaryForPrompt() {
   return Object.entries(CARD_TYPES).map(([name, def]) => {
@@ -371,9 +511,11 @@ Optional: ${optional.join('; ')}`;
 }
 
 function getLayoutTypesSummaryForPrompt() {
-  return Object.entries(LAYOUT_TYPES).map(([name, def]) => {
-    return `- ${name}: ${def.description} | best for: ${def.bestFor.join(', ')}`;
-  }).join('\n');
+  return Object.entries(LAYOUT_TYPES)
+    .filter(([name]) => name !== 'investigation') // skip alias
+    .map(([name, def]) => {
+      return `- ${name}: ${def.description} | best for: ${def.bestFor.join(', ')} | suggested cards: ${def.suggestedCards.join(', ')}`;
+    }).join('\n');
 }
 
 function getCardSchema(cardType) {
