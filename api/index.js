@@ -616,14 +616,15 @@ app.post('/api/debug/client-report', (req, res) => {
 // ============================================
 const improvementTrigger = require('./lib/improvement-trigger');
 
-// GET /api/debug/improvement - Improvement trigger status & history
+// GET /api/debug/improvement - Improvement trigger status, history & skipped reports
 app.get('/api/debug/improvement', requireDebugAuth, async (req, res) => {
   try {
-    const [status, history] = await Promise.all([
+    const [status, history, skipped] = await Promise.all([
       improvementTrigger.getStatus(),
       improvementTrigger.getTriggerHistory(parseInt(req.query.limit || '20', 10)),
+      improvementTrigger.getSkippedReports(),
     ]);
-    res.json({ status, history });
+    res.json({ status, skippedReports: skipped.length, history });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -637,6 +638,16 @@ app.post('/api/debug/improvement/trigger', requireDebugAuth, async (req, res) =>
     res.json({ triggered: true, ...result });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/debug/improvement/healthcheck - Pick up rate-limited reports
+app.post('/api/debug/improvement/healthcheck', requireDebugAuth, async (req, res) => {
+  try {
+    const result = await improvementTrigger.healthCheck();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

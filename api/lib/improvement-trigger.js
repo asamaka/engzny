@@ -19,8 +19,8 @@
  * Optional env vars (Vercel):
  *   IMPROVEMENT_REPO_OWNER    — GitHub owner (default: asamaka)
  *   IMPROVEMENT_REPO_NAME     — GitHub repo  (default: engzny)
- *   IMPROVEMENT_MIN_INTERVAL  — Min seconds between triggers (default: 1800)
- *   IMPROVEMENT_TRIGGER_ON    — Comma-separated: error,slow,periodic,all (default: error,slow)
+ *   IMPROVEMENT_MIN_INTERVAL  — Min seconds between triggers (default: 900 = 15 min)
+ *   IMPROVEMENT_TRIGGER_ON    — Comma-separated: error,slow,periodic,all (default: all)
  *   IMPROVEMENT_SLOW_THRESHOLD — Pipeline duration ms to be "slow" (default: 25000)
  *   IMPROVEMENT_PERIODIC_EVERY — Trigger every Nth successful report (default: 20)
  *
@@ -34,9 +34,12 @@ const REDIS_KEYS = {
   LAST_TRIGGER: 'thinx:improvement:last_trigger',
   TRIGGER_LOG: 'thinx:improvement:triggers',
   REPORT_COUNT: 'thinx:improvement:report_count',
+  SKIPPED_REPORTS: 'thinx:improvement:skipped_reports',
+  LAST_HEALTHCHECK: 'thinx:improvement:last_healthcheck',
 };
 
 const MAX_TRIGGER_LOG = 50;
+const MAX_SKIPPED = 50;
 
 let _getRedis = null;
 
@@ -50,8 +53,8 @@ function getConfig() {
     githubToken: process.env.GITHUB_DISPATCH_TOKEN || '',
     repoOwner: process.env.IMPROVEMENT_REPO_OWNER || 'asamaka',
     repoName: process.env.IMPROVEMENT_REPO_NAME || 'engzny',
-    minInterval: parseInt(process.env.IMPROVEMENT_MIN_INTERVAL || '1800', 10),
-    triggerOn: (process.env.IMPROVEMENT_TRIGGER_ON || 'error,slow').split(',').map(s => s.trim()),
+    minInterval: parseInt(process.env.IMPROVEMENT_MIN_INTERVAL || '900', 10),
+    triggerOn: (process.env.IMPROVEMENT_TRIGGER_ON || 'all').split(',').map(s => s.trim()),
     slowThreshold: parseInt(process.env.IMPROVEMENT_SLOW_THRESHOLD || '25000', 10),
     periodicEvery: parseInt(process.env.IMPROVEMENT_PERIODIC_EVERY || '20', 10),
   };
@@ -92,6 +95,11 @@ async function evaluateReport(report) {
     }
   }
 
+  // In 'all' mode, every report triggers (if none of the specific reasons matched)
+  if (triggers.includes('all')) {
+    return { reason: 'report_review', detail: `Pipeline ${report.requestId || 'unknown'} completed (${report.outcome || 'unknown'})` };
+  }
+
   return null;
 }
 
@@ -125,6 +133,47 @@ async function recordTrigger(entry) {
       .ltrim(REDIS_KEYS.TRIGGER_LOG, 0, MAX_TRIGGER_LOG - 1)
       .exec();
   }
+}
+
+/**
+ * Store a report that was skipped due to rate limiting.
+ * The healthcheck will pick these up later.
+ */
+async function recordSkippedReport(report, evaluation) {
+  const r = await redis();
+  if (!r) return;
+
+  const entry = {
+    requestId: report.requestId,
+    reason: evaluation.reason,
+    detail: evaluation.detail,
+    skippedAt: new Date().toISOString(),
+    summary: buildReportSummary(report),
+  };
+
+  await r.pipeline()
+    .lpush(REDIS_KEYS.SKIPPED_REPORTS, JSON.stringify(entry))
+    .ltrim(REDIS_KEYS.SKIPPED_REPORTS, 0, MAX_SKIPPED - 1)
+    .exec();
+}
+
+async function getSkippedReports() {
+  const r = await redis();
+  if (!r) return [];
+
+  const raw = await r.lrange(REDIS_KEYS.SKIPPED_REPORTS, 0, -1);
+  return (raw || []).map(entry => {
+    if (typeof entry === 'string') {
+      try { return JSON.parse(entry); } catch { return null; }
+    }
+    return entry;
+  }).filter(Boolean);
+}
+
+async function clearSkippedReports() {
+  const r = await redis();
+  if (!r) return;
+  await r.del(REDIS_KEYS.SKIPPED_REPORTS);
 }
 
 /**
@@ -187,7 +236,8 @@ async function onReportSaved(report) {
 
     const rateCheck = await checkRateLimit();
     if (!rateCheck.allowed) {
-      console.log(`[Improvement] Rate limited — retry after ${rateCheck.retryAfter}s`);
+      await recordSkippedReport(report, evaluation);
+      console.log(`[Improvement] Rate limited — queued ${report.requestId} for healthcheck (retry after ${rateCheck.retryAfter}s)`);
       return null;
     }
 
@@ -251,6 +301,66 @@ async function manualTrigger(options = {}) {
 }
 
 /**
+ * Healthcheck — picks up reports that were skipped due to rate limiting.
+ * Respects the same rate limit to avoid overlapping improvement runs.
+ * Called by a scheduled GitHub Action or manually.
+ */
+async function healthCheck() {
+  const config = getConfig();
+  if (!config.enabled || !config.githubToken) {
+    return { triggered: false, reason: 'disabled' };
+  }
+
+  const skipped = await getSkippedReports();
+  if (skipped.length === 0) {
+    return { triggered: false, reason: 'no_skipped_reports', skippedCount: 0 };
+  }
+
+  const rateCheck = await checkRateLimit();
+  if (!rateCheck.allowed) {
+    return {
+      triggered: false,
+      reason: 'rate_limited',
+      skippedCount: skipped.length,
+      retryAfter: rateCheck.retryAfter,
+    };
+  }
+
+  const reportIds = skipped.map(s => s.requestId).filter(Boolean);
+  const reasons = [...new Set(skipped.map(s => s.reason))];
+  const detail = `Healthcheck: ${skipped.length} skipped report(s) [${reasons.join(',')}] — ${reportIds.join(', ')}`;
+  const reportsSummary = skipped.map(s => s.summary);
+
+  await dispatchGitHub(config, {
+    reason: 'healthcheck',
+    detail,
+    report: JSON.stringify(reportsSummary),
+  });
+
+  await clearSkippedReports();
+
+  const triggerEntry = {
+    method: 'github_dispatch',
+    reason: 'healthcheck',
+    detail,
+    requestId: reportIds.join(',') || null,
+    skippedCount: skipped.length,
+    triggeredAt: new Date().toISOString(),
+  };
+
+  await recordTrigger(triggerEntry);
+
+  // Record healthcheck timestamp
+  const r = await redis();
+  if (r) {
+    await r.set(REDIS_KEYS.LAST_HEALTHCHECK, new Date().toISOString());
+  }
+
+  console.log(`[Improvement] Healthcheck dispatched (${skipped.length} skipped reports)`);
+  return { triggered: true, ...triggerEntry };
+}
+
+/**
  * Get trigger history from Redis.
  */
 async function getTriggerHistory(limit = 20) {
@@ -286,11 +396,15 @@ module.exports = {
   init,
   onReportSaved,
   manualTrigger,
+  healthCheck,
+  getSkippedReports,
+  clearSkippedReports,
   getTriggerHistory,
   getStatus,
   getConfig,
   evaluateReport,
   checkRateLimit,
   buildReportSummary,
+  recordSkippedReport,
   _REDIS_KEYS: REDIS_KEYS,
 };
