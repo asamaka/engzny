@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-02** | Trigger: `report_review` (a7faa1dd, success) | Added device render capture: after pipeline completes, client captures rendered cards via html2canvas and uploads JPEG; report page shows capture in iPhone device frame. Also fixed P1 dashboard card count (prior commit).
+> **2026-03-02** | Trigger: `report_review` (628b9402, success) | Fixed P1: Sonnet enhancer only populated first card because `analyzeImageWithTools` made a single API call — when Claude returned `stop_reason: tool_use` after one tool call, the code read that one response and stopped. Added `analyzeImageWithToolLoop` to Claude adapter that iterates: sends tool_results back and continues until the model finishes all cards. Dashboard was showing "1/6" cards populated; now all cards get real data.
 
 ## Active Work
 
@@ -20,6 +20,7 @@ highest-priority incomplete item and continue where the last agent left off.
 ### P1 — Degraded (slow, bad results)
 
 - [x] Cards showing 2/N populated — partial card population not detected as failure (fixed: dashboard now counts unique cardIds from card+card_update+card_add events)
+- [x] Sonnet enhancer only populates 1 out of N cards — tool_use loop missing, Claude stops after first tool call (fixed: added iterative tool_use loop in Claude adapter)
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -38,3 +39,4 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Pipeline durations trending down: recent reports at 16-21s range (vs earlier 20-24s).
 - 100% of recent users are mobile (ua: "mobile"). Render captures will be iPhone-width by default.
 - html2canvas added as CDN dependency (~40KB gzipped). Non-blocking, deferred load.
+- Sonnet enhance+review phases each make one LLM call that returns stop_reason:tool_use — without looping, only first card per phase gets populated. Tool loop fix means ~4-8 iterations per phase but each card appears in real-time via SSE.

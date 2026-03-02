@@ -194,66 +194,83 @@ async function enhance({
       hasResearch: !!researchData,
     });
 
-    try {
-      const response = await adapter.analyzeImageWithTools({
-        imageData,
-        mediaType,
-        prompt,
-        tools: ENHANCER_TOOLS,
-        maxTokens: config.maxTokens,
-      });
-
-    const duration = Date.now() - startTime;
     const actions = [];
     let nextCardId = currentCards.length + 1;
 
-    for (const block of response.content) {
-      if (block.type === 'tool_use') {
-        const { name, input } = block;
+    function processToolBlock(block) {
+      if (block.type !== 'tool_use') return;
+      const { name, input } = block;
 
-        if (name === 'update_card' && input.cardId && input.data) {
-          const action = {
-            type: 'update_card',
-            cardId: input.cardId,
-            cardType: input.cardType,
-            data: input.data,
-            reason: input.reason,
-          };
-          actions.push(action);
-          if (onCardUpdate) onCardUpdate(action);
-        }
+      if (name === 'update_card' && input.cardId && input.data) {
+        const action = {
+          type: 'update_card',
+          cardId: input.cardId,
+          cardType: input.cardType,
+          data: input.data,
+          reason: input.reason,
+        };
+        actions.push(action);
+        if (onCardUpdate) onCardUpdate(action);
+      }
 
-        if (name === 'add_card' && input.cardType && input.data) {
-          const cardId = `card-${nextCardId++}`;
-          const action = {
-            type: 'add_card',
-            cardId,
-            cardType: input.cardType,
-            data: input.data,
-            gridPosition: input.position || {
-              row: nextCardId,
-              column: 1,
-              columnSpan: 1,
-              rowSpan: 1,
-            },
-            reason: input.reason,
-          };
-          actions.push(action);
-          if (onCardAdd) onCardAdd(action);
-        }
+      if (name === 'add_card' && input.cardType && input.data) {
+        const cardId = `card-${nextCardId++}`;
+        const action = {
+          type: 'add_card',
+          cardId,
+          cardType: input.cardType,
+          data: input.data,
+          gridPosition: input.position || {
+            row: nextCardId,
+            column: 1,
+            columnSpan: 1,
+            rowSpan: 1,
+          },
+          reason: input.reason,
+        };
+        actions.push(action);
+        if (onCardAdd) onCardAdd(action);
+      }
 
-        if (name === 'update_layout' && input.type) {
-          const action = {
-            type: 'update_layout',
-            layoutType: input.type,
-            columns: input.columns,
-            reason: input.reason,
-          };
-          actions.push(action);
-          if (onLayoutUpdate) onLayoutUpdate(action);
-        }
+      if (name === 'update_layout' && input.type) {
+        const action = {
+          type: 'update_layout',
+          layoutType: input.type,
+          columns: input.columns,
+          reason: input.reason,
+        };
+        actions.push(action);
+        if (onLayoutUpdate) onLayoutUpdate(action);
       }
     }
+
+    try {
+      const useLoop = typeof adapter.analyzeImageWithToolLoop === 'function';
+      let response;
+
+      if (useLoop) {
+        response = await adapter.analyzeImageWithToolLoop({
+          imageData,
+          mediaType,
+          prompt,
+          tools: ENHANCER_TOOLS,
+          maxTokens: config.maxTokens,
+          onToolUse: processToolBlock,
+        });
+      } else {
+        response = await adapter.analyzeImageWithTools({
+          imageData,
+          mediaType,
+          prompt,
+          tools: ENHANCER_TOOLS,
+          maxTokens: config.maxTokens,
+        });
+        for (const block of response.content) {
+          processToolBlock(block);
+        }
+      }
+
+    const duration = Date.now() - startTime;
 
     logger.info('SonnetEnhancer', `${phase} pass complete`, {
       dur: duration,
