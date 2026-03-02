@@ -2838,10 +2838,10 @@ app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
   }
 });
 
-// Render capture — save device screenshot of final rendered cards (open endpoint like client-report)
+// Render capture — save device screenshot, DOM snapshot, and client state (open endpoint like client-report)
 app.post('/api/hub/v2/render-capture', async (req, res) => {
   try {
-    const { requestId, image } = req.body || {};
+    const { requestId, image, domSnapshot, clientState } = req.body || {};
     if (!requestId || !image) {
       return res.status(400).json({ error: 'requestId and image required' });
     }
@@ -2850,9 +2850,17 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
     if (sizeKB > 2048) {
       return res.status(413).json({ error: 'Image too large (max 2MB)' });
     }
-    await liveReports.saveRenderCapture(requestId, base64);
-    logger.info('RenderCapture', 'Saved device render capture', { requestId, sizeKB });
-    res.json({ ok: true, sizeKB });
+    const domSizeKB = domSnapshot ? Math.round(domSnapshot.length / 1024) : 0;
+    if (domSizeKB > 512) {
+      return res.status(413).json({ error: 'DOM snapshot too large (max 512KB)' });
+    }
+    await liveReports.saveRenderCapture(requestId, base64, { domSnapshot, clientState });
+    logger.info('RenderCapture', 'Saved device render capture', {
+      requestId, sizeKB, domSizeKB,
+      hasClientState: !!clientState,
+      viewport: clientState?.viewport ? `${clientState.viewport.width}x${clientState.viewport.height}` : null,
+    });
+    res.json({ ok: true, sizeKB, domSizeKB });
   } catch (err) {
     logger.error('RenderCapture', 'Save failed', { err: err.message });
     res.status(500).json({ error: 'Failed to save render capture' });
@@ -2872,6 +2880,30 @@ app.get('/api/r/:requestId/render', requirePin, async (req, res) => {
   }
 });
 
+app.get('/api/r/:requestId/dom', requirePin, async (req, res) => {
+  try {
+    const snapshot = await liveReports.getDomSnapshot(req.params.requestId);
+    if (!snapshot) return res.status(404).json({ error: 'No DOM snapshot' });
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(snapshot);
+  } catch (err) {
+    logger.error('DomSnapshot', 'Fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load DOM snapshot' });
+  }
+});
+
+app.get('/api/r/:requestId/client-state', requirePin, async (req, res) => {
+  try {
+    const state = await liveReports.getClientState(req.params.requestId);
+    if (!state) return res.status(404).json({ error: 'No client state' });
+    res.json(state);
+  } catch (err) {
+    logger.error('ClientState', 'Fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load client state' });
+  }
+});
+
 // Public report pages (HTML — PIN gate is client-side JS calling /api/r/auth)
 app.get('/r', (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
@@ -2883,11 +2915,12 @@ app.get('/r/:requestId', async (req, res) => {
   const authed = !!(req.cookies[RPIN_COOKIE] && verifyPin(req.cookies[RPIN_COOKIE]));
   if (authed) {
     const report = await liveReports.getReport(req.params.requestId);
-    const thumb = report ? await liveReports.getReportThumb(req.params.requestId) : null;
     const renderCapture = report ? await liveReports.getRenderCapture(req.params.requestId) : null;
-    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true, renderCapture));
+    const clientState = report ? await liveReports.getClientState(req.params.requestId) : null;
+    const thumb = report ? await liveReports.getReportThumb(req.params.requestId) : null;
+    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true, renderCapture, clientState));
   } else {
-    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false, null));
+    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false, null, null));
   }
 });
 
@@ -3069,7 +3102,7 @@ async function doSearch(){
 </body></html>`;
 }
 
-function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated, renderCapture) {
+function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated, renderCapture, clientState) {
   const { renderCardHtml, renderReflection, renderLlmTracesHtml, esc, fmtMs } = reportRenderer;
 
   // If no report data, show just the PIN gate (client-side JS will redirect after auth)
@@ -3157,11 +3190,69 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<div class="iphone-home"></div>'
       + '</div>'
       + '<div class="device-meta">'
-      + '<div class="dm-item"><span class="dm-label">Viewport</span><span class="dm-value">375 × 812 (iPhone)</span></div>'
-      + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">' + cards.length + '</span></div>'
+      + (clientState?.viewport
+        ? '<div class="dm-item"><span class="dm-label">Viewport</span><span class="dm-value">' + clientState.viewport.width + ' × ' + clientState.viewport.height + ' @' + clientState.viewport.devicePixelRatio + 'x</span></div>'
+        : '<div class="dm-item"><span class="dm-label">Viewport</span><span class="dm-value">—</span></div>')
+      + (clientState?.screen
+        ? '<div class="dm-item"><span class="dm-label">Screen</span><span class="dm-value">' + clientState.screen.width + ' × ' + clientState.screen.height + '</span></div>'
+        : '')
+      + (clientState?.viewport?.orientation
+        ? '<div class="dm-item"><span class="dm-label">Orientation</span><span class="dm-value">' + esc(clientState.viewport.orientation) + '</span></div>'
+        : '')
+      + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">'
+        + (clientState?.cards ? clientState.cards.populated + '/' + clientState.cards.total + (clientState.cards.loading ? ' (' + clientState.cards.loading + ' loading)' : '') + (clientState.cards.errored ? ' <span style="color:var(--r)">(' + clientState.cards.errored + ' errored)</span>' : '') : cards.length)
+        + '</span></div>'
       + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Client-side (html2canvas)' : 'Not available') + '</span></div>'
       + '</div>'
       + '</div>'
+
+      // Client state diagnostics — layout, overflow, performance
+      + (clientState ? '<div class="section-card" style="margin:12px 0 20px">'
+        + '<div class="sec-title" style="margin-bottom:10px">Client Render State</div>'
+
+        // Layout info
+        + (clientState.layout ? '<div class="kv"><span class="k">Grid columns</span><span class="v" style="font-family:monospace;font-size:.7rem">' + esc(clientState.layout.gridComputedCols || '—') + '</span></div>'
+          + '<div class="kv"><span class="k">Grid gap</span><span class="v">' + esc(clientState.layout.gridGap || '—') + '</span></div>'
+          + '<div class="kv"><span class="k">Overlay size</span><span class="v">' + (clientState.layout.overlayRect ? clientState.layout.overlayRect.w + ' × ' + clientState.layout.overlayRect.h + 'px' : '—') + '</span></div>'
+          : '')
+
+        // Performance metrics
+        + (clientState.performance ? (() => {
+            const p = clientState.performance;
+            let html = '';
+            if (p.first_paint) html += '<div class="kv"><span class="k">First Paint</span><span class="v">' + p.first_paint + 'ms</span></div>';
+            if (p.first_contentful_paint) html += '<div class="kv"><span class="k">First Contentful Paint</span><span class="v">' + p.first_contentful_paint + 'ms</span></div>';
+            if (p.lcp) html += '<div class="kv"><span class="k">Largest Contentful Paint</span><span class="v">' + p.lcp + 'ms</span></div>';
+            if (p.cumulativeLayoutShift != null) html += '<div class="kv"><span class="k">Layout Shift (CLS)</span><span class="v' + (p.cumulativeLayoutShift > 0.1 ? ' style="color:var(--r)"' : '') + '">' + p.cumulativeLayoutShift.toFixed(4) + (p.cumulativeLayoutShift > 0.1 ? ' (poor)' : p.cumulativeLayoutShift > 0.05 ? ' (needs improvement)' : ' (good)') + '</span></div>';
+            return html;
+          })() : '')
+
+        // Card overflow detection
+        + (() => {
+            const overflowing = (clientState.cards?.types || []).filter(c => c.overflowing);
+            if (overflowing.length === 0) return '<div class="kv"><span class="k">Overflow issues</span><span class="v" style="color:var(--g)">None detected</span></div>';
+            return '<div class="kv" style="flex-direction:column;align-items:flex-start;gap:6px"><span class="k" style="color:var(--r)">Overflow detected (' + overflowing.length + ' cards)</span>'
+              + overflowing.map(c => '<span class="v" style="font-size:.7rem;color:var(--r);font-family:monospace">' + esc(c.id) + ' (' + esc(c.type) + ') — ' + c.rect.w + '×' + c.rect.h + 'px</span>').join('')
+              + '</div>';
+          })()
+
+        // Per-card dimensions
+        + '<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--t2);font-size:.78rem">Card dimensions (' + (clientState.cards?.types?.length || 0) + ')</summary>'
+        + '<div style="margin-top:6px;display:flex;flex-direction:column;gap:3px">'
+        + (clientState.cards?.types || []).map(c =>
+            '<div style="display:flex;justify-content:space-between;font-size:.7rem;font-family:monospace;padding:3px 6px;background:var(--s);border-radius:4px">'
+            + '<span style="color:var(--t2)">' + esc(c.type) + '</span>'
+            + '<span>' + c.rect.w + '×' + c.rect.h + (c.overflowing ? ' <span style="color:var(--r)">overflow</span>' : '') + '</span></div>'
+          ).join('')
+        + '</div></details>'
+
+        // DOM snapshot link
+        + '<div style="margin-top:10px;display:flex;gap:8px">'
+        + '<a href="/api/r/' + esc(requestId) + '/dom" target="_blank" style="font-size:.75rem;color:var(--a);text-decoration:none;padding:4px 10px;background:var(--s);border:1px solid var(--b);border-radius:6px">View DOM Snapshot</a>'
+        + '<a href="/api/r/' + esc(requestId) + '/client-state" target="_blank" style="font-size:.75rem;color:var(--a);text-decoration:none;padding:4px 10px;background:var(--s);border:1px solid var(--b);border-radius:6px">Raw Client State JSON</a>'
+        + '</div>'
+        + '</div>'
+        : '')
 
       // Cards — the actual UI the user saw
       + '<h2>Card Data (' + cards.length + ' cards)</h2>'

@@ -2013,29 +2013,128 @@
             const rid = telemetry.requestId;
             if (!rid || typeof html2canvas === 'undefined') return;
 
-            setTimeout(() => {
+            waitForCardsToSettle().then(() => {
                 try {
-                    const target = cardGrid;
-                    if (!target || !target.children.length) return;
+                    const target = resultsOverlay;
+                    if (!target || !cardGrid.children.length) return;
+
+                    const clientState = collectClientState();
 
                     html2canvas(target, {
                         backgroundColor: '#0a0d12',
-                        scale: window.devicePixelRatio || 2,
+                        scale: Math.min(window.devicePixelRatio || 2, 2),
                         logging: false,
                         useCORS: true,
                         allowTaint: true,
+                        width: target.scrollWidth,
+                        height: Math.min(target.scrollHeight, 4096),
+                        windowWidth: target.scrollWidth,
+                        windowHeight: target.scrollHeight,
                     }).then(canvas => {
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+
+                        const domSnapshot = serializeDomSnapshot(target);
+
                         fetch('/api/hub/v2/render-capture', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ requestId: rid, image: dataUrl }),
+                            body: JSON.stringify({
+                                requestId: rid,
+                                image: dataUrl,
+                                domSnapshot,
+                                clientState,
+                            }),
                         }).catch(() => {});
                     }).catch(() => {});
                 } catch (e) {
                     // Non-critical — don't disrupt user experience
                 }
-            }, 1500);
+            });
+        }
+
+        function waitForCardsToSettle() {
+            return new Promise(resolve => {
+                let checks = 0;
+                const maxChecks = 20;
+                const interval = setInterval(() => {
+                    checks++;
+                    const stillLoading = cardGrid.querySelectorAll('.card.loading').length;
+                    const stillAnimating = cardGrid.querySelectorAll('.card:not(.populated)').length;
+                    if ((stillLoading === 0 && stillAnimating === 0) || checks >= maxChecks) {
+                        clearInterval(interval);
+                        setTimeout(resolve, 800);
+                    }
+                }, 250);
+            });
+        }
+
+        function collectClientState() {
+            const state = {
+                viewport: {
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    devicePixelRatio: window.devicePixelRatio || 1,
+                    scrollX: window.scrollX,
+                    scrollY: window.scrollY,
+                    orientation: screen.orientation?.type || (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
+                },
+                screen: {
+                    width: screen.width,
+                    height: screen.height,
+                    colorDepth: screen.colorDepth,
+                },
+                cards: {
+                    total: cardGrid.children.length,
+                    populated: cardGrid.querySelectorAll('.card.populated').length,
+                    loading: cardGrid.querySelectorAll('.card.loading').length,
+                    errored: cardGrid.querySelectorAll('.card.error').length,
+                    types: Array.from(cardGrid.querySelectorAll('.card')).map(c => ({
+                        id: c.id,
+                        type: c.dataset.cardType,
+                        classes: c.className,
+                        rect: { w: c.offsetWidth, h: c.offsetHeight },
+                        overflowing: c.scrollHeight > c.clientHeight || c.scrollWidth > c.clientWidth,
+                    })),
+                },
+                layout: {
+                    gridComputedCols: getComputedStyle(cardGrid).gridTemplateColumns,
+                    gridComputedRows: getComputedStyle(cardGrid).gridTemplateRows,
+                    gridGap: getComputedStyle(cardGrid).gap,
+                    overlayRect: { w: resultsOverlay.offsetWidth, h: resultsOverlay.offsetHeight },
+                },
+                performance: {},
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+            };
+
+            try {
+                const entries = performance.getEntriesByType('layout-shift');
+                if (entries.length) {
+                    state.performance.cumulativeLayoutShift = entries.reduce((sum, e) => sum + e.value, 0);
+                }
+                const paintEntries = performance.getEntriesByType('paint');
+                paintEntries.forEach(p => {
+                    state.performance[p.name.replace(/-/g, '_')] = Math.round(p.startTime);
+                });
+                const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
+                if (lcpEntries.length) {
+                    state.performance.lcp = Math.round(lcpEntries[lcpEntries.length - 1].startTime);
+                }
+            } catch (e) { /* performance API may not be fully available */ }
+
+            return state;
+        }
+
+        function serializeDomSnapshot(target) {
+            try {
+                const clone = target.cloneNode(true);
+                clone.querySelectorAll('script').forEach(s => s.remove());
+                const html = clone.outerHTML;
+                if (html.length > 512 * 1024) return html.substring(0, 512 * 1024);
+                return html;
+            } catch (e) {
+                return null;
+            }
         }
 
         // === Card Rendering ===

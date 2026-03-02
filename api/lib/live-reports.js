@@ -6,13 +6,19 @@
  *   2. Archive copy — 30-day TTL for historical review + search
  *
  * Storage keys (Redis):
- *   livereport:{id}        → JSON (TTL 48hr)
- *   livereport:{id}:thumb  → JPEG base64 (TTL 48hr)
- *   livereports:index      → JSON array of IDs
+ *   livereport:{id}              → JSON (TTL 48hr)
+ *   livereport:{id}:thumb        → JPEG base64 (TTL 48hr)
+ *   livereport:{id}:render       → JPEG base64 of rendered view (TTL 48hr)
+ *   livereport:{id}:dom          → HTML string — DOM snapshot (TTL 48hr)
+ *   livereport:{id}:clientstate  → JSON — viewport, cards, layout, perf (TTL 48hr)
+ *   livereports:index            → JSON array of IDs
  *
- *   archive:{id}           → full JSON  (TTL 30d)
- *   archive:{id}:thumb     → JPEG base64 (TTL 30d)
- *   archives:index         → JSON array of summary objects (searchable)
+ *   archive:{id}                 → full JSON  (TTL 30d)
+ *   archive:{id}:thumb           → JPEG base64 (TTL 30d)
+ *   archive:{id}:render          → JPEG base64 of rendered view (TTL 30d)
+ *   archive:{id}:dom             → HTML string — DOM snapshot (TTL 30d)
+ *   archive:{id}:clientstate     → JSON — viewport, cards, layout, perf (TTL 30d)
+ *   archives:index               → JSON array of summary objects (searchable)
  */
 
 const LIVE_TTL = 48 * 3600;     // 48 hours
@@ -256,18 +262,31 @@ async function searchArchive({ q, contentType, layoutType, outcome, from, to, ca
   };
 }
 
-// ── Render captures (device screenshot of final rendered cards) ──
+// ── Render captures (device screenshot + DOM snapshot + client state) ──
 
-async function saveRenderCapture(requestId, base64Jpeg) {
+async function saveRenderCapture(requestId, base64Jpeg, { domSnapshot, clientState } = {}) {
   const r = await redis();
   if (r) {
     await r.setex(`livereport:${requestId}:render`, LIVE_TTL, base64Jpeg);
     await r.setex(`archive:${requestId}:render`, ARCHIVE_TTL, base64Jpeg);
+    if (domSnapshot) {
+      await r.setex(`livereport:${requestId}:dom`, LIVE_TTL, domSnapshot);
+      await r.setex(`archive:${requestId}:dom`, ARCHIVE_TTL, domSnapshot);
+    }
+    if (clientState) {
+      const cs = typeof clientState === 'string' ? clientState : JSON.stringify(clientState);
+      await r.setex(`livereport:${requestId}:clientstate`, LIVE_TTL, cs);
+      await r.setex(`archive:${requestId}:clientstate`, ARCHIVE_TTL, cs);
+    }
   } else {
-    const entry = mem.reports.get(requestId);
-    if (entry) entry._renderCapture = base64Jpeg;
-    const archiveEntry = mem.archive.get(requestId);
-    if (archiveEntry) archiveEntry._renderCapture = base64Jpeg;
+    const setOnEntry = (entry) => {
+      if (!entry) return;
+      entry._renderCapture = base64Jpeg;
+      if (domSnapshot) entry._domSnapshot = domSnapshot;
+      if (clientState) entry._clientState = clientState;
+    };
+    setOnEntry(mem.reports.get(requestId));
+    setOnEntry(mem.archive.get(requestId));
   }
 }
 
@@ -280,6 +299,30 @@ async function getRenderCapture(requestId) {
   }
   const entry = mem.reports.get(requestId) || mem.archive.get(requestId);
   return entry?._renderCapture || null;
+}
+
+async function getDomSnapshot(requestId) {
+  const r = await redis();
+  if (r) {
+    const live = await r.get(`livereport:${requestId}:dom`);
+    if (live) return live;
+    return await r.get(`archive:${requestId}:dom`);
+  }
+  const entry = mem.reports.get(requestId) || mem.archive.get(requestId);
+  return entry?._domSnapshot || null;
+}
+
+async function getClientState(requestId) {
+  const r = await redis();
+  if (r) {
+    const live = await r.get(`livereport:${requestId}:clientstate`);
+    if (live) return typeof live === 'string' ? JSON.parse(live) : live;
+    const archived = await r.get(`archive:${requestId}:clientstate`);
+    if (archived) return typeof archived === 'string' ? JSON.parse(archived) : archived;
+    return null;
+  }
+  const entry = mem.reports.get(requestId) || mem.archive.get(requestId);
+  return entry?._clientState || null;
 }
 
 async function getStorageStatus() {
@@ -296,7 +339,7 @@ module.exports = {
   init,
   saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports,
   getArchive, getArchiveThumb, getReport, getReportThumb,
-  saveRenderCapture, getRenderCapture,
+  saveRenderCapture, getRenderCapture, getDomSnapshot, getClientState,
   searchArchive, getStorageStatus,
   _resetForTest,
 };

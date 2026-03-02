@@ -200,4 +200,76 @@ describe('Live Reports', () => {
       expect(result.reports).toHaveLength(1);
     });
   });
+
+  describe('Render capture with DOM snapshot and client state', () => {
+    it('should save and retrieve render capture image', async () => {
+      await liveReports.saveLiveReport('rc1', { outcome: 'success' });
+      await liveReports.saveRenderCapture('rc1', 'base64imagedata');
+      const capture = await liveReports.getRenderCapture('rc1');
+      expect(capture).toBe('base64imagedata');
+    });
+
+    it('should return null for missing render capture', async () => {
+      const capture = await liveReports.getRenderCapture('nonexistent');
+      expect(capture).toBeNull();
+    });
+
+    it('should save and retrieve DOM snapshot', async () => {
+      await liveReports.saveLiveReport('dom1', { outcome: 'success' });
+      await liveReports.saveRenderCapture('dom1', 'img', {
+        domSnapshot: '<div class="results-overlay">...</div>',
+      });
+      const snapshot = await liveReports.getDomSnapshot('dom1');
+      expect(snapshot).toBe('<div class="results-overlay">...</div>');
+    });
+
+    it('should return null for missing DOM snapshot', async () => {
+      const snapshot = await liveReports.getDomSnapshot('nonexistent');
+      expect(snapshot).toBeNull();
+    });
+
+    it('should save and retrieve client state', async () => {
+      await liveReports.saveLiveReport('cs1', { outcome: 'success' });
+      const state = {
+        viewport: { width: 375, height: 812, devicePixelRatio: 3 },
+        cards: { total: 5, populated: 5, loading: 0, errored: 0 },
+      };
+      await liveReports.saveRenderCapture('cs1', 'img', { clientState: state });
+      const retrieved = await liveReports.getClientState('cs1');
+      expect(retrieved).toEqual(state);
+    });
+
+    it('should return null for missing client state', async () => {
+      const state = await liveReports.getClientState('nonexistent');
+      expect(state).toBeNull();
+    });
+
+    it('should save all three together', async () => {
+      await liveReports.saveLiveReport('all1', { outcome: 'success' });
+      const clientState = { viewport: { width: 390, height: 844 } };
+      const domSnapshot = '<div>cards here</div>';
+      await liveReports.saveRenderCapture('all1', 'imgdata', { domSnapshot, clientState });
+
+      expect(await liveReports.getRenderCapture('all1')).toBe('imgdata');
+      expect(await liveReports.getDomSnapshot('all1')).toBe(domSnapshot);
+      expect(await liveReports.getClientState('all1')).toEqual(clientState);
+    });
+
+    it('should work with archive fallback', async () => {
+      await liveReports.saveLiveReport('af1', { outcome: 'success' });
+      await liveReports.saveRenderCapture('af1', 'img', {
+        domSnapshot: '<div>test</div>',
+        clientState: { viewport: { width: 400 } },
+      });
+
+      const capture = await liveReports.getRenderCapture('af1');
+      expect(capture).toBe('img');
+
+      const dom = await liveReports.getDomSnapshot('af1');
+      expect(dom).toBe('<div>test</div>');
+
+      const state = await liveReports.getClientState('af1');
+      expect(state.viewport.width).toBe(400);
+    });
+  });
 });
