@@ -12,29 +12,38 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style type="text/tailwindcss">
-      /* Custom thinx dark theme for DaisyUI */
-      @theme {
-        --color-base-100: #08090d;
-        --color-base-200: #12151c;
-        --color-base-300: #1a1f2e;
-        --color-base-content: #e4e8f0;
-        --color-primary: #5b8af5;
-        --color-primary-content: #ffffff;
-        --color-secondary: #a07ef0;
-        --color-secondary-content: #ffffff;
-        --color-accent: #4cd68a;
-        --color-accent-content: #000000;
-        --color-neutral: #181c26;
-        --color-neutral-content: #8892a6;
-        --color-info: #5b8af5;
-        --color-info-content: #ffffff;
-        --color-success: #4cd68a;
-        --color-success-content: #000000;
-        --color-warning: #f0c040;
-        --color-warning-content: #000000;
-        --color-error: #f06060;
-        --color-error-content: #ffffff;
+    <style>
+      /* Custom thinx dark theme — overrides DaisyUI dark theme with our palette */
+      [data-theme="thinx"] {
+        color-scheme: dark;
+        --color-base-100: oklch(7% 0.01 260);
+        --color-base-200: oklch(13% 0.015 260);
+        --color-base-300: oklch(18% 0.02 260);
+        --color-base-content: oklch(93% 0.01 260);
+        --color-primary: oklch(64% 0.17 260);
+        --color-primary-content: oklch(100% 0 0);
+        --color-secondary: oklch(64% 0.19 300);
+        --color-secondary-content: oklch(100% 0 0);
+        --color-accent: oklch(78% 0.17 160);
+        --color-accent-content: oklch(0% 0 0);
+        --color-neutral: oklch(15% 0.015 260);
+        --color-neutral-content: oklch(63% 0.03 260);
+        --color-info: oklch(64% 0.17 260);
+        --color-info-content: oklch(100% 0 0);
+        --color-success: oklch(78% 0.17 160);
+        --color-success-content: oklch(0% 0 0);
+        --color-warning: oklch(84% 0.16 85);
+        --color-warning-content: oklch(0% 0 0);
+        --color-error: oklch(67% 0.19 20);
+        --color-error-content: oklch(100% 0 0);
+        --radius-selector: 0.5rem;
+        --radius-field: 0.5rem;
+        --radius-box: 1rem;
+        --size-selector: 0.25rem;
+        --size-field: 0.25rem;
+        --border: 1px;
+        --depth: 1;
+        --noise: 0;
       }
     </style>
     <style>
