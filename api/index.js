@@ -611,6 +611,35 @@ app.post('/api/debug/client-report', (req, res) => {
 });
 
 // ============================================
+// Continuous Improvement Agent Trigger
+// ============================================
+const improvementTrigger = require('./lib/improvement-trigger');
+
+// GET /api/debug/improvement - Improvement trigger status & history
+app.get('/api/debug/improvement', requireDebugAuth, async (req, res) => {
+  try {
+    const [status, history] = await Promise.all([
+      improvementTrigger.getStatus(),
+      improvementTrigger.getTriggerHistory(parseInt(req.query.limit || '20', 10)),
+    ]);
+    res.json({ status, history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/debug/improvement/trigger - Manually trigger an improvement agent
+app.post('/api/debug/improvement/trigger', requireDebugAuth, async (req, res) => {
+  try {
+    const { focus, prompt, force } = req.body || {};
+    const result = await improvementTrigger.manualTrigger({ focus, prompt, force });
+    res.json({ triggered: true, ...result });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ============================================
 // Test Report Storage & Admin Dashboard
 // Auth: httpOnly session cookie — token never stored client-side
 // ============================================

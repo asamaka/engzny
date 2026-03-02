@@ -20,13 +20,18 @@ const ARCHIVE_TTL = 30 * 86400;  // 30 days
 const MAX_LIVE_INDEX = 100;
 const MAX_ARCHIVE_INDEX = 500;
 
+const improvementTrigger = require('./improvement-trigger');
+
 let _getRedis = null;
 const mem = {
   reports: new Map(), index: [],
   archive: new Map(), archiveIndex: [],
 };
 
-function init(getRedisFunc) { _getRedis = getRedisFunc; }
+function init(getRedisFunc) {
+  _getRedis = getRedisFunc;
+  improvementTrigger.init(getRedisFunc);
+}
 
 async function redis() { return _getRedis ? await _getRedis() : null; }
 
@@ -93,6 +98,12 @@ async function saveLiveReport(requestId, data) {
   try {
     await saveArchive(requestId, entry);
   } catch (_) { /* archive is best-effort; live report is already saved */ }
+
+  // Continuous improvement: evaluate report and maybe spawn an agent.
+  // Awaited because Vercel kills fire-and-forget after res.end().
+  try {
+    await improvementTrigger.onReportSaved(entry);
+  } catch (_) { /* improvement trigger is best-effort */ }
 
   return entry;
 }

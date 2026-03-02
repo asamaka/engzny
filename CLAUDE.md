@@ -56,6 +56,19 @@ This project uses specialized agents with clear responsibilities. Each agent has
 
 **When to use:** Debugging failures, understanding existing behavior, investigating issues.
 
+### 4. Continuous Improvement Agent (auto-spawned)
+
+**Spec:** `.claude/agents/continuous-improvement.md`
+**Scope:** Autonomous agent spawned by the Cursor Cloud Agent API when pipeline reports meet trigger criteria.
+
+**Responsibilities:**
+- Review flagged pipeline reports (errors, slow performance, periodic)
+- Investigate root causes in the codebase
+- Make targeted, safe code improvements
+- Run tests and push to `cursor/improvement-*` branches (auto-deploys)
+
+**When to use:** Spawned automatically — not manually invoked. Can also be triggered manually via `POST /api/debug/improvement/trigger`.
+
 ## Architecture
 
 ```
@@ -84,6 +97,7 @@ api/
     report-store.js           # Test report storage (Redis + memory fallback)
     screenshot-capture.js     # Screenshot capture & thumbnail generation
     vercel-logs.js            # Vercel runtime logs API client
+    improvement-trigger.js    # Continuous improvement agent trigger (Cursor API)
 
 public/
   hub-v2.html                 # Main page (served at /)
@@ -129,6 +143,8 @@ tests/
 | `/api/debug/env` | GET | Diagnostic: which integrations are configured |
 | `/api/debug/client-error` | POST | Client error reports (open, no auth) |
 | `/api/debug/client-report` | POST | Client session telemetry (open, no auth) |
+| `/api/debug/improvement` | GET | Continuous improvement trigger status & history |
+| `/api/debug/improvement/trigger` | POST | Manually trigger an improvement agent. Body: `{"focus":"area to improve","force":true}` |
 
 ## Pipeline Flow
 
@@ -204,7 +220,66 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`), REPORT_PIN (optional, defaults to `0427`)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+- **Vercel env vars (for continuous improvement):** CURSOR_API_KEY, IMPROVEMENT_ENABLED (`true` to enable)
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
+
+## Continuous Improvement
+
+The system can automatically spawn Cursor Cloud Agents to review pipeline reports and push code improvements. When enabled, every pipeline completion is evaluated against trigger criteria.
+
+### How it works
+
+```
+Pipeline completes → saveLiveReport() → evaluateReport()
+    │
+    ├─ Error?  → Spawn agent to fix the bug
+    ├─ Slow?   → Spawn agent to optimize performance
+    ├─ Every Nth report? → Spawn agent for periodic review
+    └─ None match → No action
+    │
+    v
+POST api.cursor.com/v0/agents → New Cloud Agent
+    │
+    v
+Agent reviews report → Investigates code → Makes fix → Pushes to cursor/*
+    │
+    v
+auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
+```
+
+### Configuration (Vercel env vars)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CURSOR_API_KEY` | (required) | Cursor API key from cursor.com/dashboard → Integrations |
+| `IMPROVEMENT_ENABLED` | `false` | Set to `true` to enable auto-triggering |
+| `IMPROVEMENT_REPO` | `https://github.com/asamaka/engzny` | GitHub repo for the agent |
+| `IMPROVEMENT_REF` | `main` | Base branch |
+| `IMPROVEMENT_MODEL` | `claude-4-sonnet` | LLM model for the agent |
+| `IMPROVEMENT_MIN_INTERVAL` | `1800` | Minimum seconds between triggers (30 min) |
+| `IMPROVEMENT_TRIGGER_ON` | `error,slow` | Comma-separated: `error`, `slow`, `periodic`, `all` |
+| `IMPROVEMENT_SLOW_THRESHOLD` | `25000` | Pipeline duration (ms) to be considered "slow" |
+| `IMPROVEMENT_PERIODIC_EVERY` | `20` | Trigger every Nth successful report |
+
+### Manual trigger
+
+```bash
+# Trigger with a focus area
+curl -X POST 'https://www.thinx.fun/api/debug/improvement/trigger?token=thinx-debug-2026' \
+  -H 'Content-Type: application/json' \
+  -d '{"focus":"optimize card researcher prompts for faster responses"}'
+
+# Force trigger (bypass rate limit)
+curl -X POST 'https://www.thinx.fun/api/debug/improvement/trigger?token=thinx-debug-2026' \
+  -H 'Content-Type: application/json' \
+  -d '{"focus":"review recent errors","force":true}'
+```
+
+### View trigger history
+
+```bash
+curl 'https://www.thinx.fun/api/debug/improvement?token=thinx-debug-2026'
+```
 
 ## Runtime Monitoring & Logs
 
