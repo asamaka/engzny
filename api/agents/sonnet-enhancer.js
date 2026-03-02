@@ -142,6 +142,7 @@ ${getLayoutTypesSummaryForPrompt()}
 - Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
 - For product_card: features/warnings must be plain strings
+- IMPORTANT: Call MULTIPLE tools in a SINGLE response — populate 3-5 cards at once, not one at a time
 
 **Breaking news rules:**
 - NEVER label news as "MISLEADING"/"MISINFORMATION" in hero_summary
@@ -149,16 +150,16 @@ ${getLayoutTypesSummaryForPrompt()}
 - ALWAYS use verification_card (not fact_check) for breaking news`;
 
   if (researchData) {
-    prompt += `\n\n**Web research findings:**
+    prompt += `\n\n**Web research findings (REVIEW PASS — incorporate these into cards):**
 ${JSON.stringify(researchData, null, 2)}
 
-Use research to:
-- UPDATE verification_card sources with actual findings — this is the #1 priority
-- Add source URLs and citations to all cards
-- Verify or correct facts
-- Enrich cards with web data
-- If research shows initial analysis was wrong, correct it
-- Remove any filler/boring cards that research makes redundant`;
+REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
+1. UPDATE verification_card sources with actual findings — #1 priority
+2. Add source URLs and citations to relevant cards
+3. Verify or correct facts using research data
+4. Enrich cards with web data (dates, stats, context)
+5. If research shows initial analysis was wrong, correct it
+6. Call ALL update_card tools in ONE response — do NOT make one call at a time`;
   }
 
   return prompt;
@@ -177,10 +178,11 @@ async function enhance({
   adapterConfig = {},
 }) {
   const startTime = Date.now();
+  const isReview = !!researchData;
   const config = {
     ...adapterConfig,
     model: adapterConfig.model || 'claude-sonnet-4-20250514',
-    maxTokens: 4096,
+    maxTokens: 8192,
   };
 
     const adapter = getVisionAdapter(config);
@@ -246,9 +248,17 @@ async function enhance({
 
     try {
       const useLoop = typeof adapter.analyzeImageWithToolLoop === 'function';
+      const useTextLoop = isReview && typeof adapter.textWithToolLoop === 'function';
       let response;
 
-      if (useLoop) {
+      if (useTextLoop) {
+        response = await adapter.textWithToolLoop({
+          prompt,
+          tools: ENHANCER_TOOLS,
+          maxTokens: config.maxTokens,
+          onToolUse: processToolBlock,
+        });
+      } else if (useLoop) {
         response = await adapter.analyzeImageWithToolLoop({
           imageData,
           mediaType,

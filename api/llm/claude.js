@@ -293,6 +293,67 @@ class ClaudeAdapter extends LLMAdapter {
   }
 
   /**
+   * Iterative tool use loop for TEXT-ONLY (no image) requests.
+   * Used by the review phase where the image was already analyzed.
+   */
+  async textWithToolLoop({ prompt, tools, maxTokens, onToolUse, maxIterations = 8 }) {
+    const effectiveMaxTokens = maxTokens || this.maxTokens;
+    const messages = [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ];
+
+    const allContent = [];
+    const totalUsage = { input_tokens: 0, output_tokens: 0 };
+    let finalModel = null;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: effectiveMaxTokens,
+        messages,
+        tools,
+      });
+
+      finalModel = response.model;
+      totalUsage.input_tokens += response.usage?.input_tokens || 0;
+      totalUsage.output_tokens += response.usage?.output_tokens || 0;
+      allContent.push(...response.content);
+
+      const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
+
+      if (toolUseBlocks.length > 0 && onToolUse) {
+        for (const block of toolUseBlocks) {
+          onToolUse(block);
+        }
+      }
+
+      if (response.stop_reason !== 'tool_use' || toolUseBlocks.length === 0) {
+        break;
+      }
+
+      messages.push({ role: 'assistant', content: response.content });
+      messages.push({
+        role: 'user',
+        content: toolUseBlocks.map(b => ({
+          type: 'tool_result',
+          tool_use_id: b.id,
+          content: 'Applied successfully. Continue with remaining cards.',
+        })),
+      });
+    }
+
+    return {
+      content: allContent,
+      usage: totalUsage,
+      model: finalModel,
+      stopReason: 'end_turn',
+    };
+  }
+
+  /**
    * Generate text from a prompt
    */
   async generateText({ prompt, systemPrompt, context }) {
