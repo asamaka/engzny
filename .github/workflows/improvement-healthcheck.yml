@@ -1,0 +1,52 @@
+name: Improvement Healthcheck
+
+# Lightweight cron that picks up pipeline reports skipped due to rate limiting.
+# Calls the Vercel API which checks Redis for queued reports and dispatches
+# the improvement workflow if any exist. Does nothing otherwise.
+#
+# Cost: ~1 curl call every 15 min = ~96/day. Exits immediately when idle.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  healthcheck:
+    name: Check for skipped reports
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping healthcheck endpoint
+        env:
+          DEBUG_TOKEN: ${{ secrets.DEBUG_TOKEN }}
+        run: |
+          TOKEN="${DEBUG_TOKEN:-thinx-debug-2026}"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://www.thinx.fun/api/debug/improvement/healthcheck?token=${TOKEN}" \
+            -H "Content-Type: application/json" \
+            --max-time 30)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP $HTTP_CODE"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          TRIGGERED=$(echo "$BODY" | jq -r '.triggered // false' 2>/dev/null)
+          REASON=$(echo "$BODY" | jq -r '.reason // "unknown"' 2>/dev/null)
+          SKIPPED=$(echo "$BODY" | jq -r '.skippedCount // 0' 2>/dev/null)
+
+          if [ "$TRIGGERED" = "true" ]; then
+            echo "### Improvement Agent Dispatched" >> $GITHUB_STEP_SUMMARY
+            echo "Picked up **${SKIPPED}** skipped report(s)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### No action needed" >> $GITHUB_STEP_SUMMARY
+            echo "Reason: ${REASON}" >> $GITHUB_STEP_SUMMARY
+            if [ "$SKIPPED" != "0" ] && [ "$SKIPPED" != "null" ]; then
+              echo "${SKIPPED} report(s) queued, waiting for rate limit" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi

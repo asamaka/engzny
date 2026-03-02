@@ -1,6 +1,8 @@
 name: Continuous Improvement Agent
 
-# Triggered via workflow_dispatch from the Vercel runtime.
+# Triggered via workflow_dispatch from the Vercel runtime (on every pipeline report)
+# or by the scheduled healthcheck (for rate-limited reports).
+#
 # Uses Actions:write permission (NOT Contents:write) so the dispatch token
 # can only trigger workflows — it cannot push code or modify the repo.
 # The Cursor API key (FIX_IT secret) stays here in GitHub Secrets — never in Vercel.
@@ -9,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Trigger reason (pipeline_error, slow_pipeline, periodic_review, manual)'
+        description: 'Trigger reason (pipeline_error, slow_pipeline, periodic_review, report_review, healthcheck, manual)'
         required: true
         type: string
       detail:
@@ -17,7 +19,7 @@ on:
         required: true
         type: string
       report:
-        description: 'JSON-encoded pipeline report summary (or empty for manual)'
+        description: 'JSON-encoded pipeline report summary (single or array for healthcheck)'
         required: false
         type: string
         default: ''
@@ -37,7 +39,7 @@ jobs:
           echo "Trigger reason: ${{ inputs.reason }}"
           echo "Detail: ${{ inputs.detail }}"
           if [ -n '${{ inputs.report }}' ]; then
-            echo "Report: $(echo '${{ inputs.report }}' | jq -r '.requestId // "none"' 2>/dev/null || echo 'none')"
+            echo "Report: $(echo '${{ inputs.report }}' | jq -r 'if type == "array" then length | tostring + " reports" else .requestId // "none" end' 2>/dev/null || echo 'none')"
           fi
 
       - name: Verify secrets
@@ -53,13 +55,32 @@ jobs:
           DETAIL: ${{ inputs.detail }}
           REPORT: ${{ inputs.report }}
         run: |
-          if [ "$REASON" = "manual" ]; then
-            cat > /tmp/agent-prompt.txt << 'PROMPT_END'
+          cat > /tmp/agent-prompt.txt << 'PROMPT_END'
           You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
           ## Prime Directive
 
           **You MUST ship at least one code change this session.** Analysis without implementation is a failure. You are not a research agent — you are an improvement agent that makes the product better for users every time you run.
+
+          ## FIRST — Review Previous Work & Backlog
+
+          Before doing ANYTHING else, read these two things:
+
+          1. **Backlog file:** `.cursor/improvement-backlog.md`
+             - This is your persistent memory across runs
+             - Check for incomplete work items from previous agents
+             - If there's a high-priority incomplete item, continue that work FIRST
+             - You MUST update this file before you finish (add/complete items, update "Last Run")
+
+          2. **Recent agent changes:** Run `git log --oneline -20` to see recent commits
+             - Look for `cursor/improvement-*` branch merges
+             - Understand what the last agent(s) changed so you don't duplicate or conflict
+             - If a recent change looks incomplete or broken, fixing it is your top priority
+
+          PROMPT_END
+
+          if [ "$REASON" = "manual" ]; then
+            cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
 
           ## Context
 
@@ -69,40 +90,25 @@ jobs:
 
           PROMPT_END
             echo "$DETAIL" >> /tmp/agent-prompt.txt
-            cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
+          elif [ "$REASON" = "healthcheck" ]; then
+            cat >> /tmp/agent-prompt.txt << PROMPT_END
 
-          ## Your Instructions — Plan, Implement, Ship
+          ## Context
 
-          Follow this exact sequence. Spend at most 20% of your time on steps 1-3. The rest goes to implementation.
+          You were triggered by a **scheduled healthcheck**. One or more pipeline reports were skipped due to rate limiting and are now being reviewed as a batch.
 
-          1. **Quick context** — Read `CLAUDE.md` for architecture. Read `.claude/agents/continuous-improvement.md` for your full operating spec.
-          2. **Check production** — `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
-          3. **Pick the highest customer-value improvement:**
-             - P0 (broken): errors, crashes, failed pipelines → fix first
-             - P1 (degraded): slow pipelines, bad results → fix second
-             - P2 (polish): UX friction, confusing output → fix third
-             - P3 (resilience): logging, edge cases, retry logic → fix last
-             If the focus area is vague (e.g., "health check", "test"), treat it as a periodic review and find the most impactful thing to fix.
-          4. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal.
-          5. **Test** — `npm test` (must pass)
-          6. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body.
+          **Detail:** ${DETAIL}
 
-          ## Hard Rules
+          ## Skipped Pipeline Reports
 
-          - You MUST commit and push code. An invocation without a code change is a wasted invocation.
-          - Never change test expectations to make tests pass — fix the actual code.
-          - Never modify environment variables, secrets, or deployment workflows.
-          - Never remove existing features or endpoints.
-          - Always preserve backward compatibility.
-          - Do NOT spend your time writing up findings. Spend it writing code.
+          \`\`\`json
+          ${REPORT}
+          \`\`\`
+
+          Review all skipped reports. If multiple reports show the same issue, fix the root cause once. If they show different issues, prioritize by customer impact (P0 > P1 > P2 > P3) and fix the most impactful one.
           PROMPT_END
           else
-            cat > /tmp/agent-prompt.txt << PROMPT_END
-          You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
-
-          ## Prime Directive
-
-          **You MUST ship at least one code change this session.** Analysis without implementation is a failure. You are not a research agent — you are an improvement agent that makes the product better for users every time you run.
+            cat >> /tmp/agent-prompt.txt << PROMPT_END
 
           ## Trigger
 
@@ -114,37 +120,50 @@ jobs:
           \`\`\`json
           ${REPORT}
           \`\`\`
+          PROMPT_END
+          fi
 
-          ## Your Instructions — Plan, Implement, Ship
+          cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
 
-          Follow this exact sequence. Spend at most 20% of your time on steps 1-3. The rest goes to implementation.
+          ## Your Instructions — Review, Plan, Implement, Ship
 
-          1. **Quick context** — Read \`CLAUDE.md\` for architecture. Read \`.claude/agents/continuous-improvement.md\` for your full operating spec including the customer-value prioritization framework.
-          2. **Analyze the report** — Understand what went wrong or what's slow. For \`pipeline_error\`: trace the error. For \`slow_pipeline\`: identify the slow phase. For \`periodic_review\`: check the dashboard for patterns.
-          3. **Pick the fix with highest customer ROI:**
+          Follow this exact sequence. Spend at most 20% of your time on steps 1-4. The rest goes to implementation.
+
+          1. **Read backlog** — `.cursor/improvement-backlog.md` — check for incomplete work from previous runs.
+          2. **Review recent changes** — `git log --oneline -20` — understand what recent agents changed.
+          3. **Quick context** — Read `CLAUDE.md` for architecture. Read `.claude/agents/continuous-improvement.md` for your full operating spec.
+          4. **Check production** — `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
+          5. **Pick the highest customer-value improvement:**
+             - Incomplete backlog items from previous runs (continue the work)
              - P0 (broken): errors, crashes, failed pipelines → fix first
              - P1 (degraded): slow pipelines, bad results → fix second
              - P2 (polish): UX friction, confusing output → fix third
              - P3 (resilience): logging, edge cases, retry logic → fix last
-          4. **Implement the fix** — Go directly to the relevant code. Key files:
-             - \`api/agents/orchestrator-v2.js\` — Pipeline coordinator
-             - \`api/agents/layout-designer.js\` — Vision LLM (layout)
-             - \`api/agents/card-researcher.js\` — Card population LLM
-             - \`public/hub-v2.html\` — Frontend (card rendering, SSE)
-             - \`api/index.js\` — Express server, endpoints
-          5. **Test** — \`npm test\` (must pass)
-          6. **Commit and push** — Use format: \`fix(<area>): <what>\` with customer impact in the body.
+             If the trigger is a health check or periodic review, find the most impactful thing to fix.
+          6. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal. Key files:
+             - `api/agents/orchestrator-v2.js` — Pipeline coordinator
+             - `api/agents/layout-designer.js` — Vision LLM (layout)
+             - `api/agents/card-researcher.js` — Card population LLM
+             - `public/hub-v2.html` — Frontend (card rendering, SSE)
+             - `api/index.js` — Express server, endpoints
+          7. **Test** — `npm test` (must pass)
+          8. **Update backlog** — Edit `.cursor/improvement-backlog.md`:
+             - Update "Last Run" with date, trigger reason, and what you changed
+             - Mark completed items with [x]
+             - Add any new observations or work items you discovered
+             - Remove stale items that are no longer relevant
+          9. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body. Make sure the backlog update is included in the commit.
 
           ## Hard Rules
 
           - You MUST commit and push code. An invocation without a code change is a wasted invocation.
+          - You MUST read and update `.cursor/improvement-backlog.md` every run.
           - Never change test expectations to make tests pass — fix the actual code.
           - Never modify environment variables, secrets, or deployment workflows.
           - Never remove existing features or endpoints.
           - Always preserve backward compatibility.
           - Do NOT spend your time writing up findings. Spend it writing code.
           PROMPT_END
-          fi
 
       - name: Launch Cursor Cloud Agent
         id: launch
