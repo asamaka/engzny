@@ -193,6 +193,11 @@ async function deepResearch({
 }
 
 function parseResearchResponse(text) {
+  if (!text) {
+    logger.warn('DeepResearcher', 'Empty or missing response text');
+    return { findings: [] };
+  }
+
   try {
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (jsonMatch) {
@@ -210,11 +215,12 @@ function parseResearchResponse(text) {
     logger.warn('DeepResearcher', 'Failed to parse research response, using raw text', {
       err: e.message,
     });
+    const safeText = String(text);
     return {
       findings: [{
         topic: 'Research Results',
-        summary: text.slice(0, 500),
-        details: text,
+        summary: safeText.slice(0, 500),
+        details: safeText,
         confidence: 'medium',
         sourceUrls: [],
       }],

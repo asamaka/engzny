@@ -101,6 +101,7 @@ async function runPipeline({
   );
 
   const currentCards = new Map();
+  let enhanceHeartbeat;
 
   try {
     // =====================================================
@@ -201,7 +202,7 @@ async function runPipeline({
       'Verifying information...',
     ];
     let enhanceMsgIdx = 0;
-    const enhanceHeartbeat = setInterval(() => {
+    enhanceHeartbeat = setInterval(() => {
       enhanceMsgIdx = Math.min(enhanceMsgIdx + 1, enhanceProgressMessages.length - 1);
       if (onProgress) {
         onProgress({
@@ -578,6 +579,7 @@ async function runPipeline({
 
     return populatedLayout;
   } catch (error) {
+    clearInterval(enhanceHeartbeat);
     logger.error('Orchestrator', 'Pipeline error', {
       err: error.message,
       stack: error.stack?.split('\n').slice(0, 3).join(' | '),
