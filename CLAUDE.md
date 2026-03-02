@@ -220,25 +220,50 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 - **GitHub:** VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID, CLAUDE_API_KEY
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`), REPORT_PIN (optional, defaults to `0427`)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
-- **Vercel env vars (for continuous improvement):** CURSOR_API_KEY, IMPROVEMENT_ENABLED (`true` to enable)
+- **Vercel env vars (for continuous improvement):** GITHUB_DISPATCH_TOKEN (fine-grained PAT), IMPROVEMENT_ENABLED (`true` to enable)
+- **GitHub Secrets (for continuous improvement):** CURSOR_API_KEY (Cursor API key — never stored in Vercel)
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
 
 ## Continuous Improvement
 
 The system can automatically spawn Cursor Cloud Agents to review pipeline reports and push code improvements. When enabled, every pipeline completion is evaluated against trigger criteria.
 
+### Security model
+
+The Cursor API key (which can push code to the repo) **never touches the Vercel runtime**. Instead:
+
+```
+Vercel runtime (processes untrusted user uploads)
+  │
+  │  Only has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, contents:write scope)
+  │  This token can ONLY trigger workflows — it cannot push code.
+  │
+  ▼
+GitHub Actions (trusted CI environment)
+  │
+  │  Has: CURSOR_API_KEY (from GitHub Secrets, only exposed during workflow runs)
+  │
+  ▼
+Cursor Cloud Agent API → spawns agent → agent pushes to cursor/* → auto-deploy
+```
+
+If the Vercel runtime is compromised, the attacker gets a GitHub PAT that can trigger workflows — but cannot directly push code or access the Cursor API key.
+
 ### How it works
 
 ```
 Pipeline completes → saveLiveReport() → evaluateReport()
     │
-    ├─ Error?  → Spawn agent to fix the bug
-    ├─ Slow?   → Spawn agent to optimize performance
-    ├─ Every Nth report? → Spawn agent for periodic review
+    ├─ Error?  → Dispatch to GitHub Actions
+    ├─ Slow?   → Dispatch to GitHub Actions
+    ├─ Every Nth report? → Dispatch to GitHub Actions
     └─ None match → No action
     │
     v
-POST api.cursor.com/v0/agents → New Cloud Agent
+GitHub repository_dispatch → continuous-improvement.yml workflow
+    │
+    v
+Reads CURSOR_API_KEY from GitHub Secrets → POST api.cursor.com/v0/agents
     │
     v
 Agent reviews report → Investigates code → Makes fix → Pushes to cursor/*
@@ -247,19 +272,39 @@ Agent reviews report → Investigates code → Makes fix → Pushes to cursor/*
 auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
 ```
 
-### Configuration (Vercel env vars)
+### Configuration
+
+**Vercel env vars** (safe — no code-pushing credentials):
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `CURSOR_API_KEY` | (required) | Cursor API key from cursor.com/dashboard → Integrations |
 | `IMPROVEMENT_ENABLED` | `false` | Set to `true` to enable auto-triggering |
-| `IMPROVEMENT_REPO` | `https://github.com/asamaka/engzny` | GitHub repo for the agent |
-| `IMPROVEMENT_REF` | `main` | Base branch |
-| `IMPROVEMENT_MODEL` | `claude-4-sonnet` | LLM model for the agent |
+| `GITHUB_DISPATCH_TOKEN` | (required) | GitHub fine-grained PAT with `contents:write` scope |
 | `IMPROVEMENT_MIN_INTERVAL` | `1800` | Minimum seconds between triggers (30 min) |
 | `IMPROVEMENT_TRIGGER_ON` | `error,slow` | Comma-separated: `error`, `slow`, `periodic`, `all` |
 | `IMPROVEMENT_SLOW_THRESHOLD` | `25000` | Pipeline duration (ms) to be considered "slow" |
 | `IMPROVEMENT_PERIODIC_EVERY` | `20` | Trigger every Nth successful report |
+
+**GitHub Secrets** (sensitive — only exposed during CI):
+
+| Secret | Description |
+|--------|-------------|
+| `CURSOR_API_KEY` | Cursor API key from cursor.com/dashboard → Integrations |
+
+### Setup
+
+1. **Create a GitHub fine-grained PAT** at [github.com/settings/tokens](https://github.com/settings/tokens?type=beta):
+   - Repository access: Only `asamaka/engzny`
+   - Permissions: Contents → Read and Write (needed for `repository_dispatch`)
+   - This token can only trigger workflows — it cannot access secrets or push code
+
+2. **Add the PAT to Vercel** as `GITHUB_DISPATCH_TOKEN`
+
+3. **Add Cursor API key to GitHub** as a repository secret named `CURSOR_API_KEY`:
+   - Get it from [cursor.com/dashboard](https://cursor.com/dashboard) → Integrations
+   - This key stays in GitHub — the Vercel runtime never sees it
+
+4. **Enable** by setting `IMPROVEMENT_ENABLED=true` in Vercel env vars
 
 ### Manual trigger
 

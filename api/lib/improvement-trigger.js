@@ -1,24 +1,31 @@
 /**
  * Continuous Improvement Trigger
  *
- * Spawns a Cursor Cloud Agent via the REST API when a pipeline report
- * meets certain criteria (errors, slow performance, periodic review).
+ * Evaluates pipeline reports and dispatches a GitHub Actions workflow
+ * that spawns a Cursor Cloud Agent. The Cursor API key NEVER touches
+ * the Vercel runtime — it stays in GitHub Secrets.
  *
- * Required env vars:
- *   CURSOR_API_KEY       — Cursor API key (from cursor.com/dashboard → Integrations)
- *   IMPROVEMENT_ENABLED  — "true" to enable (default: disabled)
+ * Security model:
+ *   Vercel has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, repo:contents scope only)
+ *   GitHub has: CURSOR_API_KEY (only exposed during CI workflow runs)
  *
- * Optional env vars:
- *   IMPROVEMENT_REPO     — GitHub repo URL (default: https://github.com/asamaka/engzny)
- *   IMPROVEMENT_REF      — Branch to base off (default: main)
- *   IMPROVEMENT_MODEL    — LLM model for the agent (default: claude-4-sonnet)
- *   IMPROVEMENT_MIN_INTERVAL — Minimum seconds between triggers (default: 1800 = 30 min)
- *   IMPROVEMENT_TRIGGER_ON   — Comma-separated: error,slow,periodic,all (default: error,slow)
- *   IMPROVEMENT_SLOW_THRESHOLD — Pipeline duration in ms to be "slow" (default: 25000)
+ * Required env vars (Vercel):
+ *   IMPROVEMENT_ENABLED       — "true" to enable (default: disabled)
+ *   GITHUB_DISPATCH_TOKEN     — GitHub fine-grained PAT with contents:write scope
+ *
+ * Optional env vars (Vercel):
+ *   IMPROVEMENT_REPO_OWNER    — GitHub owner (default: asamaka)
+ *   IMPROVEMENT_REPO_NAME     — GitHub repo  (default: engzny)
+ *   IMPROVEMENT_MIN_INTERVAL  — Min seconds between triggers (default: 1800)
+ *   IMPROVEMENT_TRIGGER_ON    — Comma-separated: error,slow,periodic,all (default: error,slow)
+ *   IMPROVEMENT_SLOW_THRESHOLD — Pipeline duration ms to be "slow" (default: 25000)
  *   IMPROVEMENT_PERIODIC_EVERY — Trigger every Nth successful report (default: 20)
+ *
+ * Required GitHub Secrets (for the workflow, NOT Vercel):
+ *   CURSOR_API_KEY — Cursor API key from cursor.com/dashboard → Integrations
  */
 
-const CURSOR_API_BASE = 'https://api.cursor.com';
+const GITHUB_API = 'https://api.github.com';
 
 const REDIS_KEYS = {
   LAST_TRIGGER: 'thinx:improvement:last_trigger',
@@ -37,10 +44,9 @@ async function redis() { return _getRedis ? await _getRedis() : null; }
 function getConfig() {
   return {
     enabled: process.env.IMPROVEMENT_ENABLED === 'true',
-    apiKey: process.env.CURSOR_API_KEY || '',
-    repo: process.env.IMPROVEMENT_REPO || 'https://github.com/asamaka/engzny',
-    ref: process.env.IMPROVEMENT_REF || 'main',
-    model: process.env.IMPROVEMENT_MODEL || 'claude-4-sonnet',
+    githubToken: process.env.GITHUB_DISPATCH_TOKEN || '',
+    repoOwner: process.env.IMPROVEMENT_REPO_OWNER || 'asamaka',
+    repoName: process.env.IMPROVEMENT_REPO_NAME || 'engzny',
     minInterval: parseInt(process.env.IMPROVEMENT_MIN_INTERVAL || '1800', 10),
     triggerOn: (process.env.IMPROVEMENT_TRIGGER_ON || 'error,slow').split(',').map(s => s.trim()),
     slowThreshold: parseInt(process.env.IMPROVEMENT_SLOW_THRESHOLD || '25000', 10),
@@ -50,12 +56,12 @@ function getConfig() {
 
 /**
  * Evaluate a completed pipeline report and decide whether to trigger
- * an improvement agent. Returns { shouldTrigger, reason } or null.
+ * an improvement agent. Returns { reason, detail } or null.
  */
 async function evaluateReport(report) {
   const config = getConfig();
 
-  if (!config.enabled || !config.apiKey) return null;
+  if (!config.enabled || !config.githubToken) return null;
 
   const triggers = config.triggerOn;
 
@@ -119,104 +125,56 @@ async function recordTrigger(entry) {
 }
 
 /**
- * Build the prompt for the improvement agent based on the report and trigger reason.
+ * Build a compact report summary safe to include in the GitHub dispatch payload.
+ * Keeps it small — GitHub limits event payloads to 10 client_payload keys.
  */
-function buildPrompt(report, evaluation) {
-  const reportSummary = {
+function buildReportSummary(report) {
+  return {
     requestId: report.requestId,
     outcome: report.outcome,
-    contentType: report.contentType,
-    layoutType: report.layoutType,
-    cardCount: report.cardCount,
-    duration: report.duration,
-    designDuration: report.designDuration,
-    error: report.error,
-    imageSize: report.imageSize,
+    contentType: report.contentType || null,
+    layoutType: report.layoutType || null,
+    cardCount: report.cardCount || null,
+    duration: report.duration || null,
+    designDuration: report.designDuration || null,
+    error: report.error || null,
+    imageSize: report.imageSize || null,
     cardTypes: (report.cards || []).map(c => c.cardType).filter(Boolean),
-    llmTraceSummary: report.llmTraceSummary,
+    llmTraceSummary: report.llmTraceSummary || null,
   };
-
-  const triggerContext = {
-    reason: evaluation.reason,
-    detail: evaluation.detail,
-    triggeredAt: new Date().toISOString(),
-  };
-
-  return `You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
-
-## Context
-
-A pipeline report has been flagged for review. Your job is to analyze the report, identify what went wrong or what could be better, and make targeted code improvements.
-
-## Trigger
-
-**Reason:** ${evaluation.reason}
-**Detail:** ${evaluation.detail}
-
-## Pipeline Report
-
-\`\`\`json
-${JSON.stringify(reportSummary, null, 2)}
-\`\`\`
-
-## Your Instructions
-
-1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
-2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
-3. **Analyze the report** to understand what happened.
-4. **Investigate the relevant code** based on the trigger reason:
-   - For \`pipeline_error\`: trace the error through the pipeline code
-   - For \`slow_pipeline\`: profile the slow phases and look for optimization opportunities
-   - For \`periodic_review\`: review recent patterns, look for recurring issues
-5. **Make targeted improvements** — small, safe changes that address the specific issue.
-6. **Run tests** (\`npm test\`) to verify your changes don't break anything.
-7. **Commit and push** to a \`cursor/improvement-*\` branch. The auto-deploy workflow will handle the rest.
-
-## Safety Rules
-
-- Make ONE focused improvement per trigger. Don't refactor the world.
-- Never change test expectations to make tests pass — fix the actual code.
-- Never modify environment variables or secrets.
-- Never remove existing features or endpoints.
-- If you're unsure about a change, skip it and document your findings in the commit message.
-- Prefer adding error handling, improving prompts, or optimizing performance over structural changes.`;
 }
 
 /**
- * Launch a Cursor Cloud Agent via the REST API.
+ * Send a repository_dispatch event to GitHub Actions.
+ * This triggers the continuous-improvement.yml workflow, which
+ * reads CURSOR_API_KEY from GitHub Secrets (never in Vercel).
  */
-async function launchAgent(prompt, config) {
-  const response = await fetch(`${CURSOR_API_BASE}/v0/agents`, {
+async function dispatchGitHub(config, eventType, payload) {
+  const url = `${GITHUB_API}/repos/${config.repoOwner}/${config.repoName}/dispatches`;
+
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${config.apiKey}`,
+      'Authorization': `Bearer ${config.githubToken}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      prompt: { text: prompt },
-      model: config.model,
-      source: {
-        repository: config.repo,
-        ref: config.ref,
-      },
-      target: {
-        autoCreatePr: false,
-        autoBranch: true,
-      },
+      event_type: eventType,
+      client_payload: payload,
     }),
   });
 
   if (!response.ok) {
     const body = await response.text();
-    throw new Error(`Cursor API ${response.status}: ${body}`);
+    throw new Error(`GitHub API ${response.status}: ${body}`);
   }
-
-  return response.json();
 }
 
 /**
  * Main entry point — called after a pipeline report is saved.
- * Fire-and-forget: errors are caught and logged, never thrown.
+ * Errors are caught and logged, never thrown to the caller.
  */
 async function onReportSaved(report) {
   try {
@@ -230,22 +188,25 @@ async function onReportSaved(report) {
     }
 
     const config = getConfig();
-    const prompt = buildPrompt(report, evaluation);
-    const agent = await launchAgent(prompt, config);
+    const reportSummary = buildReportSummary(report);
+
+    await dispatchGitHub(config, 'improvement-trigger', {
+      reason: evaluation.reason,
+      detail: evaluation.detail,
+      report: reportSummary,
+    });
 
     const triggerEntry = {
-      agentId: agent.id,
-      agentUrl: agent.target?.url,
+      method: 'github_dispatch',
       reason: evaluation.reason,
       detail: evaluation.detail,
       requestId: report.requestId,
       triggeredAt: new Date().toISOString(),
-      status: agent.status,
     };
 
     await recordTrigger(triggerEntry);
 
-    console.log(`[Improvement] Agent launched: ${agent.id} (reason: ${evaluation.reason})`);
+    console.log(`[Improvement] Dispatched to GitHub Actions (reason: ${evaluation.reason})`);
     return triggerEntry;
   } catch (err) {
     console.warn(`[Improvement] Trigger failed: ${err.message}`);
@@ -258,8 +219,8 @@ async function onReportSaved(report) {
  */
 async function manualTrigger(options = {}) {
   const config = getConfig();
-  if (!config.apiKey) {
-    throw new Error('CURSOR_API_KEY not configured');
+  if (!config.githubToken) {
+    throw new Error('GITHUB_DISPATCH_TOKEN not configured');
   }
 
   const rateCheck = await checkRateLimit();
@@ -267,53 +228,22 @@ async function manualTrigger(options = {}) {
     throw new Error(`Rate limited — retry after ${rateCheck.retryAfter}s (use force=true to override)`);
   }
 
-  const prompt = options.prompt || buildManualPrompt(options.focus);
-  const agent = await launchAgent(prompt, config);
+  await dispatchGitHub(config, 'improvement-trigger', {
+    reason: 'manual',
+    detail: options.focus || 'manual trigger',
+    report: null,
+  });
 
   const triggerEntry = {
-    agentId: agent.id,
-    agentUrl: agent.target?.url,
+    method: 'github_dispatch',
     reason: 'manual',
     detail: options.focus || 'manual trigger',
     requestId: null,
     triggeredAt: new Date().toISOString(),
-    status: agent.status,
   };
 
   await recordTrigger(triggerEntry);
   return triggerEntry;
-}
-
-function buildManualPrompt(focus) {
-  const focusText = focus
-    ? `\n\n## Focus Area\n\n${focus}`
-    : '';
-
-  return `You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
-
-## Context
-
-You have been manually triggered to review the codebase and make improvements.
-${focusText}
-
-## Your Instructions
-
-1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
-2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
-3. **Check the debug dashboard** for recent errors, slow pipelines, and patterns:
-   \`curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'\`
-4. **Identify the highest-impact improvement** you can make.
-5. **Make targeted improvements** — small, safe changes.
-6. **Run tests** (\`npm test\`) to verify nothing breaks.
-7. **Commit and push** to a \`cursor/improvement-*\` branch.
-
-## Safety Rules
-
-- Make ONE focused improvement per trigger.
-- Never change test expectations to make tests pass — fix the actual code.
-- Never modify environment variables or secrets.
-- Never remove existing features or endpoints.
-- If you're unsure, document findings in the commit message and skip the change.`;
 }
 
 /**
@@ -333,16 +263,14 @@ async function getTriggerHistory(limit = 20) {
 }
 
 /**
- * Get current configuration (safe — no API key exposed).
+ * Get current configuration (safe — no tokens exposed).
  */
 function getStatus() {
   const config = getConfig();
   return {
     enabled: config.enabled,
-    hasApiKey: !!config.apiKey,
-    repo: config.repo,
-    ref: config.ref,
-    model: config.model,
+    hasGithubToken: !!config.githubToken,
+    repo: `${config.repoOwner}/${config.repoName}`,
     minInterval: config.minInterval,
     triggerOn: config.triggerOn,
     slowThreshold: config.slowThreshold,
@@ -359,6 +287,6 @@ module.exports = {
   getConfig,
   evaluateReport,
   checkRateLimit,
-  buildPrompt,
+  buildReportSummary,
   _REDIS_KEYS: REDIS_KEYS,
 };

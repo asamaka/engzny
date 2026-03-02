@@ -1,0 +1,172 @@
+name: 🔄 Continuous Improvement Agent
+
+# Triggered by repository_dispatch from the Vercel runtime when a pipeline
+# report meets trigger criteria (error, slow, periodic).
+# The CURSOR_API_KEY stays here in GitHub Secrets — never in Vercel.
+
+on:
+  repository_dispatch:
+    types: [improvement-trigger]
+
+permissions:
+  contents: read
+
+jobs:
+  spawn-agent:
+    name: Spawn Cursor Cloud Agent
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📋 Parse trigger payload
+        id: payload
+        run: |
+          REASON="${{ github.event.client_payload.reason }}"
+          DETAIL='${{ toJSON(github.event.client_payload.detail) }}'
+          REPORT='${{ toJSON(github.event.client_payload.report) }}'
+
+          echo "reason=$REASON" >> $GITHUB_OUTPUT
+          echo "Trigger reason: $REASON"
+          echo "Detail: $DETAIL"
+
+          if [ "$REPORT" != "null" ]; then
+            echo "Report requestId: $(echo '${{ toJSON(github.event.client_payload.report) }}' | jq -r '.requestId // "none"')"
+          fi
+
+      - name: 🔑 Verify secrets
+        run: |
+          if [ -z "${{ secrets.CURSOR_API_KEY }}" ]; then
+            echo "::error::CURSOR_API_KEY secret not configured"
+            exit 1
+          fi
+
+      - name: 🤖 Build agent prompt
+        id: prompt
+        run: |
+          REASON="${{ github.event.client_payload.reason }}"
+          DETAIL='${{ github.event.client_payload.detail }}'
+          REPORT='${{ toJSON(github.event.client_payload.report) }}'
+
+          if [ "$REASON" = "manual" ]; then
+            PROMPT="You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
+
+          ## Context
+
+          You have been manually triggered to review the codebase and make improvements.
+
+          ## Focus Area
+
+          ${DETAIL}
+
+          ## Your Instructions
+
+          1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
+          2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
+          3. **Check the debug dashboard** for recent errors, slow pipelines, and patterns:
+             \`curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'\`
+          4. **Identify the highest-impact improvement** you can make.
+          5. **Make targeted improvements** — small, safe changes.
+          6. **Run tests** (\`npm test\`) to verify nothing breaks.
+          7. **Commit and push** to a \`cursor/improvement-*\` branch.
+
+          ## Safety Rules
+
+          - Make ONE focused improvement per trigger.
+          - Never change test expectations to make tests pass — fix the actual code.
+          - Never modify environment variables or secrets.
+          - Never remove existing features or endpoints.
+          - If unsure, document findings in the commit message and skip the change."
+          else
+            PROMPT="You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
+
+          ## Context
+
+          A pipeline report has been flagged for review. Your job is to analyze the report, identify what went wrong or what could be better, and make targeted code improvements.
+
+          ## Trigger
+
+          **Reason:** ${REASON}
+          **Detail:** ${DETAIL}
+
+          ## Pipeline Report
+
+          \`\`\`json
+          ${REPORT}
+          \`\`\`
+
+          ## Your Instructions
+
+          1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
+          2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
+          3. **Analyze the report** to understand what happened.
+          4. **Investigate the relevant code** based on the trigger reason:
+             - For \`pipeline_error\`: trace the error through the pipeline code
+             - For \`slow_pipeline\`: profile the slow phases and look for optimization opportunities
+             - For \`periodic_review\`: review recent patterns, look for recurring issues
+          5. **Make targeted improvements** — small, safe changes that address the specific issue.
+          6. **Run tests** (\`npm test\`) to verify your changes don't break anything.
+          7. **Commit and push** to a \`cursor/improvement-*\` branch. The auto-deploy workflow will handle the rest.
+
+          ## Safety Rules
+
+          - Make ONE focused improvement per trigger. Don't refactor the world.
+          - Never change test expectations to make tests pass — fix the actual code.
+          - Never modify environment variables or secrets.
+          - Never remove existing features or endpoints.
+          - If unsure about a change, skip it and document your findings in the commit message.
+          - Prefer adding error handling, improving prompts, or optimizing performance over structural changes."
+          fi
+
+          # Write prompt to file to avoid shell escaping issues
+          echo "$PROMPT" > /tmp/agent-prompt.txt
+          echo "prompt_file=/tmp/agent-prompt.txt" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Launch Cursor Cloud Agent
+        id: launch
+        run: |
+          PROMPT=$(cat /tmp/agent-prompt.txt)
+
+          # Escape the prompt for JSON
+          PROMPT_JSON=$(echo "$PROMPT" | jq -Rs .)
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.cursor.com/v0/agents" \
+            -H "Authorization: Bearer ${{ secrets.CURSOR_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"prompt\": { \"text\": $PROMPT_JSON },
+              \"source\": {
+                \"repository\": \"https://github.com/${{ github.repository }}\"
+              },
+              \"target\": {
+                \"autoCreatePr\": false,
+                \"autoBranch\": true
+              }
+            }")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            AGENT_ID=$(echo "$BODY" | jq -r '.id // "unknown"')
+            AGENT_URL=$(echo "$BODY" | jq -r '.target.url // "unknown"')
+            AGENT_STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            echo "✅ Agent launched!"
+            echo "   ID: $AGENT_ID"
+            echo "   URL: $AGENT_URL"
+            echo "   Status: $AGENT_STATUS"
+            echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
+            echo "agent_url=$AGENT_URL" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Cursor API returned $HTTP_CODE: $BODY"
+            exit 1
+          fi
+
+      - name: 📊 Summary
+        run: |
+          echo "### 🔄 Continuous Improvement Agent Launched" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | ${{ github.event.client_payload.reason }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Detail** | ${{ github.event.client_payload.detail }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Agent ID** | \`${{ steps.launch.outputs.agent_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Agent URL** | ${{ steps.launch.outputs.agent_url }} |" >> $GITHUB_STEP_SUMMARY
