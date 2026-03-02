@@ -235,11 +235,11 @@ The Cursor API key (which can push code to the repo) **never touches the Vercel 
 ```
 Vercel runtime (processes untrusted user uploads)
   │
-  │  Only has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, contents:write scope)
-  │  This token can ONLY trigger workflows — it cannot push code.
+  │  Only has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, actions:write scope)
+  │  This token can ONLY trigger workflows — it cannot push code or read secrets.
   │
   ▼
-GitHub Actions (trusted CI environment)
+GitHub Actions (trusted CI environment, triggered via workflow_dispatch)
   │
   │  Has: FIX_IT (Cursor API key, from GitHub Secrets, only exposed during workflow runs)
   │
@@ -260,7 +260,7 @@ Pipeline completes → saveLiveReport() → evaluateReport()
     └─ None match → No action
     │
     v
-GitHub repository_dispatch → continuous-improvement.yml workflow
+GitHub workflow_dispatch → continuous-improvement.yml workflow
     │
     v
 Reads CURSOR_API_KEY from GitHub Secrets → POST api.cursor.com/v0/agents
@@ -295,8 +295,8 @@ auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
 
 1. **Create a GitHub fine-grained PAT** at [github.com/settings/tokens](https://github.com/settings/tokens?type=beta):
    - Repository access: Only `asamaka/engzny`
-   - Permissions: Contents → Read and Write (needed for `repository_dispatch`)
-   - This token can only trigger workflows — it cannot access secrets or push code
+   - Permissions: Actions → Read and Write (needed for `workflow_dispatch`)
+   - This token can only trigger workflows — it cannot push code, read secrets, or modify the repo
 
 2. **Add the PAT to Vercel** as `GITHUB_DISPATCH_TOKEN`
 

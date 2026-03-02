@@ -1,12 +1,26 @@
 name: 🔄 Continuous Improvement Agent
 
-# Triggered by repository_dispatch from the Vercel runtime when a pipeline
-# report meets trigger criteria (error, slow, periodic).
+# Triggered via workflow_dispatch from the Vercel runtime.
+# Uses Actions:write permission (NOT Contents:write) so the dispatch token
+# can only trigger workflows — it cannot push code or modify the repo.
 # The Cursor API key (FIX_IT secret) stays here in GitHub Secrets — never in Vercel.
 
 on:
-  repository_dispatch:
-    types: [improvement-trigger]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Trigger reason (pipeline_error, slow_pipeline, periodic_review, manual)'
+        required: true
+        type: string
+      detail:
+        description: 'Detail about the trigger'
+        required: true
+        type: string
+      report:
+        description: 'JSON-encoded pipeline report summary (or empty for manual)'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -20,16 +34,10 @@ jobs:
       - name: 📋 Parse trigger payload
         id: payload
         run: |
-          REASON="${{ github.event.client_payload.reason }}"
-          DETAIL='${{ toJSON(github.event.client_payload.detail) }}'
-          REPORT='${{ toJSON(github.event.client_payload.report) }}'
-
-          echo "reason=$REASON" >> $GITHUB_OUTPUT
-          echo "Trigger reason: $REASON"
-          echo "Detail: $DETAIL"
-
-          if [ "$REPORT" != "null" ]; then
-            echo "Report requestId: $(echo '${{ toJSON(github.event.client_payload.report) }}' | jq -r '.requestId // "none"')"
+          echo "Trigger reason: ${{ inputs.reason }}"
+          echo "Detail: ${{ inputs.detail }}"
+          if [ -n '${{ inputs.report }}' ]; then
+            echo "Report: $(echo '${{ inputs.report }}' | jq -r '.requestId // "none"' 2>/dev/null || echo 'none')"
           fi
 
       - name: 🔑 Verify secrets
@@ -40,14 +48,14 @@ jobs:
           fi
 
       - name: 🤖 Build agent prompt
-        id: prompt
+        env:
+          REASON: ${{ inputs.reason }}
+          DETAIL: ${{ inputs.detail }}
+          REPORT: ${{ inputs.report }}
         run: |
-          REASON="${{ github.event.client_payload.reason }}"
-          DETAIL='${{ github.event.client_payload.detail }}'
-          REPORT='${{ toJSON(github.event.client_payload.report) }}'
-
           if [ "$REASON" = "manual" ]; then
-            PROMPT="You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
+            cat > /tmp/agent-prompt.txt << 'PROMPT_END'
+          You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
           ## Context
 
@@ -55,18 +63,20 @@ jobs:
 
           ## Focus Area
 
-          ${DETAIL}
+          PROMPT_END
+            echo "$DETAIL" >> /tmp/agent-prompt.txt
+            cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
 
           ## Your Instructions
 
           1. **Read CLAUDE.md** first — it contains the full project architecture and conventions.
-          2. **Read the agent spec** at \`.claude/agents/continuous-improvement.md\` for detailed guidelines.
+          2. **Read the agent spec** at `.claude/agents/continuous-improvement.md` for detailed guidelines.
           3. **Check the debug dashboard** for recent errors, slow pipelines, and patterns:
-             \`curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'\`
+             `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
           4. **Identify the highest-impact improvement** you can make.
           5. **Make targeted improvements** — small, safe changes.
-          6. **Run tests** (\`npm test\`) to verify nothing breaks.
-          7. **Commit and push** to a \`cursor/improvement-*\` branch.
+          6. **Run tests** (`npm test`) to verify nothing breaks.
+          7. **Commit and push** to a `cursor/improvement-*` branch.
 
           ## Safety Rules
 
@@ -74,9 +84,11 @@ jobs:
           - Never change test expectations to make tests pass — fix the actual code.
           - Never modify environment variables or secrets.
           - Never remove existing features or endpoints.
-          - If unsure, document findings in the commit message and skip the change."
+          - If unsure, document findings in the commit message and skip the change.
+          PROMPT_END
           else
-            PROMPT="You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
+            cat > /tmp/agent-prompt.txt << PROMPT_END
+          You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
           ## Context
 
@@ -113,19 +125,14 @@ jobs:
           - Never modify environment variables or secrets.
           - Never remove existing features or endpoints.
           - If unsure about a change, skip it and document your findings in the commit message.
-          - Prefer adding error handling, improving prompts, or optimizing performance over structural changes."
+          - Prefer adding error handling, improving prompts, or optimizing performance over structural changes.
+          PROMPT_END
           fi
-
-          # Write prompt to file to avoid shell escaping issues
-          echo "$PROMPT" > /tmp/agent-prompt.txt
-          echo "prompt_file=/tmp/agent-prompt.txt" >> $GITHUB_OUTPUT
 
       - name: 🚀 Launch Cursor Cloud Agent
         id: launch
         run: |
           PROMPT=$(cat /tmp/agent-prompt.txt)
-
-          # Escape the prompt for JSON
           PROMPT_JSON=$(echo "$PROMPT" | jq -Rs .)
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.cursor.com/v0/agents" \
@@ -149,10 +156,8 @@ jobs:
             AGENT_ID=$(echo "$BODY" | jq -r '.id // "unknown"')
             AGENT_URL=$(echo "$BODY" | jq -r '.target.url // "unknown"')
             AGENT_STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
-            echo "✅ Agent launched!"
-            echo "   ID: $AGENT_ID"
-            echo "   URL: $AGENT_URL"
-            echo "   Status: $AGENT_STATUS"
+            echo "Agent launched: $AGENT_ID ($AGENT_STATUS)"
+            echo "URL: $AGENT_URL"
             echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
             echo "agent_url=$AGENT_URL" >> $GITHUB_OUTPUT
           else
@@ -166,7 +171,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **Reason** | ${{ github.event.client_payload.reason }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Detail** | ${{ github.event.client_payload.detail }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | ${{ inputs.reason }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Detail** | ${{ inputs.detail }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Agent ID** | \`${{ steps.launch.outputs.agent_id }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Agent URL** | ${{ steps.launch.outputs.agent_url }} |" >> $GITHUB_STEP_SUMMARY

@@ -182,14 +182,15 @@ describe('Improvement Trigger', () => {
 
       expect(global.fetch).toHaveBeenCalledTimes(1);
       const [url, opts] = global.fetch.mock.calls[0];
-      expect(url).toBe('https://api.github.com/repos/asamaka/engzny/dispatches');
+      expect(url).toBe('https://api.github.com/repos/asamaka/engzny/actions/workflows/continuous-improvement.yml/dispatches');
       expect(opts.method).toBe('POST');
       expect(opts.headers['Authorization']).toBe('Bearer ghp_test');
 
       const body = JSON.parse(opts.body);
-      expect(body.event_type).toBe('improvement-trigger');
-      expect(body.client_payload.reason).toBe('pipeline_error');
-      expect(body.client_payload.report.requestId).toBe('req-abc');
+      expect(body.ref).toBe('main');
+      expect(body.inputs.reason).toBe('pipeline_error');
+      const report = JSON.parse(body.inputs.report);
+      expect(report.requestId).toBe('req-abc');
     });
 
     it('should not include raw tokens in dispatch payload', async () => {
@@ -204,8 +205,8 @@ describe('Improvement Trigger', () => {
       });
 
       const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      const payloadStr = JSON.stringify(body.client_payload);
-      expect(payloadStr).not.toContain('ghp_test');
+      const inputsStr = JSON.stringify(body.inputs);
+      expect(inputsStr).not.toContain('ghp_test');
     });
   });
 
@@ -224,9 +225,9 @@ describe('Improvement Trigger', () => {
       expect(result.detail).toBe('optimize prompts');
 
       const body = JSON.parse(global.fetch.mock.calls[0][1].body);
-      expect(body.event_type).toBe('improvement-trigger');
-      expect(body.client_payload.reason).toBe('manual');
-      expect(body.client_payload.detail).toBe('optimize prompts');
+      expect(body.ref).toBe('main');
+      expect(body.inputs.reason).toBe('manual');
+      expect(body.inputs.detail).toBe('optimize prompts');
     });
   });
 });

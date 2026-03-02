@@ -1,13 +1,16 @@
 /**
  * Continuous Improvement Trigger
  *
- * Evaluates pipeline reports and dispatches a GitHub Actions workflow
- * that spawns a Cursor Cloud Agent. The Cursor API key NEVER touches
- * the Vercel runtime — it stays in GitHub Secrets.
+ * Evaluates pipeline reports and triggers a GitHub Actions workflow
+ * (via workflow_dispatch) that spawns a Cursor Cloud Agent.
+ * The Cursor API key NEVER touches the Vercel runtime — it stays in GitHub Secrets.
  *
  * Security model:
- *   Vercel has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, repo:contents scope only)
- *   GitHub has: CURSOR_API_KEY (only exposed during CI workflow runs)
+ *   Vercel has: GITHUB_DISPATCH_TOKEN (fine-grained PAT, actions:write only)
+ *   GitHub has: FIX_IT secret (Cursor API key, only exposed during CI runs)
+ *
+ * The PAT can only trigger workflows — it cannot push code, read secrets,
+ * or modify the repository in any way.
  *
  * Required env vars (Vercel):
  *   IMPROVEMENT_ENABLED       — "true" to enable (default: disabled)
@@ -145,12 +148,13 @@ function buildReportSummary(report) {
 }
 
 /**
- * Send a repository_dispatch event to GitHub Actions.
- * This triggers the continuous-improvement.yml workflow, which
- * reads CURSOR_API_KEY from GitHub Secrets (never in Vercel).
+ * Trigger the continuous-improvement.yml workflow via workflow_dispatch.
+ * This only requires Actions:write permission on the PAT — NOT Contents:write.
+ * The Cursor API key stays in GitHub Secrets (never in Vercel).
  */
-async function dispatchGitHub(config, eventType, payload) {
-  const url = `${GITHUB_API}/repos/${config.repoOwner}/${config.repoName}/dispatches`;
+async function dispatchGitHub(config, inputs) {
+  const workflowFile = 'continuous-improvement.yml';
+  const url = `${GITHUB_API}/repos/${config.repoOwner}/${config.repoName}/actions/workflows/${workflowFile}/dispatches`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -161,8 +165,8 @@ async function dispatchGitHub(config, eventType, payload) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      event_type: eventType,
-      client_payload: payload,
+      ref: 'main',
+      inputs,
     }),
   });
 
@@ -190,10 +194,10 @@ async function onReportSaved(report) {
     const config = getConfig();
     const reportSummary = buildReportSummary(report);
 
-    await dispatchGitHub(config, 'improvement-trigger', {
+    await dispatchGitHub(config, {
       reason: evaluation.reason,
       detail: evaluation.detail,
-      report: reportSummary,
+      report: JSON.stringify(reportSummary),
     });
 
     const triggerEntry = {
@@ -228,10 +232,10 @@ async function manualTrigger(options = {}) {
     throw new Error(`Rate limited — retry after ${rateCheck.retryAfter}s (use force=true to override)`);
   }
 
-  await dispatchGitHub(config, 'improvement-trigger', {
+  await dispatchGitHub(config, {
     reason: 'manual',
     detail: options.focus || 'manual trigger',
-    report: null,
+    report: '',
   });
 
   const triggerEntry = {
