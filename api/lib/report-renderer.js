@@ -115,6 +115,8 @@ function renderCardHtml(card) {
     timeline_card: 'card-timeline', quote_card: 'card-quote', comparison_card: 'card-comparison',
     warning_card: 'card-warning', action_card: 'card-action', text_extract: 'card-extract',
     location_card: 'card-location', link_card: 'card-link',
+    chat_card: 'card-chat', map_card: 'card-map', order_card: 'card-order',
+    stats_grid_card: 'card-stats-grid', gallery_card: 'card-gallery', source_card: 'card-source',
   }[type] || '';
 
   const ICONS = {
@@ -123,6 +125,8 @@ function renderCardHtml(card) {
     timeline_card: 'timeline', quote_card: 'format_quote', comparison_card: 'compare',
     warning_card: 'warning', action_card: 'bolt', text_extract: 'description',
     location_card: 'location_on', link_card: 'link',
+    chat_card: 'chat', map_card: 'map', order_card: 'receipt_long',
+    stats_grid_card: 'monitoring', gallery_card: 'photo_library', source_card: 'source',
   };
 
   const icon = ICONS[type] || 'info';
@@ -275,6 +279,87 @@ function renderCardHtml(card) {
           </div></div>`;
         }).join('')}`;
       break;
+
+    case 'chat_card':
+      inner = `${typeLabel}
+        <div class="list-title">${esc(d.title || 'Conversation')}</div>
+        ${(d.messages || []).map(msg => {
+          const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
+          return `<div style="margin-bottom:8px;${mObj.isUser ? 'text-align:right' : ''}">
+            <div style="font-size:.7rem;color:var(--t3);margin-bottom:2px">${esc(mObj.sender || '')} ${mObj.time ? esc(mObj.time) : ''}</div>
+            <div style="display:inline-block;max-width:85%;padding:8px 12px;border-radius:12px;font-size:.82rem;line-height:1.5;${mObj.isUser ? 'background:var(--a-bgs);color:var(--a)' : 'background:var(--s3);color:var(--t)'}">${esc(mObj.text || '')}</div>
+          </div>`;
+        }).join('')}`;
+      break;
+
+    case 'map_card':
+      inner = `${typeLabel}
+        ${d.mapImageUrl ? `<img src="${esc(d.mapImageUrl)}" alt="${esc(d.name)}" style="width:100%;height:150px;object-fit:cover;border-radius:8px;margin-bottom:10px" onerror="this.style.display='none'">` : ''}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="mi" style="font-size:20px;color:var(--a)">map</span>
+          <span style="font-size:.95rem;font-weight:700;color:#fff">${esc(d.name || 'Location')}</span>
+        </div>
+        ${d.context ? `<div style="font-size:.8rem;color:var(--t2);line-height:1.6">${esc(d.context)}</div>` : ''}
+        ${d.mapUrl ? `<a href="${esc(d.mapUrl)}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:.78rem;color:var(--a);text-decoration:none"><span class="mi" style="font-size:14px">open_in_new</span> Open in Maps</a>` : ''}`;
+      break;
+
+    case 'order_card':
+      inner = `${typeLabel}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          ${d.emoji ? `<span style="font-size:1.2rem">${esc(d.emoji)}</span>` : ''}
+          <span class="list-title" style="margin:0">${esc(d.title || 'Order')}</span>
+          ${d.status ? `<span class="badge badge-g" style="font-size:.6rem">${esc(d.status)}</span>` : ''}
+        </div>
+        ${(d.items || []).map(item => {
+          const iObj = typeof item === 'object' ? item : { name: String(item) };
+          return `<div class="list-item"><span class="list-item-label">${iObj.quantity ? iObj.quantity + '× ' : ''}${esc(iObj.name || '')}</span><span class="list-item-value">${esc(iObj.price || '')}</span></div>`;
+        }).join('')}
+        ${d.total ? `<div style="display:flex;justify-content:space-between;padding-top:10px;margin-top:6px;border-top:2px solid var(--b);font-weight:700"><span>Total</span><span style="color:var(--a);font-size:1.1rem">${esc(d.total)}</span></div>` : ''}
+        ${d.deliveryTime ? `<div style="font-size:.7rem;color:var(--t3);margin-top:8px">🕐 ${esc(d.deliveryTime)}</div>` : ''}`;
+      break;
+
+    case 'stats_grid_card':
+      inner = `${typeLabel}
+        ${d.title ? `<div class="list-title">${esc(d.title)}</div>` : ''}
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        ${(d.stats || []).map(s => {
+          const sObj = typeof s === 'object' ? s : { label: String(s), value: '' };
+          return `<div style="background:var(--s3);border-radius:8px;padding:10px">
+            ${sObj.emoji ? `<div style="font-size:1rem;margin-bottom:2px">${esc(sObj.emoji)}</div>` : ''}
+            <div style="font-size:.65rem;color:var(--t3)">${esc(sObj.label || '')}</div>
+            <div style="font-size:1.2rem;font-weight:700;color:var(--a)">${esc(sObj.value || '—')}</div>
+            ${sObj.trend ? `<span class="metric-trend ${esc(sObj.trend)}" style="font-size:.6rem">${esc(sObj.trend)}</span>` : ''}
+          </div>`;
+        }).join('')}
+        </div>`;
+      break;
+
+    case 'gallery_card':
+      inner = `${typeLabel}
+        <div class="list-title">${esc(d.title || 'Gallery')}</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+        ${(d.images || []).slice(0, 6).map(img => {
+          const iObj = typeof img === 'object' ? img : { url: String(img) };
+          return `<img src="${esc(iObj.url || '')}" alt="${esc(iObj.caption || '')}" style="width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px" onerror="this.style.display='none'">`;
+        }).join('')}
+        </div>`;
+      break;
+
+    case 'source_card': {
+      const credColors = { high: 'var(--g)', medium: 'var(--y)', low: 'var(--r)', unknown: 'var(--t3)' };
+      inner = `${typeLabel}
+        <div style="display:flex;align-items:center;gap:10px">
+          ${d.imageUrl ? `<img src="${esc(d.imageUrl)}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover">` : `<div style="width:40px;height:40px;border-radius:50%;background:var(--s3);display:flex;align-items:center;justify-content:center"><span class="mi" style="font-size:20px;color:var(--t3)">source</span></div>`}
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:.88rem">${d.profileUrl ? `<a href="${esc(d.profileUrl)}" target="_blank" style="color:var(--a);text-decoration:none">${esc(d.name || 'Source')}</a>` : esc(d.name || 'Source')}</div>
+            ${d.type ? `<div style="font-size:.72rem;color:var(--t3)">${esc(d.type)}</div>` : ''}
+          </div>
+          ${d.credibility ? `<span style="font-size:.65rem;font-weight:700;color:${credColors[d.credibility] || 'var(--t3)'};text-transform:uppercase">${esc(d.credibility)}</span>` : ''}
+        </div>
+        ${d.context ? `<div style="font-size:.8rem;color:var(--t);margin-top:8px;line-height:1.6">${esc(d.context)}</div>` : ''}
+        ${d.followers ? `<div style="font-size:.7rem;color:var(--t3);margin-top:4px">${esc(d.followers)} followers</div>` : ''}`;
+      break;
+    }
 
     default:
       inner = `${typeLabel}<div style="font-size:.82rem;color:var(--t2)">${JSON.stringify(d, null, 2).slice(0, 500)}</div>`;
