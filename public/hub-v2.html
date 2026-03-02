@@ -2045,23 +2045,23 @@
             const type = card.cardType;
 
             if (type === 'hero_summary' && pd.title && pd.title !== 'Analyzing...') {
-                return `<div class="p-4">
-                    ${pd.emoji ? `<span class="text-3xl mb-2 block">${esc(pd.emoji)}</span>` : ''}
-                    ${pd.badge ? `<div class="badge badge-primary badge-sm mb-2">${esc(pd.badge)}</div>` : ''}
-                    <h2 class="text-lg font-extrabold text-white leading-tight mb-1">${esc(pd.title)}</h2>
-                    ${pd.subtitle ? `<p class="text-sm text-base-content/60">${esc(pd.subtitle)}</p>` : ''}
-                    <div class="flex items-center gap-1 mt-3">
-                        <span class="loading loading-dots loading-xs text-primary"></span>
-                        <span class="text-xs text-base-content/40">Enhancing...</span>
+                return `<div style="padding:16px">
+                    ${pd.emoji ? `<span style="font-size:1.8rem;margin-bottom:8px;display:block;line-height:1">${esc(pd.emoji)}</span>` : ''}
+                    ${pd.badge ? `<div class="badge badge-primary badge-sm" style="margin-bottom:8px;font-size:11px;font-weight:700;padding:2px 10px;border-radius:100px;background:var(--color-primary,#5b8af5);color:#fff;display:inline-block">${esc(pd.badge)}</div>` : ''}
+                    <h2 style="font-size:1.25rem;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px">${esc(pd.title)}</h2>
+                    ${pd.subtitle ? `<p style="font-size:0.875rem;color:rgba(255,255,255,0.5);line-height:1.5">${esc(pd.subtitle)}</p>` : ''}
+                    <div style="display:flex;align-items:center;gap:6px;margin-top:12px">
+                        <span class="loading loading-dots loading-xs" style="color:var(--color-primary,#5b8af5)"></span>
+                        <span style="font-size:11px;opacity:0.4">Enhancing...</span>
                     </div>
                 </div>`;
             }
 
             if (type === 'hero_summary') {
-                return `<div class="p-4 space-y-3">
-                    <div class="skeleton h-5 w-2/3"></div>
-                    <div class="skeleton h-4 w-full"></div>
-                    <div class="skeleton h-4 w-4/5"></div>
+                return `<div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                    <div class="skeleton" style="height:20px;width:66%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+                    <div class="skeleton" style="height:16px;width:100%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+                    <div class="skeleton" style="height:16px;width:80%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
                 </div>`;
             }
 
@@ -2103,11 +2103,11 @@
             };
             const label = typeLabels[type] || type.replace(/_/g, ' ');
 
-            return `<div class="p-4 space-y-3">
-                <div class="text-xs font-semibold uppercase tracking-wider text-base-content/30">${esc(label)}</div>
-                <div class="skeleton h-4 w-3/4"></div>
-                <div class="skeleton h-3 w-full"></div>
-                <div class="skeleton h-3 w-2/3"></div>
+            return `<div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.3">${esc(label)}</div>
+                <div class="skeleton" style="height:16px;width:75%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+                <div class="skeleton" style="height:12px;width:100%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+                <div class="skeleton" style="height:12px;width:66%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
             </div>`;
         }
 
