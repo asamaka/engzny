@@ -1258,7 +1258,6 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
     try {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       if (res.flush) res.flush();
-      logger.pipelineEvent(requestId, event);
     } catch (err) {
       logger.error('SSE', `Failed to send ${event}`, { requestId, err: err.message });
       endStream();
@@ -1450,7 +1449,6 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     try {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       if (res.flush) res.flush();
-      logger.pipelineEvent(requestId, event);
     } catch (err) {
       logger.error('SSE', `Failed to send ${event}`, { requestId, err: err.message });
       endStream();

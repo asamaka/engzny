@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> No runs yet.
+> **2026-03-02** | Trigger: `report_review` (a7faa1dd, success) | Fixed P1: dashboard card count showing 2/N instead of actual populated count. Root cause: (1) dashboard only counted `event === 'card'` events but most cards populate via `card_update`/`card_add`, and (2) `sendEvent` double-logged every event without cardId metadata. Fix: count unique cardIds from all card-related events + remove duplicate bare logging from `sendEvent`.
 
 ## Active Work
 
@@ -19,7 +19,7 @@ highest-priority incomplete item and continue where the last agent left off.
 
 ### P1 — Degraded (slow, bad results)
 
-- [ ] Cards showing 2/N populated — partial card population not detected as failure
+- [x] Cards showing 2/N populated — partial card population not detected as failure (fixed: dashboard now counts unique cardIds from card+card_update+card_add events)
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -34,3 +34,5 @@ highest-priority incomplete item and continue where the last agent left off.
 Patterns noticed across multiple runs that may inform future improvements.
 
 - Initial backlog created 2026-03-02. System averaging 20-24s pipeline times.
+- sendEvent was double-logging pipeline events (bare + explicit with meta). Fixed 2026-03-02.
+- Pipeline durations trending down: recent reports at 16-21s range (vs earlier 20-24s).
