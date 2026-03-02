@@ -12,6 +12,7 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
     <style>
       /* Custom thinx dark theme — overrides DaisyUI dark theme with our palette */
       [data-theme="thinx"] {
@@ -2004,6 +2005,37 @@
                 firstCardShown = true;
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
             }
+
+            captureRenderedCards();
+        }
+
+        function captureRenderedCards() {
+            const rid = telemetry.requestId;
+            if (!rid || typeof html2canvas === 'undefined') return;
+
+            setTimeout(() => {
+                try {
+                    const target = cardGrid;
+                    if (!target || !target.children.length) return;
+
+                    html2canvas(target, {
+                        backgroundColor: '#0a0d12',
+                        scale: window.devicePixelRatio || 2,
+                        logging: false,
+                        useCORS: true,
+                        allowTaint: true,
+                    }).then(canvas => {
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                        fetch('/api/hub/v2/render-capture', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requestId: rid, image: dataUrl }),
+                        }).catch(() => {});
+                    }).catch(() => {});
+                } catch (e) {
+                    // Non-critical — don't disrupt user experience
+                }
+            }, 1500);
         }
 
         // === Card Rendering ===

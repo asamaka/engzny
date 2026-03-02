@@ -2838,6 +2838,40 @@ app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
   }
 });
 
+// Render capture — save device screenshot of final rendered cards (open endpoint like client-report)
+app.post('/api/hub/v2/render-capture', async (req, res) => {
+  try {
+    const { requestId, image } = req.body || {};
+    if (!requestId || !image) {
+      return res.status(400).json({ error: 'requestId and image required' });
+    }
+    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+    const sizeKB = Math.round(base64.length * 0.75 / 1024);
+    if (sizeKB > 2048) {
+      return res.status(413).json({ error: 'Image too large (max 2MB)' });
+    }
+    await liveReports.saveRenderCapture(requestId, base64);
+    logger.info('RenderCapture', 'Saved device render capture', { requestId, sizeKB });
+    res.json({ ok: true, sizeKB });
+  } catch (err) {
+    logger.error('RenderCapture', 'Save failed', { err: err.message });
+    res.status(500).json({ error: 'Failed to save render capture' });
+  }
+});
+
+app.get('/api/r/:requestId/render', requirePin, async (req, res) => {
+  try {
+    const capture = await liveReports.getRenderCapture(req.params.requestId);
+    if (!capture) return res.status(404).json({ error: 'No render capture' });
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(capture, 'base64'));
+  } catch (err) {
+    logger.error('RenderCapture', 'Fetch failed', { err: err.message, requestId: req.params.requestId });
+    res.status(500).json({ error: 'Failed to load render capture' });
+  }
+});
+
 // Public report pages (HTML — PIN gate is client-side JS calling /api/r/auth)
 app.get('/r', (req, res) => {
   res.set('Content-Type', 'text/html; charset=utf-8');
@@ -2850,9 +2884,10 @@ app.get('/r/:requestId', async (req, res) => {
   if (authed) {
     const report = await liveReports.getReport(req.params.requestId);
     const thumb = report ? await liveReports.getReportThumb(req.params.requestId) : null;
-    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true));
+    const renderCapture = report ? await liveReports.getRenderCapture(req.params.requestId) : null;
+    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true, renderCapture));
   } else {
-    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false));
+    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false, null));
   }
 });
 
@@ -3034,7 +3069,7 @@ async function doSearch(){
 </body></html>`;
 }
 
-function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated) {
+function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated, renderCapture) {
   const { renderCardHtml, renderReflection, renderLlmTracesHtml, esc, fmtMs } = reportRenderer;
 
   // If no report data, show just the PIN gate (client-side JS will redirect after auth)
@@ -3109,8 +3144,27 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + (report.layout?.reason ? '<div class="kv"><span class="k">Layout Reason</span><span class="v">' + esc(report.layout.reason) + '</span></div>' : '')
       + '</div></div>'
 
+      // Device preview — actual rendered screenshot from user's device
+      + '<h2>Device Preview <span style="font-size:.7rem;font-weight:400;color:var(--t3)">(what the user actually saw)</span></h2>'
+      + '<div class="device-preview-section">'
+      + '<div class="iphone-frame">'
+      + '<div class="iphone-notch"></div>'
+      + '<div class="iphone-screen">'
+      + (renderCapture
+        ? '<img src="data:image/jpeg;base64,' + renderCapture + '" alt="Device render capture" class="render-capture-img">'
+        : '<div class="no-capture"><span class="mi" style="font-size:32px;color:var(--t3)">phone_iphone</span><div style="margin-top:8px;color:var(--t3);font-size:.75rem">No render capture available</div><div style="color:var(--t3);font-size:.65rem;margin-top:4px;opacity:.7">Captures are saved for new pipeline runs</div></div>')
+      + '</div>'
+      + '<div class="iphone-home"></div>'
+      + '</div>'
+      + '<div class="device-meta">'
+      + '<div class="dm-item"><span class="dm-label">Viewport</span><span class="dm-value">375 × 812 (iPhone)</span></div>'
+      + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">' + cards.length + '</span></div>'
+      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Client-side (html2canvas)' : 'Not available') + '</span></div>'
+      + '</div>'
+      + '</div>'
+
       // Cards — the actual UI the user saw
-      + '<h2>What the User Saw (' + cards.length + ' cards)</h2>'
+      + '<h2>Card Data (' + cards.length + ' cards)</h2>'
       + '<div class="cards-grid">'
       + cards.map(c => renderCardHtml(c)).join('')
       + '</div>'
@@ -3164,6 +3218,19 @@ h2{font-size:.95rem;font-weight:600;color:var(--a);margin:28px 0 12px;padding-bo
 .screenshot-row{display:flex;gap:16px;align-items:flex-start;margin:12px 0}
 .report-thumb{max-width:200px;border-radius:var(--rad);border:1px solid var(--b);flex-shrink:0}
 @media(max-width:500px){.screenshot-row{flex-direction:column}.report-thumb{max-width:100%}}
+
+/* iPhone device frame */
+.device-preview-section{display:flex;gap:24px;align-items:flex-start;margin:12px 0 20px}
+@media(max-width:600px){.device-preview-section{flex-direction:column;align-items:center}}
+.iphone-frame{width:195px;flex-shrink:0;background:#1a1a1a;border-radius:28px;border:3px solid #333;padding:8px 6px;box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 0 0 1px rgba(255,255,255,.05);position:relative}
+.iphone-notch{width:60px;height:14px;background:#1a1a1a;border-radius:0 0 10px 10px;margin:0 auto 4px;position:relative;z-index:2}
+.iphone-screen{background:#0a0d12;border-radius:16px;overflow:hidden;aspect-ratio:9/19.5;position:relative;display:flex;align-items:flex-start;justify-content:center}
+.iphone-screen .render-capture-img{width:100%;height:auto;display:block;object-fit:cover;object-position:top}
+.iphone-screen .no-capture{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:20px}
+.iphone-home{width:40px;height:4px;background:#444;border-radius:2px;margin:6px auto 2px}
+.device-meta{flex:1;display:flex;flex-direction:column;gap:6px;padding:8px 0}
+.dm-item{display:flex;justify-content:space-between;padding:8px 12px;background:var(--s);border:1px solid var(--b);border-radius:8px;font-size:.78rem}
+.dm-label{color:var(--t2)}.dm-value{color:var(--t);font-weight:500}
 
 /* Section card & kv */
 .section-card{background:var(--s);border:1px solid var(--b);border-radius:var(--rad);padding:16px;margin-bottom:12px}

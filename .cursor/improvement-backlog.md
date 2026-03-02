@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-02** | Trigger: `report_review` (a7faa1dd, success) | Fixed P1: dashboard card count showing 2/N instead of actual populated count. Root cause: (1) dashboard only counted `event === 'card'` events but most cards populate via `card_update`/`card_add`, and (2) `sendEvent` double-logged every event without cardId metadata. Fix: count unique cardIds from all card-related events + remove duplicate bare logging from `sendEvent`.
+> **2026-03-02** | Trigger: `report_review` (a7faa1dd, success) | Added device render capture: after pipeline completes, client captures rendered cards via html2canvas and uploads JPEG; report page shows capture in iPhone device frame. Also fixed P1 dashboard card count (prior commit).
 
 ## Active Work
 
@@ -23,7 +23,7 @@ highest-priority incomplete item and continue where the last agent left off.
 
 ### P2 — Polish (UX friction, confusing output)
 
-(none)
+- [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
 
 ### P3 — Resilience (logging, edge cases, retry logic)
 
@@ -36,3 +36,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Initial backlog created 2026-03-02. System averaging 20-24s pipeline times.
 - sendEvent was double-logging pipeline events (bare + explicit with meta). Fixed 2026-03-02.
 - Pipeline durations trending down: recent reports at 16-21s range (vs earlier 20-24s).
+- 100% of recent users are mobile (ua: "mobile"). Render captures will be iPhone-width by default.
+- html2canvas added as CDN dependency (~40KB gzipped). Non-blocking, deferred load.

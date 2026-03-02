@@ -256,6 +256,32 @@ async function searchArchive({ q, contentType, layoutType, outcome, from, to, ca
   };
 }
 
+// ── Render captures (device screenshot of final rendered cards) ──
+
+async function saveRenderCapture(requestId, base64Jpeg) {
+  const r = await redis();
+  if (r) {
+    await r.setex(`livereport:${requestId}:render`, LIVE_TTL, base64Jpeg);
+    await r.setex(`archive:${requestId}:render`, ARCHIVE_TTL, base64Jpeg);
+  } else {
+    const entry = mem.reports.get(requestId);
+    if (entry) entry._renderCapture = base64Jpeg;
+    const archiveEntry = mem.archive.get(requestId);
+    if (archiveEntry) archiveEntry._renderCapture = base64Jpeg;
+  }
+}
+
+async function getRenderCapture(requestId) {
+  const r = await redis();
+  if (r) {
+    const live = await r.get(`livereport:${requestId}:render`);
+    if (live) return live;
+    return await r.get(`archive:${requestId}:render`);
+  }
+  const entry = mem.reports.get(requestId) || mem.archive.get(requestId);
+  return entry?._renderCapture || null;
+}
+
 async function getStorageStatus() {
   const r = await redis();
   return r ? 'redis' : 'memory';
@@ -270,6 +296,7 @@ module.exports = {
   init,
   saveLiveReport, getLiveReport, getLiveReportThumb, listLiveReports,
   getArchive, getArchiveThumb, getReport, getReportThumb,
+  saveRenderCapture, getRenderCapture,
   searchArchive, getStorageStatus,
   _resetForTest,
 };
