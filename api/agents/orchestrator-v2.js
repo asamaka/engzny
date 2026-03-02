@@ -65,6 +65,25 @@ function createSkeletonBlueprint() {
 }
 
 /**
+ * Compute verification_card overall status from individual source statuses.
+ * Ensures the displayed badge always matches the source checkmarks the user sees.
+ */
+function computeVerificationStatus(sources) {
+  if (!sources || sources.length === 0) return 'unconfirmed';
+  const statuses = sources.map(s => s.status);
+  const hasConfirmed = statuses.some(s => s === 'confirmed');
+  const hasDenied = statuses.some(s => s === 'denied');
+  const allConfirmed = statuses.every(s => s === 'confirmed');
+  const allDenied = statuses.every(s => s === 'denied');
+
+  if (allConfirmed) return 'verified';
+  if (allDenied) return 'denied';
+  if (hasConfirmed && hasDenied) return 'conflicting';
+  if (hasConfirmed) return 'partially_verified';
+  return 'unconfirmed';
+}
+
+/**
  * Run the progressive enhancement pipeline with SSE callbacks.
  *
  * Callback contract (all optional):
@@ -368,14 +387,7 @@ async function runPipeline({
         }
 
         if (updated) {
-          // Determine overall status
-          const statuses = sources.map(s => s.status);
-          let overallStatus = 'unconfirmed';
-          if (statuses.every(s => s === 'confirmed')) overallStatus = 'verified';
-          else if (statuses.some(s => s === 'confirmed') && statuses.some(s => s !== 'confirmed')) overallStatus = 'partially_verified';
-          else if (statuses.every(s => s === 'denied')) overallStatus = 'denied';
-          else if (statuses.some(s => s === 'confirmed') && statuses.some(s => s === 'denied')) overallStatus = 'conflicting';
-
+          const overallStatus = computeVerificationStatus(sources);
           const updatedData = { ...cardData, sources, status: overallStatus, lastChecked: new Date().toISOString() };
           
           // Add research summary
@@ -538,6 +550,43 @@ async function runPipeline({
       });
     } else {
       logger.info('Orchestrator', 'Skipping Phase 3 (no research findings)');
+    }
+
+    // =====================================================
+    // Post-processing: reconcile verification card statuses
+    // The review phase may overwrite Phase 2.5's computed status,
+    // causing the overall badge to contradict individual source icons.
+    // Re-compute from actual source statuses to ensure consistency.
+    // =====================================================
+    for (const [cardId, card] of currentCards) {
+      if (card.cardType !== 'verification_card') continue;
+      const cardData = card.populatedData || card.data || {};
+      const sources = cardData.sources || [];
+      if (sources.length === 0) continue;
+
+      const correctStatus = computeVerificationStatus(sources);
+      if (cardData.status !== correctStatus) {
+        logger.info('Orchestrator', 'Reconciled verification status', {
+          cardId,
+          was: cardData.status,
+          now: correctStatus,
+          sources: sources.map(s => s.status),
+        });
+        cardData.status = correctStatus;
+        card.populatedData = cardData;
+        card.data = cardData;
+        currentCards.set(cardId, card);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId,
+            cardType: 'verification_card',
+            data: cardData,
+            reason: `Status reconciled: ${correctStatus} (based on ${sources.length} sources)`,
+            source: 'reconcile',
+          });
+        }
+      }
     }
 
     // =====================================================
