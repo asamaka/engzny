@@ -2592,9 +2592,7 @@
                     <span class="layout-progress-text" id="layoutProgressText"></span>
                 </div>
             </div>
-            <div class="content-analysis" id="contentAnalysis" style="display:none;">
-                <div class="content-analysis-intent" id="analysisIntent"></div>
-            </div>
+            <!-- content-analysis removed from user UI (still in report data) -->
             <div class="card-grid" id="cardGrid"></div>
             <div class="follow-up-section" id="followUpSection" style="display:none;">
                 <div class="follow-up-header">
@@ -3273,11 +3271,7 @@
             layoutBadge.textContent = humanizeContentType(ct);
 
             if (blueprint.contentAnalysis) {
-                contentAnalysisEl.style.display = '';
-                const intent = blueprint.contentAnalysis.intent || '';
-                const looksLikeLabel = /^[a-z_]+$/.test(intent) || intent.length < 10;
-                analysisIntent.textContent = looksLikeLabel ? '' : intent;
-                contentAnalysisEl.style.display = looksLikeLabel && !intent ? 'none' : '';
+                /* removed: intent line no longer shown in user UI */
                 renderFollowUpQuestions(blueprint.contentAnalysis);
             }
 
@@ -3305,11 +3299,7 @@
             layoutBadge.textContent = humanizeContentType(ct);
 
             if (blueprint.contentAnalysis) {
-                contentAnalysisEl.style.display = '';
-                const intent = blueprint.contentAnalysis.intent || '';
-                const looksLikeLabel = /^[a-z_]+$/.test(intent) || intent.length < 10;
-                analysisIntent.textContent = looksLikeLabel ? '' : intent;
-                contentAnalysisEl.style.display = looksLikeLabel && !intent ? 'none' : '';
+                /* removed: intent line no longer shown in user UI */
                 renderFollowUpQuestions(blueprint.contentAnalysis);
             }
 
@@ -3586,12 +3576,12 @@
 
             const cssClassMap = { link_card: 'links', did_you_know_card: 'did-you-know', verification_card: 'verification' };
             const cssClass = cssClassMap[card.cardType] || card.cardType.replace(/_/g, '-');
-            el.className = `card card-${cssClass} loading`;
+            el.className = `card card-${cssClass} bg-base-200 border border-base-300 rounded-2xl overflow-hidden loading`;
             el.dataset.cardType = card.cardType;
 
             const span = card.gridPosition?.columnSpan || 1;
-            const fullWidthTypes = ['hero_summary', 'comparison_card', 'verification_card'];
-            const twoColTypes = ['timeline_card', 'info_list', 'action_card', 'text_extract', 'link_card', 'news_card'];
+            const fullWidthTypes = ['hero_summary', 'comparison_card', 'verification_card', 'map_card', 'stats_grid_card', 'gallery_card', 'chat_card'];
+            const twoColTypes = ['timeline_card', 'info_list', 'action_card', 'text_extract', 'link_card', 'news_card', 'order_card'];
 
             if (span >= 3 || fullWidthTypes.includes(card.cardType)) {
                 el.classList.add('span-full');
@@ -3614,11 +3604,6 @@
                 if (hasImage) el.classList.add('has-image');
             }
 
-            if (card.cardType === 'news_card') {
-                const hasImage = card.populatedData?.imageUrl || card.placeholderData?.imageUrl;
-                if (hasImage) el.classList.add('has-image');
-            }
-
             el.innerHTML = renderPlaceholder(card);
             return el;
         }
@@ -3627,55 +3612,70 @@
             const pd = card.placeholderData || {};
             const type = card.cardType;
 
+            if (type === 'hero_summary' && pd.title && pd.title !== 'Analyzing...') {
+                return `<div class="p-4">
+                    ${pd.emoji ? `<span class="text-3xl mb-2 block">${esc(pd.emoji)}</span>` : ''}
+                    ${pd.badge ? `<div class="badge badge-primary badge-sm mb-2">${esc(pd.badge)}</div>` : ''}
+                    <h2 class="text-lg font-extrabold text-white leading-tight mb-1">${esc(pd.title)}</h2>
+                    ${pd.subtitle ? `<p class="text-sm text-base-content/60">${esc(pd.subtitle)}</p>` : ''}
+                    <div class="flex items-center gap-1 mt-3">
+                        <span class="loading loading-dots loading-xs text-primary"></span>
+                        <span class="text-xs text-base-content/40">Enhancing...</span>
+                    </div>
+                </div>`;
+            }
+
             if (type === 'hero_summary') {
-                return `<div class="card-inner">
-                    ${pd.emoji ? `<span class="hero-emoji">${esc(pd.emoji)}</span>` : ''}
-                    ${pd.badge ? `<span class="hero-badge">${esc(pd.badge)}</span>` : ''}
-                    <div class="hero-title">${esc(pd.title || 'Analyzing...')}</div>
-                    <div class="hero-subtitle">${esc(pd.subtitle || 'Identifying content...')}</div>
-                    <div class="placeholder-line medium"></div>
-                </div>`;
-            }
-
-            if (type === 'key_metric' && pd.value) {
-                return `<div class="card-inner">
-                    ${getCardTypeLabel(type)}
-                    <div class="metric-value" style="opacity:0.5">${esc(pd.value || '...')}</div>
-                    <div class="metric-label">${esc(pd.label || '')}</div>
-                    <div class="placeholder-line short"></div>
-                </div>`;
-            }
-
-            if (type === 'product_card' && pd.name) {
-                return `<div class="card-inner">
-                    ${getCardTypeLabel(type)}
-                    <div class="product-name" style="opacity:0.6">${esc(pd.name)}</div>
-                    ${pd.price ? `<div class="product-price" style="opacity:0.4">${esc(pd.price)}</div>` : ''}
-                    <div class="placeholder-line medium"></div>
-                    <div class="placeholder-line short"></div>
+                return `<div class="p-4 space-y-3">
+                    <div class="skeleton h-5 w-2/3"></div>
+                    <div class="skeleton h-4 w-full"></div>
+                    <div class="skeleton h-4 w-4/5"></div>
                 </div>`;
             }
 
             if (type === 'person_card' && pd.name) {
-                return `<div class="card-inner">
-                    ${getCardTypeLabel(type)}
-                    <div class="person-header">
-                        <div class="person-avatar" style="opacity:0.5">${esc(pd.emoji || (pd.name ? pd.name[0].toUpperCase() : '?'))}</div>
-                        <div>
-                            <div class="person-name" style="opacity:0.6">${esc(pd.name)}</div>
-                            ${pd.role ? `<div class="person-role">${esc(pd.role)}</div>` : ''}
+                return `<div class="p-4 flex items-center gap-3">
+                    <div class="avatar placeholder">
+                        <div class="bg-primary/20 text-primary rounded-full w-12 h-12 flex items-center justify-center">
+                            <span class="text-lg font-bold">${esc(pd.name ? pd.name[0].toUpperCase() : '?')}</span>
                         </div>
                     </div>
-                    <div class="placeholder-line medium"></div>
+                    <div class="flex-1">
+                        <div class="font-bold text-sm">${esc(pd.name)}</div>
+                        <span class="loading loading-dots loading-xs text-base-content/40"></span>
+                    </div>
                 </div>`;
             }
 
-            return `<div class="card-inner">
-                ${getCardTypeLabel(type)}
-                <div class="placeholder-line medium"></div>
-                <div class="placeholder-line short"></div>
-                <div class="placeholder-line"></div>
-                <div class="skeleton-status">Searching the web...</div>
+            if (type === 'location_card' && pd.name) {
+                return `<div class="p-4 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-rounded text-primary" style="font-size:20px">location_on</span>
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-sm">${esc(pd.name)}</div>
+                        <span class="loading loading-dots loading-xs text-base-content/40"></span>
+                    </div>
+                </div>`;
+            }
+
+            // Generic skeleton for all other card types
+            const typeLabels = {
+                key_metric: 'Metric', info_list: 'Details', fact_check: 'Fact Check',
+                timeline_card: 'Timeline', quote_card: 'Quote', comparison_card: 'Comparison',
+                warning_card: 'Alert', action_card: 'Actions', text_extract: 'Text',
+                news_card: 'News', chart_card: 'Chart', did_you_know_card: 'Did You Know?',
+                verification_card: 'Verification', link_card: 'Links', product_card: 'Product',
+                chat_card: 'Chat', map_card: 'Map', order_card: 'Order',
+                stats_grid_card: 'Stats', gallery_card: 'Gallery', source_card: 'Source',
+            };
+            const label = typeLabels[type] || type.replace(/_/g, ' ');
+
+            return `<div class="p-4 space-y-3">
+                <div class="text-xs font-semibold uppercase tracking-wider text-base-content/30">${esc(label)}</div>
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-2/3"></div>
             </div>`;
         }
 
@@ -3685,104 +3685,110 @@
             switch (cardType) {
                 case 'hero_summary': {
                     const hasImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `${hasImage ? `<div class="hero-image-wrap">
-                        <img class="hero-image" src="${esc(d.imageUrl)}" alt="" onerror="this.parentElement.style.display='none';this.closest('.card-hero')?.classList.remove('has-image')">
-                        <div class="hero-image-overlay"></div>
-                        ${d.badge ? `<div class="hero-image-badge"><span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}15;color:${esc(d.badgeColor)};backdrop-filter:blur(8px)"` : 'style="backdrop-filter:blur(8px)"'}>${esc(d.badge)}</span></div>` : ''}
-                    </div>` : ''}
-                    <div class="card-inner">
-                        ${!hasImage && d.emoji ? `<span class="hero-emoji">${esc(d.emoji)}</span>` : ''}
-                        ${!hasImage && d.badge ? `<span class="hero-badge" ${d.badgeColor ? `style="background:${esc(d.badgeColor)}15;color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</span>` : ''}
-                        <div class="hero-title">${esc(d.title || 'Analysis')}</div>
-                        <div class="hero-subtitle">${linkify(d.subtitle || '')}</div>
-                        ${d.takeaway ? `<div class="hero-takeaway">${linkify(d.takeaway)}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="hero-link"><span class="material-symbols-rounded" style="font-size:13px">open_in_new</span> Source</a>` : ''}
+                    return `${hasImage ? `<figure class="relative">
+                        <img class="w-full h-40 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
+                        ${d.badge ? `<div class="absolute top-3 left-3"><div class="badge badge-primary badge-sm font-bold" ${d.badgeColor ? `style="background:${esc(d.badgeColor)};border-color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</div></div>` : ''}
+                    </figure>` : ''}
+                    <div class="p-4">
+                        ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
+                        ${!hasImage && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2" ${d.badgeColor ? `style="background:${esc(d.badgeColor)};border-color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</div>` : ''}
+                        <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
+                        <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(d.subtitle || '')}</p>
+                        ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">
+                            <p class="text-sm text-base-content/80 leading-relaxed">${linkify(d.takeaway)}</p>
+                        </div>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1">
+                            <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Source
+                        </a>` : ''}
                     </div>`;
                 }
 
                 case 'key_metric':
-                    return `<div class="card-inner">
-                        ${d.emoji ? `<span class="metric-emoji">${esc(d.emoji)}</span>` : getCardTypeLabel('key_metric')}
-                        <div class="metric-value" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
-                        <div class="metric-label">${esc(d.label || '')}</div>
-                        ${d.trend && d.trend !== 'none' ? `<span class="metric-trend ${esc(d.trend)}">
-                            <span class="material-symbols-rounded" style="font-size:11px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
-                            ${esc(d.trend)}
-                        </span>` : ''}
+                    return `<div class="stat p-4">
+                        ${d.emoji ? `<div class="stat-figure text-primary text-2xl">${esc(d.emoji)}</div>` : ''}
+                        <div class="stat-title text-xs text-base-content/50">${esc(d.label || '')}</div>
+                        <div class="stat-value text-2xl font-extrabold text-primary" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
+                        ${d.trend && d.trend !== 'none' ? `<div class="stat-desc">
+                            <span class="badge badge-sm ${d.trend === 'up' ? 'badge-success' : d.trend === 'down' ? 'badge-error' : 'badge-info'} gap-1">
+                                <span class="material-symbols-rounded" style="font-size:12px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
+                                ${esc(d.trend)}
+                            </span>
+                        </div>` : ''}
                         ${Array.isArray(d.sparkline) && d.sparkline.length >= 2 ? renderSparkline(d.sparkline) : ''}
-                        ${d.context ? `<div class="metric-context">${linkify(d.context)}</div>` : ''}
+                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-base-300 rounded-lg">${linkify(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'info_list':
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('info_list')}
-                        <div class="list-title">${esc(d.title || 'Details')}</div>
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Details')}</h3>
+                        <div class="divide-y divide-base-300">
                         ${(d.items || []).map(item => {
                             if (typeof item === 'object' && item !== null) {
                                 const label = item.label || item.name || item.key || '';
                                 const value = item.value || item.description || item.text || '';
                                 const hasUrl = item.url && typeof item.url === 'string' && item.url.startsWith('http');
                                 const emoji = item.emoji || item.icon || '';
-                                return `<div class="list-item${item.highlight ? ' highlight' : ''}">
-                                    ${emoji ? `<span class="list-item-emoji">${esc(emoji)}</span>` : ''}
-                                    <span class="list-item-label">${esc(label)}</span>
-                                    <span class="list-item-value">${hasUrl ? renderLink(item.url, value, 'list-item-link') : linkify(value)}</span>
+                                return `<div class="flex items-start justify-between gap-3 py-2.5 text-sm ${item.highlight ? 'bg-primary/5 -mx-2 px-2 rounded-lg' : ''}">
+                                    <span class="text-base-content/50 flex items-center gap-1.5 shrink-0">${emoji ? `<span>${esc(emoji)}</span>` : ''}<span>${esc(label)}</span></span>
+                                    <span class="text-right font-medium ${item.highlight ? 'text-primary' : ''}">${hasUrl ? renderLink(item.url, value, 'text-primary hover:underline') : linkify(value)}</span>
                                 </div>`;
                             }
-                            return `<div class="list-item">
-                                <span class="list-item-value" style="text-align:left">${linkify(item)}</span>
-                            </div>`;
+                            return `<div class="py-2 text-sm">${linkify(item)}</div>`;
                         }).join('')}
+                        </div>
                     </div>`;
 
                 case 'fact_check': {
                     const verdict = d.verdict || 'unverified';
-                    const verdictIcon = verdict === 'verified' ? 'check_circle' :
-                                       verdict === 'false' ? 'cancel' :
-                                       verdict === 'misleading' ? 'warning' :
-                                       verdict === 'partially_true' ? 'change_circle' : 'help';
-                    const verdictColor = verdict === 'verified' ? 'var(--green)' :
-                                        verdict === 'false' ? 'var(--red)' :
-                                        verdict === 'misleading' ? 'var(--yellow)' :
-                                        verdict === 'partially_true' ? 'var(--orange)' :
-                                        verdict === 'needs_context' ? 'var(--purple)' : 'var(--accent)';
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('fact_check')}
-                        <div class="fact-verdict-visual">
-                            <div class="fact-verdict-icon ${esc(verdict)}">
-                                <span class="material-symbols-rounded">${verdictIcon}</span>
+                    const verdictConfig = {
+                        verified: { icon: 'check_circle', color: 'success', label: 'Verified' },
+                        false: { icon: 'cancel', color: 'error', label: 'False' },
+                        misleading: { icon: 'warning', color: 'warning', label: 'Misleading' },
+                        partially_true: { icon: 'change_circle', color: 'warning', label: 'Partially True' },
+                        needs_context: { icon: 'help', color: 'secondary', label: 'Needs Context' },
+                        unverified: { icon: 'help', color: 'info', label: 'Unverified' },
+                    };
+                    const vc = verdictConfig[verdict] || verdictConfig.unverified;
+                    return `<div class="p-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-10 h-10 rounded-full bg-${vc.color}/15 flex items-center justify-center shrink-0">
+                                <span class="material-symbols-rounded text-${vc.color}" style="font-size:22px;font-variation-settings:'FILL' 1">${vc.icon}</span>
                             </div>
-                            <div class="fact-verdict-text">
-                                <span class="fact-verdict-label" style="color:${verdictColor}">${esc(verdict.replace(/_/g, ' '))}</span>
-                                ${d.confidence ? `<span class="fact-confidence-label">${esc(d.confidence)} confidence</span>` : ''}
+                            <div>
+                                <div class="badge badge-${vc.color} badge-sm font-bold">${esc(vc.label)}</div>
+                                ${d.confidence ? `<div class="text-xs text-base-content/40 mt-0.5">${esc(d.confidence)} confidence</div>` : ''}
                             </div>
                         </div>
-                        <div class="fact-claim">${linkify(d.claim || '')}</div>
-                        ${d.explanation ? `<div class="fact-explanation">${linkify(d.explanation)}</div>` : ''}
-                        ${d.source ? `<div class="fact-source">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
+                        <p class="text-sm italic text-base-content/70 leading-relaxed mb-2">${linkify(d.claim || '')}</p>
+                        ${d.explanation ? `<p class="text-xs text-base-content/60 leading-relaxed">${linkify(d.explanation)}</p>` : ''}
+                        ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
                     </div>`;
                 }
 
                 case 'person_card': {
                     const hasPhoto = d.photoUrl && typeof d.photoUrl === 'string' && d.photoUrl.startsWith('http');
-                    const avatar = d.emoji || (d.name ? d.name[0].toUpperCase() : '?');
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('person_card')}
-                        <div class="person-header">
-                            ${hasPhoto
-                                ? `<img class="person-photo" src="${esc(d.photoUrl)}" alt="${esc(d.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="person-avatar" style="display:none">${esc(avatar)}</div>`
-                                : `<div class="person-avatar">${esc(avatar)}</div>`
-                            }
-                            <div>
-                                <div class="person-name">${esc(d.name || 'Unknown')}</div>
-                                ${d.role ? `<div class="person-role">${esc(d.role)}</div>` : ''}
-                                ${d.handle ? `<div class="person-handle">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
+                    const initial = d.name ? d.name[0].toUpperCase() : '?';
+                    return `<div class="p-4">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="avatar ${hasPhoto ? '' : 'placeholder'}">
+                                <div class="w-14 h-14 rounded-full ${hasPhoto ? 'ring ring-primary ring-offset-base-100 ring-offset-2' : 'bg-gradient-to-br from-primary/30 to-secondary/30 text-primary'}">
+                                    ${hasPhoto
+                                        ? `<img src="${esc(d.photoUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.classList.add('bg-gradient-to-br','from-primary/30','to-secondary/30');this.outerHTML='<span class=\\'text-xl font-bold\\'>${esc(initial)}</span>'">`
+                                        : `<span class="text-xl font-bold">${esc(d.emoji || initial)}</span>`
+                                    }
+                                </div>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-bold text-base text-white truncate">${esc(d.name || 'Unknown')}</div>
+                                ${d.role ? `<div class="text-xs text-base-content/50">${esc(d.role)}</div>` : ''}
+                                ${d.handle ? `<div class="text-xs text-primary">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
                             </div>
                         </div>
-                        ${d.context ? `<div class="person-context">${linkify(d.context)}</div>` : ''}
-                        ${d.notableInfo ? `<div class="person-notable">💡 ${linkify(d.notableInfo)}</div>` : ''}
-                        ${(d.details || []).length ? `<div class="person-details">${d.details.slice(0, 3).map(det =>
-                            `<div class="person-detail-item">${renderItemValue(det)}</div>`
+                        ${d.context ? `<p class="text-sm text-base-content/70 leading-relaxed">${linkify(d.context)}</p>` : ''}
+                        ${d.notableInfo ? `<div class="bg-primary/8 p-2.5 rounded-lg mt-2 text-sm">💡 ${linkify(d.notableInfo)}</div>` : ''}
+                        ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
+                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
                     </div>`;
                 }
@@ -3790,186 +3796,179 @@
                 case 'product_card': {
                     const features = (d.features || []).map(normalizeFeature).slice(0, 5);
                     const warnings = (d.warnings || []).map(normalizeFeature).slice(0, 3);
-                    const hasRating = d.rating && d.rating !== 'Not visible' && d.rating !== 'N/A';
-                    const hasPrice = d.price && d.price !== 'Not visible' && d.price !== 'N/A';
-
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('product_card')}
-                        <div class="product-header">
-                            ${d.imageUrl ? `<div class="product-image"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded\\'>inventory_2</span>'"></div>` :
-                              d.emoji ? `<span class="product-emoji">${esc(d.emoji)}</span>` : ''}
+                    return `<div class="p-4">
+                        <div class="flex gap-3 mb-3">
+                            ${d.imageUrl ? `<div class="w-20 h-20 rounded-xl bg-base-300 overflow-hidden shrink-0"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded text-base-content/30\\' style=\\'font-size:32px\\'>inventory_2</span>'"></div>` :
+                              d.emoji ? `<span class="text-3xl">${esc(d.emoji)}</span>` : ''}
                             <div>
-                                <div class="product-name">${esc(d.name || 'Product')}</div>
-                                ${hasPrice ? `<div class="product-price">${esc(d.price)}</div>` : ''}
-                                ${hasRating ? `<div class="product-rating">
-                                    <span class="material-symbols-rounded" style="font-size:13px;font-variation-settings:'FILL' 1">star</span>
-                                    ${esc(d.rating)}
-                                </div>` : ''}
+                                <div class="font-bold text-base text-white">${esc(d.name || 'Product')}</div>
+                                ${d.price ? `<div class="text-xl font-extrabold text-success">${esc(d.price)}</div>` : ''}
+                                ${d.rating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded" style="font-size:14px;font-variation-settings:'FILL' 1">star</span> ${esc(d.rating)}</div>` : ''}
                             </div>
                         </div>
-                        ${features.length ? `<ul class="product-features">${features.map(f =>
-                            `<li>${esc(f)}</li>`
-                        ).join('')}</ul>` : ''}
-                        ${d.verdict ? `<div class="product-verdict">${linkify(d.verdict)}</div>` : ''}
-                        ${warnings.length ? `<ul class="product-warnings">${warnings.map(w =>
-                            `<li>${esc(w)}</li>`
-                        ).join('')}</ul>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="product-link"><span class="material-symbols-rounded" style="font-size:13px">open_in_new</span> View</a>` : ''}
+                        ${features.length ? `<div class="flex flex-wrap gap-1.5 mb-2">${features.map(f =>
+                            `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded" style="font-size:10px">check</span>${esc(f)}</span>`
+                        ).join('')}</div>` : ''}
+                        ${d.verdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success">${linkify(d.verdict)}</div>` : ''}
+                        ${warnings.length ? `<div class="mt-2 space-y-1">${warnings.map(w =>
+                            `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded" style="font-size:12px">warning</span>${esc(w)}</div>`
+                        ).join('')}</div>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View</a>` : ''}
                     </div>`;
                 }
 
                 case 'timeline_card':
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('timeline_card')}
-                        <div class="timeline-title">${esc(d.title || 'Timeline')}</div>
-                        ${(d.events || []).map(ev => {
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Timeline')}</h3>
+                        <ul class="timeline timeline-vertical timeline-compact ml-0">
+                        ${(d.events || []).map((ev, i) => {
                             const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
                             const evText = evObj.event || evObj.text || evObj.description || '';
-                            return `<div class="timeline-event${evObj.highlight ? ' highlight' : ''}">
-                                <div class="timeline-date">${esc(evObj.date || '')}</div>
-                                <div class="timeline-dot"></div>
-                                <div class="timeline-text">${evObj.url ? renderLink(evObj.url, evText) : linkify(evText)}</div>
-                            </div>`;
+                            const isLast = i === (d.events || []).length - 1;
+                            return `<li>
+                                ${i > 0 ? '<hr class="bg-base-300"/>' : ''}
+                                <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evObj.date || '')}</div>
+                                <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-[0_0_8px_rgba(91,138,245,0.4)]' : 'bg-base-300'}"></div></div>
+                                <div class="timeline-end text-sm pb-3">${evObj.url ? renderLink(evObj.url, evText) : linkify(evText)}</div>
+                                ${!isLast ? '<hr class="bg-base-300"/>' : ''}
+                            </li>`;
                         }).join('')}
+                        </ul>
                     </div>`;
 
                 case 'quote_card': {
                     const hasQuotePhoto = d.photoUrl && typeof d.photoUrl === 'string' && d.photoUrl.startsWith('http');
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('quote_card')}
-                        <div class="quote-mark">\u201C</div>
-                        <div class="quote-text">${linkify(d.quote || '')}</div>
-                        ${d.attribution ? `<div class="quote-attribution-wrap">
-                            ${hasQuotePhoto ? `<img class="quote-photo" src="${esc(d.photoUrl)}" alt="${esc(d.attribution)}" onerror="this.style.display='none'">` : ''}
-                            <div class="quote-attribution">\u2014 ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>
+                    return `<div class="p-4 border-l-3 border-secondary">
+                        <div class="text-4xl text-secondary/30 font-serif leading-none mb-1">\u201C</div>
+                        <blockquote class="text-sm text-base-content/80 leading-relaxed italic pl-2">${linkify(d.quote || '')}</blockquote>
+                        ${d.attribution ? `<div class="flex items-center gap-2 mt-3">
+                            ${hasQuotePhoto ? `<div class="avatar"><div class="w-7 h-7 rounded-full"><img src="${esc(d.photoUrl)}" alt="" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'"></div></div>` : ''}
+                            <div class="text-xs font-semibold text-secondary">\u2014 ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>
                         </div>` : ''}
-                        ${d.context ? `<div class="quote-context">${linkify(d.context)}</div>` : ''}
+                        ${d.context ? `<p class="text-xs text-base-content/40 mt-2">${linkify(d.context)}</p>` : ''}
                     </div>`;
                 }
 
                 case 'comparison_card':
                     if (!d.columns || !d.columns.length) {
-                        return `<div class="card-inner">${getCardTypeLabel('comparison_card')}<div class="comparison-title">${esc(d.title || 'Comparison')}</div><div style="color:var(--text-muted);font-size:0.72rem">No data available</div></div>`;
+                        return `<div class="p-4"><h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Comparison')}</h3><p class="text-xs text-base-content/40">No data available</p></div>`;
                     }
-                    const cols = Array.isArray(d.columns) ? d.columns : [];
-                    const maxRows = Math.max(...cols.map(c => (Array.isArray(c.values) ? c.values : []).length), 0);
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('comparison_card')}
-                        <div class="comparison-title">${esc(d.title || 'Comparison')}</div>
-                        <table>
-                            <thead><tr>
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Comparison')}</h3>
+                        <div class="overflow-x-auto">
+                        <table class="table table-xs">
+                            <thead><tr class="border-base-300">
                                 ${d.rows ? '<th></th>' : ''}
-                                ${cols.map(c => `<th>${esc(typeof c === 'object' ? (c.header || c.name || '') : c)}</th>`).join('')}
+                                ${(d.columns || []).map(c => `<th class="text-primary font-bold">${esc(typeof c === 'object' ? (c.header || c.name || '') : c)}</th>`).join('')}
                             </tr></thead>
-                            <tbody>${Array.from({ length: maxRows }, (_, i) => `<tr>
-                                ${d.rows ? `<td style="color:var(--text-secondary);font-weight:500">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
-                                ${cols.map(c => {
+                            <tbody>${Array.from({ length: Math.max(...(d.columns || []).map(c => (Array.isArray(c.values) ? c.values : []).length), 0) }, (_, i) => `<tr class="border-base-300">
+                                ${d.rows ? `<td class="text-base-content/50 font-medium">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
+                                ${(d.columns || []).map(c => {
                                     const vals = Array.isArray(c.values) ? c.values : [];
                                     return `<td>${linkify(vals[i] || '')}</td>`;
                                 }).join('')}
                             </tr>`).join('')}</tbody>
                         </table>
+                        </div>
                     </div>`;
 
                 case 'warning_card': {
                     const level = d.level || 'warning';
-                    return `<div class="card-inner">
-                        <div class="warning-header">
-                            <div class="warning-icon-wrap">
-                                <span class="material-symbols-rounded">${level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning'}</span>
-                            </div>
-                            <span class="warning-title">${esc(d.title || 'Warning')}</span>
+                    const alertClass = level === 'critical' ? 'alert-error' : level === 'info' ? 'alert-info' : 'alert-warning';
+                    const icon = level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning';
+                    return `<div role="alert" class="alert ${alertClass} rounded-2xl">
+                        <span class="material-symbols-rounded" style="font-size:22px;font-variation-settings:'FILL' 1">${icon}</span>
+                        <div>
+                            <h3 class="font-bold text-sm">${esc(d.title || 'Warning')}</h3>
+                            ${d.details ? `<div class="text-xs mt-1 opacity-80">${linkify(d.details)}</div>` : ''}
+                            ${d.advice ? `<div class="text-xs mt-2 p-2 bg-base-100/20 rounded-lg">${linkify(d.advice)}</div>` : ''}
                         </div>
-                        ${d.details ? `<div class="warning-details">${linkify(d.details)}</div>` : ''}
-                        ${d.advice ? `<div class="warning-advice">${linkify(d.advice)}</div>` : ''}
                     </div>`;
                 }
 
                 case 'action_card':
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('action_card')}
-                        <div class="action-title">${esc(d.title || 'Next Steps')}</div>
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Next Steps')}</h3>
+                        <div class="space-y-2">
                         ${(d.actions || []).map((a, i) => {
                             const aObj = typeof a === 'object' ? a : { label: String(a) };
-                            return `<div class="action-item">
-                                <span class="action-bullet">${i + 1}</span>
-                                <div>
-                                    <div class="action-label">${aObj.url ? renderLink(aObj.url, aObj.label || aObj.name || '') : esc(aObj.label || aObj.name || '')}</div>
-                                    ${aObj.description ? `<div class="action-desc">${linkify(aObj.description)}</div>` : ''}
-                                    ${aObj.priority ? `<span class="action-priority ${esc(aObj.priority)}">${esc(aObj.priority)}</span>` : ''}
+                            return `<div class="flex items-start gap-3">
+                                <div class="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">${i + 1}</div>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium">${aObj.url ? renderLink(aObj.url, aObj.label || aObj.name || '') : esc(aObj.label || aObj.name || '')}</div>
+                                    ${aObj.description ? `<div class="text-xs text-base-content/50 mt-0.5">${linkify(aObj.description)}</div>` : ''}
+                                    ${aObj.priority ? `<span class="badge badge-xs mt-1 ${aObj.priority === 'high' ? 'badge-error' : aObj.priority === 'medium' ? 'badge-warning' : 'badge-info'}">${esc(aObj.priority)}</span>` : ''}
                                 </div>
                             </div>`;
                         }).join('')}
+                        </div>
                     </div>`;
 
                 case 'text_extract':
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('text_extract')}
-                        <div class="extract-title">${esc(d.title || 'Extracted Text')}</div>
-                        <div class="extract-text">${linkify(d.text || '')}</div>
-                        ${d.source ? `<div class="extract-source">${esc(d.source)}</div>` : ''}
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Extracted Text')}</h3>
+                        <div class="text-sm font-mono bg-base-300 p-3 rounded-xl whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed">${linkify(d.text || '')}</div>
+                        ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${esc(d.source)}</div>` : ''}
                     </div>`;
 
                 case 'location_card': {
-                    const locEmoji = d.emoji || '';
                     const hasLocImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `${hasLocImage ? `<div class="location-image-wrap">
-                        <img class="location-image" src="${esc(d.imageUrl)}" alt="${esc(d.name)}" onerror="this.parentElement.style.display='none'">
-                        <div class="location-image-overlay"></div>
-                    </div>` : ''}
-                    <div class="card-inner">
-                        ${!hasLocImage ? getCardTypeLabel('location_card') : ''}
-                        <div class="location-header">
-                            <div class="location-pin">
-                                ${locEmoji ? `<span class="location-emoji">${esc(locEmoji)}</span>` : `<span class="material-symbols-rounded">location_on</span>`}
+                    const mapsUrl = d.mapUrl || (d.name ? `https://maps.google.com/?q=${encodeURIComponent(d.name)}` : '');
+                    return `${hasLocImage ? `<figure class="relative">
+                        <img class="w-full h-32 object-cover" src="${esc(d.imageUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
+                    </figure>` : ''}
+                    <div class="p-4">
+                        <div class="flex items-center gap-3 mb-2">
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                ${d.emoji ? `<span class="text-lg">${esc(d.emoji)}</span>` : `<span class="material-symbols-rounded text-primary" style="font-size:20px">location_on</span>`}
                             </div>
                             <div>
-                                <div class="location-name">${esc(d.name || 'Location')}</div>
-                                ${d.address ? `<div class="location-address">
-                                    ${d.mapUrl ? renderLink(d.mapUrl, d.address) : linkify(d.address)}
-                                </div>` : ''}
+                                <div class="font-bold text-base text-white">${esc(d.name || 'Location')}</div>
+                                ${d.address ? `<div class="text-xs text-base-content/50">${linkify(d.address)}</div>` : ''}
                             </div>
                         </div>
-                        ${d.context ? `<div class="location-context">${linkify(d.context)}</div>` : ''}
-                        ${(d.details || []).length ? `<div class="location-details">${d.details.slice(0, 3).map(det =>
-                            `<div class="location-detail-item">${renderItemValue(det)}</div>`
+                        ${d.context ? `<p class="text-sm text-base-content/60 leading-relaxed">${linkify(d.context)}</p>` : ''}
+                        ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
+                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
+                        ${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1"><span class="material-symbols-rounded" style="font-size:14px">map</span> View on Map</a>` : ''}
                     </div>`;
                 }
 
                 case 'link_card':
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('link_card')}
-                        <div class="links-title">${esc(d.title || 'Links')}</div>
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Links')}</h3>
+                        <div class="space-y-2">
                         ${(d.links || []).map(link => {
                             const lObj = typeof link === 'object' ? link : { label: String(link), url: '' };
-                            return `<div class="link-item">
-                                <div class="link-icon"><span class="material-symbols-rounded">link</span></div>
-                                <div>
-                                    <div class="link-label">${lObj.url ? renderLink(lObj.url, lObj.label || lObj.url) : esc(lObj.label || '')}</div>
-                                    ${lObj.description ? `<div class="link-desc">${esc(lObj.description)}</div>` : ''}
+                            return `<div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><span class="material-symbols-rounded text-primary" style="font-size:16px">link</span></div>
+                                <div class="min-w-0">
+                                    <div class="text-sm font-medium">${lObj.url ? renderLink(lObj.url, lObj.label || lObj.url) : esc(lObj.label || '')}</div>
+                                    ${lObj.description ? `<div class="text-xs text-base-content/40">${esc(lObj.description)}</div>` : ''}
                                 </div>
                             </div>`;
                         }).join('')}
+                        </div>
                     </div>`;
 
                 case 'news_card': {
                     const hasNewsImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `${hasNewsImage ? `<div class="news-image-wrap">
-                        <img class="news-image" src="${esc(d.imageUrl)}" alt="" onerror="this.parentElement.style.display='none'">
-                        <div class="news-image-overlay"></div>
-                        ${d.category ? `<span class="news-category">${esc(d.category)}</span>` : ''}
-                    </div>` : ''}
-                    <div class="card-inner">
-                        ${!hasNewsImage ? getCardTypeLabel('news_card') : ''}
-                        <div class="news-headline">${esc(d.headline || 'News')}</div>
-                        <div class="news-meta">
-                            <span class="news-source">${esc(d.source || '')}</span>
+                    return `${hasNewsImage ? `<figure class="relative">
+                        <img class="w-full h-36 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
+                        ${d.category ? `<div class="absolute top-2 left-2"><span class="badge badge-sm badge-primary">${esc(d.category)}</span></div>` : ''}
+                    </figure>` : ''}
+                    <div class="p-4">
+                        <h3 class="font-bold text-base text-white mb-1 leading-tight">${esc(d.headline || 'News')}</h3>
+                        <div class="flex items-center gap-2 text-xs text-base-content/40 mb-2">
+                            <span class="font-semibold">${esc(d.source || '')}</span>
                             ${d.date ? `<span>·</span><span>${esc(d.date)}</span>` : ''}
                         </div>
-                        ${d.summary ? `<div class="news-summary">${linkify(d.summary)}</div>` : ''}
-                        ${d.relatedContext ? `<div class="news-context">💡 ${linkify(d.relatedContext)}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="news-link"><span class="material-symbols-rounded" style="font-size:13px">open_in_new</span> Read article</a>` : ''}
+                        ${d.summary ? `<p class="text-sm text-base-content/60 leading-relaxed">${linkify(d.summary)}</p>` : ''}
+                        ${d.relatedContext ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg">💡 ${linkify(d.relatedContext)}</div>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Read article</a>` : ''}
                     </div>`;
                 }
 
@@ -3978,21 +3977,15 @@
                     const maxVal = Math.max(...items.map(i => typeof i.value === 'number' ? i.value : 0), 1);
                     const unit = d.unit || '';
                     const cType = d.chartType || 'bar';
-
                     let chartHtml = '';
 
                     if (cType === 'bar') {
-                        chartHtml = `<div class="chart-bars">${items.slice(0, 8).map((item, i) => {
+                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item, i) => {
                             const pct = Math.round((item.value / maxVal) * 100);
                             const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
-                            return `<div class="chart-bar-row">
-                                <div class="chart-bar-label">${esc(item.label || '')}</div>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill" style="width:${pct}%;background:${color}">
-                                        ${pct > 20 ? `<span class="chart-bar-value">${item.value}${unit}</span>` : ''}
-                                    </div>
-                                </div>
-                                ${pct <= 20 ? `<span style="font-size:0.58rem;color:var(--text-secondary);min-width:30px">${item.value}${unit}</span>` : ''}
+                            return `<div>
+                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
+                                <div class="w-full bg-base-300 rounded-full h-2"><div class="h-2 rounded-full transition-all" style="width:${pct}%;background:${color}"></div></div>
                             </div>`;
                         }).join('')}</div>`;
                     } else if (cType === 'pie') {
@@ -4006,164 +3999,217 @@
                             return { ...item, pct, color, start };
                         });
                         const gradientStops = segments.map(s => `${s.color} ${s.start}% ${s.start + s.pct}%`).join(', ');
-                        chartHtml = `<div class="chart-pie-container">
-                            <div class="chart-pie" style="border-radius:50%;background:conic-gradient(${gradientStops})"></div>
-                            <div class="chart-legend">${segments.map(s =>
-                                `<div class="chart-legend-item">
-                                    <span class="chart-legend-dot" style="background:${s.color}"></span>
-                                    <span>${esc(s.label)}</span>
-                                    <span class="chart-legend-value">${Math.round(s.pct)}%</span>
-                                </div>`
+                        chartHtml = `<div class="flex items-center gap-4">
+                            <div class="w-20 h-20 rounded-full shrink-0" style="background:conic-gradient(${gradientStops})"></div>
+                            <div class="space-y-1">${segments.map(s =>
+                                `<div class="flex items-center gap-2 text-xs"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${s.color}"></span><span class="text-base-content/60">${esc(s.label)}</span><span class="font-bold ml-auto">${Math.round(s.pct)}%</span></div>`
                             ).join('')}</div>
                         </div>`;
                     } else if (cType === 'progress') {
-                        chartHtml = `<div class="chart-progress-items">${items.slice(0, 6).map((item, i) => {
+                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item, i) => {
                             const pct = Math.min(Math.round((item.value / maxVal) * 100), 100);
                             const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
                             return `<div>
-                                <div class="chart-progress-label">
-                                    <span class="chart-progress-name">${esc(item.label || '')}</span>
-                                    <span class="chart-progress-value">${item.value}${unit}</span>
-                                </div>
-                                <div class="chart-progress-track">
-                                    <div class="chart-progress-fill" style="width:${pct}%;background:${color}"></div>
-                                </div>
+                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-bold">${item.value}${unit}</span></div>
+                                <progress class="progress w-full h-2" value="${pct}" max="100" style="--progress-color:${color}"></progress>
                             </div>`;
                         }).join('')}</div>`;
                     } else {
-                        chartHtml = `<div class="chart-bars">${items.slice(0, 8).map((item, i) => {
+                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item, i) => {
                             const pct = Math.round((item.value / maxVal) * 100);
                             const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
-                            return `<div class="chart-bar-row">
-                                <div class="chart-bar-label">${esc(item.label || '')}</div>
-                                <div class="chart-bar-track">
-                                    <div class="chart-bar-fill" style="width:${pct}%;background:${color}">
-                                        ${pct > 20 ? `<span class="chart-bar-value">${item.value}${unit}</span>` : ''}
-                                    </div>
-                                </div>
-                            </div>`;
+                            return `<div><div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
+                                <div class="w-full bg-base-300 rounded-full h-2"><div class="h-2 rounded-full" style="width:${pct}%;background:${color}"></div></div></div>`;
                         }).join('')}</div>`;
                     }
 
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel('chart_card')}
-                        <div class="chart-title">${esc(d.title || 'Data')}</div>
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Data')}</h3>
                         ${chartHtml}
-                        ${d.insight ? `<div class="chart-insight">💡 ${linkify(d.insight)}</div>` : ''}
+                        ${d.insight ? `<div class="text-xs text-base-content/50 mt-3 p-2 bg-primary/5 rounded-lg">💡 ${linkify(d.insight)}</div>` : ''}
                     </div>`;
                 }
 
                 case 'did_you_know_card': {
                     const hasDykImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    let dykSourceHtml = '';
-                    if (d.sourceUrl && typeof d.sourceUrl === 'string' && d.sourceUrl.startsWith('http')) {
-                        try {
-                            const domain = new URL(d.sourceUrl).hostname;
-                            dykSourceHtml = `<div class="dyk-source">Source: ${renderLink(d.sourceUrl, domain)}</div>`;
-                        } catch(e) { /* ignore invalid URLs */ }
-                    }
-                    return `${hasDykImage ? `<div class="dyk-image-wrap">
-                        <img class="dyk-image" src="${esc(d.imageUrl)}" alt="" onerror="this.parentElement.style.display='none'">
-                        <div class="dyk-image-overlay"></div>
-                    </div>` : ''}
-                    <div class="card-inner">
-                        <div class="dyk-header">
-                            <span class="dyk-emoji">${esc(d.emoji || '💡')}</span>
-                            <span class="dyk-label">Did you know?</span>
-                            ${d.category ? `<span class="dyk-category">${esc(d.category)}</span>` : ''}
+                    return `${hasDykImage ? `<figure><img class="w-full h-28 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></figure>` : ''}
+                    <div class="p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xl">${esc(d.emoji || '💡')}</span>
+                            <span class="text-xs font-bold uppercase tracking-wider text-primary">Did you know?</span>
+                            ${d.category ? `<span class="badge badge-xs badge-outline">${esc(d.category)}</span>` : ''}
                         </div>
-                        <div class="dyk-fact">${linkify(d.fact || '')}</div>
-                        ${dykSourceHtml}
+                        <p class="text-sm leading-relaxed">${linkify(d.fact || '')}</p>
+                        ${d.sourceUrl ? `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>` : ''}
                     </div>`;
                 }
 
                 case 'verification_card': {
                     const vStatus = d.status || 'searching';
                     const isSearching = vStatus === 'searching';
-                    const statusIcons = {
-                        searching: 'search',
-                        partially_verified: 'pending',
-                        verified: 'check_circle',
-                        denied: 'cancel',
-                        unconfirmed: 'help',
-                        conflicting: 'warning',
+                    const statusConfig = {
+                        searching: { icon: 'search', badge: 'badge-info', label: 'Searching sources...' },
+                        partially_verified: { icon: 'pending', badge: 'badge-warning', label: 'Partially verified' },
+                        verified: { icon: 'check_circle', badge: 'badge-success', label: 'Verified by sources' },
+                        denied: { icon: 'cancel', badge: 'badge-error', label: 'Denied by sources' },
+                        unconfirmed: { icon: 'help', badge: 'badge-neutral', label: 'Unconfirmed' },
+                        conflicting: { icon: 'warning', badge: 'badge-warning', label: 'Conflicting reports' },
                     };
-                    const statusLabels = {
-                        searching: 'Searching sources...',
-                        partially_verified: 'Partially verified',
-                        verified: 'Verified by multiple sources',
-                        denied: 'Denied by sources',
-                        unconfirmed: 'No confirmation found',
-                        conflicting: 'Conflicting reports',
-                    };
-                    const sourceStatusIcons = {
-                        checking: 'hourglass_top',
-                        confirmed: 'check_circle',
-                        denied: 'cancel',
-                        not_yet_reported: 'schedule',
-                        no_info: 'remove_circle_outline',
-                    };
-                    const sourceStatusLabels = {
-                        checking: 'Checking...',
-                        confirmed: 'Confirms',
-                        denied: 'Denies',
-                        not_yet_reported: 'Not yet reported',
-                        no_info: 'No info found',
+                    const sc = statusConfig[vStatus] || statusConfig.searching;
+                    const sourceIcons = {
+                        checking: { icon: 'hourglass_top', cls: 'text-base-content/30' },
+                        confirmed: { icon: 'check_circle', cls: 'text-success' },
+                        denied: { icon: 'cancel', cls: 'text-error' },
+                        not_yet_reported: { icon: 'schedule', cls: 'text-base-content/40' },
+                        no_info: { icon: 'remove_circle_outline', cls: 'text-base-content/30' },
                     };
 
-                    return `<div class="card-inner">
-                        <div class="verify-header">
-                            <div class="verify-icon ${esc(vStatus)}">
-                                <span class="material-symbols-rounded">${statusIcons[vStatus] || 'search'}</span>
-                            </div>
-                            <div class="verify-status-text">
-                                <span class="verify-status-label ${esc(vStatus)}">${statusLabels[vStatus] || 'Checking'}</span>
-                            </div>
+                    return `<div class="p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            ${isSearching ? `<span class="loading loading-ring loading-md text-primary"></span>` : `<span class="material-symbols-rounded ${sc.badge.replace('badge-','')==='success'?'text-success':sc.badge.replace('badge-','')==='error'?'text-error':'text-warning'}" style="font-size:24px;font-variation-settings:'FILL' 1">${sc.icon}</span>`}
+                            <span class="badge ${sc.badge} badge-sm font-bold">${esc(sc.label)}</span>
                         </div>
-                        ${isSearching ? `<div class="verify-searching-bar"><div class="verify-searching-bar-fill"></div></div>` : ''}
-                        <div class="verify-claim">${linkify(d.claim || '')}</div>
-                        <div class="verify-sources">
+                        ${isSearching ? `<div class="w-full bg-base-300 rounded-full h-1 mb-3 overflow-hidden"><div class="h-1 bg-primary rounded-full animate-pulse" style="width:60%"></div></div>` : ''}
+                        <p class="text-sm italic text-base-content/70 mb-3 leading-relaxed">${linkify(d.claim || '')}</p>
+                        <div class="space-y-2">
                             ${(d.sources || []).map(src => {
                                 const sObj = typeof src === 'object' ? src : { name: String(src), status: 'checking' };
                                 const sStatus = sObj.status || 'checking';
+                                const si = sourceIcons[sStatus] || sourceIcons.checking;
                                 const hasUrl = sObj.url && typeof sObj.url === 'string' && sObj.url.startsWith('http');
-                                return `<div class="verify-source">
-                                    <div class="verify-source-status ${esc(sStatus)}">
-                                        <span class="material-symbols-rounded">${sourceStatusIcons[sStatus] || 'hourglass_top'}</span>
-                                    </div>
-                                    <div>
-                                        <div class="verify-source-name">${esc(sObj.name || 'Source')}</div>
-                                        ${sObj.snippet ? `<div class="verify-source-snippet">${linkify(sObj.snippet)}</div>` : `<div class="verify-source-snippet" style="color:var(--text-muted);font-style:italic">${sourceStatusLabels[sStatus] || 'Checking...'}</div>`}
-                                        ${hasUrl ? `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="verify-source-link">${esc(new URL(sObj.url).hostname)}</a>` : ''}
+                                return `<div class="flex items-start gap-2.5 p-2 rounded-lg bg-base-300/50">
+                                    <span class="material-symbols-rounded ${si.cls} mt-0.5" style="font-size:18px;font-variation-settings:'FILL' 1">${si.icon}</span>
+                                    <div class="min-w-0 flex-1">
+                                        <div class="font-semibold text-sm">${esc(sObj.name || 'Source')}</div>
+                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
+                                        ${hasUrl ? `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>` : ''}
                                     </div>
                                 </div>`;
                             }).join('')}
                         </div>
-                        ${d.summary ? `<div class="verify-summary">${linkify(d.summary)}</div>` : ''}
-                        ${d.lastChecked ? `<div class="verify-last-checked">Last checked: ${esc(d.lastChecked)}</div>` : ''}
+                        ${d.summary ? `<div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300 rounded-lg leading-relaxed">${linkify(d.summary)}</div>` : ''}
+                        ${d.lastChecked ? `<div class="text-xs text-base-content/30 mt-2">Last checked: ${esc(d.lastChecked)}</div>` : ''}
+                    </div>`;
+                }
+
+                case 'chat_card':
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Conversation')}</h3>
+                        <div class="space-y-1">
+                        ${(d.messages || []).map(msg => {
+                            const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
+                            const isUser = mObj.isUser;
+                            return `<div class="chat ${isUser ? 'chat-end' : 'chat-start'}">
+                                <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${mObj.time ? `<time>${esc(mObj.time)}</time>` : ''}</div>
+                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || '')}</div>
+                            </div>`;
+                        }).join('')}
+                        </div>
+                    </div>`;
+
+                case 'map_card': {
+                    const hasMapImage = d.mapImageUrl && typeof d.mapImageUrl === 'string' && d.mapImageUrl.startsWith('http');
+                    const mapsLink = d.mapUrl || (d.name ? `https://maps.google.com/?q=${encodeURIComponent(d.name)}` : '');
+                    return `${hasMapImage ? `<figure><img class="w-full h-40 object-cover" src="${esc(d.mapImageUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></figure>` : ''}
+                    <div class="p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="material-symbols-rounded text-primary" style="font-size:20px">map</span>
+                            <span class="font-bold text-sm">${esc(d.name || 'Location')}</span>
+                        </div>
+                        ${d.context ? `<p class="text-xs text-base-content/50">${linkify(d.context)}</p>` : ''}
+                        ${mapsLink ? `<a href="${esc(mapsLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Open in Maps</a>` : ''}
+                    </div>`;
+                }
+
+                case 'order_card':
+                    return `<div class="p-4">
+                        <div class="flex items-center gap-2 mb-3">
+                            ${d.emoji ? `<span class="text-xl">${esc(d.emoji)}</span>` : ''}
+                            <h3 class="font-bold text-sm text-white">${esc(d.title || 'Order')}</h3>
+                            ${d.status ? `<span class="badge badge-sm badge-success">${esc(d.status)}</span>` : ''}
+                        </div>
+                        <div class="divide-y divide-base-300">
+                        ${(d.items || []).map(item => {
+                            const iObj = typeof item === 'object' ? item : { name: String(item) };
+                            return `<div class="flex items-center justify-between py-2 text-sm">
+                                <span>${iObj.quantity ? `<span class="text-base-content/40">${iObj.quantity}× </span>` : ''}${esc(iObj.name || '')}</span>
+                                ${iObj.price ? `<span class="font-mono font-medium">${esc(iObj.price)}</span>` : ''}
+                            </div>`;
+                        }).join('')}
+                        </div>
+                        ${d.total ? `<div class="flex justify-between items-center pt-3 mt-1 border-t-2 border-base-300">
+                            <span class="font-bold text-sm">Total</span>
+                            <span class="font-extrabold text-lg text-primary">${esc(d.total)}</span>
+                        </div>` : ''}
+                        ${d.deliveryTime ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded" style="font-size:14px">schedule</span> ${esc(d.deliveryTime)}</div>` : ''}
+                    </div>`;
+
+                case 'stats_grid_card':
+                    return `<div class="p-4">
+                        ${d.title ? `<h3 class="font-bold text-sm text-white mb-3">${esc(d.title)}</h3>` : ''}
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        ${(d.stats || []).map(s => {
+                            const sObj = typeof s === 'object' ? s : { label: String(s), value: '' };
+                            return `<div class="stat p-3 bg-base-300 rounded-xl">
+                                ${sObj.emoji ? `<div class="stat-figure text-lg">${esc(sObj.emoji)}</div>` : ''}
+                                <div class="stat-title text-xs">${esc(sObj.label || '')}</div>
+                                <div class="stat-value text-lg text-primary">${esc(sObj.value || '—')}</div>
+                                ${sObj.trend ? `<div class="stat-desc"><span class="badge badge-xs ${sObj.trend === 'up' ? 'badge-success' : sObj.trend === 'down' ? 'badge-error' : 'badge-info'}">${sObj.trend}</span></div>` : ''}
+                            </div>`;
+                        }).join('')}
+                        </div>
+                    </div>`;
+
+                case 'gallery_card':
+                    return `<div class="p-4">
+                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Gallery')}</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                        ${(d.images || []).slice(0, 6).map(img => {
+                            const iObj = typeof img === 'object' ? img : { url: String(img) };
+                            return `<figure class="rounded-xl overflow-hidden aspect-video bg-base-300">
+                                <img src="${esc(iObj.url || '')}" alt="${esc(iObj.caption || '')}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
+                            </figure>`;
+                        }).join('')}
+                        </div>
+                    </div>`;
+
+                case 'source_card': {
+                    const credColors = { high: 'badge-success', medium: 'badge-warning', low: 'badge-error', unknown: 'badge-ghost' };
+                    const hasSourceImg = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
+                    return `<div class="p-4">
+                        <div class="flex items-center gap-3">
+                            ${hasSourceImg ? `<div class="avatar"><div class="w-10 h-10 rounded-full"><img src="${esc(d.imageUrl)}" alt="" loading="lazy"></div></div>` : `<div class="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center"><span class="material-symbols-rounded text-base-content/40" style="font-size:20px">source</span></div>`}
+                            <div class="min-w-0 flex-1">
+                                <div class="font-bold text-sm">${d.profileUrl ? renderLink(d.profileUrl, d.name || 'Source') : esc(d.name || 'Source')}</div>
+                                ${d.type ? `<div class="text-xs text-base-content/40">${esc(d.type)}</div>` : ''}
+                            </div>
+                            ${d.credibility ? `<span class="badge badge-sm ${credColors[d.credibility] || 'badge-ghost'}">${esc(d.credibility)}</span>` : ''}
+                        </div>
+                        ${d.context ? `<p class="text-sm text-base-content/60 mt-2">${linkify(d.context)}</p>` : ''}
+                        ${d.followers ? `<div class="text-xs text-base-content/40 mt-1">${esc(d.followers)} followers</div>` : ''}
                     </div>`;
                 }
 
                 default:
-                    return `<div class="card-inner">
-                        ${getCardTypeLabel(cardType)}
+                    return `<div class="p-4">
+                        <div class="text-xs font-bold uppercase tracking-wider text-base-content/30 mb-2">${esc(cardType.replace(/_/g, ' '))}</div>
                         ${Object.entries(d).filter(([k]) => !k.startsWith('_')).map(([key, val]) => {
                             if (val === null || val === undefined) return '';
                             if (Array.isArray(val)) {
-                                return `<div style="margin-bottom:5px">
-                                    <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                    ${val.slice(0, 5).map(v => `<div style="font-size:0.72rem;color:var(--text);padding:2px 0 2px 8px;border-left:2px solid var(--border)">${renderItemValue(v)}</div>`).join('')}
+                                return `<div class="mb-2">
+                                    <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
+                                    ${val.slice(0, 5).map(v => `<div class="text-sm pl-3 border-l-2 border-base-300 py-0.5">${renderItemValue(v)}</div>`).join('')}
                                 </div>`;
                             }
                             if (typeof val === 'object') {
-                                return `<div style="margin-bottom:5px">
-                                    <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                    <div style="font-size:0.72rem;color:var(--text)">${renderItemValue(val)}</div>
+                                return `<div class="mb-2">
+                                    <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
+                                    <div class="text-sm">${renderItemValue(val)}</div>
                                 </div>`;
                             }
-                            return `<div style="margin-bottom:5px">
-                                <div style="font-size:0.62rem;font-weight:700;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.08em">${esc(key.replace(/_/g, ' '))}</div>
-                                <div style="font-size:0.72rem;color:var(--text)">${linkify(val)}</div>
+                            return `<div class="mb-2">
+                                <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
+                                <div class="text-sm">${linkify(val)}</div>
                             </div>`;
                         }).join('')}
                     </div>`;
@@ -4209,7 +4255,7 @@
             errorState.classList.remove('active');
             cardGrid.innerHTML = '';
             cardGrid.classList.remove('single-card');
-            contentAnalysisEl.style.display = 'none';
+            /* removed: intent line */ /* contentAnalysisEl.style.display = 'none'; */
             followUpSection.style.display = 'none';
             followUpList.innerHTML = '';
             layoutProgress.style.display = '';
