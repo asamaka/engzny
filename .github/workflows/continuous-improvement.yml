@@ -2,7 +2,7 @@ name: 🔄 Continuous Improvement Agent
 
 # Triggered by repository_dispatch from the Vercel runtime when a pipeline
 # report meets trigger criteria (error, slow, periodic).
-# The CURSOR_API_KEY stays here in GitHub Secrets — never in Vercel.
+# The Cursor API key (FIX_IT secret) stays here in GitHub Secrets — never in Vercel.
 
 on:
   repository_dispatch:
@@ -34,8 +34,8 @@ jobs:
 
       - name: 🔑 Verify secrets
         run: |
-          if [ -z "${{ secrets.CURSOR_API_KEY }}" ]; then
-            echo "::error::CURSOR_API_KEY secret not configured"
+          if [ -z "${{ secrets.FIX_IT }}" ]; then
+            echo "::error::FIX_IT secret (Cursor API key) not configured"
             exit 1
           fi
 
@@ -129,7 +129,7 @@ jobs:
           PROMPT_JSON=$(echo "$PROMPT" | jq -Rs .)
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.cursor.com/v0/agents" \
-            -H "Authorization: Bearer ${{ secrets.CURSOR_API_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.FIX_IT }}" \
             -H "Content-Type: application/json" \
             -d "{
               \"prompt\": { \"text\": $PROMPT_JSON },

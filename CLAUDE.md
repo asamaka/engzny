@@ -221,7 +221,7 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 - **Vercel env vars:** ANTHROPIC_API_KEY, DEBUG_TOKEN (optional, defaults to `thinx-debug-2026`), REPORT_PIN (optional, defaults to `0427`)
 - **Vercel env vars (for persistent logs):** UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
 - **Vercel env vars (for continuous improvement):** GITHUB_DISPATCH_TOKEN (fine-grained PAT), IMPROVEMENT_ENABLED (`true` to enable)
-- **GitHub Secrets (for continuous improvement):** CURSOR_API_KEY (Cursor API key — never stored in Vercel)
+- **GitHub Secrets (for continuous improvement):** FIX_IT (Cursor API key — never stored in Vercel)
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
 
 ## Continuous Improvement
@@ -241,7 +241,7 @@ Vercel runtime (processes untrusted user uploads)
   ▼
 GitHub Actions (trusted CI environment)
   │
-  │  Has: CURSOR_API_KEY (from GitHub Secrets, only exposed during workflow runs)
+  │  Has: FIX_IT (Cursor API key, from GitHub Secrets, only exposed during workflow runs)
   │
   ▼
 Cursor Cloud Agent API → spawns agent → agent pushes to cursor/* → auto-deploy
@@ -289,7 +289,7 @@ auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
 
 | Secret | Description |
 |--------|-------------|
-| `CURSOR_API_KEY` | Cursor API key from cursor.com/dashboard → Integrations |
+| `FIX_IT` | Cursor API key from cursor.com/dashboard → Integrations |
 
 ### Setup
 
@@ -300,7 +300,7 @@ auto-deploy-production.yml → Tests → Merge to main → Vercel deploy
 
 2. **Add the PAT to Vercel** as `GITHUB_DISPATCH_TOKEN`
 
-3. **Add Cursor API key to GitHub** as a repository secret named `CURSOR_API_KEY`:
+3. **Add Cursor API key to GitHub** as a repository secret named `FIX_IT`:
    - Get it from [cursor.com/dashboard](https://cursor.com/dashboard) → Integrations
    - This key stays in GitHub — the Vercel runtime never sees it
 
