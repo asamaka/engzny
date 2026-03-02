@@ -2463,7 +2463,7 @@
                             ${d.category ? `<span class="badge badge-xs badge-outline">${esc(d.category)}</span>` : ''}
                         </div>
                         <p class="text-sm leading-relaxed">${linkify(d.fact || '')}</p>
-                        ${d.sourceUrl ? `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>` : ''}
+                        ${d.sourceUrl && d.sourceUrl.startsWith('http') ? (() => { try { return `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>`; } catch(e) { return ''; } })() : ''}
                     </div>`;
                 }
 
@@ -2505,7 +2505,7 @@
                                     <div class="min-w-0 flex-1">
                                         <div class="font-semibold text-sm">${esc(sObj.name || 'Source')}</div>
                                         ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
-                                        ${hasUrl ? `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>` : ''}
+                                        ${hasUrl ? (() => { try { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>`; } catch(e) { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">source</a>`; } })() : ''}
                                     </div>
                                 </div>`;
                             }).join('')}
