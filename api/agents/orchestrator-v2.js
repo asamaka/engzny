@@ -84,6 +84,83 @@ function computeVerificationStatus(sources) {
 }
 
 /**
+ * Programmatically apply research findings to populated cards.
+ * Matches findings to cards by keyword overlap and adds sourceUrls,
+ * context, and other enrichment data — without an LLM call.
+ * Returns the number of cards enriched.
+ */
+function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) {
+  if (!researchFindings || researchFindings.length === 0) return 0;
+  let enrichCount = 0;
+
+  for (const [cardId, card] of currentCards) {
+    if (card.cardType === 'verification_card') continue;
+    const cardData = card.populatedData || card.data || {};
+    if (!cardData || Object.keys(cardData).length === 0) continue;
+
+    const cardText = `${cardData.title || ''} ${cardData.name || ''} ${cardData.headline || ''} ${cardData.claim || ''} ${cardData.label || ''} ${cardData.fact || ''}`.toLowerCase();
+    if (!cardText.trim()) continue;
+
+    const matchedFinding = researchFindings.find(f => {
+      const fText = `${f.topic || ''} ${f.summary || ''}`.toLowerCase();
+      return fText.split(/\s+/).some(w => w.length > 3 && cardText.includes(w));
+    });
+
+    if (!matchedFinding) continue;
+
+    const updates = {};
+    let changed = false;
+
+    if (matchedFinding.sourceUrls && matchedFinding.sourceUrls.length > 0) {
+      if (!cardData.url && !cardData.sourceUrl) {
+        if (card.cardType === 'fact_check' || card.cardType === 'quote_card' || card.cardType === 'did_you_know_card') {
+          updates.sourceUrl = matchedFinding.sourceUrls[0];
+        } else {
+          updates.url = matchedFinding.sourceUrls[0];
+        }
+        changed = true;
+      }
+    }
+
+    if (matchedFinding.factCheck && card.cardType === 'fact_check') {
+      if (matchedFinding.factCheck.verdict && cardData.verdict !== matchedFinding.factCheck.verdict) {
+        updates.verdict = matchedFinding.factCheck.verdict;
+        changed = true;
+      }
+      if (matchedFinding.factCheck.explanation && !cardData.explanation) {
+        updates.explanation = matchedFinding.factCheck.explanation.slice(0, 150);
+        changed = true;
+      }
+    }
+
+    if (matchedFinding.summary && !cardData.relatedContext && card.cardType === 'news_card') {
+      updates.relatedContext = matchedFinding.summary.slice(0, 150);
+      changed = true;
+    }
+
+    if (changed) {
+      const mergedData = { ...cardData, ...updates };
+      card.populatedData = mergedData;
+      card.data = mergedData;
+      currentCards.set(cardId, card);
+      enrichCount++;
+
+      if (onCardUpdate) {
+        onCardUpdate({
+          cardId,
+          cardType: card.cardType,
+          data: updates,
+          reason: 'Research URL/context enrichment',
+          source: 'research-enrich',
+        });
+      }
+    }
+  }
+
+  return enrichCount;
+}
+
+/**
  * Run the progressive enhancement pipeline with SSE callbacks.
  *
  * Callback contract (all optional):
@@ -448,8 +525,8 @@ async function runPipeline({
     }
 
     // =====================================================
-    // Phase 3: Sonnet Review (with research data)
-    // Runs if we got research findings OR if cards are still unpopulated
+    // Phase 3: Review — LLM only if cards need population,
+    // otherwise apply research data programmatically
     // =====================================================
     const hasResearchFindings = researchResult.findings && researchResult.findings.length > 0;
     const unpopulatedCards = Array.from(currentCards.values()).filter(c => {
@@ -464,20 +541,21 @@ async function runPipeline({
       });
     }
 
-    if (hasResearchFindings || hasUnpopulatedCards) {
+    if (hasUnpopulatedCards) {
+      // Full LLM review — unpopulated cards need the model to generate content
       if (onPhase) {
-        onPhase({ phase: 'reviewing', message: hasUnpopulatedCards ? 'Populating remaining cards...' : 'Reviewing with research findings...' });
+        onPhase({ phase: 'reviewing', message: 'Populating remaining cards...' });
       }
 
       if (onProgress) {
         onProgress({
           phase: 'reviewing',
           progress: 70,
-          message: hasUnpopulatedCards ? 'Populating remaining cards...' : 'Incorporating research findings...',
+          message: 'Populating remaining cards...',
         });
       }
 
-      logger.info('Orchestrator', 'Phase 3: Review', {
+      logger.info('Orchestrator', 'Phase 3: LLM Review (unpopulated cards)', {
         findings: researchResult.findings?.length || 0,
         unpopulated: unpopulatedCards.length,
       });
@@ -563,8 +641,19 @@ async function runPipeline({
         return { actions: [], duration: 0 };
       });
 
-      logger.info('Orchestrator', 'Phase 3 complete', {
+      logger.info('Orchestrator', 'Phase 3 complete (LLM)', {
         reviewActions: reviewResult.actions?.length || 0,
+      });
+    } else if (hasResearchFindings) {
+      // All cards populated — apply research URLs/context programmatically (no LLM)
+      const enrichCount = applyResearchToCards({
+        currentCards,
+        researchFindings: researchResult.findings,
+        onCardUpdate,
+      });
+      logger.info('Orchestrator', 'Phase 3: Programmatic research enrichment (skipped LLM)', {
+        findings: researchResult.findings.length,
+        cardsEnriched: enrichCount,
       });
     } else {
       logger.info('Orchestrator', 'Skipping Phase 3 (no research findings, all cards populated)');
