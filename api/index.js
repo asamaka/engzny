@@ -2906,6 +2906,7 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
 
 function buildCardViewHtml(cardHtml, clientState) {
   const vw = clientState?.viewport?.width || 390;
+  const theme = clientState?.layout?.theme || clientState?.theme || 'night';
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -2913,15 +2914,9 @@ function buildCardViewHtml(cardHtml, clientState) {
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><\/script>
-<style>
-[data-theme="thinx"]{color-scheme:dark;--color-base-100:oklch(7% 0.01 260);--color-base-200:oklch(13% 0.015 260);--color-base-300:oklch(18% 0.02 260);--color-base-content:oklch(93% 0.01 260);--color-primary:oklch(64% 0.17 260);--color-primary-content:oklch(100% 0 0);--color-secondary:oklch(64% 0.19 300);--color-accent:oklch(78% 0.17 160);--color-neutral:oklch(15% 0.015 260)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0d12;font-family:Inter,system-ui,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased;width:${vw}px;overflow-x:hidden}
-.card-grid{display:grid;grid-template-columns:1fr;gap:10px;padding:12px 16px}
-.card{background:#12151c;border:1px solid #1a1f2e;border-radius:16px;overflow:hidden;padding:14px}
-.card.span-full,.card.span-2{grid-column:1/-1}
-.material-symbols-rounded{font-family:"Material Symbols Rounded";font-style:normal;font-weight:400;display:inline-block;line-height:1;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}
-</style></head><body data-theme="thinx">${cardHtml}</body></html>`;
+</head><body data-theme="${theme}" class="bg-base-100 text-base-content min-h-screen">
+<div class="mx-auto" style="max-width:${vw}px">${cardHtml}</div>
+</body></html>`;
 }
 
 app.get('/api/r/:requestId/render', requirePin, async (req, res) => {

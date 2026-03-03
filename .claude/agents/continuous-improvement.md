@@ -85,6 +85,19 @@ Follow this sequence strictly. Do NOT spend more than 20% of your time on steps 
 - **Performance** — only if no higher-priority fix exists in another area
 - **Backlog** — incomplete items from previous agents
 
+**Objective Hub UI Quality Rubric (mandatory every run):**
+1. Inspect at least one recent report via `/r/:requestId` and `/api/r/:requestId/client-state`.
+2. Mark each criterion pass/fail:
+   - Component consistency (Daisy-style primitives vs ad-hoc styling)
+   - Hub cohesion (spacing/gutters/typography hierarchy)
+   - Card integrity (no clipped/overflowing cards in diagnostics)
+   - Population integrity (no silent partial hub population)
+   - Mobile readability (phone viewport not edge-cramped)
+3. Classification:
+   - **UI P0** if component consistency fails OR 2+ criteria fail
+   - **UI P1** if exactly 1 criterion fails
+4. If UI P0/P1 is detected, backlog update MUST include requestId evidence + failed criteria.
+
 **Priority order:**
 1. **Incomplete backlog items** — continue work from previous agents
 2. **P0 — Broken** — errors, crashes, failed pipelines, completely broken UI
@@ -124,6 +137,7 @@ npm test
 - Set "Last Run" to your run details
 - Mark any items you fixed as `[x]`
 - Add any new items you discovered
+- If UI rubric flagged P0/P1, add/update a dedicated P0/P1 backlog item with requestId + failed criteria
 - Include the backlog update in your commit
 
 Push to your branch — CI handles the rest.
@@ -152,6 +166,7 @@ This rule exists because previous agents repeatedly fixed pipeline performance w
 5. **Performance** — pipeline durations, slow phases, timeout patterns
 6. **Backlog** — check for incomplete work from previous agents
 7. **Report data** — read the trigger report for anything notable (partial cards, bad layouts, errors)
+8. **Run objective UI rubric** — classify UI P0/P1 using the required criteria and capture evidence.
 
 ### By Trigger Type (additional context, not a directive)
 
@@ -221,6 +236,7 @@ JSON. Added extraction logic to strip markdown fences before parsing.
 - **Duplicating recent work** — always check `git log` to see what recent agents changed.
 - **Trigger tunnel vision** — fixing ONLY what the trigger says without evaluating other areas. The trigger is context, not a directive. If the trigger says `slow_pipeline` but the dashboard shows broken cards, fix the cards.
 - **Repeated same-area fixes** — if the last 3+ commits were `fix(pipeline)`, making another pipeline fix is almost certainly wrong. Look at UI, error handling, card coverage, output quality.
+- **Subjective-only UI calls** — always run the objective hub UI rubric and cite requestId evidence for UI P0/P1.
 - **Broad codebase surveys** — you don't need to read every file. Go directly to the code that needs changing.
 - **Spending >50% of your time reading** — investigation is a means to an end. The end is shipping code.
 - **Choosing a P3 improvement when P0/P1 issues exist** — always fix the most impactful thing first.

@@ -96,6 +96,17 @@ jobs:
              - **Output quality** — Is the LLM producing good card content? Are verification cards properly resolved? Are images/URLs being populated?
              - **Performance** — Only if there isn't a higher-priority fix in another area. Check if recent agents already addressed this.
              - **Backlog items** — Continue incomplete work from previous runs
+          5.1 **Run the Objective Hub UI Quality Rubric** for at least one fresh report before deciding:
+             - Check `/api/r/search` and open a recent report (`/r/:requestId`) plus `/api/r/:requestId/client-state`.
+             - Score each criterion pass/fail:
+               1) **Component consistency:** cards, badges, progress, and alerts use Daisy-style component primitives (not ad-hoc styling).
+               2) **Hub cohesion:** card spacing/gutters/typography are visually consistent and look like a modern card hub.
+               3) **Card integrity:** no clipped/overflowing card content in client-state diagnostics.
+               4) **Population integrity:** populated card ratio should match pipeline expectation (no silent partially-populated hubs).
+               5) **Mobile readability:** at phone viewport widths, card content remains legible and not edge-cramped.
+             - If 2+ criteria fail OR component consistency fails, treat as **UI P0**.
+             - If exactly 1 criterion fails (and the hub still works), treat as **UI P1**.
+             - You MUST record objective evidence (requestId + failed criteria) in backlog updates.
           6. **Pick the highest-value fix using this priority:**
              - P0 (broken): errors, crashes, failed pipelines, completely broken UI → fix first
              - P1 (degraded): partial card coverage, bad results, UI rendering glitches → fix second
@@ -113,6 +124,7 @@ jobs:
              - Update "Last Run" with date, trigger reason, and what you changed
              - Mark completed items with [x]
              - Add any new observations or work items you discovered
+             - If UI rubric flagged P0/P1, create or update a dedicated backlog item with failed criteria and report ID evidence
              - Remove stale items that are no longer relevant
           10. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body. Make sure the backlog update is included in the commit.
 
@@ -121,6 +133,8 @@ jobs:
           - You MUST commit and push code. An invocation without a code change is a wasted invocation.
           - You MUST read and update `.cursor/improvement-backlog.md` every run.
           - The trigger reason is CONTEXT — you must evaluate all areas before deciding what to fix.
+          - You MUST run the objective Hub UI Quality Rubric every run and log evidence.
+          - If the rubric flags UI P0/P1, you MUST create/update backlog P0/P1 item before finishing.
           - If the last 3+ agent commits were all in the same area (e.g., pipeline performance), you MUST choose a different area unless there's a P0 issue.
           - Never change test expectations to make tests pass — fix the actual code.
           - Never modify environment variables, secrets, or deployment workflows.

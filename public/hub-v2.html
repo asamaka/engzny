@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="thinx">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -13,988 +13,99 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
-    <style>
-      /* Custom thinx dark theme — overrides DaisyUI dark theme with our palette */
-      [data-theme="thinx"] {
-        color-scheme: dark;
-        --color-base-100: oklch(7% 0.01 260);
-        --color-base-200: oklch(13% 0.015 260);
-        --color-base-300: oklch(18% 0.02 260);
-        --color-base-content: oklch(93% 0.01 260);
-        --color-primary: oklch(64% 0.17 260);
-        --color-primary-content: oklch(100% 0 0);
-        --color-secondary: oklch(64% 0.19 300);
-        --color-secondary-content: oklch(100% 0 0);
-        --color-accent: oklch(78% 0.17 160);
-        --color-accent-content: oklch(0% 0 0);
-        --color-neutral: oklch(15% 0.015 260);
-        --color-neutral-content: oklch(63% 0.03 260);
-        --color-info: oklch(64% 0.17 260);
-        --color-info-content: oklch(100% 0 0);
-        --color-success: oklch(78% 0.17 160);
-        --color-success-content: oklch(0% 0 0);
-        --color-warning: oklch(84% 0.16 85);
-        --color-warning-content: oklch(0% 0 0);
-        --color-error: oklch(67% 0.19 20);
-        --color-error-content: oklch(100% 0 0);
-        --radius-selector: 0.5rem;
-        --radius-field: 0.5rem;
-        --radius-box: 1rem;
-        --size-selector: 0.25rem;
-        --size-field: 0.25rem;
-        --border: 1px;
-        --depth: 1;
-        --noise: 0;
-      }
-    </style>
-    <style>
-        /* Reset must be in @layer base so it doesn't override DaisyUI/Tailwind
-           layered styles. Unlayered * { padding: 0 } beats @layer components
-           and @layer utilities, which strips all DaisyUI component padding. */
-        @layer base {
-            *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-        }
-
-        :root {
-            --bg: #08090d;
-            --bg-raised: #0d0f14;
-            --surface: #12151c;
-            --surface-2: #181c26;
-            --surface-3: #1f2533;
-            --surface-bright: #283040;
-            --border: #1a1f2e;
-            --border-bright: #252d40;
-            --text: #e4e8f0;
-            --text-secondary: #8892a6;
-            --text-muted: #545e72;
-            --accent: #5b8af5;
-            --accent-dim: #3b6ad5;
-            --accent-bg: rgba(91,138,245,0.10);
-            --accent-bg-strong: rgba(91,138,245,0.18);
-            --green: #4cd68a;
-            --green-bg: rgba(76,214,138,0.12);
-            --green-dim: #2a8a50;
-            --red: #f06060;
-            --red-bg: rgba(240,96,96,0.12);
-            --yellow: #f0c040;
-            --yellow-bg: rgba(240,192,64,0.10);
-            --purple: #a07ef0;
-            --purple-bg: rgba(160,126,240,0.10);
-            --orange: #f09040;
-            --orange-bg: rgba(240,144,64,0.10);
-            --radius-sm: 10px;
-            --radius-md: 14px;
-            --radius-lg: 18px;
-            --radius-xl: 24px;
-            --radius-pill: 100px;
-            --shadow-sm: 0 2px 8px rgba(0,0,0,0.3);
-            --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
-            --shadow-lg: 0 8px 32px rgba(0,0,0,0.5);
-            --glass: rgba(18,21,28,0.75);
-            --glass-border: rgba(255,255,255,0.06);
-        }
-
-        html, body { height: 100%; }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .material-symbols-rounded {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-
-        /* === PASTE STATE === */
-        #pasteState {
-            position: fixed;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 200;
-            background: var(--bg);
-            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        #pasteState.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .paste-zone {
-            width: 260px;
-            height: 260px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 14px;
-            border: 2px dashed var(--border-bright);
-            border-radius: var(--radius-xl);
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            background: var(--surface);
-        }
-
-        .paste-zone:hover, .paste-zone:active {
-            border-color: var(--accent);
-            background: var(--accent-bg);
-            transform: scale(1.02);
-            box-shadow: 0 0 30px rgba(91,138,245,0.12);
-        }
-
-        .paste-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--accent-bg-strong);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-
-        .paste-icon .material-symbols-rounded {
-            font-size: 30px;
-            color: var(--accent);
-        }
-
-        .paste-zone:hover .paste-icon {
-            background: var(--accent);
-        }
-
-        .paste-zone:hover .paste-icon .material-symbols-rounded {
-            color: #fff;
-        }
-
-        .paste-text {
-            font-size: 0.92rem;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .paste-hint {
-            margin-top: 1.5rem;
-            font-size: 0.78rem;
-            color: var(--text-muted);
-        }
-
-        /* === ACTION BUTTONS === */
-        .action-buttons {
-            margin-top: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-            width: 100%;
-            max-width: 260px;
-        }
-
-        .action-btn {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 20px;
-            border-radius: var(--radius-md);
-            font-size: 0.88rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            border: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .action-btn .material-symbols-rounded { font-size: 20px; }
-
-        .action-btn--demo {
-            background: var(--surface);
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-        }
-
-        .action-btn--demo:hover, .action-btn--demo:active {
-            border-color: var(--accent-dim);
-            background: var(--accent-bg);
-            color: var(--accent);
-        }
-
-        .action-btn--demo:active { transform: scale(0.97); }
-
-        .action-btn--demo.loading {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-
-        .action-btn--upload {
-            background: transparent;
-            color: var(--text-muted);
-            font-weight: 500;
-            font-size: 0.82rem;
-        }
-
-        .action-btn--upload:hover, .action-btn--upload:active {
-            color: var(--accent);
-        }
-
-        .action-btn--upload:active { transform: scale(0.97); }
-
-        #photoInput { display: none; }
-
-        /* === MAIN CANVAS === */
-        #mainCanvas {
-            position: relative;
-            min-height: 100vh;
-            width: 100%;
-            display: none;
-        }
-
-        #mainCanvas.active { display: block; }
-
-        .screenshot-layer {
-            position: fixed;
-            inset: 0;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .screenshot-layer img {
-            max-width: 100%;
-            max-height: 70vh;
-            object-fit: contain;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-lg);
-            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .screenshot-layer.scanning img {
-            opacity: 0.35;
-            filter: brightness(0.7) blur(2px);
-        }
-
-        .screenshot-layer.fading { opacity: 0.06; }
-        .screenshot-layer.gone { opacity: 0; pointer-events: none; }
-
-        /* Progress overlay */
-        .progress-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 5;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.4s;
-        }
-
-        .progress-overlay.active { opacity: 1; }
-
-        .progress-ring {
-            width: 96px;
-            height: 96px;
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .progress-ring svg {
-            width: 96px;
-            height: 96px;
-            transform: rotate(-90deg);
-        }
-
-        .progress-ring-bg {
-            fill: none;
-            stroke: var(--surface-3);
-            stroke-width: 3;
-        }
-
-        .progress-ring-fill {
-            fill: none;
-            stroke: url(#progressGradient);
-            stroke-width: 3.5;
-            stroke-linecap: round;
-            stroke-dasharray: 283;
-            stroke-dashoffset: 283;
-            transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .progress-pct {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            font-weight: 800;
-            color: var(--text);
-            letter-spacing: -0.02em;
-        }
-
-        .progress-ring.complete .progress-ring-fill {
-            stroke: var(--green);
-            transition: stroke-dashoffset 0.3s ease-out, stroke 0.3s;
-        }
-
-        .progress-ring.complete .progress-pct { color: var(--green); }
-
-        .progress-label {
-            font-size: 0.82rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-            text-align: center;
-            max-width: 240px;
-            line-height: 1.4;
-        }
-
-        .progress-phase {
-            font-size: 0.68rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: var(--accent);
-            margin-bottom: 6px;
-        }
-
-        .progress-overlay.uploading .progress-phase { color: var(--accent); }
-        .progress-overlay.analyzing .progress-phase { color: var(--yellow); }
-        .progress-overlay.ready .progress-phase { color: var(--green); }
-
-        .progress-overlay.hiding {
-            opacity: 0;
-            transform: scale(0.9);
-            transition: opacity 0.4s, transform 0.4s;
-        }
-
-        /* === RESULTS OVERLAY === */
-        .results-overlay {
-            position: relative;
-            z-index: 10;
-            min-height: 100vh;
-            width: 100%;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            padding-bottom: 80px;
-        }
-
-        .results-overlay.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* === HEADER === */
-        .layout-header {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: rgba(8, 9, 13, 0.88);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border-bottom: 1px solid var(--glass-border);
-            padding: 10px 16px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .layout-header-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .layout-back {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            cursor: pointer;
-            font-family: inherit;
-            padding: 6px 8px;
-            border-radius: var(--radius-sm);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.2s ease;
-        }
-
-        .layout-back:hover {
-            color: var(--accent);
-            background: var(--accent-bg);
-        }
-
-        .layout-badge {
-            font-size: 0.62rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            padding: 4px 12px;
-            border-radius: var(--radius-pill);
-            background: var(--accent-bg-strong);
-            color: var(--accent);
-        }
-
-        .layout-progress {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .layout-progress-bar {
-            width: 80px;
-            height: 3px;
-            background: var(--surface-3);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .layout-progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), var(--purple));
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            width: 0%;
-        }
-
-        .layout-progress-text {
-            font-size: 0.65rem;
-            font-weight: 500;
-            color: var(--text-muted);
-        }
-
-        /* === CONTENT ANALYSIS === */
-        .content-analysis {
-            padding: 10px 16px 4px;
-        }
-
-        .content-analysis-intent {
-            font-size: 0.78rem;
-            font-weight: 400;
-            color: var(--text-secondary);
-            margin-bottom: 6px;
-            line-height: 1.45;
-        }
-
-        .content-analysis-intent:empty { display: none; }
-
-        /* top-questions moved to follow-up section at bottom */
-
-        /* === CARD GRID === */
-        .card-grid {
-            padding: 16px;
-            display: grid;
-            gap: 12px;
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        @media (min-width: 768px) {
-            .card-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 20px; }
-        }
-
-        @media (min-width: 1200px) {
-            .card-grid { grid-template-columns: repeat(4, 1fr); gap: 16px; }
-        }
-
-        .card-grid .span-full { grid-column: 1 / -1; }
-        .card-grid .span-2 { grid-column: span 2; }
-        @media (max-width: 480px) {
-            .card-grid .span-2 { grid-column: 1 / -1; }
-        }
-
-        .card-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
-        .card-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
-
-        .card-grid.single-card {
-            grid-template-columns: 1fr;
-            max-width: 520px;
-            margin: 0 auto;
-        }
-
-        /* === CARD BASE === */
-        .card {
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            position: relative;
-            opacity: 0;
-            transform: translateY(10px) scale(0.98);
-            transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                        transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-                        border-color 0.3s ease,
-                        box-shadow 0.3s ease;
-        }
-
-        .card.visible {
-            opacity: 1;
-            transform: translateY(0) scale(1);
-        }
-
-        .card:hover {
-            border-color: rgba(255,255,255,0.10);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-        }
-
-        .card.loading { min-height: 72px; }
-
-        .card.loading::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(90deg, transparent 0%, rgba(91,138,245,0.04) 30%, rgba(91,138,245,0.08) 50%, rgba(91,138,245,0.04) 70%, transparent 100%);
-            animation: shimmer 1.8s ease-in-out infinite;
-        }
-
-        .card.loading .placeholder-line {
-            animation: placeholderPulse 2s ease-in-out infinite;
-        }
-        .card.loading .placeholder-line:nth-child(2) { animation-delay: 0.15s; }
-        .card.loading .placeholder-line:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
-        }
-
-        @keyframes placeholderPulse {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.7; }
-        }
-
-        .card.loading.researching {
-            border-color: rgba(91,138,245,0.15);
-        }
-
-        .card.loading.researching::before {
-            content: '';
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
-            animation: researchDot 1s ease-in-out infinite;
-        }
-
-        @keyframes researchDot {
-            0%, 100% { opacity: 0.3; transform: scale(0.8); }
-            50% { opacity: 1; transform: scale(1.2); }
-        }
-
-        .skeleton-status {
-            font-size: 0.6rem;
-            color: var(--text-muted);
-            margin-top: 6px;
-            opacity: 0;
-            transition: opacity 0.4s;
-            font-style: italic;
-        }
-
-        .card.loading.researching .skeleton-status { opacity: 1; }
-
-        .web-citations {
-            margin: 0 16px 12px;
-            padding-top: 8px;
-            border-top: 1px solid var(--glass-border);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            flex-wrap: wrap;
-        }
-
-        .web-citations-label {
-            font-size: 0.56rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-
-        .web-citation-link {
-            font-size: 0.56rem;
-            color: var(--accent-dim);
-            text-decoration: none;
-            padding: 1px 5px;
-            border-radius: 4px;
-            background: var(--accent-bg);
-        }
-
-        .web-citation-link:hover {
-            color: var(--accent);
-            background: var(--accent-bg-strong);
-        }
-
-        .card.populated { animation: cardPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
-
-        @keyframes cardPop {
-            from { transform: scale(0.96); opacity: 0.7; }
-            60% { transform: scale(1.01); }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .card.just-populated {
-            border-color: rgba(91,138,245,0.25);
-            box-shadow: 0 0 24px rgba(91,138,245,0.1);
-        }
-
-        .card.card-updating {
-            animation: cardUpdate 0.5s ease-out;
-            border-color: rgba(240,192,64,0.3);
-            box-shadow: 0 0 16px rgba(240,192,64,0.1);
-        }
-
-        @keyframes cardUpdate {
-            0% { transform: scale(1); }
-            30% { transform: scale(0.98); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
-        }
-
-        .card.just-added {
-            animation: cardSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-            border-color: rgba(76,214,138,0.3);
-            box-shadow: 0 0 16px rgba(76,214,138,0.1);
-        }
-
-        @keyframes cardSlideIn {
-            from { transform: translateY(20px) scale(0.95); opacity: 0; }
-            60% { transform: translateY(-4px) scale(1.01); }
-            to { transform: translateY(0) scale(1); opacity: 1; }
-        }
-
-        .card-update-badge, .card-add-badge {
-            font-size: 0.52rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 2px 8px;
-            border-radius: 4px;
-            margin-top: 6px;
-            display: inline-block;
-            animation: badgeFadeIn 0.3s ease-out;
-        }
-
-        .card-update-badge { color: var(--yellow); background: var(--yellow-bg); }
-        .card-add-badge { color: var(--green); background: var(--green-bg); }
-
-        @keyframes badgeFadeIn {
-            from { opacity: 0; transform: translateY(-4px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .card.entering {
-            animation: cardEnter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-
-        @keyframes cardEnter {
-            from { opacity: 0; transform: translateY(14px) scale(0.95); }
-            60% { transform: translateY(-2px) scale(1.01); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .card .card-source-tag {
-            position: absolute;
-            top: 6px;
-            right: 6px;
-            font-size: 0.48rem;
-            font-weight: 700;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            padding: 2px 6px;
-            border-radius: 4px;
-            z-index: 2;
-            opacity: 0.7;
-            transition: opacity 0.5s;
-        }
-
-        .card .card-source-tag.source-haiku { background: var(--accent-bg); color: var(--accent); }
-        .card .card-source-tag.source-sonnet { background: var(--yellow-bg); color: var(--yellow); }
-        .card .card-source-tag.source-sonar { background: var(--green-bg); color: var(--green); }
-        .card .card-source-tag.source-review { background: var(--purple-bg); color: var(--purple); }
-
-        /* === CARD TYPES: now handled by DaisyUI/Tailwind inline classes === */
-
-        /* === FOLLOW-UP QUESTIONS — Interactive at bottom === */
-        .follow-up-section {
-            padding: 20px 16px 24px;
-        }
-
-        .follow-up-header {
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--text-muted);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .follow-up-header .material-symbols-rounded {
-            font-size: 14px;
-            color: var(--accent);
-        }
-
-        .follow-up-list {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .follow-up-item {
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            overflow: hidden;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        .follow-up-item:hover {
-            border-color: rgba(255,255,255,0.10);
-        }
-
-        .follow-up-question {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 14px;
-            cursor: pointer;
-            user-select: none;
-            transition: background 0.2s;
-        }
-
-        .follow-up-question:hover {
-            background: var(--surface-2);
-        }
-
-        .follow-up-question .fq-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: var(--accent-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            transition: transform 0.3s;
-        }
-
-        .follow-up-item.open .follow-up-question .fq-icon {
-            transform: rotate(45deg);
-            background: var(--accent-bg-strong);
-        }
-
-        .follow-up-question .fq-icon .material-symbols-rounded {
-            font-size: 14px;
-            color: var(--accent);
-        }
-
-        .follow-up-question .fq-text {
-            font-size: 0.78rem;
-            color: var(--text);
-            font-weight: 500;
-            line-height: 1.4;
-        }
-
-        .follow-up-answer {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s;
-            padding: 0 14px;
-        }
-
-        .follow-up-item.open .follow-up-answer {
-            max-height: 300px;
-            padding: 0 14px 14px;
-        }
-
-        .follow-up-answer-text {
-            font-size: 0.74rem;
-            color: var(--text-secondary);
-            line-height: 1.6;
-            padding: 10px 12px;
-            background: var(--surface-2);
-            border-radius: var(--radius-md);
-            border-left: 3px solid var(--accent);
-        }
-
-        /* === ERROR STATE === */
-        #errorState {
-            position: fixed;
-            inset: 0;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            z-index: 200;
-            background: var(--bg);
-            padding: 2rem;
-            text-align: center;
-        }
-
-        #errorState.active { display: flex; }
-
-        .error-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--red-bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .error-icon .material-symbols-rounded { font-size: 28px; color: var(--red); }
-
-        .error-text {
-            color: var(--red);
-            font-size: 0.88rem;
-            font-weight: 500;
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-
-        .retry-btn {
-            padding: 12px 32px;
-            background: var(--surface);
-            border: 1px solid var(--border-bright);
-            border-radius: var(--radius-pill);
-            color: var(--text);
-            font-family: inherit;
-            font-size: 0.82rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .retry-btn:hover {
-            background: var(--accent-bg);
-            border-color: var(--accent);
-            color: var(--accent);
-        }
-
-        /* === PLACEHOLDERS === */
-        .placeholder-line {
-            height: 10px;
-            background: var(--surface-2);
-            border-radius: var(--radius-sm);
-            margin-bottom: 6px;
-        }
-        .placeholder-line.short { width: 55%; }
-        .placeholder-line.medium { width: 78%; }
-
-        .loading-dots::after {
-            content: '';
-            animation: dots 1.5s steps(4) infinite;
-        }
-
-        @keyframes dots {
-            0% { content: ''; }
-            25% { content: '.'; }
-            50% { content: '..'; }
-            75% { content: '...'; }
-        }
-
-        .auto-link {
-            color: var(--accent);
-            text-decoration: none;
-            word-break: break-all;
-        }
-        .auto-link:hover { text-decoration: underline; }
-    </style>
 </head>
 <body>
     <!-- Paste State -->
-    <div id="pasteState">
-        <div class="paste-zone" id="pasteZone">
-            <div class="paste-icon">
-                <span class="material-symbols-rounded">content_paste</span>
+    <div id="pasteState" class="fixed inset-0 z-50 grid place-items-center bg-base-100 p-6">
+        <div class="w-full max-w-sm space-y-4 text-center">
+            <div id="pasteZone" class="card bg-base-200 border border-base-300 shadow-xl cursor-pointer transition hover:border-primary">
+                <div class="card-body items-center py-12">
+                    <div class="avatar placeholder">
+                        <div class="bg-primary/20 text-primary rounded-full w-16">
+                            <span class="material-symbols-rounded text-3xl">content_paste</span>
+                        </div>
+                    </div>
+                    <h2 class="card-title text-base">Tap to paste screenshot</h2>
+                    <p class="text-xs text-base-content/60">or press Ctrl+V / Cmd+V</p>
+                </div>
             </div>
-            <span class="paste-text">Tap to paste screenshot</span>
-        </div>
-        <p class="paste-hint">or press Ctrl+V / Cmd+V</p>
 
-        <div class="action-buttons">
-            <button class="action-btn action-btn--demo" id="demoBtn">
-                <span class="material-symbols-rounded">play_circle</span>
-                Try Demo
-            </button>
-            <button class="action-btn action-btn--upload" id="uploadBtn">
-                <span class="material-symbols-rounded">photo_library</span>
-                Upload Photo
-            </button>
-            <input type="file" id="photoInput" accept="image/*">
+            <div class="join join-vertical w-full gap-2">
+                <button class="btn btn-primary w-full gap-2" id="demoBtn">
+                    <span class="material-symbols-rounded">play_circle</span>
+                    Try Demo
+                </button>
+                <button class="btn btn-outline w-full gap-2" id="uploadBtn">
+                    <span class="material-symbols-rounded">photo_library</span>
+                    Upload Photo
+                </button>
+            </div>
+            <input type="file" id="photoInput" accept="image/*" class="hidden">
         </div>
     </div>
 
     <!-- Main Canvas -->
-    <div id="mainCanvas">
-        <div class="screenshot-layer" id="screenshotLayer">
-            <img id="screenshotImg" alt="">
+    <div id="mainCanvas" class="hidden min-h-screen bg-base-100">
+        <div id="screenshotLayer" class="fixed inset-0 z-0 flex items-center justify-center p-4 opacity-100 transition-opacity duration-500">
+            <img id="screenshotImg" alt="" class="max-h-[70vh] max-w-full rounded-box shadow-2xl">
         </div>
 
-        <div class="progress-overlay" id="progressOverlay">
-            <div class="progress-ring" id="progressRing">
-                <svg viewBox="0 0 100 100">
-                    <defs><linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stop-color="var(--accent)"/>
-                        <stop offset="100%" stop-color="var(--purple)"/>
-                    </linearGradient></defs>
-                    <circle class="progress-ring-bg" cx="50" cy="50" r="45"/>
-                    <circle class="progress-ring-fill" id="progressRingFill" cx="50" cy="50" r="45"/>
-                </svg>
-                <div class="progress-pct" id="progressPct">0%</div>
+        <div id="progressOverlay" class="fixed inset-0 z-10 grid place-items-center bg-base-100/80 backdrop-blur-sm">
+            <div class="card bg-base-200 border border-base-300 shadow-xl w-80">
+                <div class="card-body items-center text-center">
+                    <span class="loading loading-ring loading-lg text-primary"></span>
+                    <div class="badge badge-primary badge-outline" id="progressPhase">UPLOADING</div>
+                    <progress id="progressBar" class="progress progress-primary w-full" value="0" max="100"></progress>
+                    <p id="progressPct" class="text-sm font-semibold">0%</p>
+                    <p id="progressLabel" class="text-xs text-base-content/70">Sending screenshot...</p>
+                </div>
             </div>
-            <div class="progress-phase" id="progressPhase">UPLOADING</div>
-            <div class="progress-label" id="progressLabel">Sending screenshot...</div>
         </div>
 
-        <div class="results-overlay" id="resultsOverlay">
-            <div class="layout-header">
-                <div class="layout-header-left">
-                    <button class="layout-back" id="layoutBack">
-                        <span class="material-symbols-rounded" style="font-size:18px">arrow_back</span>
+        <div id="resultsOverlay" class="relative z-20 hidden pb-20">
+            <div class="navbar sticky top-0 z-20 bg-base-100/90 border-b border-base-300 backdrop-blur">
+                <div class="flex-1 gap-2">
+                    <button class="btn btn-ghost btn-sm gap-1" id="layoutBack">
+                        <span class="material-symbols-rounded text-base">arrow_back</span>
                         New
                     </button>
-                    <span class="layout-badge" id="layoutBadge"></span>
+                    <span class="badge badge-primary badge-outline" id="layoutBadge"></span>
                 </div>
-                <div class="layout-progress" id="layoutProgress">
-                    <div class="layout-progress-bar">
-                        <div class="layout-progress-fill" id="layoutProgressFill"></div>
-                    </div>
-                    <span class="layout-progress-text" id="layoutProgressText"></span>
+                <div class="flex-none items-center gap-2" id="layoutProgress">
+                    <progress class="progress progress-primary w-24" value="0" max="100" id="layoutProgressFill"></progress>
+                    <span class="text-xs text-base-content/60" id="layoutProgressText"></span>
                 </div>
             </div>
-            <!-- content-analysis removed from user UI (still in report data) -->
-            <div class="card-grid" id="cardGrid"></div>
-            <div class="follow-up-section" id="followUpSection" style="display:none;">
-                <div class="follow-up-header">
-                    <span class="material-symbols-rounded">forum</span>
-                    Questions you might have
+
+            <div id="cardGrid" class="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3"></div>
+
+            <div id="followUpSection" class="hidden p-4 pt-2">
+                <div class="card bg-base-200 border border-base-300 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-center gap-2 text-sm font-semibold text-base-content/70">
+                            <span class="material-symbols-rounded text-primary">forum</span>
+                            Questions you might have
+                        </div>
+                        <div class="space-y-2" id="followUpList"></div>
+                    </div>
                 </div>
-                <div class="follow-up-list" id="followUpList"></div>
             </div>
         </div>
     </div>
 
     <!-- Error State -->
-    <div id="errorState">
-        <div class="error-icon">
-            <span class="material-symbols-rounded">error</span>
+    <div id="errorState" class="fixed inset-0 z-50 hidden place-items-center bg-base-100 p-6">
+        <div class="card bg-base-200 border border-error/30 shadow-xl w-full max-w-sm">
+            <div class="card-body items-center text-center">
+                <div class="avatar placeholder">
+                    <div class="bg-error/20 text-error rounded-full w-16">
+                        <span class="material-symbols-rounded text-3xl">error</span>
+                    </div>
+                </div>
+                <p id="errorText" class="text-sm text-error">Something went wrong</p>
+                <button class="btn btn-error btn-outline" id="retryBtn">Try Again</button>
+            </div>
         </div>
-        <p class="error-text" id="errorText">something went wrong</p>
-        <button class="retry-btn" id="retryBtn">Try Again</button>
     </div>
 
     <script>
@@ -1003,31 +114,43 @@
         const screenshotLayer = document.getElementById('screenshotLayer');
         const screenshotImg = document.getElementById('screenshotImg');
         const progressOverlay = document.getElementById('progressOverlay');
-        const progressRingFill = document.getElementById('progressRingFill');
+        const progressBar = document.getElementById('progressBar');
         const progressPct = document.getElementById('progressPct');
         const progressPhase = document.getElementById('progressPhase');
         const progressLabel = document.getElementById('progressLabel');
-        const progressRing = document.getElementById('progressRing');
-        const RING_CIRCUMFERENCE = 2 * Math.PI * 45;
+        const DEFAULT_THEME = 'night';
+        const LAYOUT_THEME_MAP = {
+            simple: 'night',
+            editorial: 'business',
+            dashboard: 'dim',
+            product_showcase: 'synthwave',
+            social_feed: 'dracula',
+            breaking_news: 'coffee',
+            investigation: 'coffee',
+            food_order: 'autumn',
+            messaging: 'emerald',
+            location_explorer: 'forest',
+            media_analysis: 'abyss',
+            encyclopedia: 'nord',
+            travel_planner: 'sunset',
+        };
+
+        function applyLayoutTheme(layoutType) {
+            const theme = LAYOUT_THEME_MAP[layoutType] || DEFAULT_THEME;
+            document.documentElement.setAttribute('data-theme', theme);
+            return theme;
+        }
 
         function updateProgress(pct, phase, label) {
-            const offset = RING_CIRCUMFERENCE - (pct / 100) * RING_CIRCUMFERENCE;
-            progressRingFill.style.strokeDashoffset = offset;
+            progressBar.value = Math.max(0, Math.min(100, Math.round(pct)));
             progressPct.textContent = Math.round(pct) + '%';
             if (phase) progressPhase.textContent = phase;
             if (label) progressLabel.textContent = label;
-            if (pct >= 100) {
-                progressRing.classList.add('complete');
-            } else {
-                progressRing.classList.remove('complete');
-            }
         }
         const resultsOverlay = document.getElementById('resultsOverlay');
         const layoutBadge = document.getElementById('layoutBadge');
         const layoutProgressFill = document.getElementById('layoutProgressFill');
         const layoutProgressText = document.getElementById('layoutProgressText');
-        const contentAnalysisEl = document.getElementById('contentAnalysis');
-        const analysisIntent = document.getElementById('analysisIntent');
         const followUpSection = document.getElementById('followUpSection');
         const followUpList = document.getElementById('followUpList');
         const cardGrid = document.getElementById('cardGrid');
@@ -1042,6 +165,16 @@
         let currentImageBase64 = null;
         let totalCards = 0;
         let completedCards = 0;
+
+        function showResultsCanvas() {
+            stopAnalysisProgressTick();
+            updateProgress(95, 'READY', 'Cards ready');
+            progressOverlay.classList.add('hidden');
+            screenshotLayer.classList.remove('opacity-0');
+            screenshotLayer.classList.add('opacity-20');
+            screenshotImg.classList.remove('blur-[2px]', 'opacity-60');
+            resultsOverlay.classList.remove('hidden');
+        }
 
         // === Utilities ===
         function esc(val) {
@@ -1062,7 +195,7 @@
             const escaped = esc(text);
             return escaped.replace(
                 /(https?:\/\/[^\s<>"']+)/gi,
-                '<a href="$1" target="_blank" rel="noopener noreferrer" class="auto-link">$1</a>'
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="link link-primary break-all">$1</a>'
             );
         }
 
@@ -1082,7 +215,7 @@
                 const parts = [];
                 if (item.label || item.name) parts.push(`<strong>${esc(item.label || item.name)}</strong>`);
                 if (item.value) parts.push(linkify(item.value));
-                if (item.description) parts.push(`<span style="color:var(--text-secondary)">${linkify(item.description)}</span>`);
+                if (item.description) parts.push(`<span class="text-base-content/70">${linkify(item.description)}</span>`);
                 if (parts.length) return parts.join(': ');
                 return linkify(normalizeFeature(item));
             }
@@ -1091,30 +224,9 @@
 
         function renderLink(url, label, extraClass) {
             if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
-            const cls = extraClass ? ` class="${extraClass}"` : ' class="auto-link"';
+            const cls = extraClass ? ` class="${extraClass}"` : ' class="link link-primary break-all"';
             return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"${cls}>${esc(label || url)}</a>`;
         }
-
-        const CARD_ICONS = {
-            hero_summary: { icon: 'auto_awesome', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
-            key_metric: { icon: 'monitoring', bg: 'var(--accent-bg)', color: 'var(--accent)' },
-            info_list: { icon: 'list_alt', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
-            fact_check: { icon: 'fact_check', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
-            person_card: { icon: 'person', bg: 'var(--purple-bg)', color: 'var(--purple)' },
-            product_card: { icon: 'shopping_bag', bg: 'var(--green-bg)', color: 'var(--green)' },
-            timeline_card: { icon: 'timeline', bg: 'var(--accent-bg)', color: 'var(--accent)' },
-            quote_card: { icon: 'format_quote', bg: 'var(--purple-bg)', color: 'var(--purple)' },
-            comparison_card: { icon: 'compare', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
-            warning_card: { icon: 'warning', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
-            action_card: { icon: 'bolt', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
-            text_extract: { icon: 'description', bg: 'var(--surface-3)', color: 'var(--text-secondary)' },
-            location_card: { icon: 'location_on', bg: 'var(--accent-bg)', color: 'var(--accent)' },
-            link_card: { icon: 'link', bg: 'var(--accent-bg)', color: 'var(--accent)' },
-            news_card: { icon: 'newspaper', bg: 'var(--red-bg)', color: 'var(--red)' },
-            chart_card: { icon: 'bar_chart', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
-            did_you_know_card: { icon: 'lightbulb', bg: 'var(--yellow-bg)', color: 'var(--yellow)' },
-            verification_card: { icon: 'verified', bg: 'var(--accent-bg-strong)', color: 'var(--accent)' },
-        };
 
         const CHART_COLORS = ['#5b8af5', '#4cd68a', '#f0c040', '#f06060', '#a07ef0', '#f09040', '#60d0f0', '#f060a0'];
 
@@ -1140,26 +252,19 @@
 
             if (allQuestions.length === 0) return;
 
-            followUpSection.style.display = '';
+            followUpSection.classList.remove('hidden');
             followUpList.innerHTML = '';
 
             allQuestions.slice(0, 5).forEach((q, i) => {
                 const item = document.createElement('div');
-                item.className = 'follow-up-item';
+                item.className = 'collapse collapse-arrow bg-base-100 border border-base-300';
                 item.innerHTML = `
-                    <div class="follow-up-question" data-idx="${i}">
-                        <div class="fq-icon"><span class="material-symbols-rounded">add</span></div>
-                        <div class="fq-text">${esc(q.question)}</div>
-                    </div>
-                    <div class="follow-up-answer">
-                        <div class="follow-up-answer-text">${q.answer ? linkify(q.answer) : '<span style="color:var(--text-muted);font-style:italic">Tap to expand...</span>'}</div>
+                    <input type="checkbox" />
+                    <div class="collapse-title text-sm font-medium pr-10">${esc(q.question)}</div>
+                    <div class="collapse-content">
+                        <div class="text-sm text-base-content/80 leading-relaxed">${q.answer ? linkify(q.answer) : '<span class="text-base-content/50 italic">Expand for quick context…</span>'}</div>
                     </div>
                 `;
-
-                item.querySelector('.follow-up-question').addEventListener('click', () => {
-                    item.classList.toggle('open');
-                });
-
                 followUpList.appendChild(item);
             });
         }
@@ -1181,9 +286,9 @@
 
             const areaPoints = points + ` ${w},${h} 0,${h}`;
 
-            return `<svg class="metric-sparkline" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-                <polygon class="sparkline-area" points="${areaPoints}"/>
-                <polyline points="${points}"/>
+            return `<svg class="w-full h-6 mt-2" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+                <polygon points="${areaPoints}" fill="oklch(64% 0.17 260 / 0.25)"/>
+                <polyline points="${points}" fill="none" stroke="oklch(64% 0.17 260)" stroke-width="2" stroke-linecap="round"/>
             </svg>`;
         }
 
@@ -1215,21 +320,6 @@
             if (!ct) return 'Analysis';
             if (CONTENT_TYPE_LABELS[ct]) return CONTENT_TYPE_LABELS[ct];
             return ct.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).substring(0, 20);
-        }
-
-        const CARDS_WITHOUT_LABEL = new Set([
-            'hero_summary', 'verification_card', 'did_you_know_card', 'news_card', 'chart_card', 'warning_card',
-        ]);
-
-        function getCardTypeLabel(cardType) {
-            if (CARDS_WITHOUT_LABEL.has(cardType)) return '';
-            const info = CARD_ICONS[cardType] || { icon: 'info', bg: 'var(--surface-3)', color: 'var(--text-secondary)' };
-            return `<div class="card-type-label">
-                <div class="card-type-icon" style="background:${info.bg}">
-                    <span class="material-symbols-rounded" style="color:${info.color}">${info.icon}</span>
-                </div>
-                ${cardType.replace(/_/g, ' ')}
-            </div>`;
         }
 
         // === Image Handling ===
@@ -1355,11 +445,11 @@
             currentImageUrl = URL.createObjectURL(blob);
             screenshotImg.src = currentImageUrl;
             pasteState.classList.add('hidden');
-            mainCanvas.classList.add('active');
-            screenshotLayer.className = 'screenshot-layer scanning';
-            progressOverlay.classList.add('active');
-            progressOverlay.classList.add('uploading');
-            progressOverlay.classList.remove('analyzing', 'ready', 'hiding');
+            mainCanvas.classList.remove('hidden');
+            screenshotLayer.classList.remove('opacity-0');
+            screenshotLayer.classList.add('opacity-100');
+            screenshotImg.classList.add('opacity-60', 'blur-[2px]');
+            progressOverlay.classList.remove('hidden');
             updateProgress(0, 'UPLOADING', 'Compressing...');
 
             try {
@@ -1560,8 +650,7 @@
 
                 telemetry.requestId = requestId;
 
-                progressOverlay.classList.remove('uploading');
-                progressOverlay.classList.add('analyzing');
+                progressOverlay.classList.remove('hidden');
                 updateProgress(32, 'ANALYZING', 'Quick analysis starting...');
                 startAnalysisProgressTick(32);
 
@@ -1654,7 +743,7 @@
                     currentContinuousPct = Math.max(currentContinuousPct, mappedPct);
                     updateProgress(currentContinuousPct, phaseLabel, data.message || 'Processing...');
                     if (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing') {
-                        layoutProgressFill.style.width = data.progress + '%';
+                        layoutProgressFill.value = data.progress;
                         layoutProgressText.textContent = data.phase === 'enhancing' ? 'enhancing' : data.phase === 'reviewing' ? 'reviewing' : `${completedCards}/${totalCards}`;
                     }
                     break;
@@ -1731,12 +820,13 @@
 
             currentContinuousPct = Math.max(currentContinuousPct, 40);
             updateProgress(currentContinuousPct, 'ANALYZING', 'Reading your screenshot...');
-            layoutProgressFill.style.width = '10%';
+            layoutProgressFill.value = 10;
             layoutProgressText.textContent = 'analyzing';
         }
 
         function onLayoutPreview(blueprint) {
             totalCards = (blueprint.cards || []).length;
+            applyLayoutTheme(blueprint.layout?.type);
 
             const ct = blueprint.contentAnalysis?.contentType || 'general';
             layoutBadge.textContent = humanizeContentType(ct);
@@ -1748,7 +838,7 @@
 
             currentContinuousPct = Math.max(currentContinuousPct, 55);
             updateProgress(currentContinuousPct, 'DESIGNING', `${ct} detected — designing layout...`);
-            layoutProgressFill.style.width = '15%';
+            layoutProgressFill.value = 15;
             layoutProgressText.textContent = 'designing';
         }
 
@@ -1765,6 +855,7 @@
 
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
+            applyLayoutTheme(blueprint.layout?.type);
 
             const ct = blueprint.contentAnalysis?.contentType || 'general';
             layoutBadge.textContent = humanizeContentType(ct);
@@ -1785,23 +876,16 @@
 
             if (!firstCardShown && populatedCards.length > 0) {
                 firstCardShown = true;
-                stopAnalysisProgressTick();
-                updateProgress(95, 'READY', 'Cards ready');
-                progressOverlay.classList.add('hiding');
-                setTimeout(() => {
-                    progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-                }, 400);
-                screenshotLayer.className = 'screenshot-layer fading';
-                setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                showResultsCanvas();
             }
 
             const allCards = [...populatedCards, ...unpopulatedCards];
             const populatedCount = populatedCards.length;
 
             if (populatedCount <= 1) {
-                cardGrid.classList.add('single-card');
+                cardGrid.classList.add('max-w-xl', 'mx-auto');
             } else {
-                cardGrid.classList.remove('single-card');
+                cardGrid.classList.remove('max-w-xl', 'mx-auto');
             }
 
             allCards.forEach((card, index) => {
@@ -1819,29 +903,15 @@
                 }
 
                 cardGrid.appendChild(el);
-                setTimeout(() => {
-                    el.classList.add('visible');
-                    if (hasData) {
-                        el.classList.add('entering');
-                    } else {
-                        setTimeout(() => el.classList.add('researching'), 200);
-                    }
-                }, 60 + index * 80);
+                el.classList.add('transition-all', 'duration-300');
             });
 
             if (!firstCardShown && populatedCards.length === 0) {
-                stopAnalysisProgressTick();
-                updateProgress(90, 'ANALYZING', 'Preparing cards...');
-                progressOverlay.classList.add('hiding');
-                setTimeout(() => {
-                    progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-                }, 400);
-                screenshotLayer.className = 'screenshot-layer fading';
-                setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                showResultsCanvas();
                 firstCardShown = true;
             }
 
-            layoutProgressFill.style.width = '25%';
+            layoutProgressFill.value = 25;
             layoutProgressText.textContent = 'enhancing';
 
             startEnhanceStatusRotation();
@@ -1851,19 +921,14 @@
             if (enhanceMsgInterval) clearInterval(enhanceMsgInterval);
             let msgIdx = 0;
             enhanceMsgInterval = setInterval(() => {
-                const loadingCards = document.querySelectorAll('.card.loading.researching');
+                const loadingCards = document.querySelectorAll('.card.loading');
                 if (loadingCards.length === 0 && pipelineComplete) {
                     clearInterval(enhanceMsgInterval);
                     enhanceMsgInterval = null;
                     return;
                 }
                 msgIdx = (msgIdx + 1) % enhanceStatusMessages.length;
-                loadingCards.forEach(card => {
-                    const statusEl = card.querySelector('.skeleton-status');
-                    if (statusEl) {
-                        statusEl.textContent = enhanceStatusMessages[msgIdx];
-                    }
-                });
+                progressLabel.textContent = enhanceStatusMessages[msgIdx];
             }, 3000);
         }
 
@@ -1876,36 +941,25 @@
 
             if (!firstCardShown) {
                 firstCardShown = true;
-                stopAnalysisProgressTick();
-                updateProgress(95, 'READY', 'Cards ready');
-                progressOverlay.classList.add('hiding');
-                setTimeout(() => {
-                    progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-                }, 400);
-                screenshotLayer.className = 'screenshot-layer fading';
-                setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                showResultsCanvas();
             }
 
             if (completedCards > 1) {
-                cardGrid.classList.remove('single-card');
+                cardGrid.classList.remove('max-w-xl', 'mx-auto');
             }
 
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
             el.classList.remove('loading', 'researching');
-            el.classList.add('populated', 'just-populated', 'entering');
+            el.classList.add('populated');
             el.innerHTML = renderCardContent(data.cardType, data.data);
             el._cardData = data.data;
 
             appendCitations(el, data.data);
 
-            setTimeout(() => {
-                el.classList.remove('just-populated');
-            }, 1500);
-
             const pct = 60 + Math.round((completedCards / totalCards) * 35);
-            layoutProgressFill.style.width = pct + '%';
+            layoutProgressFill.value = pct;
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
 
@@ -1920,18 +974,11 @@
 
                 if (!firstCardShown) {
                     firstCardShown = true;
-                    stopAnalysisProgressTick();
-                    updateProgress(95, 'READY', 'Cards ready');
-                    progressOverlay.classList.add('hiding');
-                    setTimeout(() => {
-                        progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-                    }, 400);
-                    screenshotLayer.className = 'screenshot-layer fading';
-                    setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                    showResultsCanvas();
                 }
 
                 if (completedCards > 1) {
-                    cardGrid.classList.remove('single-card');
+                    cardGrid.classList.remove('max-w-xl', 'mx-auto');
                 }
             }
 
@@ -1941,24 +988,21 @@
 
             el.classList.remove('loading', 'researching');
             el.classList.add('populated');
-            if (isNewlyPopulated) el.classList.add('entering');
             el.innerHTML = renderCardContent(data.cardType, mergedData);
-
-            el.classList.add('card-updating');
-            setTimeout(() => el.classList.remove('card-updating'), 800);
 
             appendCitations(el, mergedData);
 
             if (isNewlyPopulated) {
                 const pct = 60 + Math.round((completedCards / totalCards) * 35);
-                layoutProgressFill.style.width = pct + '%';
+                layoutProgressFill.value = pct;
                 layoutProgressText.textContent = `${completedCards}/${totalCards}`;
             }
 
             const sourceClass = data.source === 'review' ? 'source-sonar' : 'source-sonnet';
             const sourceLabel = data.source === 'review' ? 'researched' : 'enhanced';
             const sourceTag = document.createElement('span');
-            sourceTag.className = `card-source-tag ${sourceClass}`;
+            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${sourceClass === 'source-sonar' ? 'badge-info' : 'badge-warning'}`;
+            sourceTag.dataset.sourceTag = 'true';
             sourceTag.textContent = sourceLabel;
             el.appendChild(sourceTag);
             setTimeout(() => sourceTag.remove(), 4000);
@@ -1975,7 +1019,7 @@
                 placeholderData: data.data,
             };
 
-            cardGrid.classList.remove('single-card');
+            cardGrid.classList.remove('max-w-xl', 'mx-auto');
 
             const el = createCardElement(card);
             el.classList.remove('loading');
@@ -1986,21 +1030,19 @@
             const sourceClass = data.source === 'review' ? 'source-sonar' : data.source === 'sonnet' ? 'source-sonnet' : 'source-haiku';
             const sourceLabel = data.source === 'review' ? 'research' : data.source === 'sonnet' ? 'enhanced' : 'new';
             const sourceTag = document.createElement('span');
-            sourceTag.className = `card-source-tag ${sourceClass}`;
+            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${sourceClass === 'source-sonar' ? 'badge-info' : 'badge-warning'}`;
+            sourceTag.dataset.sourceTag = 'true';
             sourceTag.textContent = sourceLabel;
             el.appendChild(sourceTag);
             setTimeout(() => sourceTag.remove(), 5000);
 
             cardGrid.appendChild(el);
-            setTimeout(() => {
-                el.classList.add('visible', 'just-added', 'entering');
-                setTimeout(() => el.classList.remove('just-added'), 1500);
-            }, 50);
+            el.classList.add('transition-all', 'duration-300');
 
             appendCitations(el, data.data);
 
             const pct = 60 + Math.round((completedCards / totalCards) * 35);
-            layoutProgressFill.style.width = pct + '%';
+            layoutProgressFill.value = pct;
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
 
@@ -2026,19 +1068,22 @@
             const existing = el.querySelector('.web-citations');
             if (existing) existing.remove();
 
-            const citHtml = `<div class="web-citations">
-                <span class="web-citations-label">Sources</span>
+            const citHtml = `<div class="web-citations mt-2 px-4 pb-4">
+                <div class="divider my-1 text-[10px] uppercase tracking-wider text-base-content/40">Sources</div>
+                <div class="flex flex-wrap gap-1.5">
                 ${validCitations.slice(0, 3).map(url => {
                     let domain;
                     try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { domain = url.replace(/^https?:\/\//, '').split('/')[0]; }
-                    return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="web-citation-link">${esc(domain)}</a>`;
+                    return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="badge badge-outline badge-xs">${esc(domain)}</a>`;
                 }).join('')}
+                </div>
             </div>`;
             el.insertAdjacentHTML('beforeend', citHtml);
         }
 
         function onPipelineComplete(data) {
             pipelineComplete = true;
+            if (data?.layout?.type) applyLayoutTheme(data.layout.type);
             stopAnalysisProgressTick();
             if (completionTimeout) {
                 clearTimeout(completionTimeout);
@@ -2057,17 +1102,17 @@
                 uploadProgressInterval = null;
             }
 
-            screenshotLayer.className = 'screenshot-layer gone';
-            progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-            cardGrid.classList.remove('single-card');
+            screenshotLayer.classList.add('opacity-0', 'pointer-events-none');
+            progressOverlay.classList.add('hidden');
+            cardGrid.classList.remove('max-w-xl', 'mx-auto');
 
-            document.querySelectorAll('.card-source-tag').forEach(t => t.remove());
+            document.querySelectorAll('[data-source-tag]').forEach(t => t.remove());
 
             layoutProgress.style.display = 'none';
 
             if (!firstCardShown) {
                 firstCardShown = true;
-                setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                resultsOverlay.classList.remove('hidden');
             }
 
             if (data?.contentAnalysis) {
@@ -2093,6 +1138,7 @@
                             viewport: { width: innerWidth, height: innerHeight, devicePixelRatio: devicePixelRatio || 2 },
                             screen: { width: screen.width, height: screen.height },
                             cards: { total: cardGrid.children.length, populated: cardGrid.querySelectorAll('.card.populated').length },
+                            theme: document.documentElement.getAttribute('data-theme') || DEFAULT_THEME,
                             userAgent: navigator.userAgent,
                         },
                     });
@@ -2339,6 +1385,7 @@
                     gridComputedRows: getComputedStyle(cardGrid).gridTemplateRows,
                     gridGap: getComputedStyle(cardGrid).gap,
                     overlayRect: { w: resultsOverlay.offsetWidth, h: resultsOverlay.offsetHeight },
+                    theme: document.documentElement.getAttribute('data-theme') || DEFAULT_THEME,
                 },
                 performance: {},
                 userAgent: navigator.userAgent,
@@ -2386,11 +1433,7 @@
             const el = document.createElement('div');
             el.id = `card-${card.id}`;
 
-            const cssClassMap = { link_card: 'links', did_you_know_card: 'did-you-know', verification_card: 'verification' };
-            const cssClass = cssClassMap[card.cardType] || card.cardType.replace(/_/g, '-');
-            el.className = `card card-${cssClass} bg-base-200 border border-base-300 rounded-2xl overflow-hidden loading`;
-            // Inline style fallback for dark background in case DaisyUI theme hasn't loaded
-            el.style.cssText = 'background:#12151c;border-color:#1a1f2e;border-radius:16px;overflow:hidden';
+            el.className = 'card bg-base-200 border border-base-300 shadow-sm overflow-hidden loading relative';
             el.dataset.cardType = card.cardType;
 
             const span = card.gridPosition?.columnSpan || 1;
@@ -2398,24 +1441,9 @@
             const twoColTypes = ['timeline_card', 'info_list', 'action_card', 'text_extract', 'link_card', 'news_card', 'order_card'];
 
             if (span >= 3 || fullWidthTypes.includes(card.cardType)) {
-                el.classList.add('span-full');
+                el.classList.add('col-span-1', 'md:col-span-2', 'xl:col-span-3');
             } else if (span === 2 || twoColTypes.includes(card.cardType)) {
-                el.classList.add('span-2');
-            }
-
-            if (card.cardType === 'warning_card') {
-                const level = card.placeholderData?.level || card.populatedData?.level || 'warning';
-                el.classList.add(`level-${level}`);
-            }
-
-            if (card.cardType === 'fact_check') {
-                const verdict = card.populatedData?.verdict || card.placeholderData?.verdict || 'unverified';
-                el.classList.add(`verdict-${verdict}`);
-            }
-
-            if (card.cardType === 'hero_summary') {
-                const hasImage = card.populatedData?.imageUrl || card.placeholderData?.imageUrl;
-                if (hasImage) el.classList.add('has-image');
+                el.classList.add('col-span-1', 'md:col-span-2', 'xl:col-span-2');
             }
 
             el.innerHTML = renderPlaceholder(card);
@@ -2427,23 +1455,23 @@
             const type = card.cardType;
 
             if (type === 'hero_summary' && pd.title && pd.title !== 'Analyzing...') {
-                return `<div style="padding:16px">
-                    ${pd.emoji ? `<span style="font-size:1.8rem;margin-bottom:8px;display:block;line-height:1">${esc(pd.emoji)}</span>` : ''}
-                    ${pd.badge ? `<div class="badge badge-primary badge-sm" style="margin-bottom:8px;font-size:11px;font-weight:700;padding:2px 10px;border-radius:100px;background:var(--color-primary,#5b8af5);color:#fff;display:inline-block">${esc(pd.badge)}</div>` : ''}
-                    <h2 style="font-size:1.25rem;font-weight:800;color:#fff;line-height:1.2;margin-bottom:4px">${esc(pd.title)}</h2>
-                    ${pd.subtitle ? `<p style="font-size:0.875rem;color:rgba(255,255,255,0.5);line-height:1.5">${esc(pd.subtitle)}</p>` : ''}
-                    <div style="display:flex;align-items:center;gap:6px;margin-top:12px">
-                        <span class="loading loading-dots loading-xs" style="color:var(--color-primary,#5b8af5)"></span>
-                        <span style="font-size:11px;opacity:0.4">Enhancing...</span>
+                return `<div class="card-body">
+                    ${pd.emoji ? `<span class="text-3xl leading-none">${esc(pd.emoji)}</span>` : ''}
+                    ${pd.badge ? `<div class="badge badge-primary badge-sm">${esc(pd.badge)}</div>` : ''}
+                    <h2 class="text-xl font-bold leading-tight">${esc(pd.title)}</h2>
+                    ${pd.subtitle ? `<p class="text-sm text-base-content/70 leading-relaxed">${esc(pd.subtitle)}</p>` : ''}
+                    <div class="flex items-center gap-2 mt-2">
+                        <span class="loading loading-dots loading-xs text-primary"></span>
+                        <span class="text-xs text-base-content/50">Enhancing...</span>
                     </div>
                 </div>`;
             }
 
             if (type === 'hero_summary') {
-                return `<div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-                    <div class="skeleton" style="height:20px;width:66%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
-                    <div class="skeleton" style="height:16px;width:100%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
-                    <div class="skeleton" style="height:16px;width:80%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+                return `<div class="card-body space-y-3">
+                    <div class="skeleton h-6 w-2/3"></div>
+                    <div class="skeleton h-4 w-full"></div>
+                    <div class="skeleton h-4 w-4/5"></div>
                 </div>`;
             }
 
@@ -2464,7 +1492,7 @@
             if (type === 'location_card' && pd.name) {
                 return `<div class="p-4 flex items-center gap-3">
                     <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-rounded text-primary" style="font-size:20px">location_on</span>
+                        <span class="material-symbols-rounded text-primary text-lg">location_on</span>
                     </div>
                     <div class="flex-1">
                         <div class="font-bold text-sm">${esc(pd.name)}</div>
@@ -2485,11 +1513,11 @@
             };
             const label = typeLabels[type] || type.replace(/_/g, ' ');
 
-            return `<div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.3">${esc(label)}</div>
-                <div class="skeleton" style="height:16px;width:75%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
-                <div class="skeleton" style="height:12px;width:100%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
-                <div class="skeleton" style="height:12px;width:66%;border-radius:8px;background:var(--color-base-300,#1a1f2e)"></div>
+            return `<div class="card-body space-y-3">
+                <div class="text-xs font-semibold uppercase tracking-wider text-base-content/40">${esc(label)}</div>
+                <div class="skeleton h-4 w-3/4"></div>
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-2/3"></div>
             </div>`;
         }
 
@@ -3039,8 +2067,9 @@
         // === Error & Reset ===
         function showError(message) {
             errorText.textContent = message;
-            errorState.classList.add('active');
-            progressOverlay.classList.remove('active');
+            errorState.classList.remove('hidden');
+            errorState.classList.add('grid');
+            progressOverlay.classList.add('hidden');
         }
 
         function reset() {
@@ -3066,20 +2095,22 @@
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             pasteState.classList.remove('hidden');
-            mainCanvas.classList.remove('active');
-            screenshotLayer.className = 'screenshot-layer';
-            progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
-            progressRing.classList.remove('complete');
+            mainCanvas.classList.add('hidden');
+            screenshotLayer.classList.remove('opacity-0', 'opacity-20', 'pointer-events-none');
+            screenshotLayer.classList.add('opacity-100');
+            screenshotImg.classList.remove('blur-[2px]', 'opacity-60');
+            progressOverlay.classList.add('hidden');
             updateProgress(0, 'UPLOADING', 'Sending screenshot...');
-            resultsOverlay.classList.remove('visible');
-            errorState.classList.remove('active');
+            resultsOverlay.classList.add('hidden');
+            errorState.classList.add('hidden');
+            errorState.classList.remove('grid');
             cardGrid.innerHTML = '';
-            cardGrid.classList.remove('single-card');
-            /* removed: intent line */ /* contentAnalysisEl.style.display = 'none'; */
-            followUpSection.style.display = 'none';
+            cardGrid.classList.remove('max-w-xl', 'mx-auto');
+            followUpSection.classList.add('hidden');
             followUpList.innerHTML = '';
             layoutProgress.style.display = '';
-            layoutProgressFill.style.width = '0%';
+            layoutProgressFill.value = 0;
+            applyLayoutTheme(DEFAULT_THEME);
             document.getElementById('demoBtn')?.classList.remove('loading');
         }
 
