@@ -697,6 +697,27 @@ async function runPipeline({
     }
 
     // =====================================================
+    // Surface research follow-up questions to the frontend.
+    // The classifier always returns empty arrays; enrich with
+    // the deeper Q&A that came back from Sonar / web search.
+    // =====================================================
+    if (researchResult.followUpQuestions?.length || researchResult.additionalQuestions?.length) {
+      const ca = blueprint.contentAnalysis;
+      if (researchResult.followUpQuestions?.length) {
+        ca.followUpQuestions = [
+          ...(ca.followUpQuestions || []),
+          ...researchResult.followUpQuestions,
+        ].slice(0, 5);
+      }
+      if (researchResult.additionalQuestions?.length) {
+        ca.additionalQuestions = researchResult.additionalQuestions.slice(0, 5);
+      }
+      if (researchResult.overallContext) {
+        ca.overallContext = researchResult.overallContext;
+      }
+    }
+
+    // =====================================================
     // Final: Assemble result
     // =====================================================
     const totalDuration = Date.now() - startTime;

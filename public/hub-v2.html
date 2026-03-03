@@ -1689,7 +1689,7 @@
                     break;
 
                 case 'complete':
-                    onPipelineComplete();
+                    onPipelineComplete(data);
                     break;
 
                 case 'error':
@@ -2035,7 +2035,7 @@
             }
         }
 
-        function onPipelineComplete() {
+        function onPipelineComplete(data) {
             pipelineComplete = true;
             stopAnalysisProgressTick();
             if (completionTimeout) {
@@ -2066,6 +2066,17 @@
             if (!firstCardShown) {
                 firstCardShown = true;
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+            }
+
+            if (data?.contentAnalysis) {
+                const ca = data.contentAnalysis;
+                if (ca.additionalQuestions?.length) {
+                    ca.followUpQuestions = [
+                        ...(ca.followUpQuestions || []),
+                        ...ca.additionalQuestions.map(q => ({ question: q })),
+                    ];
+                }
+                renderFollowUpQuestions(ca);
             }
 
             // Immediately fire-and-forget the rendered card HTML to the server.
@@ -2899,10 +2910,11 @@
                         <div class="space-y-1">
                         ${(d.messages || []).map(msg => {
                             const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
-                            const isUser = mObj.isUser;
+                            const isUser = mObj.isUser || mObj.isOwn || mObj.isOwnMessage || false;
+                            const time = mObj.time || mObj.timestamp || mObj.ts || '';
                             return `<div class="chat ${isUser ? 'chat-end' : 'chat-start'}">
-                                <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${mObj.time ? `<time>${esc(mObj.time)}</time>` : ''}</div>
-                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || '')}</div>
+                                <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${time ? `<time>${esc(time)}</time>` : ''}</div>
+                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || mObj.content || mObj.message || '')}</div>
                             </div>`;
                         }).join('')}
                         </div>
