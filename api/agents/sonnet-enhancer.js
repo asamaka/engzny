@@ -181,11 +181,17 @@ REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
 }
 
 function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
-  const researchFindings = researchData.findings || [];
+  const researchFindings = (researchData && researchData.findings) || [];
+
+  const unpopulatedCards = currentCards.filter(c => {
+    const data = c.populatedData || c.data || {};
+    return !data || Object.keys(data).length === 0;
+  });
 
   const relevantCards = currentCards.filter(c => {
     if (c.cardType === 'verification_card') return true;
-    const data = c.populatedData || c.data || c.placeholderData || {};
+    const data = c.populatedData || c.data || {};
+    if (!data || Object.keys(data).length === 0) return true;
     const cardText = `${data.title || ''} ${data.name || ''} ${data.claim || ''} ${data.label || ''}`.toLowerCase();
     return researchFindings.some(f => {
       const fText = `${f.topic || ''} ${f.summary || ''}`.toLowerCase();
@@ -198,7 +204,9 @@ function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
 
   const compactCards = cardsToReview.map(c => {
     const data = c.populatedData || c.data || c.placeholderData || {};
+    const isPopulated = data && Object.keys(data).length > 0;
     const summary = { id: c.id, cardType: c.cardType };
+    if (!isPopulated) summary.NEEDS_POPULATION = true;
     if (data.title) summary.title = data.title;
     if (data.name) summary.name = data.name;
     if (data.claim) summary.claim = data.claim;
@@ -215,16 +223,24 @@ function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
     factCheck: f.factCheck,
   }));
 
+  const hasUnpopulated = unpopulatedCards.length > 0;
+  const populateInstructions = hasUnpopulated
+    ? `\n0. **FIRST PRIORITY**: Cards marked NEEDS_POPULATION are EMPTY — the user sees a broken loading skeleton. You MUST call update_card for each with ALL required fields filled. Use content analysis + research to populate them.`
+    : '';
+
+  const contextLine = contentAnalysis
+    ? `\nContent: ${contentAnalysis.contentType} — ${contentAnalysis.intent || ''}`
+    : '';
+
   return `Review cards against research. Update with corrections, URLs, verified data. Call ALL update_card tools in ONE response.
 
 Cards: ${JSON.stringify(compactCards)}
 
 Schemas: ${getCardTypeSchemaForTypes(existingTypes)}
+${researchFindings.length > 0 ? `\nResearch: ${JSON.stringify(compactResearch)}` : ''}
+${researchData && researchData.overallContext ? `Context: ${researchData.overallContext}` : ''}${contextLine}
 
-Research: ${JSON.stringify(compactResearch)}
-Context: ${researchData.overallContext || ''}
-
-Tasks (ALL in ONE batch):
+Tasks (ALL in ONE batch):${populateInstructions}
 1. verification_card: update source statuses from research
 2. Add sourceUrls to cards with matching research
 3. Correct facts research contradicts

@@ -449,26 +449,42 @@ async function runPipeline({
 
     // =====================================================
     // Phase 3: Sonnet Review (with research data)
-    // Only runs if we got meaningful research findings
+    // Runs if we got research findings OR if cards are still unpopulated
     // =====================================================
     const hasResearchFindings = researchResult.findings && researchResult.findings.length > 0;
+    const unpopulatedCards = Array.from(currentCards.values()).filter(c => {
+      const data = c.populatedData || c.data || {};
+      return !data || Object.keys(data).length === 0;
+    });
+    const hasUnpopulatedCards = unpopulatedCards.length > 0;
 
-    if (hasResearchFindings) {
+    if (hasUnpopulatedCards) {
+      logger.warn('Orchestrator', 'Cards still unpopulated after enhance', {
+        unpopulated: unpopulatedCards.map(c => ({ id: c.id, type: c.cardType })),
+      });
+    }
+
+    if (hasResearchFindings || hasUnpopulatedCards) {
       if (onPhase) {
-        onPhase({ phase: 'reviewing', message: 'Reviewing with research findings...' });
+        onPhase({ phase: 'reviewing', message: hasUnpopulatedCards ? 'Populating remaining cards...' : 'Reviewing with research findings...' });
       }
 
       if (onProgress) {
         onProgress({
           phase: 'reviewing',
           progress: 70,
-          message: 'Incorporating research findings...',
+          message: hasUnpopulatedCards ? 'Populating remaining cards...' : 'Incorporating research findings...',
         });
       }
 
-      logger.info('Orchestrator', 'Phase 3: Sonnet Review with research', {
-        findings: researchResult.findings.length,
+      logger.info('Orchestrator', 'Phase 3: Review', {
+        findings: researchResult.findings?.length || 0,
+        unpopulated: unpopulatedCards.length,
       });
+
+      const reviewResearchData = hasResearchFindings
+        ? researchResult
+        : { findings: [], overallContext: '' };
 
       const reviewResult = await enhance({
         imageData,
@@ -476,7 +492,7 @@ async function runPipeline({
         currentCards: Array.from(currentCards.values()),
         contentAnalysis: blueprint.contentAnalysis,
         layout: blueprint.layout,
-        researchData: researchResult,
+        researchData: reviewResearchData,
         onCardUpdate: (action) => {
           logger.info('Orchestrator', 'Review updated card', {
             cardId: action.cardId,
@@ -551,7 +567,7 @@ async function runPipeline({
         reviewActions: reviewResult.actions?.length || 0,
       });
     } else {
-      logger.info('Orchestrator', 'Skipping Phase 3 (no research findings)');
+      logger.info('Orchestrator', 'Skipping Phase 3 (no research findings, all cards populated)');
     }
 
     // =====================================================

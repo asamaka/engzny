@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `slow_pipeline` (4a2d9787, 31369ms) | Fixed P1: Tool loop iterations causing 14s enhance + 15.3s review for 7-card pipelines. Limited enhance to 2 iterations (from default 8), review to 1 iteration. Compacted review prompt to send only cards matching research findings instead of all card data. Expected: enhance ~8s, review ~5s, total ~15-18s (down from 31s).
+> **2026-03-03** | Trigger: `report_review` (3da0bca5, 21006ms, success) | Fixed P1: Pipeline 3da0bca5 showed 6/7 cards — enhance phase missed a card (Claude returned end_turn after 6 tool calls), and review phase excluded unpopulated cards because they didn't match research findings. Fix: (1) `buildReviewPrompt` now always includes unpopulated cards and flags them with `NEEDS_POPULATION` + priority 0 instruction, (2) orchestrator runs review phase even without research findings if cards are still unpopulated.
 
 ## Active Work
 
@@ -29,6 +29,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Enhance phase 27s with Sonnet — Sonnet too slow for tool_use card population (fixed: switched to Haiku, increased review maxTokens to 8192, compacted JSON)
 - [x] Mobile uploads 15-17s + HTTP 413 errors — UPLOAD_TARGET_SIZE 3.2MB too close to Vercel 4.5MB limit (fixed: reduced to 1.5MB + MAX_DIM 1920→1568 to match Claude vision resolution)
 - [x] Tool loop iterations blowing up pipeline duration — 7-card pipelines taking 31s+ due to 4-5 loop iterations per phase (fixed: maxIterations 2 for enhance, 1 for review, compact review prompt)
+- [x] Enhance phase misses cards (6/7) when Claude returns end_turn early — review phase excluded unpopulated cards from prompt (fixed: review always includes unpopulated cards with NEEDS_POPULATION flag, orchestrator runs review even without research findings)
 
 ### P2 — Polish (UX friction, visual quality, confusing output)
 
@@ -66,4 +67,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Dashboard showed 2x "Upload failed (HTTP 413)" client errors and upload times of 15-17s for ~2.6MB images on mobile. After fix: expected upload times ~5-8s, zero 413 errors.
 - Tool loop iterations are the main pipeline duration driver for 7-card layouts. Each iteration re-sends the full conversation (including image in enhance phase), growing input tokens. Default maxIterations=8 allows up to 8 round-trips. Capped enhance at 2 (first pass populates most cards, second catches remainder) and review at 1 (all updates in a single batch). Also compacted review prompt to only include cards matching research findings — reduces input tokens by ~40% for typical 7-card pipelines.
 - UI quality was a blind spot: card grid had 8px padding/gap on mobile, giving a cramped edge-to-edge look. No agent caught this because checks were focused on errors/performance. Agent spec updated to always review UI quality regardless of trigger reason.
+- Pipeline 3da0bca5 had 6/7 cards because enhance phase (maxIterations=2) made only 1 LLM call that populated 6 cards with stop_reason: end_turn. The 7th card stayed as a loading skeleton. Root cause: buildReviewPrompt filtered cards to research-matching ones only, silently dropping empty cards. The review phase is text-only (no image) but can still populate cards like did_you_know_card, action_card, warning_card from content analysis + research context.
 - ROOT CAUSE of zero-padding UI: the global `* { margin: 0; padding: 0; }` CSS reset was unlayered, which in CSS Cascade Layers means it overrides ALL @layer-based styles regardless of specificity. DaisyUI 5 + Tailwind 4 both use @layer for their styles. So every `.badge`, `.btn`, `.card`, `p-4`, `mb-2`, `gap-3` etc. had their padding/margin stripped. Fix: move reset into `@layer base`.
