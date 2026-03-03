@@ -2842,12 +2842,12 @@ app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
 // Render capture — save device screenshot, DOM snapshot, and client state (open endpoint like client-report)
 app.post('/api/hub/v2/render-capture', async (req, res) => {
   try {
-    const { requestId, image, domSnapshot, clientState, fallback } = req.body || {};
+    const { requestId, image, domSnapshot, cardHtml, clientState, fallback } = req.body || {};
     if (!requestId) {
       return res.status(400).json({ error: 'requestId required' });
     }
-    if (!image && !domSnapshot) {
-      return res.status(400).json({ error: 'image or domSnapshot required' });
+    if (!image && !domSnapshot && !cardHtml) {
+      return res.status(400).json({ error: 'image, domSnapshot, or cardHtml required' });
     }
 
     let base64 = null;
@@ -2863,16 +2863,17 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
       renderMethod = 'client';
     }
 
-    const domSizeKB = domSnapshot ? Math.round(domSnapshot.length / 1024) : 0;
-    if (domSizeKB > 1024) {
-      return res.status(413).json({ error: 'DOM snapshot too large (max 1MB)' });
+    // Build a renderable HTML document from whatever the client sent
+    let htmlToRender = domSnapshot || null;
+    if (!htmlToRender && cardHtml) {
+      htmlToRender = buildCardViewHtml(cardHtml, clientState);
     }
 
-    // Server-side render: if no client image but we have a DOM snapshot, render it with Puppeteer
-    if (!base64 && domSnapshot) {
+    // Server-side render with Puppeteer if we have HTML but no client image
+    if (!base64 && htmlToRender) {
       try {
         const snapshotRenderer = require('./lib/snapshot-renderer');
-        const rendered = await snapshotRenderer.renderSnapshotToBase64(domSnapshot, clientState);
+        const rendered = await snapshotRenderer.renderSnapshotToBase64(htmlToRender, clientState);
         if (rendered && rendered.length > 100) {
           base64 = rendered;
           sizeKB = Math.round(base64.length * 0.75 / 1024);
@@ -2880,27 +2881,48 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
           logger.info('RenderCapture', 'Server-side render succeeded', { requestId, sizeKB });
         }
       } catch (err) {
-        logger.warn('RenderCapture', 'Server-side render failed, saving DOM only', { requestId, err: err.message });
+        logger.warn('RenderCapture', 'Server-side render failed', { requestId, err: err.message });
       }
     }
 
     if (base64) {
-      await liveReports.saveRenderCapture(requestId, base64, { domSnapshot, clientState });
-    } else if (domSnapshot || clientState) {
-      await liveReports.saveRenderCapture(requestId, '', { domSnapshot, clientState });
+      await liveReports.saveRenderCapture(requestId, base64, { domSnapshot: htmlToRender, clientState });
+    } else if (htmlToRender || clientState) {
+      await liveReports.saveRenderCapture(requestId, '', { domSnapshot: htmlToRender, clientState });
     }
 
     logger.info('RenderCapture', 'Saved render capture', {
-      requestId, sizeKB, domSizeKB, renderMethod,
+      requestId, sizeKB, renderMethod,
+      hasCardHtml: !!cardHtml, hasDomSnapshot: !!domSnapshot,
       hasClientState: !!clientState,
       viewport: clientState?.viewport ? `${clientState.viewport.width}x${clientState.viewport.height}` : null,
     });
-    res.json({ ok: true, sizeKB, domSizeKB, renderMethod });
+    res.json({ ok: true, sizeKB, renderMethod });
   } catch (err) {
     logger.error('RenderCapture', 'Save failed', { err: err.message, requestId: req.body?.requestId });
     res.status(500).json({ error: 'Failed to save render capture' });
   }
 });
+
+function buildCardViewHtml(cardHtml, clientState) {
+  const vw = clientState?.viewport?.width || 390;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"><\/script>
+<style>
+[data-theme="thinx"]{color-scheme:dark;--color-base-100:oklch(7% 0.01 260);--color-base-200:oklch(13% 0.015 260);--color-base-300:oklch(18% 0.02 260);--color-base-content:oklch(93% 0.01 260);--color-primary:oklch(64% 0.17 260);--color-primary-content:oklch(100% 0 0);--color-secondary:oklch(64% 0.19 300);--color-accent:oklch(78% 0.17 160);--color-neutral:oklch(15% 0.015 260)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0d12;font-family:Inter,system-ui,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased;width:${vw}px;overflow-x:hidden}
+.card-grid{display:grid;grid-template-columns:1fr;gap:10px;padding:12px 16px}
+.card{background:#12151c;border:1px solid #1a1f2e;border-radius:16px;overflow:hidden;padding:14px}
+.card.span-full,.card.span-2{grid-column:1/-1}
+.material-symbols-rounded{font-family:"Material Symbols Rounded";font-style:normal;font-weight:400;display:inline-block;line-height:1;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}
+</style></head><body data-theme="thinx">${cardHtml}</body></html>`;
+}
 
 app.get('/api/r/:requestId/render', requirePin, async (req, res) => {
   try {
