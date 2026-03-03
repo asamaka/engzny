@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `slow_pipeline` (f843d2b8, 28783ms) | Fixed P1: Enhance phase took 18.1s because prompt included all 22 card type schemas + 13 layout types. Trimmed to only relevant types (existing cards + layout suggestions + did_you_know_card) and replaced layout list with just current layout. Also compacted review prompt JSON. Expected enhance reduction: ~5-7s (from 18s to ~11-13s), bringing total pipeline to ~22-24s.
+> **2026-03-03** | Trigger: `slow_pipeline` (cc177943, 42304ms) | Fixed P1: Enhance phase took 27.3s with Sonnet (tool loop + large image). Switched enhance model from Sonnet to Haiku (5-10x faster for structured extraction). Also increased review maxTokens from 4096 to 8192 (batch all cards in one response), and compacted all JSON serialization (removed pretty-printing). Expected pipeline: classify ~1.5s + enhance ~5-8s + review ~5-7s ≈ 15-18s.
 
 ## Active Work
 
@@ -26,6 +26,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Verification card status inconsistent: shows "unconfirmed" while 2/3 sources are green (fixed: post-phase reconciliation re-computes overall status from source statuses)
 - [x] Review phase 24.5s: Sonnet used for text-only structured merging (fixed: switched to Haiku + lean prompt + reduced maxTokens)
 - [x] Enhance phase 18s with Sonnet — prompt sent all 22 schemas + 13 layouts (fixed: targeted schemas for relevant types only, compact layout info)
+- [x] Enhance phase 27s with Sonnet — Sonnet too slow for tool_use card population (fixed: switched to Haiku, increased review maxTokens to 8192, compacted JSON)
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -54,3 +55,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Pipeline breakdown for 46s run: classify 1.5s + enhance 20s (parallel with research 11s) + review 24.5s. After Haiku review fix, expected: classify 1.5s + enhance 20s + review ~3-5s = ~25s total.
 - Enhance prompt was sending all 22 card type schemas (~3500 tokens) + 13 layout type summaries (~500 tokens) even though classifier already chose specific types. For a "simple" layout with 4 cards, only 4 schemas are needed. Switched to targeted schemas: existing types + layout suggested types + did_you_know_card.
 - Pipeline breakdown for 28.8s run (f843d2b8): classify 1.0s + enhance 18.1s (parallel with research 10.9s) + review 9.7s. After targeted schema fix, expected: classify 1.0s + enhance ~12s + review ~9s = ~22s total.
+- Pipeline breakdown for 42.3s run (cc177943): classify 1.5s + enhance 27.3s (Sonnet, parallel with research 9.5s) + review 13.5s (Haiku, 4096 maxTokens). Switched enhance to Haiku and unified maxTokens to 8192. Expected: classify 1.5s + enhance ~6s + review ~6s = ~14-18s total.
+- Haiku is sufficient for card population from screenshots — the task is structured extraction, not complex reasoning. Quality maintained by review phase as second pass.

@@ -110,14 +110,14 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
 
   const currentState = JSON.stringify({
     contentAnalysis,
-    layout,
+    layout: { type: layout.type, columns: layout.columns },
     cards: currentCards.map(c => ({
       id: c.id,
       cardType: c.cardType,
       data: c.populatedData || c.data || c.placeholderData,
       gridPosition: c.gridPosition,
     })),
-  }, null, 2);
+  });
 
   let prompt = `You are populating a screenshot analysis hub. A fast classifier identified the content and chose a layout with skeleton cards. YOUR JOB: populate each card with REAL DATA from the screenshot, making the hub informative, visual, and concise.
 
@@ -158,8 +158,15 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 - ALWAYS use verification_card (not fact_check) for breaking news`;
 
   if (researchData) {
+    const compactResearch = {
+      findings: (researchData.findings || []).map(f => ({
+        topic: f.topic, summary: f.summary, confidence: f.confidence,
+        sourceUrls: f.sourceUrls, factCheck: f.factCheck,
+      })),
+      overallContext: researchData.overallContext,
+    };
     prompt += `\n\n**Web research findings (REVIEW PASS — incorporate these into cards):**
-${JSON.stringify(researchData, null, 2)}
+${JSON.stringify(compactResearch)}
 
 REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
 1. UPDATE verification_card sources with actual findings — #1 priority
@@ -182,7 +189,7 @@ function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
       cardType: c.cardType,
       data: c.populatedData || c.data || c.placeholderData,
     })),
-  }, null, 2);
+  });
 
   const researchFindings = researchData.findings || [];
   const researchJson = JSON.stringify({
@@ -236,8 +243,8 @@ async function enhance({
   const isReview = !!researchData;
   const config = {
     ...adapterConfig,
-    model: adapterConfig.model || 'claude-sonnet-4-20250514',
-    maxTokens: isReview ? 4096 : 8192,
+    model: adapterConfig.model || 'claude-haiku-4-5-20251001',
+    maxTokens: 8192,
   };
 
     const adapter = getVisionAdapter(config);
