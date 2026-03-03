@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `report_review` (ae0ad637, breaking_news, 17.5s) | Fixed P1: verification_card field name mismatches — LLM sends `status: "verified"` but orchestrator only recognized `"confirmed"`, and LLM sends `source: "name"` but code/renderer only checked `.name`. Both sources showed as "checking" (hourglass) and overall status stuck at "unconfirmed" despite all sources confirmed. Fixed: (1) added `normalizeSourceStatus()` in orchestrator to map LLM variants (`verified`→`confirmed`, `false`→`denied`, `searching`→`checking`). (2) Phase 2.5 and reconciliation now normalize `.source`→`.name` field. (3) Frontend accepts `verified`, `searching`, `pending`, `false`, `disproven` as source status variants and `sObj.source` as name fallback.
+> **2026-03-03** | Trigger: `report_review` (19a4260b, breaking_news, 16.0s) | Fixed P2: web research citations never shown to users — `appendCitations()` looked for `.card-inner` element but no card renderer creates that wrapper, so citations from Perplexity Sonar/Claude web search were silently dropped. Fixed: append citations directly to card element, remove stale citations on card updates, add horizontal margin to `.web-citations` CSS so they align with card content padding, and validate citation URLs before rendering.
 
 ## Active Work
 
@@ -45,6 +45,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Chat card field name mismatches — LLM sends `isOwn`/`timestamp` but renderer only checked `isUser`/`time`. Fixed: accept `isOwn`/`isOwnMessage`, `timestamp`/`ts`, `content`/`message` variants.
 - [x] Follow-up questions always empty — fast classifier returns `[]`, research Sonar Q&A never surfaced. Fixed: orchestrator merges research follow-up questions, frontend re-renders on complete event.
 - [ ] `getCardTypeLabel` function and `CARD_ICONS` for 6 new card types (chat_card, map_card, order_card, stats_grid_card, gallery_card, source_card) are dead code — never called. Consider removing or integrating.
+- [x] Web research citations never displayed — `appendCitations()` queried `.card-inner` which no card renderer creates, silently dropping all Perplexity/Claude citations (fixed: append directly to card element, add horizontal margin to CSS)
 - [ ] Ongoing: review card rendering CSS on each run for visual regressions (margins, padding, spacing, typography, responsive breakpoints)
 - [ ] Ongoing: agent diversification — if last 3+ commits are same area, agents must pick a different area (enforced via prompt + spec)
 
@@ -86,4 +87,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Chat card schema defines `isUser` (boolean) and `time` (string) for messages, but the LLM frequently uses alternative names like `isOwn`, `isOwnMessage`, `timestamp`, `ts`, `content`, `message`. Making renderers defensive against common LLM field name variants is more reliable than expecting perfect schema adherence.
 - Verification card had the same LLM field variant issue: schema says `name`/`confirmed` but Haiku sends `source`/`verified`. The `computeVerificationStatus` function only checked for exact `"confirmed"` match, causing all-green sources to compute as `"unconfirmed"`. This pattern will recur for any card type — **always normalize LLM-provided enum values before comparing**.
 - Haiku should NEVER set verification statuses — it has no research data to back claims. Its role is speed-to-first-card with assumptions that get confirmed/denied by Sonar research. Phase 2.5 must always re-evaluate ALL sources against research, not just "checking" ones.
+- The `appendCitations` function was referencing `.card-inner` — a class that was likely removed during a card renderer refactor but the citation code wasn't updated. This meant zero research citations were ever visible to users since the feature was added. Always verify DOM selectors against actual rendered HTML when making changes.
 - Report 00c854e0 (messaging/WhatsApp, 5 cards, 11.2s): research phase returned 2 follow-up Q&A with answers + 3 additional questions — all valuable context that was being discarded. Report f38c2ec1 (breaking news, 7 cards, 17.4s): person_card and location_card data was swapped by the LLM (person_card had location data and vice versa) — potential P2 output quality issue for future fix.
