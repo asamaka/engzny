@@ -140,7 +140,7 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 **YOUR TASKS (PRIORITY ORDER):**
 1. POPULATE HERO: Update hero_summary with a proper takeaway, imageUrl if relevant, and ensure title is under 6 words. Add badge and badgeColor.
 2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
-3. VERIFICATION: If there's a verification_card, set each source status to confirmed/denied/not_yet_reported. Include snippets and URLs.
+3. VERIFICATION: If there's a verification_card, populate the claim and source NAMES, but set ALL source statuses to "checking" — research will verify them later.
 4. ADD IMAGES: person_card needs photoUrl, location_card needs imageUrl, news_card needs imageUrl.
 5. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
 6. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
@@ -151,7 +151,7 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 - Keep ALL text ultra-concise — no paragraphs. Titles: max 6 words. Values: max 10 words.
 - For person_card: ALWAYS include name, role, and context even if sparse
 - For location_card: ALWAYS include name, context, and a Google Maps URL in mapUrl
-- For verification_card: set sources to "not_yet_reported" if you can't verify (NEVER leave as "checking")
+- For verification_card: ALWAYS set source statuses to "checking" — you cannot verify claims, only research can. Populate the claim text and source names only.
 - Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
 - For product_card: features/warnings must be plain strings
@@ -257,11 +257,11 @@ ${researchFindings.length > 0 ? `\nResearch: ${JSON.stringify(compactResearch)}`
 ${researchData && researchData.overallContext ? `Context: ${truncateStr(researchData.overallContext, 300)}` : ''}${contextLine}
 
 Tasks (ALL in ONE batch):${populateInstructions}
-1. verification_card: update source statuses from research
+1. verification_card: update source statuses ONLY based on research evidence — set "confirmed" if research supports, "denied" if contradicts, "not_yet_reported" if no evidence
 2. Add sourceUrls to cards with matching research
 3. Correct facts research contradicts
 4. Enrich with dates/stats/context
-Rules: ultra-concise text, batch ALL tools in ONE response, skip accurate cards`;
+Rules: ultra-concise text, batch ALL tools in ONE response, skip accurate cards, NEVER guess verification statuses without research evidence`;
 }
 
 async function enhance({

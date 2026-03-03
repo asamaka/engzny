@@ -445,36 +445,32 @@ async function runPipeline({
           if (!source.name && source.source) source.name = source.source;
         }
 
-        // Try to match research findings to verification sources
+        // Haiku's verification statuses are unreliable assumptions —
+        // always re-evaluate ALL sources against research findings
         for (const source of sources) {
-          const normalized = normalizeSourceStatus(source.status);
-          if (normalized === 'checking') {
-            // Find a research finding that mentions this source
-            const sourceName = (source.name || '').toLowerCase();
-            const finding = sourceName && researchResult.findings.find(f => {
-              const text = `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
-              return text.includes(sourceName);
-            });
+          const sourceName = (source.name || '').toLowerCase();
+          const finding = sourceName && researchResult.findings.find(f => {
+            const text = `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
+            return text.includes(sourceName);
+          });
 
-            if (finding) {
-              const fc = finding.factCheck;
-              if (fc && (fc.verdict === 'verified' || fc.verdict === 'partially_true')) {
-                source.status = 'confirmed';
-              } else if (fc && (fc.verdict === 'false' || fc.verdict === 'misleading')) {
-                source.status = 'denied';
-              } else {
-                source.status = 'not_yet_reported';
-              }
-              source.snippet = finding.summary || '';
-              if (finding.sourceUrls && finding.sourceUrls.length > 0) {
-                source.url = finding.sourceUrls[0];
-              }
-              updated = true;
+          if (finding) {
+            const fc = finding.factCheck;
+            if (fc && (fc.verdict === 'verified' || fc.verdict === 'partially_true')) {
+              source.status = 'confirmed';
+            } else if (fc && (fc.verdict === 'false' || fc.verdict === 'misleading')) {
+              source.status = 'denied';
             } else {
-              // No finding for this source — mark as not yet reported
               source.status = 'not_yet_reported';
-              updated = true;
             }
+            source.snippet = finding.summary || '';
+            if (finding.sourceUrls && finding.sourceUrls.length > 0) {
+              source.url = finding.sourceUrls[0];
+            }
+            updated = true;
+          } else {
+            source.status = 'not_yet_reported';
+            updated = true;
           }
         }
 
@@ -516,9 +512,10 @@ async function runPipeline({
       let anyStillChecking = false;
       for (const source of sources) {
         if (!source.name && source.source) source.name = source.source;
-        if (normalizeSourceStatus(source.status) === 'checking') {
+        const norm = normalizeSourceStatus(source.status);
+        if (norm === 'checking' || norm === 'not_yet_reported') {
           source.status = 'not_yet_reported';
-          source.snippet = 'Unable to verify — check source directly';
+          if (!source.snippet) source.snippet = 'Unable to verify — check source directly';
           anyStillChecking = true;
         }
       }
