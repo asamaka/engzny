@@ -2852,17 +2852,36 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
 
     let base64 = null;
     let sizeKB = 0;
+    let renderMethod = 'none';
+
     if (image) {
       base64 = image.replace(/^data:image\/\w+;base64,/, '');
       sizeKB = Math.round(base64.length * 0.75 / 1024);
       if (sizeKB > 2048) {
         return res.status(413).json({ error: 'Image too large (max 2MB)' });
       }
+      renderMethod = 'client';
     }
 
     const domSizeKB = domSnapshot ? Math.round(domSnapshot.length / 1024) : 0;
     if (domSizeKB > 1024) {
       return res.status(413).json({ error: 'DOM snapshot too large (max 1MB)' });
+    }
+
+    // Server-side render: if no client image but we have a DOM snapshot, render it with Puppeteer
+    if (!base64 && domSnapshot) {
+      try {
+        const snapshotRenderer = require('./lib/snapshot-renderer');
+        const rendered = await snapshotRenderer.renderSnapshotToBase64(domSnapshot, clientState);
+        if (rendered && rendered.length > 100) {
+          base64 = rendered;
+          sizeKB = Math.round(base64.length * 0.75 / 1024);
+          renderMethod = 'server-puppeteer';
+          logger.info('RenderCapture', 'Server-side render succeeded', { requestId, sizeKB });
+        }
+      } catch (err) {
+        logger.warn('RenderCapture', 'Server-side render failed, saving DOM only', { requestId, err: err.message });
+      }
     }
 
     if (base64) {
@@ -2871,12 +2890,12 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
       await liveReports.saveRenderCapture(requestId, '', { domSnapshot, clientState });
     }
 
-    logger.info('RenderCapture', 'Saved device render capture', {
-      requestId, sizeKB, domSizeKB, fallback: !!fallback,
+    logger.info('RenderCapture', 'Saved render capture', {
+      requestId, sizeKB, domSizeKB, renderMethod,
       hasClientState: !!clientState,
       viewport: clientState?.viewport ? `${clientState.viewport.width}x${clientState.viewport.height}` : null,
     });
-    res.json({ ok: true, sizeKB, domSizeKB, fallback: !!fallback });
+    res.json({ ok: true, sizeKB, domSizeKB, renderMethod });
   } catch (err) {
     logger.error('RenderCapture', 'Save failed', { err: err.message, requestId: req.body?.requestId });
     res.status(500).json({ error: 'Failed to save render capture' });
