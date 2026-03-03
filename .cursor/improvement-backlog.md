@@ -29,9 +29,11 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Enhance phase 27s with Sonnet — Sonnet too slow for tool_use card population (fixed: switched to Haiku, increased review maxTokens to 8192, compacted JSON)
 - [x] Mobile uploads 15-17s + HTTP 413 errors — UPLOAD_TARGET_SIZE 3.2MB too close to Vercel 4.5MB limit (fixed: reduced to 1.5MB + MAX_DIM 1920→1568 to match Claude vision resolution)
 
-### P2 — Polish (UX friction, confusing output)
+### P2 — Polish (UX friction, visual quality, confusing output)
 
+- [x] Card grid had cramped margins on mobile — padding was 8px, gap was 8px. Increased to 16px padding + 12px gap (mobile), 20px/14px (tablet), 16px gap (desktop). Follow-up section padding also fixed.
 - [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
+- [ ] Ongoing: review card rendering CSS on each run for visual regressions (margins, padding, spacing, typography, responsive breakpoints)
 
 ### P3 — Resilience (logging, edge cases, retry logic)
 
@@ -60,3 +62,4 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Haiku is sufficient for card population from screenshots — the task is structured extraction, not complex reasoning. Quality maintained by review phase as second pass.
 - Client-side UPLOAD_TARGET_SIZE was 3.2MB (3.2 * 4/3 = 4.27MB base64 + JSON overhead → dangerously close to Vercel 4.5MB limit). Reduced to 1.5MB (~2MB base64) — eliminates HTTP 413 risk and halves mobile upload time. MAX_DIM reduced from 1920 to 1568 to match Claude's internal vision processing resolution.
 - Dashboard showed 2x "Upload failed (HTTP 413)" client errors and upload times of 15-17s for ~2.6MB images on mobile. After fix: expected upload times ~5-8s, zero 413 errors.
+- UI quality was a blind spot: card grid had 8px padding/gap on mobile, giving a cramped edge-to-edge look. No agent caught this because checks were focused on errors/performance. Agent spec updated to always review UI quality regardless of trigger reason.

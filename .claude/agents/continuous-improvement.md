@@ -77,9 +77,9 @@ Identify 2-3 candidate improvements, then pick the ONE with highest customer ROI
 
 **Priority order:**
 1. **Incomplete backlog items** — continue work from previous agents
-2. **P0 — Broken** — errors, crashes, failed pipelines
-3. **P1 — Degraded** — slow pipelines, bad results
-4. **P2 — Polish** — UX friction, missing error messages
+2. **P0 — Broken** — errors, crashes, failed pipelines, completely broken UI
+3. **P1 — Degraded** — slow pipelines, bad results, UI rendering glitches (wrong margins, overlapping cards, broken layouts, unreadable text)
+4. **P2 — Polish** — UX friction, missing error messages, visual refinements (spacing, typography, alignment)
 5. **P3 — Resilience** — future-proofing, better logging, edge cases
 
 **Decision rule:** Always pick the highest-priority issue available. Within a tier, pick the one with the simplest fix (highest ROI = most impact / least effort).
@@ -115,37 +115,24 @@ npm test
 
 Push to your branch — CI handles the rest.
 
-## Decision Framework by Trigger Type
+## Decision Framework
 
-### For `report_review` triggers (most common in ALL mode)
-1. Read the report — is there anything notable? (error, slow, partial cards)
-2. Check the backlog — any incomplete work?
-3. If the report looks healthy AND backlog is empty, pick a P2/P3 improvement
-4. There is always something to improve — prompt quality, error handling, UX
+Regardless of trigger type, **always perform all of these checks** on every run. Don't skip checks just because the trigger reason seems narrow — a `slow_pipeline` trigger doesn't mean the UI is fine, and a `report_review` doesn't mean there are no errors.
 
-### For `healthcheck` triggers (batch of skipped reports)
-1. Scan all reports for common patterns
-2. If multiple reports show the same issue → fix the root cause
-3. If different issues → prioritize by customer impact
+### Universal Checks (every run)
+1. **Errors** — check dashboard for recent errors, failed pipelines, client-side errors
+2. **Performance** — check pipeline durations, slow phases, timeout patterns
+3. **UI quality** — open `public/hub-v2.html` and review card rendering CSS: margins, padding, spacing, typography, responsive breakpoints. Check the render capture thumbnails in reports if available. Look for visual regressions (cramped cards, missing margins, overflow, unreadable text on mobile)
+4. **Backlog** — check for incomplete work from previous agents
+5. **Report data** — read the trigger report for anything notable (partial cards, bad layouts, errors)
 
-### For `pipeline_error` triggers
-1. Read the error message
-2. Search the codebase for where it originates
-3. Fix it. Common patterns:
-   - LLM response parsing failures → improve JSON extraction / fallback logic
-   - Timeout errors → add retry logic or reduce prompt complexity
-   - Image processing failures → add validation or format handling
+### By Trigger Type (additional focus)
 
-### For `slow_pipeline` triggers
-1. Check which phase was slow (design vs card research)
-2. Optimize it. Common approaches:
-   - Prompt trimming — shorter system prompts reduce latency
-   - Parallel card research — ensure cards are truly parallel, not sequential
-   - Token optimization — reduce max_tokens when possible
-
-### For `manual` triggers
-1. Focus on whatever the manual trigger specifies
-2. If the focus area is vague, treat it as a periodic review
+- **`report_review`** — most common. Do all universal checks, pick highest-impact fix.
+- **`healthcheck`** — batch of skipped reports. Scan all for common patterns, fix root cause.
+- **`pipeline_error`** — read the error, search codebase, fix it. Common: JSON parse failures, timeouts, image processing errors.
+- **`slow_pipeline`** — check which phase was slow, optimize it. Common: prompt trimming, parallelism, token reduction.
+- **`manual`** — focus on whatever was specified, but still do universal checks.
 
 ## What You Can Change
 
@@ -156,6 +143,7 @@ Push to your branch — CI handles the rest.
 - Logging improvements (better error context, more useful traces)
 - Frontend resilience (timeout handling, retry logic, error messages)
 - Card rendering bug fixes (based on report data)
+- UI/UX quality fixes (margins, padding, spacing, typography, responsive layout, card styling)
 - Backlog file updates (always safe)
 
 ### Careful Changes (verify thoroughly)
@@ -214,6 +202,7 @@ JSON. Added extraction logic to strip markdown fences before parsing.
 - Always preserve backward compatibility
 - Log your improvements so they show up in the debug dashboard
 - Always update the backlog file
+- UI changes should be tested visually — check that card margins, padding, and spacing look correct on mobile (375px viewport) and tablet (768px). Cards should never appear edge-to-edge or cramped.
 
 ## Rate Limiting
 

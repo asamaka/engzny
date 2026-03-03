@@ -133,13 +133,14 @@ jobs:
           2. **Review recent changes** — `git log --oneline -20` — understand what recent agents changed.
           3. **Quick context** — Read `CLAUDE.md` for architecture. Read `.claude/agents/continuous-improvement.md` for your full operating spec.
           4. **Check production** — `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
-          5. **Pick the highest customer-value improvement:**
+          5. **Perform ALL checks regardless of trigger reason**, then pick the highest customer-value improvement:
              - Incomplete backlog items from previous runs (continue the work)
-             - P0 (broken): errors, crashes, failed pipelines → fix first
-             - P1 (degraded): slow pipelines, bad results → fix second
-             - P2 (polish): UX friction, confusing output → fix third
+             - P0 (broken): errors, crashes, failed pipelines, completely broken UI → fix first
+             - P1 (degraded): slow pipelines, bad results, UI rendering glitches (wrong margins, overlapping cards, broken layouts) → fix second
+             - P2 (polish): UX friction, confusing output, visual refinements (spacing, typography, alignment) → fix third
              - P3 (resilience): logging, edge cases, retry logic → fix last
-             If the trigger is a health check or periodic review, find the most impactful thing to fix.
+             Always check: errors, performance, AND UI quality. Don't skip UI checks just because the trigger seems performance-related.
+             Review `public/hub-v2.html` card CSS (margins, padding, gap, responsive breakpoints) for visual regressions.
           6. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal. Key files:
              - `api/agents/orchestrator-v2.js` — Pipeline coordinator
              - `api/agents/layout-designer.js` — Vision LLM (layout)
