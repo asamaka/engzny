@@ -181,50 +181,55 @@ REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
 }
 
 function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
-  const existingTypes = currentCards.map(c => c.cardType);
-  const currentState = JSON.stringify({
-    contentAnalysis,
-    cards: currentCards.map(c => ({
-      id: c.id,
-      cardType: c.cardType,
-      data: c.populatedData || c.data || c.placeholderData,
-    })),
-  });
-
   const researchFindings = researchData.findings || [];
-  const researchJson = JSON.stringify({
-    findings: researchFindings.map(f => ({
-      topic: f.topic,
-      summary: f.summary,
-      confidence: f.confidence,
-      sourceUrls: f.sourceUrls,
-      factCheck: f.factCheck,
-    })),
-    overallContext: researchData.overallContext,
+
+  const relevantCards = currentCards.filter(c => {
+    if (c.cardType === 'verification_card') return true;
+    const data = c.populatedData || c.data || c.placeholderData || {};
+    const cardText = `${data.title || ''} ${data.name || ''} ${data.claim || ''} ${data.label || ''}`.toLowerCase();
+    return researchFindings.some(f => {
+      const fText = `${f.topic || ''} ${f.summary || ''}`.toLowerCase();
+      return fText.split(/\s+/).some(w => w.length > 3 && cardText.includes(w));
+    });
   });
 
-  return `You are reviewing populated cards against web research findings. Update cards with corrections, URLs, and verified data.
+  const cardsToReview = relevantCards.length > 0 ? relevantCards : currentCards;
+  const existingTypes = [...new Set(cardsToReview.map(c => c.cardType))];
 
-**Current cards:**
-${currentState}
+  const compactCards = cardsToReview.map(c => {
+    const data = c.populatedData || c.data || c.placeholderData || {};
+    const summary = { id: c.id, cardType: c.cardType };
+    if (data.title) summary.title = data.title;
+    if (data.name) summary.name = data.name;
+    if (data.claim) summary.claim = data.claim;
+    if (data.sources) summary.sources = data.sources;
+    if (data.status) summary.status = data.status;
+    return summary;
+  });
 
-**Schemas for existing card types:**
-${getCardTypeSchemaForTypes(existingTypes)}
+  const compactResearch = researchFindings.map(f => ({
+    topic: f.topic,
+    summary: f.summary,
+    confidence: f.confidence,
+    sourceUrls: (f.sourceUrls || []).slice(0, 3),
+    factCheck: f.factCheck,
+  }));
 
-**Research findings:**
-${researchJson}
+  return `Review cards against research. Update with corrections, URLs, verified data. Call ALL update_card tools in ONE response.
 
-**YOUR TASKS — call ALL update_card tools in ONE response:**
-1. If verification_card exists: update sources with confirmed/denied/not_yet_reported based on research
-2. Add sourceUrls to cards where research found relevant links
-3. Correct any facts that research contradicts
-4. Enrich cards with dates, stats, context from research
-5. Do NOT add new cards unless research reveals critical missing info
+Cards: ${JSON.stringify(compactCards)}
 
-**RULES:**
-- Keep text ultra-concise — no paragraphs
-- Call MULTIPLE tools in a SINGLE response
-- Only update cards that benefit from research data — skip cards already accurate`;
+Schemas: ${getCardTypeSchemaForTypes(existingTypes)}
+
+Research: ${JSON.stringify(compactResearch)}
+Context: ${researchData.overallContext || ''}
+
+Tasks (ALL in ONE batch):
+1. verification_card: update source statuses from research
+2. Add sourceUrls to cards with matching research
+3. Correct facts research contradicts
+4. Enrich with dates/stats/context
+Rules: ultra-concise text, batch ALL tools in ONE response, skip accurate cards`;
 }
 
 async function enhance({
@@ -258,6 +263,7 @@ async function enhance({
       model: config.model,
       cardCount: currentCards.length,
       hasResearch: !!researchData,
+      maxIterations: adapterConfig.maxIterations || 8,
     });
 
     const actions = [];
@@ -313,6 +319,7 @@ async function enhance({
     try {
       const useLoop = typeof adapter.analyzeImageWithToolLoop === 'function';
       const useTextLoop = isReview && typeof adapter.textWithToolLoop === 'function';
+      const maxIterations = adapterConfig.maxIterations || 8;
       let response;
 
       if (useTextLoop) {
@@ -321,6 +328,7 @@ async function enhance({
           tools: ENHANCER_TOOLS,
           maxTokens: config.maxTokens,
           onToolUse: processToolBlock,
+          maxIterations,
         });
       } else if (useLoop) {
         response = await adapter.analyzeImageWithToolLoop({
@@ -330,6 +338,7 @@ async function enhance({
           tools: ENHANCER_TOOLS,
           maxTokens: config.maxTokens,
           onToolUse: processToolBlock,
+          maxIterations,
         });
       } else {
         response = await adapter.analyzeImageWithTools({

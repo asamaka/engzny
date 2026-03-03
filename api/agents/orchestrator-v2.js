@@ -308,8 +308,9 @@ async function runPipeline({
       },
       adapterConfig: {
         ...adapterConfig,
-          model: adapterConfig.enhanceModel || 'claude-haiku-4-5-20251001',
+        model: adapterConfig.enhanceModel || 'claude-haiku-4-5-20251001',
         traceCollector,
+        maxIterations: 2,
       },
     }).catch(err => {
       logger.warn('Orchestrator', 'Enhancement failed (non-fatal)', { err: err.message });
@@ -539,6 +540,7 @@ async function runPipeline({
           ...adapterConfig,
           model: adapterConfig.reviewModel || 'claude-haiku-4-5-20251001',
           traceCollector,
+          maxIterations: 1,
         },
       }).catch(err => {
         logger.warn('Orchestrator', 'Review failed (non-fatal)', { err: err.message });
