@@ -2035,11 +2035,8 @@
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
             }
 
-            renderCaptureAttempts = 0;
             setTimeout(() => captureRenderedCards(), 500);
         }
-
-        let renderCaptureAttempts = 0;
 
         const CAPTURE_STYLE_PROPS = [
             'color', 'backgroundColor', 'backgroundImage',
@@ -2047,112 +2044,172 @@
             'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
             'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle',
             'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomLeftRadius', 'borderBottomRightRadius',
-            'boxShadow',
+            'boxShadow', 'textShadow',
             'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
-            'textAlign', 'textTransform',
+            'textAlign', 'textTransform', 'textDecoration',
             'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
             'display', 'flexDirection', 'alignItems', 'justifyContent', 'gap', 'flexWrap',
             'gridTemplateColumns', 'gridTemplateRows',
-            'width', 'maxWidth', 'height', 'maxHeight',
+            'width', 'maxWidth', 'minWidth', 'height', 'maxHeight', 'minHeight',
             'overflowX', 'overflowY',
             'opacity', 'visibility',
+            'position', 'top', 'right', 'bottom', 'left', 'zIndex',
+            'whiteSpace', 'wordBreak', 'wordWrap',
+            'listStyleType',
         ];
 
-        function collectComputedStyles(elements) {
-            return elements.map(el => {
-                const cs = getComputedStyle(el);
-                const styles = {};
-                CAPTURE_STYLE_PROPS.forEach(p => { styles[p] = cs[p]; });
-                return styles;
-            });
-        }
-
-        function applyStylesToClone(clonedElements, styleCache) {
-            for (let i = 0; i < clonedElements.length && i < styleCache.length; i++) {
-                const s = styleCache[i];
+        function inlineComputedStyles(origElements, clonedElements) {
+            for (let i = 0; i < origElements.length && i < clonedElements.length; i++) {
+                const cs = getComputedStyle(origElements[i]);
                 const el = clonedElements[i];
                 CAPTURE_STYLE_PROPS.forEach(p => {
-                    if (s[p] && s[p] !== 'none' && s[p] !== 'normal' && s[p] !== 'auto') {
-                        el.style[p] = s[p];
-                    }
+                    const v = cs[p];
+                    if (v !== undefined && v !== '') el.style[p] = v;
                 });
             }
         }
 
-        function sendRenderCapture(rid, image, domSnapshot, clientState, fallback) {
+        function prepareCloneForCapture(target) {
+            const clone = target.cloneNode(true);
+            clone.querySelectorAll('script, style, link[rel="stylesheet"]').forEach(s => s.remove());
+            const origElements = [target, ...target.querySelectorAll('*')];
+            const clonedElements = [clone, ...clone.querySelectorAll('*')];
+            inlineComputedStyles(origElements, clonedElements);
+            clone.style.opacity = '1';
+            clone.style.transform = 'none';
+            clone.style.position = 'relative';
+            return clone;
+        }
+
+        function sendRenderCapture(rid, image, domSnapshot, clientState, method) {
+            const payload = { requestId: rid, domSnapshot, clientState };
+            if (image) payload.image = image;
+            else payload.fallback = true;
             fetch('/api/hub/v2/render-capture', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requestId: rid, image: image || undefined, domSnapshot, clientState, fallback }),
+                body: JSON.stringify(payload),
             }).then(r => {
                 if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
-                else console.log('[RenderCapture] Saved', fallback ? '(DOM only)' : '(image + DOM)');
+                else console.log('[RenderCapture] Saved via', method);
             }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
         }
 
-        function captureRenderedCards() {
+        function captureViaForeignObject(target) {
+            const w = target.scrollWidth;
+            const h = Math.min(target.scrollHeight, 4096);
+            const scale = Math.min(window.devicePixelRatio || 2, 2);
+            const clone = prepareCloneForCapture(target);
+            clone.style.width = w + 'px';
+            clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+            const xhtml = new XMLSerializer().serializeToString(clone);
+            const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
+                + '<foreignObject width="100%" height="100%">' + xhtml + '</foreignObject></svg>';
+            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(w * scale);
+                        canvas.height = Math.round(h * scale);
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#0a0d12';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.scale(scale, scale);
+                        ctx.drawImage(img, 0, 0, w, h);
+                        URL.revokeObjectURL(url);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                        resolve(dataUrl);
+                    } catch (e) {
+                        URL.revokeObjectURL(url);
+                        reject(e);
+                    }
+                };
+                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG load failed')); };
+                img.src = url;
+            });
+        }
+
+        function captureViaHtml2Canvas(target) {
+            if (typeof html2canvas === 'undefined') return Promise.reject(new Error('not loaded'));
+            const origElements = [target, ...target.querySelectorAll('*')];
+            const styleCache = origElements.map(el => {
+                const cs = getComputedStyle(el);
+                const s = {};
+                CAPTURE_STYLE_PROPS.forEach(p => { s[p] = cs[p]; });
+                return s;
+            });
+            return html2canvas(target, {
+                backgroundColor: '#0a0d12',
+                scale: Math.min(window.devicePixelRatio || 2, 2),
+                logging: false,
+                useCORS: true,
+                allowTaint: true,
+                width: target.scrollWidth,
+                height: Math.min(target.scrollHeight, 4096),
+                windowWidth: target.scrollWidth,
+                windowHeight: target.scrollHeight,
+                onclone: (clonedDoc) => {
+                    clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(s => s.remove());
+                    const ct = clonedDoc.getElementById('resultsOverlay');
+                    if (!ct) return;
+                    ct.style.opacity = '1';
+                    ct.style.transform = 'none';
+                    const clonedEls = [ct, ...ct.querySelectorAll('*')];
+                    for (let i = 0; i < clonedEls.length && i < styleCache.length; i++) {
+                        const s = styleCache[i];
+                        CAPTURE_STYLE_PROPS.forEach(p => { if (s[p] !== undefined && s[p] !== '') clonedEls[i].style[p] = s[p]; });
+                    }
+                },
+            }).then(canvas => canvas.toDataURL('image/jpeg', 0.82));
+        }
+
+        async function captureRenderedCards() {
             const rid = telemetry.requestId;
             if (!rid) return;
-            renderCaptureAttempts++;
-            const attempt = renderCaptureAttempts;
 
-            if (typeof html2canvas === 'undefined') {
-                console.warn('[RenderCapture] html2canvas not loaded, attempt', attempt);
-                if (attempt <= 3) {
-                    setTimeout(() => captureRenderedCards(), 2000);
-                    return;
-                }
-                console.warn('[RenderCapture] html2canvas never loaded, sending DOM snapshot only');
-                waitForCardsToSettle().then(() => {
-                    const clientState = collectClientState();
-                    const domSnapshot = serializeDomSnapshot(resultsOverlay);
-                    if (domSnapshot) sendRenderCapture(rid, null, domSnapshot, clientState, true);
-                });
+            await waitForCardsToSettle();
+
+            const target = resultsOverlay;
+            if (!target || !cardGrid.children.length) {
+                console.warn('[RenderCapture] No target or empty card grid');
                 return;
             }
 
-            waitForCardsToSettle().then(() => {
-                try {
-                    const target = resultsOverlay;
-                    if (!target || !cardGrid.children.length) {
-                        console.warn('[RenderCapture] No target or empty card grid');
-                        return;
-                    }
+            const clientState = collectClientState();
+            const domSnapshot = serializeDomSnapshot(target);
 
-                    const clientState = collectClientState();
-                    const domSnapshot = serializeDomSnapshot(target);
-
-                    const origElements = [target, ...target.querySelectorAll('*')];
-                    const styleCache = collectComputedStyles(origElements);
-
-                    html2canvas(target, {
-                        backgroundColor: '#0a0d12',
-                        scale: Math.min(window.devicePixelRatio || 2, 2),
-                        logging: false,
-                        useCORS: true,
-                        allowTaint: true,
-                        width: target.scrollWidth,
-                        height: Math.min(target.scrollHeight, 4096),
-                        windowWidth: target.scrollWidth,
-                        windowHeight: target.scrollHeight,
-                        onclone: (clonedDoc) => {
-                            const ct = clonedDoc.getElementById('resultsOverlay');
-                            if (!ct) return;
-                            ct.style.opacity = '1';
-                            ct.style.transform = 'none';
-                            applyStylesToClone([ct, ...ct.querySelectorAll('*')], styleCache);
-                        },
-                    }).then(canvas => {
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-                        sendRenderCapture(rid, dataUrl, domSnapshot, clientState, false);
-                    }).catch(e => {
-                        console.warn('[RenderCapture] html2canvas failed:', e.message);
-                        sendRenderCapture(rid, null, domSnapshot, clientState, true);
-                    });
-                } catch (e) {
-                    console.warn('[RenderCapture] Error:', e.message);
+            // Method 1: SVG foreignObject — browser's own renderer
+            try {
+                const dataUrl = await captureViaForeignObject(target);
+                if (dataUrl && dataUrl.length > 1000) {
+                    console.log('[RenderCapture] foreignObject succeeded, size:', Math.round(dataUrl.length / 1024), 'KB');
+                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, 'foreignObject');
+                    return;
                 }
-            });
+            } catch (e) {
+                console.warn('[RenderCapture] foreignObject failed:', e.message);
+            }
+
+            // Method 2: html2canvas with aggressive style inlining
+            try {
+                const dataUrl = await captureViaHtml2Canvas(target);
+                if (dataUrl && dataUrl.length > 1000) {
+                    console.log('[RenderCapture] html2canvas succeeded, size:', Math.round(dataUrl.length / 1024), 'KB');
+                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, 'html2canvas');
+                    return;
+                }
+            } catch (e) {
+                console.warn('[RenderCapture] html2canvas failed:', e.message);
+            }
+
+            // Method 3: DOM snapshot only (server renders as iframe)
+            console.warn('[RenderCapture] All image captures failed, sending DOM snapshot only');
+            sendRenderCapture(rid, null, domSnapshot, clientState, 'dom-only');
         }
 
         function waitForCardsToSettle() {
@@ -2230,31 +2287,15 @@
 
         function serializeDomSnapshot(target) {
             try {
-                const clone = target.cloneNode(true);
-                clone.querySelectorAll('script').forEach(s => s.remove());
-
-                const origElements = [target, ...target.querySelectorAll('*')];
-                const clonedElements = [clone, ...clone.querySelectorAll('*')];
-                for (let i = 0; i < origElements.length && i < clonedElements.length; i++) {
-                    const cs = getComputedStyle(origElements[i]);
-                    const el = clonedElements[i];
-                    CAPTURE_STYLE_PROPS.forEach(p => {
-                        const v = cs[p];
-                        if (v && v !== 'none' && v !== 'normal' && v !== 'auto') el.style[p] = v;
-                    });
-                }
-
-                clone.style.opacity = '1';
-                clone.style.transform = 'none';
-
+                const clone = prepareCloneForCapture(target);
                 const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
                     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
                     + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">'
                     + '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">'
-                    + '<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0a0d12;overflow-x:hidden;font-family:Inter,system-ui,-apple-system,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased}'
+                    + '<style>*{box-sizing:border-box}body{background:#0a0d12;overflow-x:hidden;font-family:Inter,system-ui,-apple-system,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased}'
                     + '.material-symbols-rounded{font-family:"Material Symbols Rounded";font-style:normal;font-weight:400;display:inline-block;line-height:1;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}</style>'
                     + '</head><body>' + clone.outerHTML + '</body></html>';
-                if (html.length > 768 * 1024) return html.substring(0, 768 * 1024);
+                if (html.length > 1024 * 1024) return html.substring(0, 1024 * 1024);
                 return html;
             } catch (e) {
                 console.warn('[RenderCapture] DOM snapshot failed:', e.message);
