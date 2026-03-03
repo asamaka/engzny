@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `slow_pipeline` (4a2d9787, 31369ms) | Fixed P1: Tool loop iterations causing 14s enhance + 15.3s review for 7-card pipelines. Limited enhance to 2 iterations (from default 8), review to 1 iteration. Compacted review prompt to send only cards matching research findings instead of all card data. Expected: enhance ~8s, review ~5s, total ~15-18s (down from 31s).
+> **2026-03-03** | Manual: Complete hub-v2.html rewrite. Nuked the old 3100-line monolith with 23 bespoke card renderers, fragile Tailwind/DaisyUI dependencies, and the `* { padding: 0 }` CSS layer bug. New hub: ~900 lines, zero external CSS framework dependencies, all styles in custom stylesheet, unified card structure (card-head + card-body + card-foot), single-column mobile by default, consistent padding/spacing throughout. All 24 card types supported with a clean generic fallback.
 
 ## Active Work
 
@@ -32,10 +32,10 @@ highest-priority incomplete item and continue where the last agent left off.
 
 ### P2 — Polish (UX friction, visual quality, confusing output)
 
-- [x] Card grid had cramped margins on mobile — padding was 8px, gap was 8px. Increased to 16px padding + 12px gap (mobile), 20px/14px (tablet), 16px gap (desktop). Follow-up section padding also fixed.
-- [x] ALL DaisyUI/Tailwind padding broken — unlayered `* { padding: 0 }` reset overrides `@layer` styles (CSS cascade: unlayered beats layered regardless of specificity). Moved reset into `@layer base` so DaisyUI components and Tailwind utilities take proper effect. Root cause of zero-padding cards, cramped badges/pills, and all spacing issues.
-- [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
-- [ ] Ongoing: review card rendering CSS on each run for visual regressions (margins, padding, spacing, typography, responsive breakpoints)
+- [x] Card grid had cramped margins on mobile — root cause was `* { padding: 0 }` CSS reset overriding DaisyUI @layer styles. Fixed by complete hub rewrite with zero framework dependencies.
+- [x] hub-v2.html complete rewrite — 3100 lines → ~900 lines. All CSS in custom stylesheet, no Tailwind/DaisyUI dependency for layout/cards. Unified card structure. Single-column mobile.
+- [ ] Render capture may need tuning after rewrite — html2canvas still used but DOM structure is simpler now
+- [ ] Ongoing: review card rendering CSS on each run for visual regressions
 
 ### P3 — Resilience (logging, edge cases, retry logic)
 
