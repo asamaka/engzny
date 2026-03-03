@@ -76,95 +76,104 @@ jobs:
              - Look for `cursor/improvement-*` branch merges
              - Understand what the last agent(s) changed so you don't duplicate or conflict
              - If a recent change looks incomplete or broken, fixing it is your top priority
+             - **Classify the last 5-10 agent commits by area** (pipeline, ui, upload, error-handling, etc.)
+             - **If 3+ of the last 5 commits are in the SAME area, you MUST fix something in a DIFFERENT area** — diminishing returns means each successive fix in the same area helps users less
 
-          PROMPT_END
+          ## Your Instructions — Evaluate ALL Areas, Then Pick ONE Fix
 
-          if [ "$REASON" = "manual" ]; then
-            cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
-
-          ## Context
-
-          You have been manually triggered. Your focus area is below.
-
-          ## Focus Area
-
-          PROMPT_END
-            echo "$DETAIL" >> /tmp/agent-prompt.txt
-          elif [ "$REASON" = "healthcheck" ]; then
-            cat >> /tmp/agent-prompt.txt << PROMPT_END
-
-          ## Context
-
-          You were triggered by a **scheduled healthcheck**. One or more pipeline reports were skipped due to rate limiting and are now being reviewed as a batch.
-
-          **Detail:** ${DETAIL}
-
-          ## Skipped Pipeline Reports
-
-          \`\`\`json
-          ${REPORT}
-          \`\`\`
-
-          Review all skipped reports. If multiple reports show the same issue, fix the root cause once. If they show different issues, prioritize by customer impact (P0 > P1 > P2 > P3) and fix the most impactful one.
-          PROMPT_END
-          else
-            cat >> /tmp/agent-prompt.txt << PROMPT_END
-
-          ## Trigger
-
-          **Reason:** ${REASON}
-          **Detail:** ${DETAIL}
-
-          ## Pipeline Report
-
-          \`\`\`json
-          ${REPORT}
-          \`\`\`
-          PROMPT_END
-          fi
-
-          cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
-
-          ## Your Instructions — Review, Plan, Implement, Ship
+          **The trigger reason below is CONTEXT, not a directive.** You must evaluate ALL areas before choosing what to fix. Do NOT just fix what the trigger says — it's one data point among many.
 
           Follow this exact sequence. Spend at most 20% of your time on steps 1-4. The rest goes to implementation.
 
           1. **Read backlog** — `.cursor/improvement-backlog.md` — check for incomplete work from previous runs.
-          2. **Review recent changes** — `git log --oneline -20` — understand what recent agents changed.
+          2. **Review recent changes** — `git log --oneline -20` — classify recent commits by area. If recent agents over-indexed on one area (e.g., 3+ pipeline fixes in a row), actively look for improvements in OTHER areas.
           3. **Quick context** — Read `CLAUDE.md` for architecture. Read `.claude/agents/continuous-improvement.md` for your full operating spec.
           4. **Check production** — `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
-          5. **Perform ALL checks regardless of trigger reason**, then pick the highest customer-value improvement:
-             - Incomplete backlog items from previous runs (continue the work)
+          5. **Evaluate ALL of these areas** (not just the trigger). Write down one candidate fix per area, then pick the highest customer-value one:
+             - **Errors** — Check dashboard for pipeline errors, client errors (HTTP 413, SSE stalls), failed pipelines
+             - **Card coverage** — Are all cards being populated? Dashboard shows X/Y cards per pipeline — any misses are P1
+             - **UI quality** — Review `public/hub-v2.html` card rendering CSS and JS. Check margins, padding, gap, responsive breakpoints, card content rendering, mobile layout. Look at render capture thumbnails in reports.
+             - **Output quality** — Is the LLM producing good card content? Are verification cards properly resolved? Are images/URLs being populated?
+             - **Performance** — Only if there isn't a higher-priority fix in another area. Check if recent agents already addressed this.
+             - **Backlog items** — Continue incomplete work from previous runs
+          6. **Pick the highest-value fix using this priority:**
              - P0 (broken): errors, crashes, failed pipelines, completely broken UI → fix first
-             - P1 (degraded): slow pipelines, bad results, UI rendering glitches (wrong margins, overlapping cards, broken layouts) → fix second
-             - P2 (polish): UX friction, confusing output, visual refinements (spacing, typography, alignment) → fix third
-             - P3 (resilience): logging, edge cases, retry logic → fix last
-             Always check: errors, performance, AND UI quality. Don't skip UI checks just because the trigger seems performance-related.
-             Review `public/hub-v2.html` card CSS (margins, padding, gap, responsive breakpoints) for visual regressions.
-          6. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal. Key files:
+             - P1 (degraded): partial card coverage, bad results, UI rendering glitches → fix second
+             - P2 (polish): UX friction, visual refinements, missing features → fix third
+             - P3 (resilience): logging, edge cases, retry logic, marginal performance → fix last
+             - **Tiebreaker:** prefer fixing an area that recent agents HAVEN'T touched
+          7. **Implement the fix** — Go directly to the relevant code, make the change. Keep it minimal. Key files:
              - `api/agents/orchestrator-v2.js` — Pipeline coordinator
              - `api/agents/layout-designer.js` — Vision LLM (layout)
              - `api/agents/card-researcher.js` — Card population LLM
              - `public/hub-v2.html` — Frontend (card rendering, SSE)
              - `api/index.js` — Express server, endpoints
-          7. **Test** — `npm test` (must pass)
-          8. **Update backlog** — Edit `.cursor/improvement-backlog.md`:
+          8. **Test** — `npm test` (must pass)
+          9. **Update backlog** — Edit `.cursor/improvement-backlog.md`:
              - Update "Last Run" with date, trigger reason, and what you changed
              - Mark completed items with [x]
              - Add any new observations or work items you discovered
              - Remove stale items that are no longer relevant
-          9. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body. Make sure the backlog update is included in the commit.
+          10. **Commit and push** — Use format: `fix(<area>): <what>` with customer impact in the body. Make sure the backlog update is included in the commit.
 
           ## Hard Rules
 
           - You MUST commit and push code. An invocation without a code change is a wasted invocation.
           - You MUST read and update `.cursor/improvement-backlog.md` every run.
+          - The trigger reason is CONTEXT — you must evaluate all areas before deciding what to fix.
+          - If the last 3+ agent commits were all in the same area (e.g., pipeline performance), you MUST choose a different area unless there's a P0 issue.
           - Never change test expectations to make tests pass — fix the actual code.
           - Never modify environment variables, secrets, or deployment workflows.
           - Never remove existing features or endpoints.
           - Always preserve backward compatibility.
           - Do NOT spend your time writing up findings. Spend it writing code.
           PROMPT_END
+
+          if [ "$REASON" = "manual" ]; then
+            cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
+
+          ## Trigger Context
+
+          You have been manually triggered. The focus area below is a suggestion — still evaluate all areas before deciding.
+
+          **Focus suggestion:**
+
+          PROMPT_END
+            echo "$DETAIL" >> /tmp/agent-prompt.txt
+          elif [ "$REASON" = "healthcheck" ]; then
+            cat >> /tmp/agent-prompt.txt << PROMPT_END
+
+          ## Trigger Context
+
+          You were triggered by a **scheduled healthcheck**. One or more pipeline reports were skipped due to rate limiting. This is context for your evaluation — not a directive to only fix what the reports show.
+
+          **Detail:** ${DETAIL}
+
+          **Skipped reports (context only):**
+
+          \`\`\`json
+          ${REPORT}
+          \`\`\`
+
+          Scan the reports for patterns, but also check the dashboard, UI, and backlog for potentially higher-value fixes.
+          PROMPT_END
+          else
+            cat >> /tmp/agent-prompt.txt << PROMPT_END
+
+          ## Trigger Context
+
+          **This is context, not a directive.** Evaluate all areas before deciding what to fix.
+
+          **Trigger reason:** ${REASON}
+          **Detail:** ${DETAIL}
+
+          **Pipeline report (context only):**
+
+          \`\`\`json
+          ${REPORT}
+          \`\`\`
+          PROMPT_END
+          fi
 
       - name: Launch Cursor Cloud Agent
         id: launch

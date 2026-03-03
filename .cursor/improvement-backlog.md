@@ -40,6 +40,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] ALL DaisyUI/Tailwind padding broken — unlayered `* { padding: 0 }` reset overrides `@layer` styles (CSS cascade: unlayered beats layered regardless of specificity). Moved reset into `@layer base` so DaisyUI components and Tailwind utilities take proper effect. Root cause of zero-padding cards, cramped badges/pills, and all spacing issues.
 - [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
 - [ ] Ongoing: review card rendering CSS on each run for visual regressions (margins, padding, spacing, typography, responsive breakpoints)
+- [ ] Ongoing: agent diversification — if last 3+ commits are same area, agents must pick a different area (enforced via prompt + spec)
 
 ### P3 — Resilience (logging, edge cases, retry logic)
 

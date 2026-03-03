@@ -59,30 +59,43 @@ Follow this sequence strictly. Do NOT spend more than 20% of your time on steps 
 - Check for incomplete items from previous agents
 - If there's a high-priority incomplete item, that's your top priority
 
-### 2. Review Recent Changes (1 min)
+### 2. Review Recent Changes + Diversify (1 min)
 - Run `git log --oneline -20`
 - Look for recent `cursor/improvement-*` branch merges
 - Understand what was recently changed to avoid duplicating or conflicting
+- **Classify the last 5-10 agent commits by area** (pipeline, ui, upload, error-handling, etc.)
+- **If 3+ of the last 5 commits are in the same area, you MUST fix something in a different area** — diminishing returns means each successive fix in the same area helps users less
 
 ### 3. Quick Context (2 min max)
 - Read `CLAUDE.md` for architecture overview
-- Skim the trigger report to understand the problem
+- Skim the trigger report — but remember: **the trigger is context, not a directive**
 
 ### 4. Check Production State (2 min max)
 - Hit the debug dashboard: `curl 'https://www.thinx.fun/api/debug/dashboard?token=thinx-debug-2026'`
 - Note: errors, slow pipelines, client issues — whatever stands out
 
-### 5. Make a Plan — Prioritize by Customer Value (3 min max)
-Identify 2-3 candidate improvements, then pick the ONE with highest customer ROI. Use this framework:
+### 5. Evaluate ALL Areas, Then Pick ONE Fix (3 min max)
+**The trigger reason is context, not a directive.** Evaluate EVERY area below — write down one candidate fix per area — then pick the ONE with highest customer ROI.
+
+**Areas to check (ALL of them, every run):**
+- **Errors** — pipeline errors, client errors (HTTP 413, SSE stalls), failed pipelines
+- **Card coverage** — are all cards being populated? Dashboard shows X/Y per pipeline — any misses are P1
+- **UI quality** — card rendering CSS/JS, margins, padding, responsive layout, mobile experience
+- **Output quality** — is the LLM producing good content? URLs populated? Verification resolved?
+- **Performance** — only if no higher-priority fix exists in another area
+- **Backlog** — incomplete items from previous agents
 
 **Priority order:**
 1. **Incomplete backlog items** — continue work from previous agents
 2. **P0 — Broken** — errors, crashes, failed pipelines, completely broken UI
-3. **P1 — Degraded** — slow pipelines, bad results, UI rendering glitches (wrong margins, overlapping cards, broken layouts, unreadable text)
+3. **P1 — Degraded** — partial card coverage, bad results, UI rendering glitches (wrong margins, overlapping cards, broken layouts, unreadable text)
 4. **P2 — Polish** — UX friction, missing error messages, visual refinements (spacing, typography, alignment)
-5. **P3 — Resilience** — future-proofing, better logging, edge cases
+5. **P3 — Resilience** — future-proofing, better logging, edge cases, marginal performance
 
-**Decision rule:** Always pick the highest-priority issue available. Within a tier, pick the one with the simplest fix (highest ROI = most impact / least effort).
+**Decision rules:**
+- Always pick the highest-priority issue available
+- Within a tier, pick the one with the simplest fix (highest ROI = most impact / least effort)
+- **Tiebreaker: prefer areas that recent agents HAVEN'T touched** — if the last 3 commits were pipeline fixes, a P1 UI fix beats a P1 pipeline fix
 
 ### 6. Implement the Change
 - Write the code. Keep it minimal — smallest diff that delivers the improvement.
@@ -117,22 +130,36 @@ Push to your branch — CI handles the rest.
 
 ## Decision Framework
 
-Regardless of trigger type, **always perform all of these checks** on every run. Don't skip checks just because the trigger reason seems narrow — a `slow_pipeline` trigger doesn't mean the UI is fine, and a `report_review` doesn't mean there are no errors.
+### The Trigger Is Context, Not a Directive
 
-### Universal Checks (every run)
-1. **Errors** — check dashboard for recent errors, failed pipelines, client-side errors
-2. **Performance** — check pipeline durations, slow phases, timeout patterns
-3. **UI quality** — open `public/hub-v2.html` and review card rendering CSS: margins, padding, spacing, typography, responsive breakpoints. Check the render capture thumbnails in reports if available. Look for visual regressions (cramped cards, missing margins, overflow, unreadable text on mobile)
-4. **Backlog** — check for incomplete work from previous agents
-5. **Report data** — read the trigger report for anything notable (partial cards, bad layouts, errors)
+The trigger reason tells you WHY this agent was spawned, but it does NOT determine what you should fix. A `slow_pipeline` trigger doesn't mean you should optimize performance — it means a pipeline was slow, which is one data point. You must evaluate ALL areas before deciding.
 
-### By Trigger Type (additional focus)
+**Anti-pattern (DO NOT DO THIS):** See `slow_pipeline` trigger → immediately optimize the pipeline → ignore everything else.
+
+**Correct behavior:** See `slow_pipeline` trigger → check errors, card coverage, UI quality, output quality, backlog, AND performance → pick the highest-value fix across all areas.
+
+### Diminishing Returns Rule
+
+Check `git log --oneline -10` and classify commits by area. If 3+ of the last 5 agent commits are in the same area (e.g., `fix(pipeline)` appearing 3+ times), that area has diminishing returns — each fix helps users less than the previous one. **You MUST choose a different area** unless there's a P0 issue in the over-indexed area.
+
+This rule exists because previous agents repeatedly fixed pipeline performance while ignoring UI quality, card coverage, and error handling issues that affected users more.
+
+### Universal Checks (every run, regardless of trigger)
+1. **Errors** — check dashboard for recent errors, failed pipelines, client-side errors (HTTP 413, SSE stalls)
+2. **Card coverage** — check dashboard pipeline list for X/Y card counts. Any pipeline with cards < total is a P1 issue.
+3. **UI quality** — review `public/hub-v2.html` card rendering CSS and JS. Check margins, padding, spacing, typography, responsive breakpoints. Look for visual regressions.
+4. **Output quality** — are LLM outputs useful? Verification cards resolved? URLs/images populated?
+5. **Performance** — pipeline durations, slow phases, timeout patterns
+6. **Backlog** — check for incomplete work from previous agents
+7. **Report data** — read the trigger report for anything notable (partial cards, bad layouts, errors)
+
+### By Trigger Type (additional context, not a directive)
 
 - **`report_review`** — most common. Do all universal checks, pick highest-impact fix.
-- **`healthcheck`** — batch of skipped reports. Scan all for common patterns, fix root cause.
-- **`pipeline_error`** — read the error, search codebase, fix it. Common: JSON parse failures, timeouts, image processing errors.
-- **`slow_pipeline`** — check which phase was slow, optimize it. Common: prompt trimming, parallelism, token reduction.
-- **`manual`** — focus on whatever was specified, but still do universal checks.
+- **`healthcheck`** — batch of skipped reports. Scan all for common patterns, but still check all areas.
+- **`pipeline_error`** — the error is a strong signal, but still check other areas before deciding.
+- **`slow_pipeline`** — one pipeline was slow. This is context. Check if recent agents already addressed performance (if so, look elsewhere). Only fix performance if it's truly the highest-value fix AND recent agents haven't already over-indexed on it.
+- **`manual`** — focus suggestion from the operator, but still evaluate all areas.
 
 ## What You Can Change
 
@@ -157,7 +184,9 @@ Regardless of trigger type, **always perform all of these checks** on every run.
 - Authentication mechanisms (debug tokens, report PINs)
 - Test infrastructure (jest config, test utilities)
 - Deployment workflows (GitHub Actions, Vercel config)
-- This agent spec or CLAUDE.md (unless explicitly instructed)
+- CLAUDE.md (unless explicitly instructed)
+
+Note: The agent spec (this file) and the workflow prompt CAN be updated to improve agent behavior — but only to add constraints or fix behavioral issues, never to relax rules or remove safeguards.
 
 ## Commit Message Format
 
@@ -190,6 +219,8 @@ JSON. Added extraction logic to strip markdown fences before parsing.
 - **Analysis-only runs** — reporting findings without fixing anything. You are not a research agent.
 - **Skipping the backlog** — you MUST read and update `.cursor/improvement-backlog.md` every run.
 - **Duplicating recent work** — always check `git log` to see what recent agents changed.
+- **Trigger tunnel vision** — fixing ONLY what the trigger says without evaluating other areas. The trigger is context, not a directive. If the trigger says `slow_pipeline` but the dashboard shows broken cards, fix the cards.
+- **Repeated same-area fixes** — if the last 3+ commits were `fix(pipeline)`, making another pipeline fix is almost certainly wrong. Look at UI, error handling, card coverage, output quality.
 - **Broad codebase surveys** — you don't need to read every file. Go directly to the code that needs changing.
 - **Spending >50% of your time reading** — investigation is a means to an end. The end is shipping code.
 - **Choosing a P3 improvement when P0/P1 issues exist** — always fix the most impactful thing first.
