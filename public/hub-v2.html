@@ -2034,6 +2034,26 @@
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
             }
 
+            // Immediately fire-and-forget the rendered card HTML to the server.
+            // sendBeacon is guaranteed to deliver even if the user navigates away.
+            try {
+                const rid = telemetry.requestId;
+                if (rid && cardGrid.children.length) {
+                    const payload = JSON.stringify({
+                        requestId: rid,
+                        cardHtml: cardGrid.outerHTML,
+                        clientState: {
+                            viewport: { width: innerWidth, height: innerHeight, devicePixelRatio: devicePixelRatio || 2 },
+                            screen: { width: screen.width, height: screen.height },
+                            cards: { total: cardGrid.children.length, populated: cardGrid.querySelectorAll('.card.populated').length },
+                            userAgent: navigator.userAgent,
+                        },
+                    });
+                    navigator.sendBeacon('/api/hub/v2/render-capture', new Blob([payload], { type: 'application/json' }));
+                }
+            } catch (e) { /* sendBeacon is best-effort */ }
+
+            // Also try the full async capture as a bonus (image + inlined DOM snapshot)
             setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 500);
         }
 
