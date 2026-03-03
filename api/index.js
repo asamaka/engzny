@@ -3250,7 +3250,7 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">'
         + (clientState?.cards ? clientState.cards.populated + '/' + clientState.cards.total + (clientState.cards.loading ? ' (' + clientState.cards.loading + ' loading)' : '') + (clientState.cards.errored ? ' <span style="color:var(--r)">(' + clientState.cards.errored + ' errored)</span>' : '') : cards.length)
         + '</span></div>'
-      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Client-side (html2canvas)' : hasDomSnapshot ? 'DOM snapshot (live render)' : 'Not available') + '</span></div>'
+      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Rendered screenshot' : hasDomSnapshot ? 'DOM snapshot (live render)' : 'Not available') + '</span></div>'
       + '</div>'
       + '</div>'
 
