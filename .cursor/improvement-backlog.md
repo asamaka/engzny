@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `report_review` (17514e17, 16595ms) | Fixed P1: Mobile uploads were 15-17s and hitting HTTP 413 errors. Reduced client-side image compression target from 3.2MB to 1.5MB and max dimension from 1920px to 1568px (Claude's optimal vision resolution). Eliminates 413 errors, halves upload time on mobile, no quality loss for LLM analysis.
+> **2026-03-03** | Trigger: `slow_pipeline` (4a2d9787, 31369ms) | Fixed P1: Tool loop iterations causing 14s enhance + 15.3s review for 7-card pipelines. Limited enhance to 2 iterations (from default 8), review to 1 iteration. Compacted review prompt to send only cards matching research findings instead of all card data. Expected: enhance ~8s, review ~5s, total ~15-18s (down from 31s).
 
 ## Active Work
 
@@ -28,6 +28,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Enhance phase 18s with Sonnet — prompt sent all 22 schemas + 13 layouts (fixed: targeted schemas for relevant types only, compact layout info)
 - [x] Enhance phase 27s with Sonnet — Sonnet too slow for tool_use card population (fixed: switched to Haiku, increased review maxTokens to 8192, compacted JSON)
 - [x] Mobile uploads 15-17s + HTTP 413 errors — UPLOAD_TARGET_SIZE 3.2MB too close to Vercel 4.5MB limit (fixed: reduced to 1.5MB + MAX_DIM 1920→1568 to match Claude vision resolution)
+- [x] Tool loop iterations blowing up pipeline duration — 7-card pipelines taking 31s+ due to 4-5 loop iterations per phase (fixed: maxIterations 2 for enhance, 1 for review, compact review prompt)
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -60,3 +61,4 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Haiku is sufficient for card population from screenshots — the task is structured extraction, not complex reasoning. Quality maintained by review phase as second pass.
 - Client-side UPLOAD_TARGET_SIZE was 3.2MB (3.2 * 4/3 = 4.27MB base64 + JSON overhead → dangerously close to Vercel 4.5MB limit). Reduced to 1.5MB (~2MB base64) — eliminates HTTP 413 risk and halves mobile upload time. MAX_DIM reduced from 1920 to 1568 to match Claude's internal vision processing resolution.
 - Dashboard showed 2x "Upload failed (HTTP 413)" client errors and upload times of 15-17s for ~2.6MB images on mobile. After fix: expected upload times ~5-8s, zero 413 errors.
+- Tool loop iterations are the main pipeline duration driver for 7-card layouts. Each iteration re-sends the full conversation (including image in enhance phase), growing input tokens. Default maxIterations=8 allows up to 8 round-trips. Capped enhance at 2 (first pass populates most cards, second catches remainder) and review at 1 (all updates in a single batch). Also compacted review prompt to only include cards matching research findings — reduces input tokens by ~40% for typical 7-card pipelines.
