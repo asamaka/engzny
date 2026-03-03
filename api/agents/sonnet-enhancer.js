@@ -13,7 +13,7 @@
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeDetailedSchemaForPrompt, getCardTypeSchemaForTypes, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { getCardTypeDetailedSchemaForPrompt, getCardTypeSchemaForTypes, getLayoutTypesSummaryForPrompt, CARD_TYPES, LAYOUT_TYPES } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
 const ENHANCER_TOOLS = [
@@ -100,6 +100,14 @@ const ENHANCER_TOOLS = [
 ];
 
 function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData) {
+  const existingTypes = currentCards.map(c => c.cardType);
+  const layoutDef = LAYOUT_TYPES[layout?.type];
+  const suggestedTypes = layoutDef ? layoutDef.suggestedCards : [];
+  const relevantTypes = [...new Set([...existingTypes, ...suggestedTypes, 'did_you_know_card'])];
+
+  const allTypeNames = Object.keys(CARD_TYPES);
+  const otherTypes = allTypeNames.filter(t => !relevantTypes.includes(t));
+
   const currentState = JSON.stringify({
     contentAnalysis,
     layout,
@@ -119,10 +127,10 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
 ${currentState}
 
 **Card schemas:**
-${getCardTypeDetailedSchemaForPrompt()}
+${getCardTypeSchemaForTypes(relevantTypes)}
+${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', ')}` : ''}
 
-**Available layouts:**
-${getLayoutTypesSummaryForPrompt()}
+**Layout:** ${layout.type}${layoutDef ? ` — ${layoutDef.description}` : ''}
 
 **YOUR TASKS (PRIORITY ORDER):**
 1. POPULATE HERO: Update hero_summary with a proper takeaway, imageUrl if relevant, and ensure title is under 6 words. Add badge and badgeColor.
@@ -186,7 +194,7 @@ function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
       factCheck: f.factCheck,
     })),
     overallContext: researchData.overallContext,
-  }, null, 2);
+  });
 
   return `You are reviewing populated cards against web research findings. Update cards with corrections, URLs, and verified data.
 
