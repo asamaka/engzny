@@ -1813,8 +1813,18 @@
                 }
 
                 case 'chart_card': {
-                    const items = Array.isArray(d.data) ? d.data : [];
-                    const maxVal = Math.max(...items.map(i => typeof i.value === 'number' ? i.value : 0), 1);
+                    const items = (Array.isArray(d.data) ? d.data : []).map(raw => {
+                        const label = raw.label || raw.name || raw.team || raw.category || raw.key || raw.x || raw.metric || '';
+                        let value = typeof raw.value === 'number' ? raw.value : undefined;
+                        if (value === undefined) {
+                            for (const k of Object.keys(raw)) {
+                                if (typeof raw[k] === 'number') { value = raw[k]; break; }
+                            }
+                        }
+                        if (value === undefined) value = parseFloat(raw.value) || 0;
+                        return { ...raw, label, value };
+                    });
+                    const maxVal = Math.max(...items.map(i => i.value), 1);
                     const unit = d.unit || '';
                     const cType = d.chartType || 'bar';
                     let chartHtml = '';
@@ -1983,12 +1993,14 @@
                     return `<div class="p-4">
                         ${d.title ? `<h3 class="font-bold text-sm text-white mb-3">${esc(d.title)}</h3>` : ''}
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        ${(d.stats || []).map(s => {
+                        ${(d.stats || d.data || d.items || []).map(s => {
                             const sObj = typeof s === 'object' ? s : { label: String(s), value: '' };
+                            const sLabel = sObj.label || sObj.name || sObj.title || sObj.metric || sObj.key || '';
+                            const sValue = sObj.value != null ? String(sObj.value) : sObj.stat || sObj.number || sObj.amount || '—';
                             return `<div class="stat p-3 bg-base-300 rounded-xl">
                                 ${sObj.emoji ? `<div class="stat-figure text-lg">${esc(sObj.emoji)}</div>` : ''}
-                                <div class="stat-title text-xs">${esc(sObj.label || '')}</div>
-                                <div class="stat-value text-lg text-primary">${esc(sObj.value || '—')}</div>
+                                <div class="stat-title text-xs">${esc(sLabel)}</div>
+                                <div class="stat-value text-lg text-primary">${esc(sValue)}</div>
                                 ${sObj.trend ? `<div class="stat-desc"><span class="badge badge-xs ${sObj.trend === 'up' ? 'badge-success' : sObj.trend === 'down' ? 'badge-error' : 'badge-info'}">${sObj.trend}</span></div>` : ''}
                             </div>`;
                         }).join('')}

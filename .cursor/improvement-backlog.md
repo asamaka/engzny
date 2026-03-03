@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `report_review` (19a4260b, breaking_news, 16.0s) | Fixed P2: web research citations never shown to users — `appendCitations()` looked for `.card-inner` element but no card renderer creates that wrapper, so citations from Perplexity Sonar/Claude web search were silently dropped. Fixed: append citations directly to card element, remove stale citations on card updates, add horizontal margin to `.web-citations` CSS so they align with card content padding, and validate citation URLs before rendering.
+> **2026-03-03** | Trigger: `healthcheck` (4515184b sports, 453c4e9a breaking_news) | Fixed P1: chart_card and stats_grid_card showed "undefined" values and broken bars when LLM used variant field names (e.g., `{team, minute}` instead of `{label, value}`). Added field name normalization to chart_card renderer (tries label/name/team/category/key/x/metric for labels; uses first numeric field as fallback for values). Also made stats_grid_card defensive: accepts data/items as array source, normalizes label/value from common LLM alternatives. Evidence: report 4515184b chart_card DOM had `<span>undefined</span>` and `width:NaN%` bars.
 
 ## Active Work
 
@@ -34,6 +34,8 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Enhance phase misses cards (6/7) when Claude returns end_turn early — review phase excluded unpopulated cards from prompt (fixed: review always includes unpopulated cards with NEEDS_POPULATION flag, orchestrator runs review even without research findings)
 - [x] Product pipeline 75.6s — enhance 33.2s + review 40.9s due to image re-processing and verbose research data (fixed: prompt caching via cache_control for tool loop, research data truncation in review/enhance prompts)
 - [x] Review phase always runs LLM call when research findings exist even if all cards populated — 7s overhead for marginal enrichment (fixed: skip LLM review when all cards populated, programmatic research enrichment instead)
+- [x] chart_card shows "undefined" and NaN% bars when LLM uses variant field names (e.g., `{team, minute}` instead of `{label, value}`) — fixed: normalize label/value from common LLM alternatives, fallback to first numeric field for value (report 4515184b)
+- [x] stats_grid_card fragile to LLM field name variants — fixed: accept `name`/`title`/`metric`/`key` for label, `stat`/`number`/`amount` for value, `data`/`items` as array source alternatives
 - [ ] Sonnet model appears in 3/5 pipeline traces despite code specifying Haiku — investigate if adapter cache or API routing causes model mismatch (not confirmed as root cause yet, added logging to help diagnose)
 
 ### P2 — Polish (UX friction, visual quality, confusing output)
@@ -88,4 +90,6 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Verification card had the same LLM field variant issue: schema says `name`/`confirmed` but Haiku sends `source`/`verified`. The `computeVerificationStatus` function only checked for exact `"confirmed"` match, causing all-green sources to compute as `"unconfirmed"`. This pattern will recur for any card type — **always normalize LLM-provided enum values before comparing**.
 - Haiku should NEVER set verification statuses — it has no research data to back claims. Its role is speed-to-first-card with assumptions that get confirmed/denied by Sonar research. Phase 2.5 must always re-evaluate ALL sources against research, not just "checking" ones.
 - The `appendCitations` function was referencing `.card-inner` — a class that was likely removed during a card renderer refactor but the citation code wasn't updated. This meant zero research citations were ever visible to users since the feature was added. Always verify DOM selectors against actual rendered HTML when making changes.
+- UI Rubric (2026-03-03, report 89b5e4b3): Component consistency — inline `style=` attrs on cards still present in prod DOM (fix may not be deployed yet); Hub cohesion — PASS; Card integrity — 7/7 PASS; Population integrity — 7/7 PASS; Mobile readability — PASS (393px viewport, 16px padding). Overall: P1 at most (inline styles), pending deployment of recent UI commits.
+- chart_card renderer assumed `{label, value}` schema compliance. LLM sent `{team: "Wolves (Gomes)", minute: 78}` for a sports goal timeline — same class of bug as chat_card and verification_card field mismatches. Pattern: **every card type with arrays of objects should normalize field names defensively** rather than trusting schema compliance.
 - Report 00c854e0 (messaging/WhatsApp, 5 cards, 11.2s): research phase returned 2 follow-up Q&A with answers + 3 additional questions — all valuable context that was being discarded. Report f38c2ec1 (breaking news, 7 cards, 17.4s): person_card and location_card data was swapped by the LLM (person_card had location data and vice versa) — potential P2 output quality issue for future fix.
