@@ -1229,9 +1229,10 @@
 
         // === Image Handling ===
 
-        // Vercel serverless has a 4.5MB body limit. Base64 adds ~33% overhead,
-        // so we target 3.2MB binary to keep the JSON payload under 4.3MB.
-        const UPLOAD_TARGET_SIZE = 3.2 * 1024 * 1024;
+        // Vercel serverless has a 4.5MB body limit. Target 1.5MB binary
+        // (~2MB base64) for fast mobile uploads and safe headroom.
+        // Claude vision processes at 1568px max anyway — no quality loss.
+        const UPLOAD_TARGET_SIZE = 1.5 * 1024 * 1024;
 
         function loadImageEl(src) {
             return new Promise((resolve, reject) => {
@@ -1273,13 +1274,11 @@
             const url = URL.createObjectURL(blob);
             try {
                 const img = await loadImageEl(url);
-                const MAX_DIM = 1920;
+                const MAX_DIM = 1568;
                 let w = img.naturalWidth, h = img.naturalHeight;
-                if (w > MAX_DIM || h > MAX_DIM) {
-                    const s = Math.min(MAX_DIM / w, MAX_DIM / h);
-                    w = Math.round(w * s);
-                    h = Math.round(h * s);
-                }
+                const s = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
+                w = Math.round(w * s);
+                h = Math.round(h * s);
 
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
