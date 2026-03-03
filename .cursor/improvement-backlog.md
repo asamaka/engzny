@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `slow_pipeline` (cc177943, 42304ms) | Fixed P1: Enhance phase took 27.3s with Sonnet (tool loop + large image). Switched enhance model from Sonnet to Haiku (5-10x faster for structured extraction). Also increased review maxTokens from 4096 to 8192 (batch all cards in one response), and compacted all JSON serialization (removed pretty-printing). Expected pipeline: classify ~1.5s + enhance ~5-8s + review ~5-7s ≈ 15-18s.
+> **2026-03-03** | Trigger: `report_review` (17514e17, 16595ms) | Fixed P1: Mobile uploads were 15-17s and hitting HTTP 413 errors. Reduced client-side image compression target from 3.2MB to 1.5MB and max dimension from 1920px to 1568px (Claude's optimal vision resolution). Eliminates 413 errors, halves upload time on mobile, no quality loss for LLM analysis.
 
 ## Active Work
 
@@ -27,6 +27,7 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Review phase 24.5s: Sonnet used for text-only structured merging (fixed: switched to Haiku + lean prompt + reduced maxTokens)
 - [x] Enhance phase 18s with Sonnet — prompt sent all 22 schemas + 13 layouts (fixed: targeted schemas for relevant types only, compact layout info)
 - [x] Enhance phase 27s with Sonnet — Sonnet too slow for tool_use card population (fixed: switched to Haiku, increased review maxTokens to 8192, compacted JSON)
+- [x] Mobile uploads 15-17s + HTTP 413 errors — UPLOAD_TARGET_SIZE 3.2MB too close to Vercel 4.5MB limit (fixed: reduced to 1.5MB + MAX_DIM 1920→1568 to match Claude vision resolution)
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -57,3 +58,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Pipeline breakdown for 28.8s run (f843d2b8): classify 1.0s + enhance 18.1s (parallel with research 10.9s) + review 9.7s. After targeted schema fix, expected: classify 1.0s + enhance ~12s + review ~9s = ~22s total.
 - Pipeline breakdown for 42.3s run (cc177943): classify 1.5s + enhance 27.3s (Sonnet, parallel with research 9.5s) + review 13.5s (Haiku, 4096 maxTokens). Switched enhance to Haiku and unified maxTokens to 8192. Expected: classify 1.5s + enhance ~6s + review ~6s = ~14-18s total.
 - Haiku is sufficient for card population from screenshots — the task is structured extraction, not complex reasoning. Quality maintained by review phase as second pass.
+- Client-side UPLOAD_TARGET_SIZE was 3.2MB (3.2 * 4/3 = 4.27MB base64 + JSON overhead → dangerously close to Vercel 4.5MB limit). Reduced to 1.5MB (~2MB base64) — eliminates HTTP 413 risk and halves mobile upload time. MAX_DIM reduced from 1920 to 1568 to match Claude's internal vision processing resolution.
+- Dashboard showed 2x "Upload failed (HTTP 413)" client errors and upload times of 15-17s for ~2.6MB images on mobile. After fix: expected upload times ~5-8s, zero 413 errors.
