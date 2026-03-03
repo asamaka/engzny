@@ -33,6 +33,7 @@ highest-priority incomplete item and continue where the last agent left off.
 ### P2 — Polish (UX friction, visual quality, confusing output)
 
 - [x] Card grid had cramped margins on mobile — padding was 8px, gap was 8px. Increased to 16px padding + 12px gap (mobile), 20px/14px (tablet), 16px gap (desktop). Follow-up section padding also fixed.
+- [x] ALL DaisyUI/Tailwind padding broken — unlayered `* { padding: 0 }` reset overrides `@layer` styles (CSS cascade: unlayered beats layered regardless of specificity). Moved reset into `@layer base` so DaisyUI components and Tailwind utilities take proper effect. Root cause of zero-padding cards, cramped badges/pills, and all spacing issues.
 - [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
 - [ ] Ongoing: review card rendering CSS on each run for visual regressions (margins, padding, spacing, typography, responsive breakpoints)
 
@@ -65,3 +66,4 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Dashboard showed 2x "Upload failed (HTTP 413)" client errors and upload times of 15-17s for ~2.6MB images on mobile. After fix: expected upload times ~5-8s, zero 413 errors.
 - Tool loop iterations are the main pipeline duration driver for 7-card layouts. Each iteration re-sends the full conversation (including image in enhance phase), growing input tokens. Default maxIterations=8 allows up to 8 round-trips. Capped enhance at 2 (first pass populates most cards, second catches remainder) and review at 1 (all updates in a single batch). Also compacted review prompt to only include cards matching research findings — reduces input tokens by ~40% for typical 7-card pipelines.
 - UI quality was a blind spot: card grid had 8px padding/gap on mobile, giving a cramped edge-to-edge look. No agent caught this because checks were focused on errors/performance. Agent spec updated to always review UI quality regardless of trigger reason.
+- ROOT CAUSE of zero-padding UI: the global `* { margin: 0; padding: 0; }` CSS reset was unlayered, which in CSS Cascade Layers means it overrides ALL @layer-based styles regardless of specificity. DaisyUI 5 + Tailwind 4 both use @layer for their styles. So every `.badge`, `.btn`, `.card`, `p-4`, `mb-2`, `gap-3` etc. had their padding/margin stripped. Fix: move reset into `@layer base`.

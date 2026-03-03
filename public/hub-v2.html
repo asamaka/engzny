@@ -48,7 +48,12 @@
       }
     </style>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        /* Reset must be in @layer base so it doesn't override DaisyUI/Tailwind
+           layered styles. Unlayered * { padding: 0 } beats @layer components
+           and @layer utilities, which strips all DaisyUI component padding. */
+        @layer base {
+            *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        }
 
         :root {
             --bg: #08090d;
