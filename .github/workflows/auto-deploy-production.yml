@@ -95,7 +95,7 @@ jobs:
             echo "⏳ Attempt $attempt: waiting ${WAIT}s for Vercel deploy..."
             sleep $WAIT
 
-            HEALTH=$(curl -s -w "\n%{http_code}" --max-time 10 "https://thinx.fun/api/health")
+            HEALTH=$(curl -s -w "\n%{http_code}" --max-time 10 -L "https://www.thinx.fun/api/health")
             HTTP_CODE=$(echo "$HEALTH" | tail -n 1)
             BODY=$(echo "$HEALTH" | head -n 1)
 
@@ -103,7 +103,7 @@ jobs:
               echo "✅ Health check passed on attempt $attempt! Response: $BODY"
 
               # Also verify hub page
-              PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://thinx.fun/")
+              PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 -L "https://www.thinx.fun/")
               if [ "$PAGE_CODE" = "200" ]; then
                 echo "✅ Hub page loaded!"
               else
