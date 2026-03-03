@@ -25,8 +25,8 @@ const instances = new Map();
  * @returns {LLMAdapter}
  */
 function getAdapter(provider = 'claude', config = {}) {
-  const { traceCollector, requestId, ...adapterConfig } = config;
-  const cacheKey = `${provider}:${JSON.stringify(adapterConfig)}`;
+  const { traceCollector, requestId, maxIterations, ...adapterConfig } = config;
+  const cacheKey = `${provider}:${adapterConfig.model || 'default'}`;
   
   if (instances.has(cacheKey)) {
     return instances.get(cacheKey);

@@ -235,17 +235,19 @@ class ClaudeAdapter extends LLMAdapter {
               media_type: mediaType,
               data: imageData,
             },
+            cache_control: maxIterations > 1 ? { type: 'ephemeral' } : undefined,
           },
           {
             type: 'text',
             text: prompt,
+            cache_control: maxIterations > 1 ? { type: 'ephemeral' } : undefined,
           },
         ],
       },
     ];
 
     const allContent = [];
-    const totalUsage = { input_tokens: 0, output_tokens: 0 };
+    const totalUsage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
     let finalModel = null;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -259,6 +261,8 @@ class ClaudeAdapter extends LLMAdapter {
       finalModel = response.model;
       totalUsage.input_tokens += response.usage?.input_tokens || 0;
       totalUsage.output_tokens += response.usage?.output_tokens || 0;
+      totalUsage.cache_creation_input_tokens += response.usage?.cache_creation_input_tokens || 0;
+      totalUsage.cache_read_input_tokens += response.usage?.cache_read_input_tokens || 0;
       allContent.push(...response.content);
 
       const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
@@ -301,12 +305,18 @@ class ClaudeAdapter extends LLMAdapter {
     const messages = [
       {
         role: 'user',
-        content: prompt,
+        content: [
+          {
+            type: 'text',
+            text: prompt,
+            cache_control: maxIterations > 1 ? { type: 'ephemeral' } : undefined,
+          },
+        ],
       },
     ];
 
     const allContent = [];
-    const totalUsage = { input_tokens: 0, output_tokens: 0 };
+    const totalUsage = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
     let finalModel = null;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
@@ -320,6 +330,8 @@ class ClaudeAdapter extends LLMAdapter {
       finalModel = response.model;
       totalUsage.input_tokens += response.usage?.input_tokens || 0;
       totalUsage.output_tokens += response.usage?.output_tokens || 0;
+      totalUsage.cache_creation_input_tokens += response.usage?.cache_creation_input_tokens || 0;
+      totalUsage.cache_read_input_tokens += response.usage?.cache_read_input_tokens || 0;
       allContent.push(...response.content);
 
       const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');

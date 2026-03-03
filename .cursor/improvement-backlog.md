@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `report_review` (3da0bca5, 21006ms, success) | Fixed P1: Pipeline 3da0bca5 showed 6/7 cards — enhance phase missed a card (Claude returned end_turn after 6 tool calls), and review phase excluded unpopulated cards because they didn't match research findings. Fix: (1) `buildReviewPrompt` now always includes unpopulated cards and flags them with `NEEDS_POPULATION` + priority 0 instruction, (2) orchestrator runs review phase even without research findings if cards are still unpopulated.
+> **2026-03-03** | Trigger: `healthcheck` (5 skipped reports: c90617c6, fc81ec8b, d9c9b87f, ee2fb909, 42e05848) | Fixed P1: Pipeline d9c9b87f took 75.6s (product_showcase, 7 cards) — enhance 33.2s + review 40.9s. Root cause: (1) tool loop re-sends full image on every iteration without caching, (2) verbose Sonar research data inflates review prompt. Fix: added Anthropic prompt caching (cache_control: ephemeral) to analyzeImageWithToolLoop and textWithToolLoop, truncated research summaries/explanations in review and enhance prompts, simplified adapter cache key to prevent stale entries.
 
 ## Active Work
 
@@ -30,6 +30,8 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Mobile uploads 15-17s + HTTP 413 errors — UPLOAD_TARGET_SIZE 3.2MB too close to Vercel 4.5MB limit (fixed: reduced to 1.5MB + MAX_DIM 1920→1568 to match Claude vision resolution)
 - [x] Tool loop iterations blowing up pipeline duration — 7-card pipelines taking 31s+ due to 4-5 loop iterations per phase (fixed: maxIterations 2 for enhance, 1 for review, compact review prompt)
 - [x] Enhance phase misses cards (6/7) when Claude returns end_turn early — review phase excluded unpopulated cards from prompt (fixed: review always includes unpopulated cards with NEEDS_POPULATION flag, orchestrator runs review even without research findings)
+- [x] Product pipeline 75.6s — enhance 33.2s + review 40.9s due to image re-processing and verbose research data (fixed: prompt caching via cache_control for tool loop, research data truncation in review/enhance prompts)
+- [ ] Sonnet model appears in 3/5 pipeline traces despite code specifying Haiku — investigate if adapter cache or API routing causes model mismatch (not confirmed as root cause yet, added logging to help diagnose)
 
 ### P2 — Polish (UX friction, visual quality, confusing output)
 
@@ -40,7 +42,7 @@ highest-priority incomplete item and continue where the last agent left off.
 
 ### P3 — Resilience (logging, edge cases, retry logic)
 
-(none)
+- [ ] Adapter singleton cache uses module-level Map — could cause subtle issues across warm serverless invocations. Simplified cache key to `provider:model` to reduce stale entries.
 
 ## Observations
 
@@ -69,3 +71,4 @@ Patterns noticed across multiple runs that may inform future improvements.
 - UI quality was a blind spot: card grid had 8px padding/gap on mobile, giving a cramped edge-to-edge look. No agent caught this because checks were focused on errors/performance. Agent spec updated to always review UI quality regardless of trigger reason.
 - Pipeline 3da0bca5 had 6/7 cards because enhance phase (maxIterations=2) made only 1 LLM call that populated 6 cards with stop_reason: end_turn. The 7th card stayed as a loading skeleton. Root cause: buildReviewPrompt filtered cards to research-matching ones only, silently dropping empty cards. The review phase is text-only (no image) but can still populate cards like did_you_know_card, action_card, warning_card from content analysis + research context.
 - ROOT CAUSE of zero-padding UI: the global `* { margin: 0; padding: 0; }` CSS reset was unlayered, which in CSS Cascade Layers means it overrides ALL @layer-based styles regardless of specificity. DaisyUI 5 + Tailwind 4 both use @layer for their styles. So every `.badge`, `.btn`, `.card`, `p-4`, `mb-2`, `gap-3` etc. had their padding/margin stripped. Fix: move reset into `@layer base`.
+- Product pipeline d9c9b87f: 75.6s total, 145K input tokens. Enhance 33.2s + review 40.9s. The trace shows Sonnet model despite code specifying Haiku for both phases. Possible causes: adapter cache returning stale instance, API model routing, or warm serverless instance reuse. Added model logging (configModel vs adapterModel) to enhance function to help diagnose. Also added prompt caching (cache_control: ephemeral) to reduce re-processing cost on tool loop iteration 2, and truncated research data (summaries ≤200 chars, explanations ≤150 chars, max 8 findings) to cap review prompt size.

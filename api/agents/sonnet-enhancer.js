@@ -99,6 +99,11 @@ const ENHANCER_TOOLS = [
   },
 ];
 
+function truncateStr(str, max) {
+  if (!str || str.length <= max) return str;
+  return str.slice(0, max) + '...';
+}
+
 function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData) {
   const existingTypes = currentCards.map(c => c.cardType);
   const layoutDef = LAYOUT_TYPES[layout?.type];
@@ -159,11 +164,18 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 
   if (researchData) {
     const compactResearch = {
-      findings: (researchData.findings || []).map(f => ({
-        topic: f.topic, summary: f.summary, confidence: f.confidence,
-        sourceUrls: f.sourceUrls, factCheck: f.factCheck,
+      findings: (researchData.findings || []).slice(0, 8).map(f => ({
+        topic: truncateStr(f.topic, 80),
+        summary: truncateStr(f.summary, 200),
+        confidence: f.confidence,
+        sourceUrls: (f.sourceUrls || []).slice(0, 2),
+        factCheck: f.factCheck ? {
+          claim: truncateStr(f.factCheck.claim, 100),
+          verdict: f.factCheck.verdict,
+          explanation: truncateStr(f.factCheck.explanation, 150),
+        } : undefined,
       })),
-      overallContext: researchData.overallContext,
+      overallContext: truncateStr(researchData.overallContext, 300),
     };
     prompt += `\n\n**Web research findings (REVIEW PASS — incorporate these into cards):**
 ${JSON.stringify(compactResearch)}
@@ -215,12 +227,16 @@ function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
     return summary;
   });
 
-  const compactResearch = researchFindings.map(f => ({
-    topic: f.topic,
-    summary: f.summary,
+  const compactResearch = researchFindings.slice(0, 8).map(f => ({
+    topic: truncateStr(f.topic, 80),
+    summary: truncateStr(f.summary, 200),
     confidence: f.confidence,
-    sourceUrls: (f.sourceUrls || []).slice(0, 3),
-    factCheck: f.factCheck,
+    sourceUrls: (f.sourceUrls || []).slice(0, 2),
+    factCheck: f.factCheck ? {
+      claim: truncateStr(f.factCheck.claim, 100),
+      verdict: f.factCheck.verdict,
+      explanation: truncateStr(f.factCheck.explanation, 150),
+    } : undefined,
   }));
 
   const hasUnpopulated = unpopulatedCards.length > 0;
@@ -238,7 +254,7 @@ Cards: ${JSON.stringify(compactCards)}
 
 Schemas: ${getCardTypeSchemaForTypes(existingTypes)}
 ${researchFindings.length > 0 ? `\nResearch: ${JSON.stringify(compactResearch)}` : ''}
-${researchData && researchData.overallContext ? `Context: ${researchData.overallContext}` : ''}${contextLine}
+${researchData && researchData.overallContext ? `Context: ${truncateStr(researchData.overallContext, 300)}` : ''}${contextLine}
 
 Tasks (ALL in ONE batch):${populateInstructions}
 1. verification_card: update source statuses from research
@@ -276,10 +292,12 @@ async function enhance({
     const phase = researchData ? 'review' : 'enhance';
 
     logger.info('SonnetEnhancer', `Starting ${phase} pass`, {
-      model: config.model,
+      configModel: config.model,
+      adapterModel: adapter.model,
       cardCount: currentCards.length,
       hasResearch: !!researchData,
       maxIterations: adapterConfig.maxIterations || 8,
+      promptLen: prompt.length,
     });
 
     const actions = [];
