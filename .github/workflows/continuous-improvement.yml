@@ -55,6 +55,8 @@ jobs:
           DETAIL: ${{ inputs.detail }}
           REPORT: ${{ inputs.report }}
         run: |
+          REQUEST_ID=$(echo "$REPORT" | jq -r 'if type == "array" then .[0].requestId // "unknown" else .requestId // "unknown" end' 2>/dev/null || echo 'unknown')
+
           cat > /tmp/agent-prompt.txt << 'PROMPT_END'
           You are a Continuous Improvement Agent for thinx.fun — a mobile-first screenshot intelligence app.
 
@@ -122,6 +124,40 @@ jobs:
           \`\`\`
           PROMPT_END
           fi
+
+          cat >> /tmp/agent-prompt.txt << PROMPT_END
+
+          ## Fetching Live Data from Production
+
+          The report summary above is compact. To investigate deeper, pull live data from production using these commands.
+
+          **Full report for the triggering pipeline (requestId: \`${REQUEST_ID}\`):**
+          \`\`\`bash
+          # Authenticate with the reports API (sets session cookie)
+          curl -s -c /tmp/cookies -X POST 'https://www.thinx.fun/api/r/auth' \\
+            -H 'Content-Type: application/json' -d '{"pin":"0427"}'
+
+          # Fetch full report data (cards, LLM traces, client session, thumbnail)
+          curl -s -b /tmp/cookies 'https://www.thinx.fun/api/r/${REQUEST_ID}/data'
+          \`\`\`
+
+          **Recent pipeline traces and errors:**
+          \`\`\`bash
+          # Pipeline traces with phase timing (last 50 pipelines)
+          curl -s 'https://www.thinx.fun/api/debug/pipelines?token=thinx-debug-2026'
+
+          # Recent errors
+          curl -s 'https://www.thinx.fun/api/debug/logs?level=error&limit=20&token=thinx-debug-2026'
+
+          # List recent reports (overview of all recent analyses)
+          curl -s -b /tmp/cookies 'https://www.thinx.fun/api/r/list'
+
+          # Search archived reports (filterable by content type, layout, outcome, date range)
+          curl -s -b /tmp/cookies 'https://www.thinx.fun/api/r/search?limit=10'
+          \`\`\`
+
+          Use these to understand the full context before implementing your fix. The full report contains complete card data, LLM traces with token counts and durations per phase, and the client session report showing what the user actually experienced.
+          PROMPT_END
 
           cat >> /tmp/agent-prompt.txt << 'PROMPT_END'
 
