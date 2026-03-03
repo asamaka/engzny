@@ -2035,7 +2035,7 @@
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
             }
 
-            setTimeout(() => captureRenderedCards(), 500);
+            setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 500);
         }
 
         const CAPTURE_STYLE_PROPS = [
@@ -2170,9 +2170,19 @@
 
         async function captureRenderedCards() {
             const rid = telemetry.requestId;
-            if (!rid) return;
+            if (!rid) {
+                console.warn('[RenderCapture] No requestId, skipping');
+                return;
+            }
 
-            await waitForCardsToSettle();
+            let clientState = null;
+            let domSnapshot = null;
+
+            try {
+                await waitForCardsToSettle();
+            } catch (e) {
+                console.warn('[RenderCapture] waitForCardsToSettle error:', e.message);
+            }
 
             const target = resultsOverlay;
             if (!target || !cardGrid.children.length) {
@@ -2180,10 +2190,10 @@
                 return;
             }
 
-            const clientState = collectClientState();
-            const domSnapshot = serializeDomSnapshot(target);
+            try { clientState = collectClientState(); } catch (e) { console.warn('[RenderCapture] collectClientState error:', e.message); }
+            try { domSnapshot = serializeDomSnapshot(target); } catch (e) { console.warn('[RenderCapture] serializeDomSnapshot error:', e.message); }
 
-            // Method 1: SVG foreignObject — browser's own renderer
+            // Method 1: SVG foreignObject — browser's own renderer, no dependencies
             try {
                 const dataUrl = await captureViaForeignObject(target);
                 if (dataUrl && dataUrl.length > 1000) {
@@ -2195,7 +2205,7 @@
                 console.warn('[RenderCapture] foreignObject failed:', e.message);
             }
 
-            // Method 2: html2canvas with aggressive style inlining
+            // Method 2: html2canvas with aggressive style inlining (strip stylesheets, inline all)
             try {
                 const dataUrl = await captureViaHtml2Canvas(target);
                 if (dataUrl && dataUrl.length > 1000) {
@@ -2207,9 +2217,11 @@
                 console.warn('[RenderCapture] html2canvas failed:', e.message);
             }
 
-            // Method 3: DOM snapshot only (server renders as iframe)
+            // Method 3: DOM snapshot only — always works, server renders as iframe in report
             console.warn('[RenderCapture] All image captures failed, sending DOM snapshot only');
-            sendRenderCapture(rid, null, domSnapshot, clientState, 'dom-only');
+            if (domSnapshot || clientState) {
+                sendRenderCapture(rid, null, domSnapshot, clientState, 'dom-only');
+            }
         }
 
         function waitForCardsToSettle() {
