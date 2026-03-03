@@ -536,11 +536,31 @@ function validateCardData(cardType, data) {
   return { valid: errors.length === 0, errors };
 }
 
+function getCardTypeSchemaForTypes(cardTypes) {
+  const uniqueTypes = [...new Set(cardTypes)];
+  return uniqueTypes
+    .filter(name => CARD_TYPES[name])
+    .map(name => {
+      const def = CARD_TYPES[name];
+      const required = [];
+      const optional = [];
+      for (const [field, fieldDef] of Object.entries(def.schema)) {
+        const desc = fieldDef.description || '';
+        const enumStr = fieldDef.enum ? ` [${fieldDef.enum.join('|')}]` : '';
+        const line = `${field}: ${fieldDef.type}${enumStr} — ${desc}`;
+        if (fieldDef.required) required.push(line);
+        else optional.push(line);
+      }
+      return `## ${name}\nRequired: ${required.join('; ')}\nOptional: ${optional.join('; ')}`;
+    }).join('\n\n');
+}
+
 module.exports = {
   CARD_TYPES,
   LAYOUT_TYPES,
   getCardTypeSummaryForPrompt,
   getCardTypeDetailedSchemaForPrompt,
+  getCardTypeSchemaForTypes,
   getLayoutTypesSummaryForPrompt,
   getCardSchema,
   validateCardData,

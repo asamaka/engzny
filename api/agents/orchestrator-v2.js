@@ -537,7 +537,7 @@ async function runPipeline({
         },
         adapterConfig: {
           ...adapterConfig,
-          model: adapterConfig.reviewModel || 'claude-sonnet-4-20250514',
+          model: adapterConfig.reviewModel || 'claude-haiku-4-5-20251001',
           traceCollector,
         },
       }).catch(err => {

@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-03** | Trigger: `slow_pipeline` (0723744a, 81224ms) | Fixed P0: Reports had no screenshot thumbnail and no render capture — users couldn't see what was actually delivered. Root causes: server-side `sharp` failing silently on Vercel, client-side html2canvas errors swallowed. Fix: client generates 360px JPEG thumbnail before upload (no sharp dependency), render capture has retry logic and fallback to DOM-only capture. Also fixed P1: verification status inconsistency + pipeline speed optimizations.
+> **2026-03-03** | Trigger: `slow_pipeline` (9aeb1bb2, 46260ms) | Fixed P1: Review phase took 24.5s using Sonnet for text-only structured data merging. Switched review to Haiku (~3-5s), built lean review-specific prompt (only includes schemas for existing card types, stripped layout/population instructions), reduced review maxTokens from 8192→4096. Expected pipeline reduction: ~20s (from 46s to ~25s).
 
 ## Active Work
 
@@ -24,6 +24,8 @@ highest-priority incomplete item and continue where the last agent left off.
 - [x] Sonnet enhancer only populates 1 out of N cards — tool_use loop missing, Claude stops after first tool call (fixed: added iterative tool_use loop in Claude adapter)
 - [x] Pipeline 75-81s: review phase re-sends image unnecessarily, each tool loop iteration doubles input tokens (fixed: text-only review, doubled maxTokens, batch prompt hint)
 - [x] Verification card status inconsistent: shows "unconfirmed" while 2/3 sources are green (fixed: post-phase reconciliation re-computes overall status from source statuses)
+- [x] Review phase 24.5s: Sonnet used for text-only structured merging (fixed: switched to Haiku + lean prompt + reduced maxTokens)
+- [ ] Enhance phase still 20s with Sonnet — tool_use loop may need prompt optimization to reduce round-trips
 
 ### P2 — Polish (UX friction, confusing output)
 
@@ -48,3 +50,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Phase 3 (review) overwrites Phase 2.5's verification status computation. The review LLM picks an overall status that may contradict the individual source icons the user sees. Added post-phase reconciliation to always re-derive status from source data.
 - Report thumbnails depend on `sharp` which requires native binaries. On Vercel serverless, sharp fails silently. Moved thumbnail generation to client-side (canvas resize to 360px JPEG).
 - html2canvas render capture had zero error visibility — all `.catch(() => {})`. Added console.warn, retry (up to 3 attempts for script loading), and DOM-only fallback when canvas capture fails.
+- Review phase was using Sonnet (24.5s) for text-only card updates — a perfect fit for Haiku since no image analysis needed. Lean prompt with only relevant card schemas reduces input tokens significantly.
+- Pipeline breakdown for 46s run: classify 1.5s + enhance 20s (parallel with research 11s) + review 24.5s. After Haiku review fix, expected: classify 1.5s + enhance 20s + review ~3-5s = ~25s total.

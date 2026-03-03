@@ -13,7 +13,7 @@
  */
 
 const { getVisionAdapter } = require('../llm');
-const { getCardTypeDetailedSchemaForPrompt, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
+const { getCardTypeDetailedSchemaForPrompt, getCardTypeSchemaForTypes, getLayoutTypesSummaryForPrompt } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
 
 const ENHANCER_TOOLS = [
@@ -165,6 +165,53 @@ REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
   return prompt;
 }
 
+function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
+  const existingTypes = currentCards.map(c => c.cardType);
+  const currentState = JSON.stringify({
+    contentAnalysis,
+    cards: currentCards.map(c => ({
+      id: c.id,
+      cardType: c.cardType,
+      data: c.populatedData || c.data || c.placeholderData,
+    })),
+  }, null, 2);
+
+  const researchFindings = researchData.findings || [];
+  const researchJson = JSON.stringify({
+    findings: researchFindings.map(f => ({
+      topic: f.topic,
+      summary: f.summary,
+      confidence: f.confidence,
+      sourceUrls: f.sourceUrls,
+      factCheck: f.factCheck,
+    })),
+    overallContext: researchData.overallContext,
+  }, null, 2);
+
+  return `You are reviewing populated cards against web research findings. Update cards with corrections, URLs, and verified data.
+
+**Current cards:**
+${currentState}
+
+**Schemas for existing card types:**
+${getCardTypeSchemaForTypes(existingTypes)}
+
+**Research findings:**
+${researchJson}
+
+**YOUR TASKS — call ALL update_card tools in ONE response:**
+1. If verification_card exists: update sources with confirmed/denied/not_yet_reported based on research
+2. Add sourceUrls to cards where research found relevant links
+3. Correct any facts that research contradicts
+4. Enrich cards with dates, stats, context from research
+5. Do NOT add new cards unless research reveals critical missing info
+
+**RULES:**
+- Keep text ultra-concise — no paragraphs
+- Call MULTIPLE tools in a SINGLE response
+- Only update cards that benefit from research data — skip cards already accurate`;
+}
+
 async function enhance({
   imageData,
   mediaType,
@@ -182,12 +229,14 @@ async function enhance({
   const config = {
     ...adapterConfig,
     model: adapterConfig.model || 'claude-sonnet-4-20250514',
-    maxTokens: 8192,
+    maxTokens: isReview ? 4096 : 8192,
   };
 
     const adapter = getVisionAdapter(config);
     const traceCollector = adapterConfig.traceCollector;
-    const prompt = buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData);
+    const prompt = isReview
+      ? buildReviewPrompt(currentCards, contentAnalysis, researchData)
+      : buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData);
     const phase = researchData ? 'review' : 'enhance';
 
     logger.info('SonnetEnhancer', `Starting ${phase} pass`, {
