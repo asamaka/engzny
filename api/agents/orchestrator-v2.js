@@ -208,13 +208,13 @@ async function runPipeline({
     // Sonnet populates cards, Sonar researches in parallel
     // =====================================================
     if (onPhase) {
-      onPhase({ phase: 'enhancing', message: 'Sonnet populating cards + deep research...' });
+      onPhase({ phase: 'enhancing', message: 'Populating cards + deep research...' });
     }
 
-    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement + Research');
+    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Haiku) + Research');
 
     const enhanceProgressMessages = [
-      'Sonnet analyzing screenshot...',
+      'Analyzing screenshot...',
       'Populating card content...',
       'Adding details and context...',
       'Searching for images...',
@@ -239,7 +239,7 @@ async function runPipeline({
       contentAnalysis: blueprint.contentAnalysis,
       layout: blueprint.layout,
       onCardUpdate: (action) => {
-        logger.info('Orchestrator', 'Sonnet updated card', {
+        logger.info('Orchestrator', 'Enhancer updated card', {
           cardId: action.cardId,
           reason: action.reason,
         });
@@ -266,7 +266,7 @@ async function runPipeline({
         }
       },
       onCardAdd: (action) => {
-        logger.info('Orchestrator', 'Sonnet added card', {
+        logger.info('Orchestrator', 'Enhancer added card', {
           cardId: action.cardId,
           cardType: action.cardType,
           reason: action.reason,
@@ -294,7 +294,7 @@ async function runPipeline({
         }
       },
       onLayoutUpdate: (action) => {
-        logger.info('Orchestrator', 'Sonnet changed layout', {
+        logger.info('Orchestrator', 'Enhancer changed layout', {
           type: action.layoutType,
           reason: action.reason,
         });
@@ -308,11 +308,11 @@ async function runPipeline({
       },
       adapterConfig: {
         ...adapterConfig,
-        model: adapterConfig.enhanceModel || 'claude-sonnet-4-20250514',
+          model: adapterConfig.enhanceModel || 'claude-haiku-4-5-20251001',
         traceCollector,
       },
     }).catch(err => {
-      logger.warn('Orchestrator', 'Sonnet enhancement failed (non-fatal)', { err: err.message });
+      logger.warn('Orchestrator', 'Enhancement failed (non-fatal)', { err: err.message });
       return { actions: [], duration: Date.now() - startTime };
     });
 
@@ -541,7 +541,7 @@ async function runPipeline({
           traceCollector,
         },
       }).catch(err => {
-        logger.warn('Orchestrator', 'Sonnet review failed (non-fatal)', { err: err.message });
+        logger.warn('Orchestrator', 'Review failed (non-fatal)', { err: err.message });
         return { actions: [], duration: 0 };
       });
 
