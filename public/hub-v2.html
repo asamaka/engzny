@@ -2041,6 +2041,55 @@
 
         let renderCaptureAttempts = 0;
 
+        const CAPTURE_STYLE_PROPS = [
+            'color', 'backgroundColor', 'backgroundImage',
+            'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
+            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+            'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle',
+            'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomLeftRadius', 'borderBottomRightRadius',
+            'boxShadow',
+            'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
+            'textAlign', 'textTransform',
+            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+            'display', 'flexDirection', 'alignItems', 'justifyContent', 'gap', 'flexWrap',
+            'gridTemplateColumns', 'gridTemplateRows',
+            'width', 'maxWidth', 'height', 'maxHeight',
+            'overflowX', 'overflowY',
+            'opacity', 'visibility',
+        ];
+
+        function collectComputedStyles(elements) {
+            return elements.map(el => {
+                const cs = getComputedStyle(el);
+                const styles = {};
+                CAPTURE_STYLE_PROPS.forEach(p => { styles[p] = cs[p]; });
+                return styles;
+            });
+        }
+
+        function applyStylesToClone(clonedElements, styleCache) {
+            for (let i = 0; i < clonedElements.length && i < styleCache.length; i++) {
+                const s = styleCache[i];
+                const el = clonedElements[i];
+                CAPTURE_STYLE_PROPS.forEach(p => {
+                    if (s[p] && s[p] !== 'none' && s[p] !== 'normal' && s[p] !== 'auto') {
+                        el.style[p] = s[p];
+                    }
+                });
+            }
+        }
+
+        function sendRenderCapture(rid, image, domSnapshot, clientState, fallback) {
+            fetch('/api/hub/v2/render-capture', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requestId: rid, image: image || undefined, domSnapshot, clientState, fallback }),
+            }).then(r => {
+                if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
+                else console.log('[RenderCapture] Saved', fallback ? '(DOM only)' : '(image + DOM)');
+            }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
+        }
+
         function captureRenderedCards() {
             const rid = telemetry.requestId;
             if (!rid) return;
@@ -2048,8 +2097,17 @@
             const attempt = renderCaptureAttempts;
 
             if (typeof html2canvas === 'undefined') {
-                console.warn('[RenderCapture] html2canvas not loaded, retrying in 2s');
-                if (attempt <= 3) setTimeout(() => captureRenderedCards(), 2000);
+                console.warn('[RenderCapture] html2canvas not loaded, attempt', attempt);
+                if (attempt <= 3) {
+                    setTimeout(() => captureRenderedCards(), 2000);
+                    return;
+                }
+                console.warn('[RenderCapture] html2canvas never loaded, sending DOM snapshot only');
+                waitForCardsToSettle().then(() => {
+                    const clientState = collectClientState();
+                    const domSnapshot = serializeDomSnapshot(resultsOverlay);
+                    if (domSnapshot) sendRenderCapture(rid, null, domSnapshot, clientState, true);
+                });
                 return;
             }
 
@@ -2064,6 +2122,9 @@
                     const clientState = collectClientState();
                     const domSnapshot = serializeDomSnapshot(target);
 
+                    const origElements = [target, ...target.querySelectorAll('*')];
+                    const styleCache = collectComputedStyles(origElements);
+
                     html2canvas(target, {
                         backgroundColor: '#0a0d12',
                         scale: Math.min(window.devicePixelRatio || 2, 2),
@@ -2074,33 +2135,19 @@
                         height: Math.min(target.scrollHeight, 4096),
                         windowWidth: target.scrollWidth,
                         windowHeight: target.scrollHeight,
+                        onclone: (clonedDoc) => {
+                            const ct = clonedDoc.getElementById('resultsOverlay');
+                            if (!ct) return;
+                            ct.style.opacity = '1';
+                            ct.style.transform = 'none';
+                            applyStylesToClone([ct, ...ct.querySelectorAll('*')], styleCache);
+                        },
                     }).then(canvas => {
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-
-                        fetch('/api/hub/v2/render-capture', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                requestId: rid,
-                                image: dataUrl,
-                                domSnapshot,
-                                clientState,
-                            }),
-                        }).then(r => {
-                            if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
-                        }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
+                        sendRenderCapture(rid, dataUrl, domSnapshot, clientState, false);
                     }).catch(e => {
                         console.warn('[RenderCapture] html2canvas failed:', e.message);
-                        fetch('/api/hub/v2/render-capture', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                requestId: rid,
-                                domSnapshot,
-                                clientState,
-                                fallback: true,
-                            }),
-                        }).catch(() => {});
+                        sendRenderCapture(rid, null, domSnapshot, clientState, true);
                     });
                 } catch (e) {
                     console.warn('[RenderCapture] Error:', e.message);
@@ -2185,10 +2232,32 @@
             try {
                 const clone = target.cloneNode(true);
                 clone.querySelectorAll('script').forEach(s => s.remove());
-                const html = clone.outerHTML;
-                if (html.length > 512 * 1024) return html.substring(0, 512 * 1024);
+
+                const origElements = [target, ...target.querySelectorAll('*')];
+                const clonedElements = [clone, ...clone.querySelectorAll('*')];
+                for (let i = 0; i < origElements.length && i < clonedElements.length; i++) {
+                    const cs = getComputedStyle(origElements[i]);
+                    const el = clonedElements[i];
+                    CAPTURE_STYLE_PROPS.forEach(p => {
+                        const v = cs[p];
+                        if (v && v !== 'none' && v !== 'normal' && v !== 'auto') el.style[p] = v;
+                    });
+                }
+
+                clone.style.opacity = '1';
+                clone.style.transform = 'none';
+
+                const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+                    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                    + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">'
+                    + '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">'
+                    + '<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0a0d12;overflow-x:hidden;font-family:Inter,system-ui,-apple-system,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased}'
+                    + '.material-symbols-rounded{font-family:"Material Symbols Rounded";font-style:normal;font-weight:400;display:inline-block;line-height:1;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}</style>'
+                    + '</head><body>' + clone.outerHTML + '</body></html>';
+                if (html.length > 768 * 1024) return html.substring(0, 768 * 1024);
                 return html;
             } catch (e) {
+                console.warn('[RenderCapture] DOM snapshot failed:', e.message);
                 return null;
             }
         }
