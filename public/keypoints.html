@@ -1,427 +1,56 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Keypoints - thinx.fun</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        :root {
-            --bg: #0a0a0a;
-            --surface: #1a1a1a;
-            --surface-elevated: #242424;
-            --text: #e0e0e0;
-            --text-dim: #888;
-            --text-bright: #ffffff;
-            --accent: #00ffaa;
-            --accent-dim: rgba(0, 255, 170, 0.15);
-            --accent-hover: #00dd99;
-            --border: #333;
-            --danger: #ff4444;
-            --warning: #ffaa00;
-            --info: #44aaff;
-            --success: #00ff88;
-        }
-
-        body {
-            font-family: 'JetBrains Mono', monospace;
-            background: var(--bg);
-            color: var(--text);
-            overflow-x: hidden;
-        }
-
-        /* === HEADER === */
-        .header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 60px;
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 1rem;
-            z-index: 100;
-        }
-
-        .header-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--accent);
-        }
-
-        .header-back {
-            background: none;
-            border: none;
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            cursor: pointer;
-            padding: 0.5rem;
-        }
-
-        .header-back:hover {
-            color: var(--accent);
-        }
-
-        /* === MAIN CONTENT === */
-        .main {
-            padding-top: 60px;
-            min-height: 100vh;
-            padding-bottom: 80px;
-        }
-
-        /* === OVERVIEW CARD === */
-        .overview {
-            background: linear-gradient(135deg, var(--surface) 0%, var(--surface-elevated) 100%);
-            padding: 1.5rem;
-            margin: 1rem;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-        }
-
-        .overview-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 0.5rem;
-        }
-
-        .overview-subtitle {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 1rem;
-        }
-
-        .overview-answer {
-            font-size: 0.9rem;
-            line-height: 1.6;
-            color: var(--text);
-            padding: 1rem;
-            background: var(--bg);
-            border-radius: 8px;
-            border-left: 3px solid var(--accent);
-        }
-
-        /* === TRAILS NAVIGATION === */
-        .trails-nav {
-            padding: 1rem 1rem 0.5rem 1rem;
-            overflow-x: auto;
-            white-space: nowrap;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .trails-nav::-webkit-scrollbar {
-            display: none;
-        }
-
-        .trail-filter {
-            display: inline-block;
-            padding: 0.5rem 1rem;
-            margin-right: 0.5rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .trail-filter:hover {
-            border-color: var(--accent);
-            color: var(--text);
-        }
-
-        .trail-filter.active {
-            background: var(--accent);
-            color: var(--bg);
-            border-color: var(--accent);
-            font-weight: 600;
-        }
-
-        .trail-filter .count {
-            opacity: 0.7;
-            margin-left: 0.25rem;
-        }
-
-        /* === KEYPOINT CARDS === */
-        .cards {
-            padding: 1rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .card {
-            background: var(--surface);
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            overflow: hidden;
-            transition: all 0.3s ease;
-            opacity: 1;
-            transform: scale(1);
-        }
-
-        .card.hidden {
-            display: none;
-        }
-
-        .card:active {
-            transform: scale(0.98);
-        }
-
-        .card-header {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .card-trail {
-            display: inline-block;
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            margin-bottom: 0.5rem;
-        }
-
-        .card-trail.people { background: #ff4499; color: white; }
-        .card-trail.events { background: #4499ff; color: white; }
-        .card-trail.facts { background: #ffaa00; color: white; }
-        .card-trail.products { background: #00ff88; color: black; }
-        .card-trail.context { background: #aa88ff; color: white; }
-        .card-trail.claims { background: #ff6644; color: white; }
-        .card-trail.dates { background: #44ddff; color: black; }
-        .card-trail.locations { background: #88ff44; color: black; }
-        .card-trail.general { background: #888; color: white; }
-
-        .card-title {
-            font-size: 0.95rem;
-            font-weight: 600;
-            color: var(--text-bright);
-            margin-bottom: 0.5rem;
-        }
-
-        .card-description {
-            font-size: 0.8rem;
-            color: var(--text-dim);
-            line-height: 1.5;
-        }
-
-        .card-body {
-            padding: 1rem;
-        }
-
-        .card-question {
-            font-size: 0.85rem;
-            color: var(--accent);
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-
-        .card-answer {
-            font-size: 0.85rem;
-            color: var(--text);
-            line-height: 1.6;
-            padding: 0.75rem;
-            background: var(--bg);
-            border-radius: 6px;
-            margin-bottom: 1rem;
-        }
-
-        .card-text {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            padding: 0.75rem;
-            background: var(--surface-elevated);
-            border-radius: 6px;
-            margin-bottom: 1rem;
-            font-style: italic;
-            border-left: 2px solid var(--border);
-        }
-
-        .card-footer {
-            padding: 1rem;
-            border-top: 1px solid var(--border);
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-
-        .badge {
-            display: inline-block;
-            font-size: 0.65rem;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            border: 1px solid var(--border);
-            color: var(--text-dim);
-        }
-
-        .badge.priority-critical { border-color: var(--danger); color: var(--danger); }
-        .badge.priority-high { border-color: var(--warning); color: var(--warning); }
-        .badge.priority-medium { border-color: var(--info); color: var(--info); }
-        .badge.priority-low { border-color: var(--text-dim); }
-
-        .badge.verify { border-color: var(--warning); color: var(--warning); }
-
-        .deep-dive-section {
-            margin-top: 1rem;
-            display: none;
-        }
-
-        .deep-dive-section.active {
-            display: block;
-        }
-
-        .deep-dive-title {
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 0.5rem;
-        }
-
-        .deep-dive-prompts {
-            list-style: none;
-        }
-
-        .deep-dive-prompts li {
-            font-size: 0.8rem;
-            color: var(--text);
-            padding: 0.5rem;
-            margin-bottom: 0.25rem;
-            background: var(--surface-elevated);
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .deep-dive-prompts li:hover {
-            background: var(--accent-dim);
-            border-left: 2px solid var(--accent);
-        }
-
-        .deep-dive-prompts li::before {
-            content: '→ ';
-            color: var(--accent);
-        }
-
-        .expand-btn {
-            width: 100%;
-            padding: 0.75rem;
-            background: none;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--accent);
-            font-size: 0.75rem;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s ease;
-        }
-
-        .expand-btn:hover {
-            background: var(--accent-dim);
-            border-color: var(--accent);
-        }
-
-        /* === EMPTY STATE === */
-        .empty-state {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--text-dim);
-        }
-
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .empty-state-text {
-            font-size: 0.9rem;
-        }
-
-        /* === LOADING STATE === */
-        .loading {
-            padding: 3rem 1rem;
-            text-align: center;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--surface-elevated);
-            border-top-color: var(--accent);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body>
-    <!-- Header -->
-    <div class="header">
-        <button class="header-back" onclick="window.history.back()">← back</button>
-        <div class="header-title">keypoints</div>
-        <div style="width: 60px;"></div>
+<body class="min-h-screen bg-base-100">
+    <div class="navbar bg-base-200 border-b border-base-300 sticky top-0 z-20">
+        <div class="flex-1">
+            <button class="btn btn-ghost btn-sm" onclick="window.history.back()">← back</button>
+        </div>
+        <div class="flex-none font-semibold text-primary">keypoints</div>
     </div>
 
-    <!-- Main Content -->
-    <div class="main">
-        <!-- Loading State -->
-        <div class="loading" id="loadingState">
-            <div class="spinner"></div>
-            <div class="loading-text">extracting keypoints...</div>
+    <main class="p-4 pb-10 max-w-2xl mx-auto space-y-4">
+        <div id="loadingState" class="grid place-items-center py-10 gap-3">
+            <span class="loading loading-spinner loading-lg text-primary"></span>
+            <p class="text-sm text-base-content/60">extracting keypoints...</p>
         </div>
 
-        <!-- Content Container (hidden until loaded) -->
-        <div id="contentContainer" style="display: none;">
-            <!-- Overview Card -->
-            <div class="overview" id="overviewCard">
-                <div class="overview-subtitle">What am I looking at?</div>
-                <div class="overview-title" id="mainTopic"></div>
-                <div class="overview-answer" id="immediateAnswer"></div>
+        <div id="contentContainer" class="hidden space-y-4">
+            <div class="card bg-base-200 border border-base-300 shadow-sm" id="overviewCard">
+                <div class="card-body">
+                    <div class="badge badge-primary badge-outline w-fit">What am I looking at?</div>
+                    <h2 class="card-title" id="mainTopic"></h2>
+                    <p class="text-sm text-base-content/80 leading-relaxed" id="immediateAnswer"></p>
+                </div>
             </div>
 
-            <!-- Trails Navigation -->
-            <div class="trails-nav" id="trailsNav"></div>
-
-            <!-- Keypoint Cards -->
-            <div class="cards" id="cardsContainer"></div>
+            <div class="flex gap-2 overflow-x-auto pb-1" id="trailsNav"></div>
+            <div class="grid grid-cols-1 gap-4" id="cardsContainer"></div>
         </div>
 
-        <!-- Empty State -->
-        <div class="empty-state" id="emptyState" style="display: none;">
-            <div class="empty-state-icon">🔍</div>
-            <div class="empty-state-text">No keypoints found in this image</div>
-        </div>
-    </div>
+        <div id="emptyState" class="hidden"></div>
+    </main>
 
     <script>
-        // Get image data from URL fragment or sessionStorage
         const urlParams = new URLSearchParams(window.location.search);
         const imageDataSource = urlParams.get('img') || sessionStorage.getItem('currentImage');
 
+        function showEmpty(msg, type = 'warning') {
+            const empty = document.getElementById('emptyState');
+            empty.classList.remove('hidden');
+            empty.innerHTML = `<div class="alert alert-${type}"><span>${msg}</span></div>`;
+        }
+
         if (!imageDataSource) {
-            document.getElementById('loadingState').style.display = 'none';
-            document.getElementById('emptyState').style.display = 'block';
-            document.querySelector('.empty-state-text').textContent = 'No image provided';
+            document.getElementById('loadingState').classList.add('hidden');
+            showEmpty('No image provided');
         } else {
             extractKeypoints(imageDataSource);
         }
@@ -430,47 +59,35 @@
             try {
                 const response = await fetch('/api/keypoints', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         image: imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error('Failed to extract keypoints');
-                }
-
+                if (!response.ok) throw new Error('Failed to extract keypoints');
                 const data = await response.json();
                 displayKeypoints(data);
-
             } catch (error) {
                 console.error('Error:', error);
-                document.getElementById('loadingState').style.display = 'none';
-                document.getElementById('emptyState').style.display = 'block';
-                document.querySelector('.empty-state-text').textContent = 'Failed to extract keypoints: ' + error.message;
+                document.getElementById('loadingState').classList.add('hidden');
+                showEmpty(`Failed to extract keypoints: ${error.message}`, 'error');
             }
         }
 
         function displayKeypoints(data) {
-            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('loadingState').classList.add('hidden');
 
             if (!data.keypoints || data.keypoints.length === 0) {
-                document.getElementById('emptyState').style.display = 'block';
+                showEmpty('No keypoints found in this image');
                 return;
             }
 
-            document.getElementById('contentContainer').style.display = 'block';
-
-            // Display overview
+            document.getElementById('contentContainer').classList.remove('hidden');
             document.getElementById('mainTopic').textContent = data.overview.mainTopic;
             document.getElementById('immediateAnswer').textContent = data.overview.immediateAnswer;
 
-            // Display trails navigation
             renderTrailsNav(data.trails);
-
-            // Display keypoint cards
             renderCards(data.keypoints);
         }
 
@@ -478,20 +95,18 @@
             const nav = document.getElementById('trailsNav');
             nav.innerHTML = '';
 
-            // Add "All" filter
-            const allFilter = document.createElement('div');
-            allFilter.className = 'trail-filter active';
-            allFilter.innerHTML = `all <span class="count">(${Object.values(trails).reduce((sum, t) => sum + t.count, 0)})</span>`;
+            const allFilter = document.createElement('button');
+            allFilter.className = 'btn btn-sm btn-primary';
+            allFilter.innerHTML = `all <span class="opacity-70">(${Object.values(trails).reduce((sum, t) => sum + t.count, 0)})</span>`;
             allFilter.onclick = () => filterByTrail('all');
             nav.appendChild(allFilter);
 
-            // Add trail-specific filters
             Object.entries(trails).forEach(([trailName, trail]) => {
                 if (trail.count > 0) {
-                    const filter = document.createElement('div');
-                    filter.className = 'trail-filter';
+                    const filter = document.createElement('button');
+                    filter.className = 'btn btn-sm btn-outline';
                     filter.dataset.trail = trailName;
-                    filter.innerHTML = `${trailName} <span class="count">(${trail.count})</span>`;
+                    filter.innerHTML = `${trailName} <span class="opacity-70">(${trail.count})</span>`;
                     filter.onclick = () => filterByTrail(trailName);
                     nav.appendChild(filter);
                 }
@@ -504,79 +119,77 @@
 
             keypoints.forEach(kp => {
                 const card = document.createElement('div');
-                card.className = 'card';
+                card.className = 'card bg-base-200 border border-base-300 shadow-sm';
                 card.dataset.trail = kp.trail;
 
                 let html = `
-                    <div class="card-header">
-                        <div class="card-trail ${kp.trail}">${kp.trail}</div>
-                        <div class="card-title">${kp.title}</div>
-                        <div class="card-description">${kp.description}</div>
-                    </div>
                     <div class="card-body">
-                        <div class="card-question">Q: ${kp.obviousQuestion}</div>
-                        <div class="card-answer">${kp.quickAnswer}</div>
+                        <div class="badge badge-outline w-fit">${kp.trail}</div>
+                        <div class="text-base font-semibold">${kp.title}</div>
+                        <div class="text-sm text-base-content/60">${kp.description}</div>
+                        <div class="divider my-1"></div>
+                        <div class="text-sm text-primary font-medium">Q: ${kp.obviousQuestion}</div>
+                        <div class="p-3 rounded-box bg-base-300 text-sm text-base-content/90">${kp.quickAnswer}</div>
                 `;
 
                 if (kp.extractedText) {
-                    html += `<div class="card-text">"${kp.extractedText}"</div>`;
+                    html += `<div class="text-xs p-3 rounded-box bg-base-300/70 italic text-base-content/70">"${kp.extractedText}"</div>`;
                 }
 
+                const priorityBadge = kp.priority === 'critical' ? 'badge-error' :
+                    kp.priority === 'high' ? 'badge-warning' :
+                    kp.priority === 'medium' ? 'badge-info' : 'badge-ghost';
+                html += `<div class="flex gap-2 flex-wrap">`;
+                html += `<span class="badge ${priorityBadge}">${kp.priority}</span>`;
+                if (kp.needsVerification) html += `<span class="badge badge-warning badge-outline">needs verification</span>`;
                 html += `</div>`;
 
-                // Card footer with badges
-                html += `<div class="card-footer">`;
-                html += `<span class="badge priority-${kp.priority}">${kp.priority}</span>`;
-                if (kp.needsVerification) {
-                    html += `<span class="badge verify">needs verification</span>`;
-                }
-                html += `</div>`;
-
-                // Deep dive section
                 if (kp.deepDivePrompts && kp.deepDivePrompts.length > 0) {
                     html += `
-                        <div class="card-body">
-                            <button class="expand-btn" onclick="toggleDeepDive(this)">
-                                + explore deeper
-                            </button>
-                            <div class="deep-dive-section">
-                                <div class="deep-dive-title">Dive deeper:</div>
-                                <ul class="deep-dive-prompts">
+                        <button class="btn btn-outline btn-sm w-full mt-3" onclick="toggleDeepDive(this)">+ explore deeper</button>
+                        <div class="deep-dive-section hidden mt-3">
+                            <div class="text-xs uppercase tracking-wide text-base-content/50 mb-2">Dive deeper:</div>
+                            <ul class="menu bg-base-300 rounded-box">
+                                ${kp.deepDivePrompts.map(prompt => `<li><a>${prompt}</a></li>`).join('')}
+                            </ul>
+                        </div>
                     `;
-                    kp.deepDivePrompts.forEach(prompt => {
-                        html += `<li>${prompt}</li>`;
-                    });
-                    html += `</ul></div></div>`;
                 }
 
+                html += `</div>`;
                 card.innerHTML = html;
                 container.appendChild(card);
             });
         }
 
         function filterByTrail(trailName) {
-            // Update active filter
-            document.querySelectorAll('.trail-filter').forEach(f => f.classList.remove('active'));
+            document.querySelectorAll('#trailsNav button').forEach(f => {
+                f.classList.remove('btn-primary');
+                f.classList.add('btn-outline');
+            });
+
             if (trailName === 'all') {
-                document.querySelector('.trail-filter').classList.add('active');
+                const b = document.querySelector('#trailsNav button');
+                b.classList.add('btn-primary');
+                b.classList.remove('btn-outline');
             } else {
-                document.querySelector(`.trail-filter[data-trail="${trailName}"]`).classList.add('active');
+                const b = document.querySelector(`#trailsNav button[data-trail="${trailName}"]`);
+                if (b) {
+                    b.classList.add('btn-primary');
+                    b.classList.remove('btn-outline');
+                }
             }
 
-            // Filter cards
-            document.querySelectorAll('.card').forEach(card => {
-                if (trailName === 'all' || card.dataset.trail === trailName) {
-                    card.classList.remove('hidden');
-                } else {
-                    card.classList.add('hidden');
-                }
+            document.querySelectorAll('#cardsContainer .card').forEach(card => {
+                if (trailName === 'all' || card.dataset.trail === trailName) card.classList.remove('hidden');
+                else card.classList.add('hidden');
             });
         }
 
         function toggleDeepDive(btn) {
             const section = btn.nextElementSibling;
-            section.classList.toggle('active');
-            btn.textContent = section.classList.contains('active') ? '− collapse' : '+ explore deeper';
+            section.classList.toggle('hidden');
+            btn.textContent = section.classList.contains('hidden') ? '+ explore deeper' : '− collapse';
         }
     </script>
 </body>

@@ -6,6 +6,14 @@ describe('Hub UI contract (Daisy-first)', () => {
   const apiPath = path.join(__dirname, '../../api/index.js');
   const hubHtml = fs.readFileSync(hubPath, 'utf8');
   const apiIndex = fs.readFileSync(apiPath, 'utf8');
+  const secondaryPages = [
+    'job.html',
+    'canvas.html',
+    'scan.html',
+    'scan-view.html',
+    'keypoints.html',
+    'demo.html',
+  ];
 
   test('head includes DaisyUI/Tailwind and no custom <style> blocks', () => {
     const headMarkup = hubHtml.split('<body>')[0];
@@ -30,6 +38,16 @@ describe('Hub UI contract (Daisy-first)', () => {
     expect(fnBody).toContain('daisyui@5/themes.css');
     expect(fnBody).not.toContain('.card-grid{');
     expect(fnBody).not.toMatch(/<style>/i);
+  });
+
+  test('secondary customer pages use Daisy/Tailwind with no style blocks', () => {
+    for (const page of secondaryPages) {
+      const html = fs.readFileSync(path.join(__dirname, '../../public', page), 'utf8');
+      expect(html).toContain('cdn.jsdelivr.net/npm/daisyui@5/themes.css');
+      expect(html).toContain('cdn.jsdelivr.net/npm/daisyui@5');
+      expect(html).toContain('cdn.jsdelivr.net/npm/@tailwindcss/browser@4');
+      expect(html).not.toMatch(/<style[\s>]/i);
+    }
   });
 });
 
