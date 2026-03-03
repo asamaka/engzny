@@ -68,9 +68,16 @@ function createSkeletonBlueprint() {
  * Compute verification_card overall status from individual source statuses.
  * Ensures the displayed badge always matches the source checkmarks the user sees.
  */
+function normalizeSourceStatus(status) {
+  if (status === 'verified' || status === 'confirmed') return 'confirmed';
+  if (status === 'denied' || status === 'false' || status === 'disproven') return 'denied';
+  if (status === 'checking' || status === 'searching' || status === 'pending') return 'checking';
+  return status;
+}
+
 function computeVerificationStatus(sources) {
   if (!sources || sources.length === 0) return 'unconfirmed';
-  const statuses = sources.map(s => s.status);
+  const statuses = sources.map(s => normalizeSourceStatus(s.status));
   const hasConfirmed = statuses.some(s => s === 'confirmed');
   const hasDenied = statuses.some(s => s === 'denied');
   const allConfirmed = statuses.every(s => s === 'confirmed');
@@ -433,13 +440,20 @@ async function runPipeline({
         const sources = cardData.sources || [];
         let updated = false;
 
+        // Normalize source field names — LLM may use "source" instead of "name"
+        for (const source of sources) {
+          if (!source.name && source.source) source.name = source.source;
+        }
+
         // Try to match research findings to verification sources
         for (const source of sources) {
-          if (source.status === 'checking') {
+          const normalized = normalizeSourceStatus(source.status);
+          if (normalized === 'checking') {
             // Find a research finding that mentions this source
-            const finding = researchResult.findings.find(f => {
+            const sourceName = (source.name || '').toLowerCase();
+            const finding = sourceName && researchResult.findings.find(f => {
               const text = `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
-              return text.includes(source.name.toLowerCase());
+              return text.includes(sourceName);
             });
 
             if (finding) {
@@ -501,7 +515,8 @@ async function runPipeline({
       const sources = cardData.sources || [];
       let anyStillChecking = false;
       for (const source of sources) {
-        if (source.status === 'checking') {
+        if (!source.name && source.source) source.name = source.source;
+        if (normalizeSourceStatus(source.status) === 'checking') {
           source.status = 'not_yet_reported';
           source.snippet = 'Unable to verify — check source directly';
           anyStillChecking = true;
@@ -670,6 +685,12 @@ async function runPipeline({
       const cardData = card.populatedData || card.data || {};
       const sources = cardData.sources || [];
       if (sources.length === 0) continue;
+
+      // Normalize source field names and statuses for consistent storage
+      for (const src of sources) {
+        if (!src.name && src.source) src.name = src.source;
+        src.status = normalizeSourceStatus(src.status);
+      }
 
       const correctStatus = computeVerificationStatus(sources);
       if (cardData.status !== correctStatus) {

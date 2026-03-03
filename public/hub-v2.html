@@ -2870,8 +2870,13 @@
                     const sc = statusConfig[vStatus] || statusConfig.searching;
                     const sourceIcons = {
                         checking: { icon: 'hourglass_top', cls: 'text-base-content/30' },
+                        searching: { icon: 'hourglass_top', cls: 'text-base-content/30' },
+                        pending: { icon: 'hourglass_top', cls: 'text-base-content/30' },
                         confirmed: { icon: 'check_circle', cls: 'text-success' },
+                        verified: { icon: 'check_circle', cls: 'text-success' },
                         denied: { icon: 'cancel', cls: 'text-error' },
+                        'false': { icon: 'cancel', cls: 'text-error' },
+                        disproven: { icon: 'cancel', cls: 'text-error' },
                         not_yet_reported: { icon: 'schedule', cls: 'text-base-content/40' },
                         no_info: { icon: 'remove_circle_outline', cls: 'text-base-content/30' },
                     };
@@ -2892,8 +2897,8 @@
                                 return `<div class="flex items-start gap-2.5 p-2 rounded-lg bg-base-300/50">
                                     <span class="material-symbols-rounded ${si.cls} mt-0.5" style="font-size:18px;font-variation-settings:'FILL' 1">${si.icon}</span>
                                     <div class="min-w-0 flex-1">
-                                        <div class="font-semibold text-sm">${esc(sObj.name || 'Source')}</div>
-                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
+                                        <div class="font-semibold text-sm">${esc(sObj.name || sObj.source || 'Source')}</div>
+                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
                                         ${hasUrl ? (() => { try { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>`; } catch(e) { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">source</a>`; } })() : ''}
                                     </div>
                                 </div>`;
