@@ -2861,8 +2861,8 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
     }
 
     const domSizeKB = domSnapshot ? Math.round(domSnapshot.length / 1024) : 0;
-    if (domSizeKB > 512) {
-      return res.status(413).json({ error: 'DOM snapshot too large (max 512KB)' });
+    if (domSizeKB > 1024) {
+      return res.status(413).json({ error: 'DOM snapshot too large (max 1MB)' });
     }
 
     if (base64) {
@@ -2934,9 +2934,10 @@ app.get('/r/:requestId', async (req, res) => {
     const renderCapture = report ? await liveReports.getRenderCapture(req.params.requestId) : null;
     const clientState = report ? await liveReports.getClientState(req.params.requestId) : null;
     const thumb = report ? await liveReports.getReportThumb(req.params.requestId) : null;
-    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true, renderCapture, clientState));
+    const hasDomSnapshot = report ? !!(await liveReports.getDomSnapshot(req.params.requestId)) : false;
+    res.send(getLiveReportViewerHtml(req.params.requestId, report, thumb, true, renderCapture, clientState, hasDomSnapshot));
   } else {
-    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false, null, null));
+    res.send(getLiveReportViewerHtml(req.params.requestId, null, null, false, null, null, false));
   }
 });
 
@@ -3118,7 +3119,7 @@ async function doSearch(){
 </body></html>`;
 }
 
-function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated, renderCapture, clientState) {
+function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated, renderCapture, clientState, hasDomSnapshot) {
   const { renderCardHtml, renderReflection, renderLlmTracesHtml, esc, fmtMs } = reportRenderer;
 
   // If no report data, show just the PIN gate (client-side JS will redirect after auth)
@@ -3199,9 +3200,21 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<div class="iphone-frame">'
       + '<div class="iphone-notch"></div>'
       + '<div class="iphone-screen">'
-      + (renderCapture
-        ? '<img src="data:image/jpeg;base64,' + renderCapture + '" alt="Device render capture" class="render-capture-img">'
-        : '<div class="no-capture"><span class="mi" style="font-size:32px;color:var(--t3)">phone_iphone</span><div style="margin-top:8px;color:var(--t3);font-size:.75rem">No render capture available</div><div style="color:var(--t3);font-size:.65rem;margin-top:4px;opacity:.7">Captures are saved for new pipeline runs</div></div>')
+      + (() => {
+        if (renderCapture) {
+          return '<img src="data:image/jpeg;base64,' + renderCapture + '" alt="Device render capture" class="render-capture-img">';
+        }
+        if (hasDomSnapshot) {
+          const vw = clientState?.viewport?.width || 390;
+          const vh = clientState?.viewport?.height || 844;
+          const frameW = 183;
+          const scale = (frameW / vw).toFixed(4);
+          return '<iframe src="/api/r/' + esc(requestId) + '/dom" class="dom-snapshot-iframe" sandbox="allow-same-origin" loading="lazy" title="Rendered card view"'
+            + ' style="width:' + vw + 'px;height:' + vh + 'px;transform:scale(' + scale + ');transform-origin:top left;position:absolute;top:0;left:0"'
+            + '></iframe>';
+        }
+        return '<div class="no-capture"><span class="mi" style="font-size:32px;color:var(--t3)">phone_iphone</span><div style="margin-top:8px;color:var(--t3);font-size:.75rem">No render capture available</div><div style="color:var(--t3);font-size:.65rem;margin-top:4px;opacity:.7">Captures are saved for new pipeline runs</div></div>';
+      })()
       + '</div>'
       + '<div class="iphone-home"></div>'
       + '</div>'
@@ -3218,7 +3231,7 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">'
         + (clientState?.cards ? clientState.cards.populated + '/' + clientState.cards.total + (clientState.cards.loading ? ' (' + clientState.cards.loading + ' loading)' : '') + (clientState.cards.errored ? ' <span style="color:var(--r)">(' + clientState.cards.errored + ' errored)</span>' : '') : cards.length)
         + '</span></div>'
-      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Client-side (html2canvas)' : 'Not available') + '</span></div>'
+      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Client-side (html2canvas)' : hasDomSnapshot ? 'DOM snapshot (live render)' : 'Not available') + '</span></div>'
       + '</div>'
       + '</div>'
 
@@ -3333,6 +3346,7 @@ h2{font-size:.95rem;font-weight:600;color:var(--a);margin:28px 0 12px;padding-bo
 .iphone-notch{width:60px;height:14px;background:#1a1a1a;border-radius:0 0 10px 10px;margin:0 auto 4px;position:relative;z-index:2}
 .iphone-screen{background:#0a0d12;border-radius:16px;overflow:hidden;aspect-ratio:9/19.5;position:relative;display:flex;align-items:flex-start;justify-content:center}
 .iphone-screen .render-capture-img{width:100%;height:auto;display:block;object-fit:cover;object-position:top}
+.iphone-screen .dom-snapshot-iframe{width:100%;height:100%;border:none;background:#0a0d12;display:block;transform-origin:top left}
 .iphone-screen .no-capture{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;padding:20px}
 .iphone-home{width:40px;height:4px;background:#444;border-radius:2px;margin:6px auto 2px}
 .device-meta{flex:1;display:flex;flex-direction:column;gap:6px;padding:8px 0}
