@@ -6,7 +6,7 @@ and updates it before pushing.
 
 ## Last Run
 
-> **2026-03-02** | Trigger: `slow_pipeline` (0723744a, 81224ms) | Fixed P1 quality bug: verification_card showed "Unconfirmed" badge while 2/3 sources had green checkmarks — Phase 3 (review) overwrote Phase 2.5's algorithmically-computed status. Added post-phase reconciliation that re-computes overall status from individual source statuses. Also fixed P1 speed: text-only review phase + doubled maxTokens to cut pipeline time.
+> **2026-03-03** | Trigger: `slow_pipeline` (0723744a, 81224ms) | Fixed P0: Reports had no screenshot thumbnail and no render capture — users couldn't see what was actually delivered. Root causes: server-side `sharp` failing silently on Vercel, client-side html2canvas errors swallowed. Fix: client generates 360px JPEG thumbnail before upload (no sharp dependency), render capture has retry logic and fallback to DOM-only capture. Also fixed P1: verification status inconsistency + pipeline speed optimizations.
 
 ## Active Work
 
@@ -15,7 +15,8 @@ highest-priority incomplete item and continue where the last agent left off.
 
 ### P0 — Broken (errors, crashes, failed pipelines)
 
-(none)
+- [x] Reports missing screenshot thumbnail (hasThumb: false) — sharp fails silently on Vercel, no thumbnail saved (fixed: client-side thumbnail generation, sent with upload)
+- [x] Reports missing render capture — html2canvas errors swallowed, no fallback (fixed: retry logic, DOM-only fallback, console warnings)
 
 ### P1 — Degraded (slow, bad results)
 
@@ -45,3 +46,5 @@ Patterns noticed across multiple runs that may inform future improvements.
 - Review phase was re-sending the base64 image in every tool loop iteration — for a 2333KB image, this adds massive input token cost. Switched to text-only for review since cards are already populated from the enhance pass.
 - With maxTokens at 4096, Claude could only fit ~4 tool calls per response, forcing multiple round-trips. Increasing to 8192 lets Claude batch 7+ cards in one response.
 - Phase 3 (review) overwrites Phase 2.5's verification status computation. The review LLM picks an overall status that may contradict the individual source icons the user sees. Added post-phase reconciliation to always re-derive status from source data.
+- Report thumbnails depend on `sharp` which requires native binaries. On Vercel serverless, sharp fails silently. Moved thumbnail generation to client-side (canvas resize to 360px JPEG).
+- html2canvas render capture had zero error visibility — all `.catch(() => {})`. Added console.warn, retry (up to 3 attempts for script loading), and DOM-only fallback when canvas capture fails.

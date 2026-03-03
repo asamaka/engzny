@@ -1192,7 +1192,7 @@ const pipelineJobs = new Map();
 // Step 1: POST image, get requestId immediately (no SSE, fast response)
 app.post('/api/hub/v2/start', async (req, res) => {
   try {
-    const { image, question, mediaType: rawMediaType } = req.body || {};
+    const { image, question, mediaType: rawMediaType, thumb } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
 
@@ -1201,6 +1201,7 @@ app.post('/api/hub/v2/start', async (req, res) => {
       mediaType: normalized.mediaType,
       question: question || null,
       createdAt: Date.now(),
+      _clientThumb: thumb || null,
     });
 
     // Evict old jobs (keep last 50)
@@ -1383,8 +1384,8 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       try {
         if (pipelineResult.success) {
           const pl = pipelineResult.populatedLayout;
-          let thumb = null;
-          if (job._captureId) {
+          let thumb = job._clientThumb || null;
+          if (!thumb && job._captureId) {
             thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
           }
           await liveReports.saveLiveReport(requestId, {
@@ -2841,28 +2842,43 @@ app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
 // Render capture — save device screenshot, DOM snapshot, and client state (open endpoint like client-report)
 app.post('/api/hub/v2/render-capture', async (req, res) => {
   try {
-    const { requestId, image, domSnapshot, clientState } = req.body || {};
-    if (!requestId || !image) {
-      return res.status(400).json({ error: 'requestId and image required' });
+    const { requestId, image, domSnapshot, clientState, fallback } = req.body || {};
+    if (!requestId) {
+      return res.status(400).json({ error: 'requestId required' });
     }
-    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
-    const sizeKB = Math.round(base64.length * 0.75 / 1024);
-    if (sizeKB > 2048) {
-      return res.status(413).json({ error: 'Image too large (max 2MB)' });
+    if (!image && !domSnapshot) {
+      return res.status(400).json({ error: 'image or domSnapshot required' });
     }
+
+    let base64 = null;
+    let sizeKB = 0;
+    if (image) {
+      base64 = image.replace(/^data:image\/\w+;base64,/, '');
+      sizeKB = Math.round(base64.length * 0.75 / 1024);
+      if (sizeKB > 2048) {
+        return res.status(413).json({ error: 'Image too large (max 2MB)' });
+      }
+    }
+
     const domSizeKB = domSnapshot ? Math.round(domSnapshot.length / 1024) : 0;
     if (domSizeKB > 512) {
       return res.status(413).json({ error: 'DOM snapshot too large (max 512KB)' });
     }
-    await liveReports.saveRenderCapture(requestId, base64, { domSnapshot, clientState });
+
+    if (base64) {
+      await liveReports.saveRenderCapture(requestId, base64, { domSnapshot, clientState });
+    } else if (domSnapshot || clientState) {
+      await liveReports.saveRenderCapture(requestId, '', { domSnapshot, clientState });
+    }
+
     logger.info('RenderCapture', 'Saved device render capture', {
-      requestId, sizeKB, domSizeKB,
+      requestId, sizeKB, domSizeKB, fallback: !!fallback,
       hasClientState: !!clientState,
       viewport: clientState?.viewport ? `${clientState.viewport.width}x${clientState.viewport.height}` : null,
     });
-    res.json({ ok: true, sizeKB, domSizeKB });
+    res.json({ ok: true, sizeKB, domSizeKB, fallback: !!fallback });
   } catch (err) {
-    logger.error('RenderCapture', 'Save failed', { err: err.message });
+    logger.error('RenderCapture', 'Save failed', { err: err.message, requestId: req.body?.requestId });
     res.status(500).json({ error: 'Failed to save render capture' });
   }
 });

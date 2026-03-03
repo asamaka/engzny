@@ -1242,6 +1242,31 @@
             });
         }
 
+        async function generateThumbnail(blob, maxWidth = 360) {
+            try {
+                const url = URL.createObjectURL(blob);
+                try {
+                    const img = await loadImageEl(url);
+                    const scale = Math.min(maxWidth / img.naturalWidth, 1);
+                    const w = Math.round(img.naturalWidth * scale);
+                    const h = Math.round(img.naturalHeight * scale);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                    return dataUrl.replace(/^data:image\/\w+;base64,/, '');
+                } finally {
+                    URL.revokeObjectURL(url);
+                }
+            } catch (e) {
+                console.warn('Thumbnail generation failed:', e);
+                return null;
+            }
+        }
+
+        let currentThumbBase64 = null;
+
         async function compressImage(blob) {
             if (blob.size <= UPLOAD_TARGET_SIZE) return blob;
 
@@ -1338,6 +1363,8 @@
             } catch (e) {
                 console.warn('Compression failed, using original:', e);
             }
+
+            currentThumbBase64 = await generateThumbnail(blob);
 
             updateProgress(5, 'UPLOADING', 'Sending screenshot...');
 
@@ -1522,7 +1549,9 @@
                         reject(new Error('Upload failed — network error'));
                     });
 
-                    xhr.send(JSON.stringify({ image: imageDataUrl }));
+                    const payload = { image: imageDataUrl };
+                    if (currentThumbBase64) payload.thumb = currentThumbBase64;
+                    xhr.send(JSON.stringify(payload));
                 });
 
                 telemetry.requestId = requestId;
@@ -2006,19 +2035,34 @@
                 setTimeout(() => resultsOverlay.classList.add('visible'), 100);
             }
 
-            captureRenderedCards();
+            renderCaptureAttempts = 0;
+            setTimeout(() => captureRenderedCards(), 500);
         }
+
+        let renderCaptureAttempts = 0;
 
         function captureRenderedCards() {
             const rid = telemetry.requestId;
-            if (!rid || typeof html2canvas === 'undefined') return;
+            if (!rid) return;
+            renderCaptureAttempts++;
+            const attempt = renderCaptureAttempts;
+
+            if (typeof html2canvas === 'undefined') {
+                console.warn('[RenderCapture] html2canvas not loaded, retrying in 2s');
+                if (attempt <= 3) setTimeout(() => captureRenderedCards(), 2000);
+                return;
+            }
 
             waitForCardsToSettle().then(() => {
                 try {
                     const target = resultsOverlay;
-                    if (!target || !cardGrid.children.length) return;
+                    if (!target || !cardGrid.children.length) {
+                        console.warn('[RenderCapture] No target or empty card grid');
+                        return;
+                    }
 
                     const clientState = collectClientState();
+                    const domSnapshot = serializeDomSnapshot(target);
 
                     html2canvas(target, {
                         backgroundColor: '#0a0d12',
@@ -2033,8 +2077,6 @@
                     }).then(canvas => {
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
 
-                        const domSnapshot = serializeDomSnapshot(target);
-
                         fetch('/api/hub/v2/render-capture', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -2044,10 +2086,24 @@
                                 domSnapshot,
                                 clientState,
                             }),
+                        }).then(r => {
+                            if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
+                        }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
+                    }).catch(e => {
+                        console.warn('[RenderCapture] html2canvas failed:', e.message);
+                        fetch('/api/hub/v2/render-capture', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                requestId: rid,
+                                domSnapshot,
+                                clientState,
+                                fallback: true,
+                            }),
                         }).catch(() => {});
-                    }).catch(() => {});
+                    });
                 } catch (e) {
-                    // Non-critical — don't disrupt user experience
+                    console.warn('[RenderCapture] Error:', e.message);
                 }
             });
         }
