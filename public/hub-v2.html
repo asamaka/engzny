@@ -1417,8 +1417,6 @@
                     + '<meta name="viewport" content="width=device-width,initial-scale=1">'
                     + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">'
                     + '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">'
-                    + '<style>*{box-sizing:border-box}body{background:#0a0d12;overflow-x:hidden;font-family:Inter,system-ui,-apple-system,sans-serif;color:#e8eaf0;-webkit-font-smoothing:antialiased}'
-                    + '.material-symbols-rounded{font-family:"Material Symbols Rounded";font-style:normal;font-weight:400;display:inline-block;line-height:1;direction:ltr;-webkit-font-feature-settings:"liga";font-feature-settings:"liga"}</style>'
                     + '</head><body>' + clone.outerHTML + '</body></html>';
                 if (html.length > 1024 * 1024) return html.substring(0, 1024 * 1024);
                 return html;
@@ -1530,18 +1528,18 @@
                     return `${hasImage ? `<figure class="relative">
                         <img class="w-full h-40 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
                         <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
-                        ${d.badge ? `<div class="absolute top-3 left-3"><div class="badge badge-primary badge-sm font-bold" ${d.badgeColor ? `style="background:${esc(d.badgeColor)};border-color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</div></div>` : ''}
+                        ${d.badge ? `<div class="absolute top-3 left-3"><div class="badge badge-primary badge-sm font-bold">${esc(d.badge)}</div></div>` : ''}
                     </figure>` : ''}
                     <div class="p-4">
                         ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
-                        ${!hasImage && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2" ${d.badgeColor ? `style="background:${esc(d.badgeColor)};border-color:${esc(d.badgeColor)}"` : ''}>${esc(d.badge)}</div>` : ''}
+                        ${!hasImage && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
                         <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
                         <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(d.subtitle || '')}</p>
                         ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">
                             <p class="text-sm text-base-content/80 leading-relaxed">${linkify(d.takeaway)}</p>
                         </div>` : ''}
                         ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1">
-                            <span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Source
+                            <span class="material-symbols-rounded text-sm">open_in_new</span> Source
                         </a>` : ''}
                     </div>`;
                 }
@@ -1550,10 +1548,10 @@
                     return `<div class="stat p-4">
                         ${d.emoji ? `<div class="stat-figure text-primary text-2xl">${esc(d.emoji)}</div>` : ''}
                         <div class="stat-title text-xs text-base-content/50">${esc(d.label || '')}</div>
-                        <div class="stat-value text-2xl font-extrabold text-primary" ${d.color ? `style="color:${esc(d.color)}"` : ''}>${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
+                        <div class="stat-value text-2xl font-extrabold text-primary">${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
                         ${d.trend && d.trend !== 'none' ? `<div class="stat-desc">
                             <span class="badge badge-sm ${d.trend === 'up' ? 'badge-success' : d.trend === 'down' ? 'badge-error' : 'badge-info'} gap-1">
-                                <span class="material-symbols-rounded" style="font-size:12px">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
+                                <span class="material-symbols-rounded text-xs">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
                                 ${esc(d.trend)}
                             </span>
                         </div>` : ''}
@@ -1595,7 +1593,7 @@
                     return `<div class="p-4">
                         <div class="flex items-center gap-3 mb-3">
                             <div class="w-10 h-10 rounded-full bg-${vc.color}/15 flex items-center justify-center shrink-0">
-                                <span class="material-symbols-rounded text-${vc.color}" style="font-size:22px;font-variation-settings:'FILL' 1">${vc.icon}</span>
+                                <span class="material-symbols-rounded text-${vc.color} text-xl">${vc.icon}</span>
                             </div>
                             <div>
                                 <div class="badge badge-${vc.color} badge-sm font-bold">${esc(vc.label)}</div>
@@ -1645,17 +1643,17 @@
                             <div>
                                 <div class="font-bold text-base text-white">${esc(d.name || 'Product')}</div>
                                 ${d.price ? `<div class="text-xl font-extrabold text-success">${esc(d.price)}</div>` : ''}
-                                ${d.rating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded" style="font-size:14px;font-variation-settings:'FILL' 1">star</span> ${esc(d.rating)}</div>` : ''}
+                                ${d.rating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded text-sm">star</span> ${esc(d.rating)}</div>` : ''}
                             </div>
                         </div>
                         ${features.length ? `<div class="flex flex-wrap gap-1.5 mb-2">${features.map(f =>
-                            `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded" style="font-size:10px">check</span>${esc(f)}</span>`
+                            `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded text-[10px]">check</span>${esc(f)}</span>`
                         ).join('')}</div>` : ''}
                         ${d.verdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success">${linkify(d.verdict)}</div>` : ''}
                         ${warnings.length ? `<div class="mt-2 space-y-1">${warnings.map(w =>
-                            `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded" style="font-size:12px">warning</span>${esc(w)}</div>`
+                            `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded text-xs">warning</span>${esc(w)}</div>`
                         ).join('')}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> View</a>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> View</a>` : ''}
                     </div>`;
                 }
 
@@ -1719,7 +1717,7 @@
                     const alertClass = level === 'critical' ? 'alert-error' : level === 'info' ? 'alert-info' : 'alert-warning';
                     const icon = level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning';
                     return `<div role="alert" class="alert ${alertClass} rounded-2xl">
-                        <span class="material-symbols-rounded" style="font-size:22px;font-variation-settings:'FILL' 1">${icon}</span>
+                        <span class="material-symbols-rounded text-xl">${icon}</span>
                         <div>
                             <h3 class="font-bold text-sm">${esc(d.title || 'Warning')}</h3>
                             ${d.details ? `<div class="text-xs mt-1 opacity-80">${linkify(d.details)}</div>` : ''}
@@ -1763,7 +1761,7 @@
                     <div class="p-4">
                         <div class="flex items-center gap-3 mb-2">
                             <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                ${d.emoji ? `<span class="text-lg">${esc(d.emoji)}</span>` : `<span class="material-symbols-rounded text-primary" style="font-size:20px">location_on</span>`}
+                                ${d.emoji ? `<span class="text-lg">${esc(d.emoji)}</span>` : `<span class="material-symbols-rounded text-primary text-lg">location_on</span>`}
                             </div>
                             <div>
                                 <div class="font-bold text-base text-white">${esc(d.name || 'Location')}</div>
@@ -1774,7 +1772,7 @@
                         ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
                             `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
-                        ${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1"><span class="material-symbols-rounded" style="font-size:14px">map</span> View on Map</a>` : ''}
+                        ${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1"><span class="material-symbols-rounded text-sm">map</span> View on Map</a>` : ''}
                     </div>`;
                 }
 
@@ -1785,7 +1783,7 @@
                         ${(d.links || []).map(link => {
                             const lObj = typeof link === 'object' ? link : { label: String(link), url: '' };
                             return `<div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><span class="material-symbols-rounded text-primary" style="font-size:16px">link</span></div>
+                                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><span class="material-symbols-rounded text-primary text-base">link</span></div>
                                 <div class="min-w-0">
                                     <div class="text-sm font-medium">${lObj.url ? renderLink(lObj.url, lObj.label || lObj.url) : esc(lObj.label || '')}</div>
                                     ${lObj.description ? `<div class="text-xs text-base-content/40">${esc(lObj.description)}</div>` : ''}
@@ -1810,7 +1808,7 @@
                         </div>
                         ${d.summary ? `<p class="text-sm text-base-content/60 leading-relaxed">${linkify(d.summary)}</p>` : ''}
                         ${d.relatedContext ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg">💡 ${linkify(d.relatedContext)}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Read article</a>` : ''}
+                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Read article</a>` : ''}
                     </div>`;
                 }
 
@@ -1822,46 +1820,35 @@
                     let chartHtml = '';
 
                     if (cType === 'bar') {
-                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item, i) => {
+                        chartHtml = `<div class="space-y-3">${items.slice(0, 8).map((item) => {
                             const pct = Math.round((item.value / maxVal) * 100);
-                            const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
                             return `<div>
                                 <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
-                                <div class="w-full bg-base-300 rounded-full h-2"><div class="h-2 rounded-full transition-all" style="width:${pct}%;background:${color}"></div></div>
+                                <progress class="progress progress-primary w-full h-2" value="${pct}" max="100"></progress>
                             </div>`;
                         }).join('')}</div>`;
                     } else if (cType === 'pie') {
                         const total = items.reduce((s, i) => s + (typeof i.value === 'number' ? i.value : 0), 0) || 1;
-                        let cumPct = 0;
-                        const segments = items.slice(0, 6).map((item, i) => {
+                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item) => {
                             const pct = (item.value / total) * 100;
-                            const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
-                            const start = cumPct;
-                            cumPct += pct;
-                            return { ...item, pct, color, start };
-                        });
-                        const gradientStops = segments.map(s => `${s.color} ${s.start}% ${s.start + s.pct}%`).join(', ');
-                        chartHtml = `<div class="flex items-center gap-4">
-                            <div class="w-20 h-20 rounded-full shrink-0" style="background:conic-gradient(${gradientStops})"></div>
-                            <div class="space-y-1">${segments.map(s =>
-                                `<div class="flex items-center gap-2 text-xs"><span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:${s.color}"></span><span class="text-base-content/60">${esc(s.label)}</span><span class="font-bold ml-auto">${Math.round(s.pct)}%</span></div>`
-                            ).join('')}</div>
-                        </div>`;
+                            return `<div>
+                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-bold">${Math.round(pct)}%</span></div>
+                                <progress class="progress progress-secondary w-full h-2" value="${Math.round(pct)}" max="100"></progress>
+                            </div>`;
+                        }).join('')}</div>`;
                     } else if (cType === 'progress') {
-                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item, i) => {
+                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item) => {
                             const pct = Math.min(Math.round((item.value / maxVal) * 100), 100);
-                            const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
                             return `<div>
                                 <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-bold">${item.value}${unit}</span></div>
-                                <progress class="progress w-full h-2" value="${pct}" max="100" style="--progress-color:${color}"></progress>
+                                <progress class="progress progress-accent w-full h-2" value="${pct}" max="100"></progress>
                             </div>`;
                         }).join('')}</div>`;
                     } else {
-                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item, i) => {
+                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item) => {
                             const pct = Math.round((item.value / maxVal) * 100);
-                            const color = item.color || CHART_COLORS[i % CHART_COLORS.length];
                             return `<div><div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
-                                <div class="w-full bg-base-300 rounded-full h-2"><div class="h-2 rounded-full" style="width:${pct}%;background:${color}"></div></div></div>`;
+                                <progress class="progress progress-primary w-full h-2" value="${pct}" max="100"></progress></div>`;
                         }).join('')}</div>`;
                     }
 
@@ -1913,10 +1900,10 @@
 
                     return `<div class="p-4">
                         <div class="flex items-center gap-2 mb-3">
-                            ${isSearching ? `<span class="loading loading-ring loading-md text-primary"></span>` : `<span class="material-symbols-rounded ${sc.badge.replace('badge-','')==='success'?'text-success':sc.badge.replace('badge-','')==='error'?'text-error':'text-warning'}" style="font-size:24px;font-variation-settings:'FILL' 1">${sc.icon}</span>`}
+                            ${isSearching ? `<span class="loading loading-ring loading-md text-primary"></span>` : `<span class="material-symbols-rounded ${sc.badge.replace('badge-','')==='success'?'text-success':sc.badge.replace('badge-','')==='error'?'text-error':'text-warning'} text-2xl">${sc.icon}</span>`}
                             <span class="badge ${sc.badge} badge-sm font-bold">${esc(sc.label)}</span>
                         </div>
-                        ${isSearching ? `<div class="w-full bg-base-300 rounded-full h-1 mb-3 overflow-hidden"><div class="h-1 bg-primary rounded-full animate-pulse" style="width:60%"></div></div>` : ''}
+                        ${isSearching ? `<div class="w-full bg-base-300 rounded-full h-1 mb-3 overflow-hidden"><div class="h-1 bg-primary rounded-full animate-pulse w-3/5"></div></div>` : ''}
                         <p class="text-sm italic text-base-content/70 mb-3 leading-relaxed">${linkify(d.claim || '')}</p>
                         <div class="space-y-2">
                             ${(d.sources || []).map(src => {
@@ -1925,7 +1912,7 @@
                                 const si = sourceIcons[sStatus] || sourceIcons.checking;
                                 const hasUrl = sObj.url && typeof sObj.url === 'string' && sObj.url.startsWith('http');
                                 return `<div class="flex items-start gap-2.5 p-2 rounded-lg bg-base-300/50">
-                                    <span class="material-symbols-rounded ${si.cls} mt-0.5" style="font-size:18px;font-variation-settings:'FILL' 1">${si.icon}</span>
+                                    <span class="material-symbols-rounded ${si.cls} mt-0.5 text-lg">${si.icon}</span>
                                     <div class="min-w-0 flex-1">
                                         <div class="font-semibold text-sm">${esc(sObj.name || sObj.source || 'Source')}</div>
                                         ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
@@ -1961,11 +1948,11 @@
                     return `${hasMapImage ? `<figure><img class="w-full h-40 object-cover" src="${esc(d.mapImageUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></figure>` : ''}
                     <div class="p-4">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="material-symbols-rounded text-primary" style="font-size:20px">map</span>
+                            <span class="material-symbols-rounded text-primary text-lg">map</span>
                             <span class="font-bold text-sm">${esc(d.name || 'Location')}</span>
                         </div>
                         ${d.context ? `<p class="text-xs text-base-content/50">${linkify(d.context)}</p>` : ''}
-                        ${mapsLink ? `<a href="${esc(mapsLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded" style="font-size:14px">open_in_new</span> Open in Maps</a>` : ''}
+                        ${mapsLink ? `<a href="${esc(mapsLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Open in Maps</a>` : ''}
                     </div>`;
                 }
 
@@ -1989,7 +1976,7 @@
                             <span class="font-bold text-sm">Total</span>
                             <span class="font-extrabold text-lg text-primary">${esc(d.total)}</span>
                         </div>` : ''}
-                        ${d.deliveryTime ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded" style="font-size:14px">schedule</span> ${esc(d.deliveryTime)}</div>` : ''}
+                        ${d.deliveryTime ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> ${esc(d.deliveryTime)}</div>` : ''}
                     </div>`;
 
                 case 'stats_grid_card':
@@ -2026,7 +2013,7 @@
                     const hasSourceImg = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
                     return `<div class="p-4">
                         <div class="flex items-center gap-3">
-                            ${hasSourceImg ? `<div class="avatar"><div class="w-10 h-10 rounded-full"><img src="${esc(d.imageUrl)}" alt="" loading="lazy"></div></div>` : `<div class="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center"><span class="material-symbols-rounded text-base-content/40" style="font-size:20px">source</span></div>`}
+                            ${hasSourceImg ? `<div class="avatar"><div class="w-10 h-10 rounded-full"><img src="${esc(d.imageUrl)}" alt="" loading="lazy"></div></div>` : `<div class="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center"><span class="material-symbols-rounded text-base-content/40 text-lg">source</span></div>`}
                             <div class="min-w-0 flex-1">
                                 <div class="font-bold text-sm">${d.profileUrl ? renderLink(d.profileUrl, d.name || 'Source') : esc(d.name || 'Source')}</div>
                                 ${d.type ? `<div class="text-xs text-base-content/40">${esc(d.type)}</div>` : ''}

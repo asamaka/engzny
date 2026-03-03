@@ -23,6 +23,10 @@ describe('Hub UI contract (Daisy-first)', () => {
     expect(headMarkup).not.toMatch(/<style[\s>]/i);
   });
 
+  test('hub contains no inline style attributes', () => {
+    expect(hubHtml).not.toMatch(/style="/i);
+  });
+
   test('hub defines layout-to-theme mapping for shared styles', () => {
     expect(hubHtml).toContain('const LAYOUT_THEME_MAP = {');
     expect(hubHtml).toContain("breaking_news: 'coffee'");
