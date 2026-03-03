@@ -1913,18 +1913,47 @@
             const el = document.getElementById(`card-${data.cardId}`);
             if (!el) return;
 
+            const isNewlyPopulated = !populatedCardIds.has(data.cardId);
+            if (isNewlyPopulated) {
+                populatedCardIds.add(data.cardId);
+                completedCards++;
+
+                if (!firstCardShown) {
+                    firstCardShown = true;
+                    stopAnalysisProgressTick();
+                    updateProgress(95, 'READY', 'Cards ready');
+                    progressOverlay.classList.add('hiding');
+                    setTimeout(() => {
+                        progressOverlay.classList.remove('active', 'uploading', 'analyzing', 'ready', 'hiding');
+                    }, 400);
+                    screenshotLayer.className = 'screenshot-layer fading';
+                    setTimeout(() => resultsOverlay.classList.add('visible'), 100);
+                }
+
+                if (completedCards > 1) {
+                    cardGrid.classList.remove('single-card');
+                }
+            }
+
             const existingData = el._cardData || {};
             const mergedData = { ...existingData, ...data.data };
             el._cardData = mergedData;
 
             el.classList.remove('loading', 'researching');
             el.classList.add('populated');
+            if (isNewlyPopulated) el.classList.add('entering');
             el.innerHTML = renderCardContent(data.cardType, mergedData);
 
             el.classList.add('card-updating');
             setTimeout(() => el.classList.remove('card-updating'), 800);
 
             appendCitations(el, mergedData);
+
+            if (isNewlyPopulated) {
+                const pct = 60 + Math.round((completedCards / totalCards) * 35);
+                layoutProgressFill.style.width = pct + '%';
+                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+            }
 
             const sourceClass = data.source === 'review' ? 'source-sonar' : 'source-sonnet';
             const sourceLabel = data.source === 'review' ? 'researched' : 'enhanced';
