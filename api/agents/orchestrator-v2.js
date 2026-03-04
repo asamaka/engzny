@@ -207,13 +207,13 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
         changed = true;
       }
       if (matchedFinding.factCheck.explanation && !cardData.explanation) {
-        updates.explanation = matchedFinding.factCheck.explanation.slice(0, 150);
+        updates.explanation = matchedFinding.factCheck.explanation.slice(0, 300);
         changed = true;
       }
     }
 
     if (matchedFinding.summary && !cardData.relatedContext && card.cardType === 'news_card') {
-      updates.relatedContext = matchedFinding.summary.slice(0, 150);
+      updates.relatedContext = matchedFinding.summary.slice(0, 300);
       changed = true;
     }
 
@@ -230,13 +230,14 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
       changed = true;
     }
 
-    if (matchedFinding.summary && !cardData.background && card.cardType === 'person_card') {
-      updates.background = matchedFinding.summary.slice(0, 200);
+    if (matchedFinding.summary && !cardData.notableInfo && card.cardType === 'person_card') {
+      updates.notableInfo = matchedFinding.summary.slice(0, 500);
       changed = true;
     }
 
-    if (matchedFinding.details && !cardData.details && card.cardType === 'location_card') {
-      updates.details = matchedFinding.details.slice(0, 200);
+    if (matchedFinding.summary && !cardData.details && card.cardType === 'location_card') {
+      const detailText = (matchedFinding.details || matchedFinding.summary || '').slice(0, 500);
+      updates.details = [detailText];
       changed = true;
     }
 
