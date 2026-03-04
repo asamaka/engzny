@@ -66,6 +66,38 @@ function createSkeletonBlueprint() {
 }
 
 /**
+ * Normalize a verification source array in place: convert strings/URLs to objects.
+ * LLM may return sources as ["Al Jazeera", "https://..."] instead of [{name, status}].
+ */
+function normalizeSourceArray(sources) {
+  for (let i = 0; i < sources.length; i++) {
+    if (typeof sources[i] === 'string') {
+      const s = sources[i];
+      if (s.startsWith('http')) {
+        try {
+          sources[i] = { name: new URL(s).hostname.replace(/^www\./, ''), url: s, status: 'checking' };
+        } catch (_) {
+          sources[i] = { name: s, url: s, status: 'checking' };
+        }
+      } else {
+        sources[i] = { name: s, status: 'checking' };
+      }
+    }
+  }
+  return sources;
+}
+
+/**
+ * Truncate text at a word boundary, appending "..." if truncated.
+ */
+function truncateAtWord(text, maxLen) {
+  if (!text || text.length <= maxLen) return text;
+  const truncated = text.slice(0, maxLen);
+  const lastSpace = truncated.lastIndexOf(' ');
+  return (lastSpace > maxLen * 0.6 ? truncated.slice(0, lastSpace) : truncated) + '...';
+}
+
+/**
  * Compute verification_card overall status from individual source statuses.
  * Ensures the displayed badge always matches the source checkmarks the user sees.
  */
@@ -534,6 +566,9 @@ async function runPipeline({
         const sources = cardData.sources || [];
         let updated = false;
 
+        // Normalize string sources to objects (LLM may return ["Al Jazeera"] instead of [{name: "Al Jazeera"}])
+        normalizeSourceArray(sources);
+
         // Normalize source field names — LLM may use "source" instead of "name"
         for (const source of sources) {
           if (!source.name && source.source) source.name = source.source;
@@ -576,7 +611,7 @@ async function runPipeline({
             .filter(Boolean)
             .join('. ');
           if (researchSummary) {
-            updatedData.summary = researchSummary.slice(0, 200);
+            updatedData.summary = truncateAtWord(researchSummary, 500);
           }
 
           vCard.populatedData = updatedData;
@@ -600,6 +635,7 @@ async function runPipeline({
     for (const vCard of verificationCards) {
       const cardData = vCard.populatedData || vCard.data || {};
       const sources = cardData.sources || [];
+      normalizeSourceArray(sources);
       let anyStillChecking = false;
       for (const source of sources) {
         if (!source.name && source.source) source.name = source.source;
@@ -774,7 +810,8 @@ async function runPipeline({
       const sources = cardData.sources || [];
       if (sources.length === 0) continue;
 
-      // Normalize source field names and statuses for consistent storage
+      // Normalize string sources and field names for consistent storage
+      normalizeSourceArray(sources);
       for (const src of sources) {
         if (!src.name && src.source) src.name = src.source;
         src.status = normalizeSourceStatus(src.status);
