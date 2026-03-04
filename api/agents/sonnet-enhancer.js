@@ -1,20 +1,28 @@
 /**
  * Sonnet Enhancer Agent
  *
- * Uses Claude Sonnet with tool_use to progressively enhance the card layout.
- * Sonnet can see the screenshot + what Haiku has already rendered, then:
- * 1. Update existing cards with richer data (fill optional fields)
- * 2. Add new cards that Haiku missed
- * 3. Change the layout if a better one fits
+ * Uses Claude Sonnet with tool_use + web_search to progressively enhance
+ * the card layout. Sonnet can see the screenshot, search the web to validate
+ * sources, and populate cards with real data:
+ *   1. Update existing cards with richer data (fill optional fields)
+ *   2. Add new cards that Haiku missed
+ *   3. Validate claims by searching source domains from the screenshot
+ *   4. Change the layout if a better one fits
  *
  * Triggered twice:
- * - After Haiku populates initial cards (enhancement pass)
- * - After Sonar returns deep research (review pass)
+ * - After Haiku populates initial cards (enhancement + web search pass)
+ * - After Sonar returns deep research (review pass — text only, no image)
  */
 
 const { getVisionAdapter } = require('../llm');
 const { getCardTypeDetailedSchemaForPrompt, getCardTypeSchemaForTypes, getLayoutTypesSummaryForPrompt, CARD_TYPES, LAYOUT_TYPES } = require('../contracts/card-types');
 const { logger } = require('../lib/logger');
+
+const WEB_SEARCH_TOOL = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+  max_uses: 5,
+};
 
 const ENHANCER_TOOLS = [
   {
@@ -126,6 +134,8 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
 
   let prompt = `You are populating a screenshot analysis hub. A fast classifier identified the content and chose a layout with skeleton cards. YOUR JOB: populate each card with REAL DATA from the screenshot, making the hub informative, visual, and concise.
 
+**You have web search access.** Use it to validate claims from the screenshot — especially check the source domains visible in the screenshot (e.g., if you see a BBC article, search BBC.com). This makes the results trustworthy.
+
 **The user already sees these cards as loading skeletons. Populate them in order of importance — each call you make instantly appears on screen.**
 
 **Current state:**
@@ -138,21 +148,21 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 **Layout:** ${layout.type}${layoutDef ? ` — ${layoutDef.description}` : ''}
 
 **YOUR TASKS (PRIORITY ORDER):**
-1. POPULATE HERO: Update hero_summary with a proper takeaway and ensure title is under 6 words. Add badge and badgeColor.
+1. POPULATE HERO: Update hero_summary with a proper takeaway and ensure title is under 6 words. Add badge and badgeColor. Keep investigationStatus as "investigating" — it will be resolved when all research completes.
 2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
-3. VERIFICATION: If there's a verification_card, populate the claim and source NAMES, but set ALL source statuses to "checking" — research will verify them later.
-4. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
-5. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
-6. REMOVE UNNECESSARY: If a skeleton card type doesn't fit the content, replace it with something better via add_card.
+3. WEB VALIDATE: Search the web to validate key claims from the screenshot. Check the source domain(s) visible in the screenshot. If you see a news article from "BBC" or "Al Jazeera", search that domain specifically. Add real source URLs you find to cards.
+4. VERIFICATION: If there's a verification_card, populate the claim and source NAMES. If you've already searched the web, set source statuses based on what you found ("confirmed"/"denied"/"checking"). Otherwise set to "checking".
+5. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
+6. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
 
-**DO NOT generate imageUrl or photoUrl** — you have no web access, so any URL you create will be wrong. Image URLs are added later from verified web research.
+**DO NOT generate imageUrl or photoUrl from memory** — only use image URLs you find via web search results. If you don't find a relevant image, leave imageUrl empty.
 
 **CRITICAL RULES:**
 - POPULATE ALL CARDS — skeleton cards with no data look broken to the user
 - Keep ALL text ultra-concise — no paragraphs. Titles: max 6 words. Values: max 10 words.
 - For person_card: ALWAYS include name, role, and context even if sparse
 - For location_card: ALWAYS include name, context, and a Google Maps URL in mapUrl
-- For verification_card: ALWAYS set source statuses to "checking" — you cannot verify claims, only research can. Populate the claim text and source names only.
+- Use web search to find REAL URLs for url fields — don't fabricate URLs
 - Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
 - For product_card: features/warnings must be plain strings
@@ -355,12 +365,18 @@ async function enhance({
       const useLoop = typeof adapter.analyzeImageWithToolLoop === 'function';
       const useTextLoop = isReview && typeof adapter.textWithToolLoop === 'function';
       const maxIterations = adapterConfig.maxIterations || 8;
+      const useWebSearch = adapterConfig.enableWebSearch && !isReview;
+      const tools = useWebSearch ? [WEB_SEARCH_TOOL, ...ENHANCER_TOOLS] : ENHANCER_TOOLS;
       let response;
+
+      if (useWebSearch) {
+        logger.info('SonnetEnhancer', 'Web search enabled for enhance pass', { maxSearches: WEB_SEARCH_TOOL.max_uses });
+      }
 
       if (useTextLoop) {
         response = await adapter.textWithToolLoop({
           prompt,
-          tools: ENHANCER_TOOLS,
+          tools,
           maxTokens: config.maxTokens,
           onToolUse: processToolBlock,
           maxIterations,
@@ -370,7 +386,7 @@ async function enhance({
           imageData,
           mediaType,
           prompt,
-          tools: ENHANCER_TOOLS,
+          tools,
           maxTokens: config.maxTokens,
           onToolUse: processToolBlock,
           maxIterations,
@@ -380,7 +396,7 @@ async function enhance({
           imageData,
           mediaType,
           prompt,
-          tools: ENHANCER_TOOLS,
+          tools,
           maxTokens: config.maxTokens,
         });
         for (const block of response.content) {
@@ -390,6 +406,7 @@ async function enhance({
 
     const duration = Date.now() - startTime;
 
+    const webSearchResults = (response.content || []).filter(b => b.type === 'web_search_tool_result');
     logger.info('SonnetEnhancer', `${phase} pass complete`, {
       dur: duration,
       model: response.model,
@@ -397,6 +414,7 @@ async function enhance({
       updates: actions.filter(a => a.type === 'update_card').length,
       adds: actions.filter(a => a.type === 'add_card').length,
       layoutChanges: actions.filter(a => a.type === 'update_layout').length,
+      webSearches: webSearchResults.length,
       usage: response.usage,
     });
 
@@ -445,4 +463,4 @@ async function enhance({
   }
 }
 
-module.exports = { enhance, ENHANCER_TOOLS };
+module.exports = { enhance, ENHANCER_TOOLS, WEB_SEARCH_TOOL };

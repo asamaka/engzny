@@ -1,20 +1,20 @@
 /**
- * Orchestrator v2 — Progressive Enhancement Pipeline
+ * Orchestrator v2 — 3-Milestone Progressive Pipeline
  *
- * Three-phase architecture optimized for speed-to-first-card:
+ * Milestone 1 — Hero Card (< 3 seconds):
+ *   Haiku classifies screenshot → hero card with title, screenshot image,
+ *   and "Investigating" status pill. Skeleton cards visible.
  *
- * Phase 1 — Haiku Classification (~1-2s):
- *   Haiku glances at screenshot, returns title + layout choice.
- *   User sees hero card with title + layout skeleton within 2-3 seconds.
+ * Milestone 2 — Live Research + Cards:
+ *   Two parallel research streams populate cards via SSE:
+ *   2a. Sonnet + Web Search: Validates sources from screenshot, populates
+ *       cards, does light web searches on source domains.
+ *   2b. Sonar Deep Research: Deep web-grounded research in parallel.
+ *   Cards appear and update live as results come in.
  *
- * Phase 2 — Parallel Enhancement + Research:
- *   2a. Sonnet Enhancement: Sees screenshot + Haiku's classification,
- *       populates each card one-by-one via tool_use (each fires SSE event).
- *   2b. Sonar Deep Research: Web-grounded research running in parallel.
- *
- * Phase 3 — Sonnet Review (after Sonar responds):
- *   Sonnet reviews all displayed info + Sonar research findings,
- *   makes final corrections and additions.
+ * Milestone 3 — Complete:
+ *   Both Sonnet and Sonar finished. Hero status pill updates to
+ *   "Confirmed" or "Unconfirmed". No more changes.
  */
 
 const { fastClassify } = require('./fast-classifier');
@@ -318,20 +318,20 @@ async function runPipeline({
       onPhase({ phase: 'enhancing', message: 'Populating cards + deep research...' });
     }
 
-    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Haiku) + Research');
+    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Sonnet + Web Search) + Deep Research (Sonar)');
 
     const enhanceMessages = [
-      'Analyzing screenshot...',
-      'Populating card content...',
-      'Adding details and context...',
-      'Searching for images...',
+      'Searching source websites...',
+      'Validating claims...',
+      'Populating cards with web data...',
+      'Cross-referencing sources...',
     ];
     const researchMessages = [
-      'Researching with web sources...',
-      'Cross-referencing information...',
+      'Deep research in progress...',
+      'Checking multiple sources...',
       'Verifying facts and claims...',
       'Adding citations and context...',
-      'Finalizing research...',
+      'Compiling research...',
     ];
     let heartbeatIdx = 0;
     let enhanceDone = false;
@@ -363,10 +363,6 @@ async function runPipeline({
       contentAnalysis: blueprint.contentAnalysis,
       layout: blueprint.layout,
       onCardUpdate: (action) => {
-        // LLM has no web access during enhance — any imageUrl/photoUrl is hallucinated
-        delete action.data.imageUrl;
-        delete action.data.photoUrl;
-
         logger.info('Orchestrator', 'Enhancer updated card', {
           cardId: action.cardId,
           reason: action.reason,
@@ -394,10 +390,6 @@ async function runPipeline({
         }
       },
       onCardAdd: (action) => {
-        // LLM has no web access during enhance — any imageUrl/photoUrl is hallucinated
-        delete action.data.imageUrl;
-        delete action.data.photoUrl;
-
         logger.info('Orchestrator', 'Enhancer added card', {
           cardId: action.cardId,
           cardType: action.cardType,
@@ -440,9 +432,10 @@ async function runPipeline({
       },
       adapterConfig: {
         ...adapterConfig,
-        model: adapterConfig.enhanceModel || 'claude-haiku-4-5-20251001',
+        model: adapterConfig.enhanceModel || 'claude-sonnet-4-5-20250514',
         traceCollector,
-        maxIterations: 2,
+        maxIterations: 3,
+        enableWebSearch: true,
       },
     }).then(result => {
       enhanceDone = true;
@@ -791,6 +784,52 @@ async function runPipeline({
       }
       if (researchResult.overallContext) {
         ca.overallContext = researchResult.overallContext;
+      }
+    }
+
+    // =====================================================
+    // Milestone 3: Resolve hero investigation status
+    // Derive from verification card status + research findings
+    // =====================================================
+    const heroCard = Array.from(currentCards.values()).find(c => c.cardType === 'hero_summary');
+    if (heroCard) {
+      const heroData = heroCard.populatedData || heroCard.data || {};
+      const vCard = Array.from(currentCards.values()).find(c => c.cardType === 'verification_card');
+      const vData = vCard ? (vCard.populatedData || vCard.data || {}) : null;
+
+      let investigationStatus = 'unconfirmed';
+      if (vData && vData.status) {
+        const vs = vData.status;
+        if (vs === 'verified' || vs === 'confirmed') investigationStatus = 'confirmed';
+        else if (vs === 'denied' || vs === 'false') investigationStatus = 'unconfirmed';
+        else if (vs === 'partially_verified' || vs === 'conflicting') investigationStatus = 'mixed';
+      } else if (researchResult.findings && researchResult.findings.length > 0) {
+        const verdicts = researchResult.findings
+          .filter(f => f.factCheck?.verdict)
+          .map(f => f.factCheck.verdict);
+        if (verdicts.includes('verified') || verdicts.includes('partially_true')) investigationStatus = 'confirmed';
+        else if (verdicts.includes('false') || verdicts.includes('misleading')) investigationStatus = 'unconfirmed';
+        else if (verdicts.length > 0) investigationStatus = 'mixed';
+      }
+
+      heroData.investigationStatus = investigationStatus;
+      heroCard.populatedData = heroData;
+      heroCard.data = heroData;
+      currentCards.set(heroCard.id, heroCard);
+
+      logger.info('Orchestrator', 'Investigation status resolved', {
+        status: investigationStatus,
+        vCardStatus: vData?.status,
+      });
+
+      if (onCardUpdate) {
+        onCardUpdate({
+          cardId: heroCard.id,
+          cardType: 'hero_summary',
+          data: { investigationStatus },
+          reason: `Investigation ${investigationStatus}`,
+          source: 'status',
+        });
       }
     }
 

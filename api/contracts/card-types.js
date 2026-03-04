@@ -10,12 +10,12 @@
  *   1. Visual first — emoji, badges, colors make cards engaging
  *   2. Less text, more visual — concise labels, not paragraphs
  *   3. Show what the user didn't know — focus on new/surprising info
- *   4. Image URLs come from web research only — LLMs without web access hallucinate URLs
+ *   4. Image/source URLs should come from web search or research — not fabricated from memory
  */
 
 const CARD_TYPES = {
   hero_summary: {
-    description: 'Large headline card — image banner, icon, title, one-line subtitle, key takeaway',
+    description: 'Large headline card — screenshot banner, icon, title, one-line subtitle, key takeaway, investigation status pill',
     schema: {
       title: { type: 'string', required: true, description: 'Headline (3-8 words)' },
       subtitle: { type: 'string', required: true, description: 'One-line context sentence' },
@@ -23,7 +23,8 @@ const CARD_TYPES = {
       badge: { type: 'string', description: 'Category label (e.g. "Breaking News", "Product")' },
       badgeColor: { type: 'string', description: 'Badge accent color hex' },
       takeaway: { type: 'string', description: 'Key insight the user likely did NOT know — 1 sentence max' },
-      imageUrl: { type: 'string', description: 'Banner image URL — populated from web research results only (do not generate)' },
+      investigationStatus: { type: 'string', enum: ['investigating', 'confirmed', 'unconfirmed', 'mixed'], description: 'Overall investigation status — starts as investigating, updated when research completes' },
+      imageUrl: { type: 'string', description: 'Banner image URL — use only URLs found via web search' },
       url: { type: 'string', description: 'Primary source URL if visible' },
     },
     sizing: { minWidth: 2, minHeight: 1, defaultSpan: 'full' },
@@ -82,7 +83,7 @@ const CARD_TYPES = {
       name: { type: 'string', required: true, description: 'Full name' },
       role: { type: 'string', description: 'Title or descriptor (under 6 words)' },
       emoji: { type: 'string', description: 'Representing emoji (flag, role symbol, etc.)' },
-      photoUrl: { type: 'string', description: 'Photo URL — populated from web research results only (do not generate)' },
+      photoUrl: { type: 'string', description: 'Photo URL — use only URLs found via web search' },
       handle: { type: 'string', description: 'Social handle' },
       profileUrl: { type: 'string', description: 'Profile URL' },
       context: { type: 'string', description: 'Why they are relevant (1 sentence)' },
@@ -199,7 +200,7 @@ const CARD_TYPES = {
     schema: {
       name: { type: 'string', required: true, description: 'Place name' },
       emoji: { type: 'string', description: 'Country flag or location emoji' },
-      imageUrl: { type: 'string', description: 'Location photo URL — populated from web research results only (do not generate)' },
+      imageUrl: { type: 'string', description: 'Location photo URL — use only URLs found via web search' },
       address: { type: 'string', description: 'Address' },
       context: { type: 'string', description: 'Why relevant (1 sentence)' },
       details: { type: 'array', items: { type: 'string' }, description: 'Key facts (max 3, short phrases)' },
@@ -230,7 +231,7 @@ const CARD_TYPES = {
     schema: {
       headline: { type: 'string', required: true, description: 'News headline (under 12 words)' },
       source: { type: 'string', required: true, description: 'News source name' },
-      imageUrl: { type: 'string', description: 'Article image URL — populated from web research results only (do not generate)' },
+      imageUrl: { type: 'string', description: 'Article image URL — use only URLs found via web search' },
       date: { type: 'string', description: 'Publication date' },
       summary: { type: 'string', description: 'What happened in 1-2 sentences — focus on what is NEW or surprising' },
       category: { type: 'string', description: 'News category (politics, tech, sports, etc.)' },

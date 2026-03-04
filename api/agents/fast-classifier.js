@@ -196,13 +196,13 @@ function buildSkeletonFromClassification(classification) {
       status: 'placeholder',
     };
 
-    // Pre-populate hero with title from classification
     if (isHero) {
       card.populatedData = {
         title,
         subtitle,
         emoji,
         badge: humanizeContentType(contentType),
+        investigationStatus: 'investigating',
       };
       card.placeholderData = card.populatedData;
       card.status = 'populated';

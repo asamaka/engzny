@@ -651,7 +651,7 @@
                 telemetry.requestId = requestId;
 
                 progressOverlay.classList.remove('hidden');
-                updateProgress(32, 'ANALYZING', 'Quick analysis starting...');
+                updateProgress(32, 'ANALYZING', 'Starting investigation...');
                 startAnalysisProgressTick(32);
 
                 await new Promise((resolve, reject) => {
@@ -735,16 +735,16 @@
                         classifying: 'ANALYZING',
                         designing: 'DESIGNING',
                         researching: 'RESEARCHING',
-                        enhancing: 'ENHANCING',
-                        reviewing: 'REVIEWING',
+                        enhancing: 'INVESTIGATING',
+                        reviewing: 'INVESTIGATING',
                     };
-                    const phaseLabel = phaseLabels[data.phase] || 'ANALYZING';
+                    const phaseLabel = phaseLabels[data.phase] || 'INVESTIGATING';
                     const mappedPct = 30 + Math.min(data.progress, 95) * 0.6;
                     currentContinuousPct = Math.max(currentContinuousPct, mappedPct);
                     updateProgress(currentContinuousPct, phaseLabel, data.message || 'Processing...');
                     if (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing') {
                         layoutProgressFill.value = data.progress;
-                        layoutProgressText.textContent = data.phase === 'enhancing' ? 'enhancing' : data.phase === 'reviewing' ? 'reviewing' : `${completedCards}/${totalCards}`;
+                        layoutProgressText.textContent = `${completedCards}/${totalCards}`;
                     }
                     break;
                 }
@@ -843,13 +843,13 @@
         }
 
         const enhanceStatusMessages = [
-            'Sonnet analyzing deeper...',
-            'Enriching card content...',
-            'Searching for more context...',
-            'Verifying information...',
+            'Searching source websites...',
+            'Validating claims...',
             'Cross-referencing sources...',
-            'Adding insights...',
-            'Compiling research...',
+            'Adding verified data...',
+            'Checking multiple sources...',
+            'Enriching with web results...',
+            'Compiling findings...',
         ];
         let enhanceMsgInterval = null;
 
@@ -998,14 +998,17 @@
                 layoutProgressText.textContent = `${completedCards}/${totalCards}`;
             }
 
-            const sourceClass = data.source === 'review' ? 'source-sonar' : 'source-sonnet';
-            const sourceLabel = data.source === 'review' ? 'researched' : 'enhanced';
-            const sourceTag = document.createElement('span');
-            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${sourceClass === 'source-sonar' ? 'badge-info' : 'badge-warning'}`;
-            sourceTag.dataset.sourceTag = 'true';
-            sourceTag.textContent = sourceLabel;
-            el.appendChild(sourceTag);
-            setTimeout(() => sourceTag.remove(), 4000);
+            const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched', status: '', reconcile: '' };
+            const sourceLabel = srcLabels[data.source] || 'updated';
+            if (sourceLabel) {
+                const isResearch = data.source === 'review' || data.source === 'research-enrich';
+                const sourceTag = document.createElement('span');
+                sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${isResearch ? 'badge-info' : 'badge-warning'}`;
+                sourceTag.dataset.sourceTag = 'true';
+                sourceTag.textContent = sourceLabel;
+                el.appendChild(sourceTag);
+                setTimeout(() => sourceTag.remove(), 4000);
+            }
         }
 
         function onCardAdded(data) {
@@ -1027,10 +1030,11 @@
             el.innerHTML = renderCardContent(data.cardType, data.data);
             el._cardData = data.data;
 
-            const sourceClass = data.source === 'review' ? 'source-sonar' : data.source === 'sonnet' ? 'source-sonnet' : 'source-haiku';
-            const sourceLabel = data.source === 'review' ? 'research' : data.source === 'sonnet' ? 'enhanced' : 'new';
+            const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched' };
+            const sourceLabel = srcLabels[data.source] || 'new';
+            const isResearch = data.source === 'review' || data.source === 'research-enrich';
             const sourceTag = document.createElement('span');
-            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${sourceClass === 'source-sonar' ? 'badge-info' : 'badge-warning'}`;
+            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${isResearch ? 'badge-info' : 'badge-warning'}`;
             sourceTag.dataset.sourceTag = 'true';
             sourceTag.textContent = sourceLabel;
             el.appendChild(sourceTag);
@@ -1049,8 +1053,8 @@
         function onPhaseChange(data) {
             const phaseMessages = {
                 haiku: 'Quick analysis...',
-                enhancing: 'Enhancing with Sonnet...',
-                reviewing: 'Incorporating research...',
+                enhancing: 'Investigating sources...',
+                reviewing: 'Deep research...',
             };
             const msg = phaseMessages[data.phase] || data.message || '';
             if (msg) {
@@ -1453,14 +1457,23 @@
             const type = card.cardType;
 
             if (type === 'hero_summary' && pd.title && pd.title !== 'Analyzing...') {
-                return `<div class="card-body">
-                    ${pd.emoji ? `<span class="text-3xl leading-none">${esc(pd.emoji)}</span>` : ''}
-                    ${pd.badge ? `<div class="badge badge-primary badge-sm">${esc(pd.badge)}</div>` : ''}
+                const screenshotSrc = typeof currentImageBase64 === 'string' ? currentImageBase64 : '';
+                return `${screenshotSrc ? `<figure class="relative">
+                    <img class="w-full h-40 object-cover" src="${screenshotSrc}" alt="">
+                    <div class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/50 to-transparent"></div>
+                    <div class="absolute top-3 left-3 flex gap-2">
+                        ${pd.badge ? `<div class="badge badge-primary badge-sm font-bold">${esc(pd.badge)}</div>` : ''}
+                    </div>
+                    <div class="absolute top-3 right-3">${renderStatusPill(pd.investigationStatus || 'investigating')}</div>
+                </figure>` : ''}
+                <div class="p-4">
+                    ${pd.emoji ? `<span class="text-3xl leading-none block mb-1">${esc(pd.emoji)}</span>` : ''}
+                    ${!screenshotSrc ? renderStatusPill(pd.investigationStatus || 'investigating') : ''}
                     <h2 class="text-xl font-bold leading-tight">${esc(pd.title)}</h2>
                     ${pd.subtitle ? `<p class="text-sm text-base-content/70 leading-relaxed">${esc(pd.subtitle)}</p>` : ''}
                     <div class="flex items-center gap-2 mt-2">
                         <span class="loading loading-dots loading-xs text-primary"></span>
-                        <span class="text-xs text-base-content/50">Enhancing...</span>
+                        <span class="text-xs text-base-content/50">Investigating...</span>
                     </div>
                 </div>`;
             }
@@ -1519,20 +1532,37 @@
             </div>`;
         }
 
+        function renderStatusPill(status) {
+            const configs = {
+                investigating: { icon: 'search', label: 'Investigating', cls: 'badge-warning text-warning-content' },
+                confirmed: { icon: 'check_circle', label: 'Confirmed', cls: 'badge-success text-success-content' },
+                unconfirmed: { icon: 'help', label: 'Unconfirmed', cls: 'badge-neutral text-neutral-content' },
+                mixed: { icon: 'swap_horiz', label: 'Mixed', cls: 'badge-info text-info-content' },
+            };
+            const c = configs[status] || configs.investigating;
+            return `<div class="badge ${c.cls} badge-sm gap-1 font-semibold shadow-sm">
+                <span class="material-symbols-rounded text-xs">${c.icon}</span>${c.label}
+            </div>`;
+        }
+
         function renderCardContent(cardType, data) {
             const d = data || {};
 
             switch (cardType) {
                 case 'hero_summary': {
                     const hasImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `${hasImage ? `<figure class="relative">
-                        <img class="w-full h-40 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
-                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
-                        ${d.badge ? `<div class="absolute top-3 left-3"><div class="badge badge-primary badge-sm font-bold">${esc(d.badge)}</div></div>` : ''}
+                    const heroImg = hasImage ? d.imageUrl : (typeof currentImageBase64 === 'string' ? currentImageBase64 : '');
+                    const status = d.investigationStatus || 'investigating';
+                    return `${heroImg ? `<figure class="relative">
+                        <img class="w-full h-40 object-cover" src="${hasImage ? esc(d.imageUrl) : heroImg}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
+                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/50 to-transparent"></div>
+                        <div class="absolute top-3 left-3">${d.badge ? `<div class="badge badge-primary badge-sm font-bold">${esc(d.badge)}</div>` : ''}</div>
+                        <div class="absolute top-3 right-3">${renderStatusPill(status)}</div>
                     </figure>` : ''}
                     <div class="p-4">
                         ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
-                        ${!hasImage && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
+                        ${!heroImg && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
+                        ${!heroImg ? renderStatusPill(status) : ''}
                         <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
                         <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(d.subtitle || '')}</p>
                         ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">

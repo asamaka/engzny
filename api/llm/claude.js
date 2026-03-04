@@ -224,6 +224,7 @@ class ClaudeAdapter extends LLMAdapter {
    */
   async analyzeImageWithToolLoop({ imageData, mediaType, prompt, tools, maxTokens, onToolUse, maxIterations = 8 }) {
     const effectiveMaxTokens = maxTokens || this.maxTokens;
+    const hasServerTools = tools.some(t => t.type && t.type.startsWith('web_search'));
     const messages = [
       {
         role: 'user',
@@ -265,6 +266,7 @@ class ClaudeAdapter extends LLMAdapter {
       totalUsage.cache_read_input_tokens += response.usage?.cache_read_input_tokens || 0;
       allContent.push(...response.content);
 
+      // Only process client-side tool_use blocks (skip server_tool_use from web_search)
       const toolUseBlocks = response.content.filter(b => b.type === 'tool_use');
 
       if (toolUseBlocks.length > 0 && onToolUse) {
