@@ -138,13 +138,14 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 **Layout:** ${layout.type}${layoutDef ? ` — ${layoutDef.description}` : ''}
 
 **YOUR TASKS (PRIORITY ORDER):**
-1. POPULATE HERO: Update hero_summary with a proper takeaway, imageUrl if relevant, and ensure title is under 6 words. Add badge and badgeColor.
+1. POPULATE HERO: Update hero_summary with a proper takeaway and ensure title is under 6 words. Add badge and badgeColor.
 2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
 3. VERIFICATION: If there's a verification_card, populate the claim and source NAMES, but set ALL source statuses to "checking" — research will verify them later.
-4. ADD IMAGES: person_card needs photoUrl, location_card needs imageUrl, news_card needs imageUrl.
-5. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
-6. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
-7. REMOVE UNNECESSARY: If a skeleton card type doesn't fit the content, replace it with something better via add_card.
+4. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
+5. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
+6. REMOVE UNNECESSARY: If a skeleton card type doesn't fit the content, replace it with something better via add_card.
+
+**DO NOT generate imageUrl or photoUrl** — you have no web access, so any URL you create will be wrong. Image URLs are added later from verified web research.
 
 **CRITICAL RULES:**
 - POPULATE ALL CARDS — skeleton cards with no data look broken to the user

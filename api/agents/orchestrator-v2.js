@@ -363,6 +363,10 @@ async function runPipeline({
       contentAnalysis: blueprint.contentAnalysis,
       layout: blueprint.layout,
       onCardUpdate: (action) => {
+        // LLM has no web access during enhance — any imageUrl/photoUrl is hallucinated
+        delete action.data.imageUrl;
+        delete action.data.photoUrl;
+
         logger.info('Orchestrator', 'Enhancer updated card', {
           cardId: action.cardId,
           reason: action.reason,
@@ -390,6 +394,10 @@ async function runPipeline({
         }
       },
       onCardAdd: (action) => {
+        // LLM has no web access during enhance — any imageUrl/photoUrl is hallucinated
+        delete action.data.imageUrl;
+        delete action.data.photoUrl;
+
         logger.info('Orchestrator', 'Enhancer added card', {
           cardId: action.cardId,
           cardType: action.cardType,

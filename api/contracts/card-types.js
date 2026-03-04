@@ -7,10 +7,10 @@
  *   - visual hints: emoji, colors, sizing, imageUrl for the frontend
  *
  * Design principles:
- *   1. Images first — every card that can show a photo should
+ *   1. Visual first — emoji, badges, colors make cards engaging
  *   2. Less text, more visual — concise labels, not paragraphs
  *   3. Show what the user didn't know — focus on new/surprising info
- *   4. Person/location/news cards should always try to fetch real photos
+ *   4. Image URLs come from web research only — LLMs without web access hallucinate URLs
  */
 
 const CARD_TYPES = {
@@ -23,7 +23,7 @@ const CARD_TYPES = {
       badge: { type: 'string', description: 'Category label (e.g. "Breaking News", "Product")' },
       badgeColor: { type: 'string', description: 'Badge accent color hex' },
       takeaway: { type: 'string', description: 'Key insight the user likely did NOT know — 1 sentence max' },
-      imageUrl: { type: 'string', description: 'Banner image URL — news article image, product shot, etc.' },
+      imageUrl: { type: 'string', description: 'Banner image URL — populated from web research results only (do not generate)' },
       url: { type: 'string', description: 'Primary source URL if visible' },
     },
     sizing: { minWidth: 2, minHeight: 1, defaultSpan: 'full' },
@@ -77,12 +77,12 @@ const CARD_TYPES = {
   },
 
   person_card: {
-    description: 'Person mentioned or shown — MUST include photoUrl from web search when possible. Shows real photo, name, role.',
+    description: 'Person mentioned or shown — name, role, context. Photo added from web research when available.',
     schema: {
       name: { type: 'string', required: true, description: 'Full name' },
       role: { type: 'string', description: 'Title or descriptor (under 6 words)' },
       emoji: { type: 'string', description: 'Representing emoji (flag, role symbol, etc.)' },
-      photoUrl: { type: 'string', description: 'IMPORTANT: Real photo URL of this person — use web search to find Wikipedia/official photo. Makes cards much richer.' },
+      photoUrl: { type: 'string', description: 'Photo URL — populated from web research results only (do not generate)' },
       handle: { type: 'string', description: 'Social handle' },
       profileUrl: { type: 'string', description: 'Profile URL' },
       context: { type: 'string', description: 'Why they are relevant (1 sentence)' },
@@ -195,11 +195,11 @@ const CARD_TYPES = {
   },
 
   location_card: {
-    description: 'Place or location — MUST include imageUrl from web search. Shows photo, name, key facts.',
+    description: 'Place or location — name, context, key facts. Photo added from web research when available.',
     schema: {
       name: { type: 'string', required: true, description: 'Place name' },
       emoji: { type: 'string', description: 'Country flag or location emoji' },
-      imageUrl: { type: 'string', description: 'IMPORTANT: Photo of this location — use web search to find a real photo. Makes cards much richer.' },
+      imageUrl: { type: 'string', description: 'Location photo URL — populated from web research results only (do not generate)' },
       address: { type: 'string', description: 'Address' },
       context: { type: 'string', description: 'Why relevant (1 sentence)' },
       details: { type: 'array', items: { type: 'string' }, description: 'Key facts (max 3, short phrases)' },
@@ -226,11 +226,11 @@ const CARD_TYPES = {
   },
 
   news_card: {
-    description: 'News article with image, headline, source, date — use for news/article screenshots. MUST include imageUrl.',
+    description: 'News article with headline, source, date — image added from web research when available.',
     schema: {
       headline: { type: 'string', required: true, description: 'News headline (under 12 words)' },
       source: { type: 'string', required: true, description: 'News source name' },
-      imageUrl: { type: 'string', description: 'IMPORTANT: Article image or news photo URL. Makes the card visual and engaging.' },
+      imageUrl: { type: 'string', description: 'Article image URL — populated from web research results only (do not generate)' },
       date: { type: 'string', description: 'Publication date' },
       summary: { type: 'string', description: 'What happened in 1-2 sentences — focus on what is NEW or surprising' },
       category: { type: 'string', description: 'News category (politics, tech, sports, etc.)' },
