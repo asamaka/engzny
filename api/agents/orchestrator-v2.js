@@ -145,6 +145,29 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
       changed = true;
     }
 
+    if (matchedFinding.imageUrl && !cardData.imageUrl) {
+      const imageCardTypes = new Set(['person_card', 'location_card', 'news_card', 'hero_summary', 'product_card']);
+      if (imageCardTypes.has(card.cardType)) {
+        updates.imageUrl = matchedFinding.imageUrl;
+        changed = true;
+      }
+    }
+
+    if (matchedFinding.summary && !cardData.context && card.cardType === 'did_you_know_card') {
+      updates.context = matchedFinding.summary.slice(0, 200);
+      changed = true;
+    }
+
+    if (matchedFinding.summary && !cardData.background && card.cardType === 'person_card') {
+      updates.background = matchedFinding.summary.slice(0, 200);
+      changed = true;
+    }
+
+    if (matchedFinding.details && !cardData.details && card.cardType === 'location_card') {
+      updates.details = matchedFinding.details.slice(0, 200);
+      changed = true;
+    }
+
     if (changed) {
       const mergedData = { ...cardData, ...updates };
       card.populatedData = mergedData;
@@ -175,7 +198,7 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
  *   onLayoutUpdate(blueprint)    — Layout with hero title (from Haiku classification)
  *   onLayoutPreview(blueprint)   — Kept for backward compat (same as onLayoutUpdate)
  *   onCardPopulated(cardUpdate)  — A card has been populated with real data
- *   onCardUpdate(cardUpdate)     — Sonnet updated an existing card
+ *   onCardUpdate(cardUpdate)     — Enhancer updated an existing card
  *   onCardAdd(cardAdd)           — Sonnet added a new card
  *   onPhase(phase)               — Phase transition notification
  *   onComplete(result)           — Pipeline finished
@@ -289,7 +312,7 @@ async function runPipeline({
 
     // =====================================================
     // Phase 2: Parallel Enhancement + Deep Research
-    // Sonnet populates cards, Sonar researches in parallel
+    // Haiku populates cards, Sonar researches in parallel
     // =====================================================
     if (onPhase) {
       onPhase({ phase: 'enhancing', message: 'Populating cards + deep research...' });
@@ -297,26 +320,43 @@ async function runPipeline({
 
     logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Haiku) + Research');
 
-    const enhanceProgressMessages = [
+    const enhanceMessages = [
       'Analyzing screenshot...',
       'Populating card content...',
       'Adding details and context...',
       'Searching for images...',
-      'Verifying information...',
     ];
-    let enhanceMsgIdx = 0;
+    const researchMessages = [
+      'Researching with web sources...',
+      'Cross-referencing information...',
+      'Verifying facts and claims...',
+      'Adding citations and context...',
+      'Finalizing research...',
+    ];
+    let heartbeatIdx = 0;
+    let enhanceDone = false;
+    let researchMsgIdx = 0;
     enhanceHeartbeat = setInterval(() => {
-      enhanceMsgIdx = Math.min(enhanceMsgIdx + 1, enhanceProgressMessages.length - 1);
       if (onProgress) {
-        onProgress({
-          phase: 'enhancing',
-          progress: 25 + enhanceMsgIdx * 10,
-          message: enhanceProgressMessages[enhanceMsgIdx],
-        });
+        if (!enhanceDone) {
+          heartbeatIdx = Math.min(heartbeatIdx + 1, enhanceMessages.length - 1);
+          onProgress({
+            phase: 'enhancing',
+            progress: 25 + heartbeatIdx * 10,
+            message: enhanceMessages[heartbeatIdx],
+          });
+        } else {
+          researchMsgIdx = Math.min(researchMsgIdx + 1, researchMessages.length - 1);
+          onProgress({
+            phase: 'researching',
+            progress: 70 + researchMsgIdx * 5,
+            message: researchMessages[researchMsgIdx],
+          });
+        }
       }
     }, 3000);
 
-    const sonnetEnhancePromise = enhance({
+    const enhancePromise = enhance({
       imageData,
       mediaType,
       currentCards: blueprint.cards,
@@ -345,7 +385,7 @@ async function runPipeline({
             cardType: action.cardType,
             data: action.data,
             reason: action.reason,
-            source: 'sonnet',
+            source: 'enhance',
           });
         }
       },
@@ -373,7 +413,7 @@ async function runPipeline({
             data: action.data,
             gridPosition: action.gridPosition,
             reason: action.reason,
-            source: 'sonnet',
+            source: 'enhance',
           });
         }
       },
@@ -396,7 +436,18 @@ async function runPipeline({
         traceCollector,
         maxIterations: 2,
       },
+    }).then(result => {
+      enhanceDone = true;
+      if (onProgress) {
+        onProgress({
+          phase: 'researching',
+          progress: 70,
+          message: researchMessages[0],
+        });
+      }
+      return result;
     }).catch(err => {
+      enhanceDone = true;
       logger.warn('Orchestrator', 'Enhancement failed (non-fatal)', { err: err.message });
       return { actions: [], duration: Date.now() - startTime };
     });
@@ -413,7 +464,7 @@ async function runPipeline({
     });
 
     const [enhanceResult, researchResult] = await Promise.all([
-      sonnetEnhancePromise,
+      enhancePromise,
       deepResearchPromise,
     ]);
 
