@@ -46,7 +46,7 @@
 
     <!-- Main Canvas -->
     <div id="mainCanvas" class="hidden min-h-screen bg-base-100">
-        <div id="screenshotLayer" class="fixed inset-0 z-0 flex items-center justify-center p-4 opacity-100 transition-opacity duration-500">
+        <div id="screenshotLayer" class="fixed inset-0 z-0 flex items-center justify-center p-4 opacity-0 pointer-events-none hidden">
             <img id="screenshotImg" alt="" class="max-h-[70vh] max-w-full rounded-box shadow-2xl">
         </div>
 
@@ -170,9 +170,6 @@
             stopAnalysisProgressTick();
             updateProgress(95, 'READY', 'Cards ready');
             progressOverlay.classList.add('hidden');
-            screenshotLayer.classList.remove('opacity-0');
-            screenshotLayer.classList.add('opacity-20');
-            screenshotImg.classList.remove('blur-[2px]', 'opacity-60');
             resultsOverlay.classList.remove('hidden');
         }
 
@@ -446,9 +443,6 @@
             screenshotImg.src = currentImageUrl;
             pasteState.classList.add('hidden');
             mainCanvas.classList.remove('hidden');
-            screenshotLayer.classList.remove('opacity-0');
-            screenshotLayer.classList.add('opacity-100');
-            screenshotImg.classList.add('opacity-60', 'blur-[2px]');
             progressOverlay.classList.remove('hidden');
             updateProgress(0, 'UPLOADING', 'Compressing...');
 
@@ -1106,7 +1100,6 @@
                 uploadProgressInterval = null;
             }
 
-            screenshotLayer.classList.add('opacity-0', 'pointer-events-none');
             progressOverlay.classList.add('hidden');
             cardGrid.classList.remove('max-w-xl', 'mx-auto');
 
@@ -2125,9 +2118,6 @@
 
             pasteState.classList.remove('hidden');
             mainCanvas.classList.add('hidden');
-            screenshotLayer.classList.remove('opacity-0', 'opacity-20', 'pointer-events-none');
-            screenshotLayer.classList.add('opacity-100');
-            screenshotImg.classList.remove('blur-[2px]', 'opacity-60');
             progressOverlay.classList.add('hidden');
             updateProgress(0, 'UPLOADING', 'Sending screenshot...');
             resultsOverlay.classList.add('hidden');
