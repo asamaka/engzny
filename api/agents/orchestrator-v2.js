@@ -432,7 +432,7 @@ async function runPipeline({
       },
       adapterConfig: {
         ...adapterConfig,
-        model: adapterConfig.enhanceModel || 'claude-sonnet-4-5-20250514',
+        model: adapterConfig.enhanceModel || 'claude-sonnet-4-20250514',
         traceCollector,
         maxIterations: 3,
         enableWebSearch: true,
