@@ -226,7 +226,7 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
     }
 
     if (matchedFinding.summary && !cardData.context && card.cardType === 'did_you_know_card') {
-      updates.context = matchedFinding.summary.slice(0, 200);
+      updates.context = matchedFinding.summary.slice(0, 500);
       changed = true;
     }
 

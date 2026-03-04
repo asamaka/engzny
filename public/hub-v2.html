@@ -1969,6 +1969,7 @@
                             ${d.category ? `<span class="badge badge-xs badge-outline">${esc(d.category)}</span>` : ''}
                         </div>
                         <p class="text-sm leading-relaxed">${linkify(d.fact || '')}</p>
+                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg">${linkify(d.context)}</div>` : ''}
                         ${d.sourceUrl && d.sourceUrl.startsWith('http') ? (() => { try { return `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>`; } catch(e) { return ''; } })() : ''}
                     </div>`;
                 }
