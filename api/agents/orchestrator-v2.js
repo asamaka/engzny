@@ -539,10 +539,38 @@ async function runPipeline({
       return { findings: [], duration: Date.now() - startTime };
     });
 
-    const [enhanceResult, researchResult] = await Promise.all([
-      enhancePromise,
+    // Wait for enhance to complete first (cards populate during this via SSE)
+    const enhanceResult = await enhancePromise;
+
+    // Race deep research against a pipeline duration cap.
+    // Sonar typically takes 20-25s which can push total pipeline past 25s.
+    // Cards are already populated from enhance — research adds enrichment
+    // (verification sources, context, URLs) which is valuable but not critical.
+    const PIPELINE_MAX_MS = parseInt(process.env.PIPELINE_MAX_DURATION || '20000', 10);
+    const MIN_RESEARCH_GRACE_MS = 2000;
+    const elapsedAfterEnhance = Date.now() - startTime;
+    const researchGrace = Math.max(MIN_RESEARCH_GRACE_MS, PIPELINE_MAX_MS - elapsedAfterEnhance);
+
+    let researchDeadlineTimer;
+    const researchResult = await Promise.race([
       deepResearchPromise,
+      new Promise(resolve => {
+        researchDeadlineTimer = setTimeout(() => resolve({
+          findings: [],
+          timedOut: true,
+          duration: Date.now() - startTime,
+        }), researchGrace);
+      }),
     ]);
+    clearTimeout(researchDeadlineTimer);
+
+    if (researchResult.timedOut) {
+      logger.info('Orchestrator', 'Research deadline reached — proceeding without findings', {
+        pipelineCap: PIPELINE_MAX_MS,
+        elapsed: Date.now() - startTime,
+        graceMs: researchGrace,
+      });
+    }
 
     clearInterval(enhanceHeartbeat);
 
