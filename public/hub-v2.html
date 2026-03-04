@@ -165,6 +165,19 @@
         let currentImageBase64 = null;
         let totalCards = 0;
         let completedCards = 0;
+        let allCardsReadyShown = false;
+
+        function checkAllCardsReady() {
+            if (allCardsReadyShown || pipelineComplete || totalCards === 0) return;
+            if (completedCards < totalCards) return;
+            allCardsReadyShown = true;
+            layoutProgressFill.value = 100;
+            layoutProgressText.innerHTML = '<span class="text-success flex items-center gap-1"><span class="material-symbols-rounded text-sm">check_circle</span>ready</span>';
+            if (enhanceMsgInterval) {
+                clearInterval(enhanceMsgInterval);
+                enhanceMsgInterval = null;
+            }
+        }
 
         function showResultsCanvas() {
             stopAnalysisProgressTick();
@@ -591,6 +604,7 @@
         async function startPipelineInner(imageDataUrl) {
             blueprintReceived = false;
             pipelineComplete = false;
+            allCardsReadyShown = false;
             lastEventTime = Date.now();
             telemetry.reset();
 
@@ -736,7 +750,7 @@
                     const mappedPct = 30 + Math.min(data.progress, 95) * 0.6;
                     currentContinuousPct = Math.max(currentContinuousPct, mappedPct);
                     updateProgress(currentContinuousPct, phaseLabel, data.message || 'Processing...');
-                    if (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing') {
+                    if (!allCardsReadyShown && (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing')) {
                         layoutProgressFill.value = data.progress;
                         layoutProgressText.textContent = `${completedCards}/${totalCards}`;
                     }
@@ -850,6 +864,7 @@
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
             completedCards = 0;
+            allCardsReadyShown = false;
             populatedCardIds.clear();
             applyLayoutTheme(blueprint.layout?.type);
 
@@ -893,7 +908,12 @@
                     populatedCardIds.add(card.id);
                     el.classList.remove('loading');
                     el.classList.add('populated');
-                    el.innerHTML = renderCardContent(card.cardType, card.populatedData);
+                    try {
+                        el.innerHTML = renderCardContent(card.cardType, card.populatedData);
+                    } catch (e) {
+                        console.warn(`[CardRender] ${card.cardType} failed:`, e.message);
+                        el.innerHTML = renderFallbackCard(card.cardType, card.populatedData);
+                    }
                     el._cardData = card.populatedData;
                     appendCitations(el, card.populatedData);
                 }
@@ -907,10 +927,12 @@
                 firstCardShown = true;
             }
 
-            layoutProgressFill.value = 25;
-            layoutProgressText.textContent = 'enhancing';
-
-            startEnhanceStatusRotation();
+            checkAllCardsReady();
+            if (!allCardsReadyShown) {
+                layoutProgressFill.value = 25;
+                layoutProgressText.textContent = 'enhancing';
+                startEnhanceStatusRotation();
+            }
         }
 
         function startEnhanceStatusRotation() {
@@ -918,7 +940,7 @@
             let msgIdx = 0;
             enhanceMsgInterval = setInterval(() => {
                 const loadingCards = document.querySelectorAll('.card.loading');
-                if (loadingCards.length === 0 && pipelineComplete) {
+                if ((loadingCards.length === 0 && pipelineComplete) || allCardsReadyShown) {
                     clearInterval(enhanceMsgInterval);
                     enhanceMsgInterval = null;
                     return;
@@ -949,14 +971,22 @@
 
             el.classList.remove('loading', 'researching');
             el.classList.add('populated');
-            el.innerHTML = renderCardContent(data.cardType, data.data);
+            try {
+                el.innerHTML = renderCardContent(data.cardType, data.data);
+            } catch (e) {
+                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
+                el.innerHTML = renderFallbackCard(data.cardType, data.data);
+            }
             el._cardData = data.data;
 
             appendCitations(el, data.data);
 
-            const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-            layoutProgressFill.value = pct;
-            layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+            checkAllCardsReady();
+            if (!allCardsReadyShown) {
+                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
+                layoutProgressFill.value = pct;
+                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+            }
         }
 
         function onCardUpdated(data) {
@@ -984,14 +1014,22 @@
 
             el.classList.remove('loading', 'researching');
             el.classList.add('populated');
-            el.innerHTML = renderCardContent(data.cardType, mergedData);
+            try {
+                el.innerHTML = renderCardContent(data.cardType, mergedData);
+            } catch (e) {
+                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
+                el.innerHTML = renderFallbackCard(data.cardType, mergedData);
+            }
 
             appendCitations(el, mergedData);
 
             if (isNewlyPopulated) {
-                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-                layoutProgressFill.value = pct;
-                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+                checkAllCardsReady();
+                if (!allCardsReadyShown) {
+                    const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
+                    layoutProgressFill.value = pct;
+                    layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+                }
             }
 
             const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched', status: '', reconcile: '' };
@@ -1026,7 +1064,12 @@
             const el = createCardElement(card);
             el.classList.remove('loading');
             el.classList.add('populated');
-            el.innerHTML = renderCardContent(data.cardType, data.data);
+            try {
+                el.innerHTML = renderCardContent(data.cardType, data.data);
+            } catch (e) {
+                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
+                el.innerHTML = renderFallbackCard(data.cardType, data.data);
+            }
             el._cardData = data.data;
 
             const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched' };
@@ -1044,9 +1087,12 @@
 
             appendCitations(el, data.data);
 
-            const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-            layoutProgressFill.value = pct;
-            layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+            checkAllCardsReady();
+            if (!allCardsReadyShown) {
+                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
+                layoutProgressFill.value = pct;
+                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+            }
         }
 
         function onPhaseChange(data) {
@@ -1527,6 +1573,17 @@
                 <div class="skeleton h-4 w-3/4"></div>
                 <div class="skeleton h-3 w-full"></div>
                 <div class="skeleton h-3 w-2/3"></div>
+            </div>`;
+        }
+
+        function renderFallbackCard(cardType, data) {
+            const d = data || {};
+            const title = d.title || d.name || d.headline || d.label || d.claim || d.quote || '';
+            const subtitle = d.subtitle || d.context || d.summary || d.description || d.explanation || '';
+            return `<div class="p-4">
+                <div class="text-xs font-bold uppercase tracking-wider text-base-content/30 mb-2">${esc((cardType || '').replace(/_/g, ' '))}</div>
+                ${title ? `<div class="text-sm font-medium mb-1">${esc(typeof title === 'string' ? title : JSON.stringify(title))}</div>` : ''}
+                ${subtitle ? `<div class="text-xs text-base-content/60">${esc(typeof subtitle === 'string' ? subtitle.slice(0, 200) : '')}</div>` : ''}
             </div>`;
         }
 
@@ -2123,6 +2180,7 @@
             currentImageBase64 = null;
             totalCards = 0;
             completedCards = 0;
+            allCardsReadyShown = false;
             blueprintReceived = false;
             pipelineComplete = false;
             firstCardShown = false;
