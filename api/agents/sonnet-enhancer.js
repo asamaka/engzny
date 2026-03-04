@@ -1,17 +1,17 @@
 /**
- * Sonnet Enhancer Agent
+ * Card Enhancer Agent
  *
- * Uses Claude Sonnet with tool_use + web_search to progressively enhance
- * the card layout. Sonnet can see the screenshot, search the web to validate
- * sources, and populate cards with real data:
- *   1. Update existing cards with richer data (fill optional fields)
+ * Uses Claude with tool_use to progressively populate and enhance the card
+ * layout. The model sees the screenshot and populates cards with real data:
+ *   1. Update existing cards with data extracted from the screenshot
  *   2. Add new cards that Haiku missed
- *   3. Validate claims by searching source domains from the screenshot
- *   4. Change the layout if a better one fits
+ *   3. Change the layout if a better one fits
  *
  * Triggered twice:
- * - After Haiku populates initial cards (enhancement + web search pass)
+ * - After Haiku classifies (enhancement pass — image + card population)
  * - After Sonar returns deep research (review pass — text only, no image)
+ *
+ * Web validation is handled by Sonar deep research running in parallel.
  */
 
 const { getVisionAdapter } = require('../llm');
@@ -134,8 +134,6 @@ function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData
 
   let prompt = `You are populating a screenshot analysis hub. A fast classifier identified the content and chose a layout with skeleton cards. YOUR JOB: populate each card with REAL DATA from the screenshot, making the hub informative, visual, and concise.
 
-**You have web search access.** Use it to validate claims from the screenshot — especially check the source domains visible in the screenshot (e.g., if you see a BBC article, search BBC.com). This makes the results trustworthy.
-
 **The user already sees these cards as loading skeletons. Populate them in order of importance — each call you make instantly appears on screen.**
 
 **Current state:**
@@ -150,19 +148,18 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 **YOUR TASKS (PRIORITY ORDER):**
 1. POPULATE HERO: Update hero_summary with a proper takeaway and ensure title is under 6 words. Add badge and badgeColor. Keep investigationStatus as "investigating" — it will be resolved when all research completes.
 2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
-3. WEB VALIDATE: Search the web to validate key claims from the screenshot. Check the source domain(s) visible in the screenshot. If you see a news article from "BBC" or "Al Jazeera", search that domain specifically. Add real source URLs you find to cards.
-4. VERIFICATION: If there's a verification_card, populate the claim and source NAMES. If you've already searched the web, set source statuses based on what you found ("confirmed"/"denied"/"checking"). Otherwise set to "checking".
-5. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
-6. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
+3. VERIFICATION: If there's a verification_card, populate the claim and source NAMES. Set all source statuses to "checking" — a separate research phase will verify them.
+4. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
+5. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
 
-**DO NOT generate imageUrl or photoUrl from memory** — only use image URLs you find via web search results. If you don't find a relevant image, leave imageUrl empty.
+**DO NOT generate imageUrl or photoUrl** — leave imageUrl empty. A research phase will add real URLs later.
 
 **CRITICAL RULES:**
 - POPULATE ALL CARDS — skeleton cards with no data look broken to the user
 - Keep ALL text ultra-concise — no paragraphs. Titles: max 6 words. Values: max 10 words.
 - For person_card: ALWAYS include name, role, and context even if sparse
 - For location_card: ALWAYS include name, context, and a Google Maps URL in mapUrl
-- Use web search to find REAL URLs for url fields — don't fabricate URLs
+- Do NOT fabricate URLs — leave url fields empty if you don't know the real URL
 - Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
 - For product_card: features/warnings must be plain strings

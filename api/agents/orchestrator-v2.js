@@ -5,15 +5,16 @@
  *   Haiku classifies screenshot → hero card with title, screenshot image,
  *   and "Investigating" status pill. Skeleton cards visible.
  *
- * Milestone 2 — Live Research + Cards:
- *   Two parallel research streams populate cards via SSE:
- *   2a. Sonnet + Web Search: Validates sources from screenshot, populates
- *       cards, does light web searches on source domains.
- *   2b. Sonar Deep Research: Deep web-grounded research in parallel.
- *   Cards appear and update live as results come in.
+ * Milestone 2 — Live Cards + Deep Research:
+ *   Two parallel streams:
+ *   2a. Haiku Enhancement: Populates all skeleton cards from screenshot
+ *       using tool_use loop (~12-18s).
+ *   2b. Sonar Deep Research: Web-grounded fact-checking in parallel.
+ *   Cards appear live via SSE as Haiku populates them.
  *
  * Milestone 3 — Complete:
- *   Both Sonnet and Sonar finished. Hero status pill updates to
+ *   Enhancement and research finished. Research findings wired to
+ *   verification cards. Hero status pill updates to
  *   "Confirmed" or "Unconfirmed". No more changes.
  */
 
@@ -318,7 +319,7 @@ async function runPipeline({
       onPhase({ phase: 'enhancing', message: 'Populating cards + deep research...' });
     }
 
-    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Sonnet + Web Search) + Deep Research (Sonar)');
+    logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Haiku) + Deep Research (Sonar)');
 
     const enhanceMessages = [
       'Searching source websites...',
@@ -432,10 +433,9 @@ async function runPipeline({
       },
       adapterConfig: {
         ...adapterConfig,
-        model: adapterConfig.enhanceModel || 'claude-sonnet-4-20250514',
+        model: adapterConfig.enhanceModel || 'claude-haiku-4-5-20251001',
         traceCollector,
-        maxIterations: 3,
-        enableWebSearch: true,
+        maxIterations: 2,
       },
     }).then(result => {
       enhanceDone = true;
