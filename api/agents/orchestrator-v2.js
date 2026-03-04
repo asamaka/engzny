@@ -95,6 +95,42 @@ function computeVerificationStatus(sources) {
 }
 
 /**
+ * Find the best matching research finding for a verification source name.
+ * Uses progressively looser matching: exact substring → cleaned name → keyword overlap.
+ */
+function findMatchingFinding(sourceName, findings) {
+  if (!sourceName || !findings || findings.length === 0) return null;
+  const name = sourceName.toLowerCase();
+
+  const getFindingText = (f) =>
+    `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
+
+  // 1. Exact substring match (current behavior)
+  let match = findings.find(f => getFindingText(f).includes(name));
+  if (match) return match;
+
+  // 2. Strip parenthetical qualifiers: "Al Jazeera Mubasher (English)" → "al jazeera mubasher"
+  const cleaned = name.replace(/\s*\([^)]*\)\s*/g, '').replace(/\s+/g, ' ').trim();
+  if (cleaned && cleaned !== name) {
+    match = findings.find(f => getFindingText(f).includes(cleaned));
+    if (match) return match;
+  }
+
+  // 3. Keyword overlap: require ≥50% of significant words (4+ chars) to match
+  const words = (cleaned || name).split(/\s+/).filter(w => w.length >= 4);
+  if (words.length >= 1) {
+    const threshold = Math.max(1, Math.ceil(words.length / 2));
+    match = findings.find(f => {
+      const text = getFindingText(f);
+      return words.filter(w => text.includes(w)).length >= threshold;
+    });
+    if (match) return match;
+  }
+
+  return null;
+}
+
+/**
  * Programmatically apply research findings to populated cards.
  * Matches findings to cards by keyword overlap and adds sourceUrls,
  * context, and other enrichment data — without an LLM call.
@@ -507,10 +543,7 @@ async function runPipeline({
         // always re-evaluate ALL sources against research findings
         for (const source of sources) {
           const sourceName = (source.name || '').toLowerCase();
-          const finding = sourceName && researchResult.findings.find(f => {
-            const text = `${f.topic || ''} ${f.summary || ''} ${f.details || ''}`.toLowerCase();
-            return text.includes(sourceName);
-          });
+          const finding = sourceName && findMatchingFinding(sourceName, researchResult.findings);
 
           if (finding) {
             const fc = finding.factCheck;

@@ -1691,13 +1691,18 @@
                         <ul class="timeline timeline-vertical timeline-compact ml-0">
                         ${(d.events || []).map((ev, i) => {
                             const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
-                            const evText = evObj.event || evObj.text || evObj.description || '';
+                            const evDate = evObj.date || evObj.time || evObj.timestamp || evObj.when || evObj.period || '';
+                            const evLabel = evObj.label || evObj.title || evObj.name || '';
+                            const evText = evObj.event || evObj.text || evObj.description || evLabel || '';
+                            const displayText = evLabel && evObj.description && evLabel !== evText
+                                ? `<span class="font-semibold">${esc(evLabel)}</span> — ${linkify(evObj.description)}`
+                                : (evObj.url ? renderLink(evObj.url, evText) : linkify(evText));
                             const isLast = i === (d.events || []).length - 1;
                             return `<li>
                                 ${i > 0 ? '<hr class="bg-base-300"/>' : ''}
-                                <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evObj.date || '')}</div>
+                                <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evDate)}</div>
                                 <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-[0_0_8px_rgba(91,138,245,0.4)]' : 'bg-base-300'}"></div></div>
-                                <div class="timeline-end text-sm pb-3">${evObj.url ? renderLink(evObj.url, evText) : linkify(evText)}</div>
+                                <div class="timeline-end text-sm pb-3">${evObj.url && !evLabel ? renderLink(evObj.url, evText) : displayText}</div>
                                 ${!isLast ? '<hr class="bg-base-300"/>' : ''}
                             </li>`;
                         }).join('')}
