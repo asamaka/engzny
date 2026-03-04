@@ -1915,6 +1915,7 @@
                         verified: { icon: 'check_circle', badge: 'badge-success', label: 'Verified by sources' },
                         denied: { icon: 'cancel', badge: 'badge-error', label: 'Denied by sources' },
                         unconfirmed: { icon: 'help', badge: 'badge-neutral', label: 'Unconfirmed' },
+                        inconclusive: { icon: 'help_outline', badge: 'badge-warning', label: 'Inconclusive' },
                         conflicting: { icon: 'warning', badge: 'badge-warning', label: 'Conflicting reports' },
                     };
                     const sc = statusConfig[vStatus] || statusConfig.searching;
@@ -1927,7 +1928,10 @@
                         denied: { icon: 'cancel', cls: 'text-error' },
                         'false': { icon: 'cancel', cls: 'text-error' },
                         disproven: { icon: 'cancel', cls: 'text-error' },
-                        not_yet_reported: { icon: 'schedule', cls: 'text-base-content/40' },
+                        inconclusive: { icon: 'help_outline', cls: 'text-warning' },
+                        unverified: { icon: 'help_outline', cls: 'text-warning' },
+                        needs_context: { icon: 'help_outline', cls: 'text-warning' },
+                        not_yet_reported: { icon: 'remove_circle_outline', cls: 'text-base-content/40' },
                         no_info: { icon: 'remove_circle_outline', cls: 'text-base-content/30' },
                     };
 
@@ -1955,7 +1959,7 @@
                                     <span class="material-symbols-rounded ${si.cls} mt-0.5 text-lg">${si.icon}</span>
                                     <div class="min-w-0 flex-1">
                                         <div class="font-semibold text-sm">${esc(sObj.name || sObj.source || 'Source')}</div>
-                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : '')}
+                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(sObj.snippet)}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : sStatus === 'inconclusive' || sStatus === 'unverified' || sStatus === 'needs_context' ? `<div class="text-xs text-warning/60 italic">Could not confirm or deny</div>` : sStatus === 'not_yet_reported' ? `<div class="text-xs text-base-content/30 italic">Not found in research</div>` : '')}
                                         ${hasUrl ? (() => { try { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>`; } catch(e) { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">source</a>`; } })() : ''}
                                     </div>
                                 </div>`;

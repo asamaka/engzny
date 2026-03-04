@@ -73,6 +73,7 @@ function normalizeSourceStatus(status) {
   if (status === 'verified' || status === 'confirmed') return 'confirmed';
   if (status === 'denied' || status === 'false' || status === 'disproven') return 'denied';
   if (status === 'checking' || status === 'searching' || status === 'pending') return 'checking';
+  if (status === 'inconclusive' || status === 'unverified' || status === 'needs_context' || status === 'mixed') return 'inconclusive';
   return status;
 }
 
@@ -83,11 +84,13 @@ function computeVerificationStatus(sources) {
   const hasDenied = statuses.some(s => s === 'denied');
   const allConfirmed = statuses.every(s => s === 'confirmed');
   const allDenied = statuses.every(s => s === 'denied');
+  const hasInconclusive = statuses.some(s => s === 'inconclusive');
 
   if (allConfirmed) return 'verified';
   if (allDenied) return 'denied';
   if (hasConfirmed && hasDenied) return 'conflicting';
   if (hasConfirmed) return 'partially_verified';
+  if (hasInconclusive) return 'inconclusive';
   return 'unconfirmed';
 }
 
@@ -513,7 +516,7 @@ async function runPipeline({
             } else if (fc && (fc.verdict === 'false' || fc.verdict === 'misleading')) {
               source.status = 'denied';
             } else {
-              source.status = 'not_yet_reported';
+              source.status = 'inconclusive';
             }
             source.snippet = finding.summary || '';
             if (finding.sourceUrls && finding.sourceUrls.length > 0) {
@@ -565,7 +568,7 @@ async function runPipeline({
       for (const source of sources) {
         if (!source.name && source.source) source.name = source.source;
         const norm = normalizeSourceStatus(source.status);
-        if (norm === 'checking' || norm === 'not_yet_reported') {
+        if (norm === 'checking') {
           source.status = 'not_yet_reported';
           if (!source.snippet) source.snippet = 'Unable to verify — check source directly';
           anyStillChecking = true;
