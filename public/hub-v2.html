@@ -1940,7 +1940,14 @@
                         <p class="text-sm italic text-base-content/70 mb-3 leading-relaxed">${linkify(d.claim || '')}</p>
                         <div class="space-y-2">
                             ${(d.sources || []).map(src => {
-                                const sObj = typeof src === 'object' ? src : { name: String(src), status: 'checking' };
+                                const sObj = typeof src === 'object' ? src : (() => {
+                                    const s = String(src);
+                                    if (s.startsWith('http')) {
+                                        try { return { name: new URL(s).hostname.replace(/^www\./, ''), url: s, status: 'confirmed' }; }
+                                        catch(e) { return { name: s, url: s, status: 'confirmed' }; }
+                                    }
+                                    return { name: s, status: 'checking' };
+                                })();
                                 const sStatus = sObj.status || 'checking';
                                 const si = sourceIcons[sStatus] || sourceIcons.checking;
                                 const hasUrl = sObj.url && typeof sObj.url === 'string' && sObj.url.startsWith('http');
