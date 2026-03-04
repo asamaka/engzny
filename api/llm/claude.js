@@ -17,7 +17,7 @@ class ClaudeAdapter extends LLMAdapter {
       throw new Error('ANTHROPIC_API_KEY is required for ClaudeAdapter');
     }
     
-    this.client = new Anthropic({ apiKey: this.apiKey });
+    this.client = new Anthropic({ apiKey: this.apiKey, maxRetries: 4 });
     this.model = config.model || 'claude-opus-4-6';
     this.maxTokens = config.maxTokens || 4096;
   }

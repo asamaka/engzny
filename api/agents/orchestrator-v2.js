@@ -273,6 +273,9 @@ async function runPipeline({
 
     if (!haikuBlueprint) {
       logger.warn('Orchestrator', 'Haiku failed, using fallback skeleton');
+      for (const card of skeleton.cards) {
+        currentCards.set(card.id, card);
+      }
       if (onProgress) {
         onProgress({ phase: 'enhancing', progress: 15, message: 'Enhancing analysis...' });
       }
@@ -847,6 +850,35 @@ async function runPipeline({
       status: 'populated',
       data: card.populatedData || card.data || card.placeholderData,
     }));
+
+    // Guard: if zero cards have meaningful data beyond placeholders,
+    // the pipeline effectively failed (e.g. API overloaded on both classify + enhance)
+    const populatedCount = finalCards.filter(card => {
+      const data = card.populatedData || card.data || {};
+      if (!data || Object.keys(data).length === 0) return false;
+      if (data.title === 'Analyzing screenshot...' && Object.keys(data).length <= 3) return false;
+      return true;
+    }).length;
+
+    if (populatedCount === 0) {
+      const degradedError = new Error(
+        'Analysis could not be completed — our AI service is temporarily overloaded. Please try again in a moment.'
+      );
+      degradedError.code = 'ZERO_CARDS_POPULATED';
+      logger.error('Orchestrator', 'Pipeline degraded — zero cards populated', {
+        dur: totalDuration,
+        skeletonCards: finalCards.length,
+        classifyErrors: traceCollector.getSummary()?.byPhase?.classify?.errors || 0,
+        enhanceErrors: traceCollector.getSummary()?.byPhase?.enhance?.errors || 0,
+      });
+      clearInterval(enhanceHeartbeat);
+      if (onError) {
+        onError(degradedError);
+      } else {
+        throw degradedError;
+      }
+      return null;
+    }
 
     const populatedLayout = {
       ...blueprint,
