@@ -849,6 +849,8 @@
 
         function onLayoutUpdate(blueprint) {
             totalCards = (blueprint.cards || []).length;
+            completedCards = 0;
+            populatedCardIds.clear();
             applyLayoutTheme(blueprint.layout?.type);
 
             const ct = blueprint.contentAnalysis?.contentType || 'general';
@@ -952,7 +954,7 @@
 
             appendCitations(el, data.data);
 
-            const pct = 60 + Math.round((completedCards / totalCards) * 35);
+            const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
             layoutProgressFill.value = pct;
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }
@@ -987,7 +989,7 @@
             appendCitations(el, mergedData);
 
             if (isNewlyPopulated) {
-                const pct = 60 + Math.round((completedCards / totalCards) * 35);
+                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
                 layoutProgressFill.value = pct;
                 layoutProgressText.textContent = `${completedCards}/${totalCards}`;
             }
@@ -1007,8 +1009,11 @@
 
         function onCardAdded(data) {
             totalCards++;
-            completedCards++;
             const cardId = data.cardId;
+            if (!populatedCardIds.has(cardId)) {
+                populatedCardIds.add(cardId);
+                completedCards++;
+            }
             const card = {
                 id: cardId,
                 cardType: data.cardType,
@@ -1039,7 +1044,7 @@
 
             appendCitations(el, data.data);
 
-            const pct = 60 + Math.round((completedCards / totalCards) * 35);
+            const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
             layoutProgressFill.value = pct;
             layoutProgressText.textContent = `${completedCards}/${totalCards}`;
         }

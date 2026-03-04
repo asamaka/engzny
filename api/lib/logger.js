@@ -281,7 +281,9 @@ class ProdLogger {
     });
 
     const sessionEntry = { ...entry };
+    const eventCount = Array.isArray(sessionEntry.eventsReceived) ? sessionEntry.eventsReceived.length : 0;
     delete sessionEntry.eventsReceived;
+    sessionEntry.eventCount = eventCount;
     this._persistToRedis(REDIS_KEYS.SESSIONS, sessionEntry, REDIS_LIMITS.SESSIONS);
   }
 
@@ -619,7 +621,7 @@ class ProdLogger {
           totalDuration: r.totalDuration ? `${(r.totalDuration / 1000).toFixed(1)}s` : null,
           uploadTime: r.uploadDuration ? `${(r.uploadDuration / 1000).toFixed(1)}s` : null,
           firstEvent: r.firstEventDelay ? `${(r.firstEventDelay / 1000).toFixed(1)}s` : null,
-          eventsReceived: r.eventsReceived?.length || 0,
+          eventsReceived: r.eventsReceived?.length || r.eventCount || 0,
           retries: r.retries || 0,
           error: r.error || null,
           ua: r.userAgent ? (r.userAgent.includes('Mobile') ? 'mobile' : 'desktop') : '?',
