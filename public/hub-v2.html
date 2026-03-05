@@ -1744,26 +1744,31 @@
                 }
 
                 case 'product_card': {
-                    const features = (d.features || []).map(normalizeFeature).slice(0, 5);
-                    const warnings = (d.warnings || []).map(normalizeFeature).slice(0, 3);
+                    const prodName = d.name || d.title || d.product || d.productName || 'Product';
+                    const prodPrice = d.price || d.cost || d.amount || '';
+                    const prodRating = d.rating || d.score || d.stars || '';
+                    const prodVerdict = d.verdict || d.summary || d.conclusion || d.assessment || '';
+                    const features = (d.features || d.specs || d.specifications || d.highlights || d.pros || []).map(normalizeFeature).slice(0, 5);
+                    const warnings = (d.warnings || d.cons || d.concerns || d.drawbacks || d.negatives || d.risks || []).map(normalizeFeature).slice(0, 3);
+                    const prodUrl = d.url || d.link || d.href || d.productUrl || '';
                     return `<div class="p-4">
                         <div class="flex gap-3 mb-3">
-                            ${d.imageUrl ? `<div class="w-20 h-20 rounded-xl bg-base-300 overflow-hidden shrink-0"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded text-base-content/30\\' style=\\'font-size:32px\\'>inventory_2</span>'"></div>` :
+                            ${d.imageUrl ? `<div class="w-20 h-20 rounded-xl bg-base-300 overflow-hidden shrink-0"><img src="${esc(d.imageUrl)}" alt="${esc(prodName)}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded text-base-content/30\\' style=\\'font-size:32px\\'>inventory_2</span>'"></div>` :
                               d.emoji ? `<span class="text-3xl">${esc(d.emoji)}</span>` : ''}
                             <div>
-                                <div class="font-bold text-base text-white">${esc(d.name || 'Product')}</div>
-                                ${d.price ? `<div class="text-xl font-extrabold text-success">${esc(d.price)}</div>` : ''}
-                                ${d.rating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded text-sm">star</span> ${esc(d.rating)}</div>` : ''}
+                                <div class="font-bold text-base text-white">${esc(prodName)}</div>
+                                ${prodPrice ? `<div class="text-xl font-extrabold text-success">${esc(prodPrice)}</div>` : ''}
+                                ${prodRating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded text-sm">star</span> ${esc(prodRating)}</div>` : ''}
                             </div>
                         </div>
                         ${features.length ? `<div class="flex flex-wrap gap-1.5 mb-2">${features.map(f =>
                             `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded text-[10px]">check</span>${esc(f)}</span>`
                         ).join('')}</div>` : ''}
-                        ${d.verdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success">${linkify(d.verdict)}</div>` : ''}
+                        ${prodVerdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success">${linkify(prodVerdict)}</div>` : ''}
                         ${warnings.length ? `<div class="mt-2 space-y-1">${warnings.map(w =>
                             `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded text-xs">warning</span>${esc(w)}</div>`
                         ).join('')}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> View</a>` : ''}
+                        ${prodUrl ? `<a href="${esc(prodUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> View</a>` : ''}
                     </div>`;
                 }
 
@@ -1804,8 +1809,10 @@
                     </div>`;
                 }
 
-                case 'comparison_card':
-                    if (!d.columns || !d.columns.length) {
+                case 'comparison_card': {
+                    const compCols = d.columns || d.items || d.options || d.features || [];
+                    const compRows = d.rows || d.categories || d.criteria || d.labels || d.aspects || null;
+                    if (!compCols.length) {
                         return `<div class="p-4"><h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Comparison')}</h3><p class="text-xs text-base-content/40">No data available</p></div>`;
                     }
                     return `<div class="p-4">
@@ -1813,19 +1820,20 @@
                         <div class="overflow-x-auto">
                         <table class="table table-xs">
                             <thead><tr class="border-base-300">
-                                ${d.rows ? '<th></th>' : ''}
-                                ${(d.columns || []).map(c => `<th class="text-primary font-bold">${esc(typeof c === 'object' ? (c.header || c.name || '') : c)}</th>`).join('')}
+                                ${compRows ? '<th></th>' : ''}
+                                ${compCols.map(c => `<th class="text-primary font-bold">${esc(typeof c === 'object' ? (c.header || c.name || c.title || c.label || '') : c)}</th>`).join('')}
                             </tr></thead>
-                            <tbody>${Array.from({ length: Math.max(...(d.columns || []).map(c => (Array.isArray(c.values) ? c.values : []).length), 0) }, (_, i) => `<tr class="border-base-300">
-                                ${d.rows ? `<td class="text-base-content/50 font-medium">${esc(Array.isArray(d.rows) ? d.rows[i] || '' : '')}</td>` : ''}
-                                ${(d.columns || []).map(c => {
-                                    const vals = Array.isArray(c.values) ? c.values : [];
+                            <tbody>${Array.from({ length: Math.max(...compCols.map(c => (Array.isArray(c.values) ? c.values : Array.isArray(c.items) ? c.items : Array.isArray(c.data) ? c.data : []).length), 0) }, (_, i) => `<tr class="border-base-300">
+                                ${compRows ? `<td class="text-base-content/50 font-medium">${esc(Array.isArray(compRows) ? compRows[i] || '' : '')}</td>` : ''}
+                                ${compCols.map(c => {
+                                    const vals = Array.isArray(c.values) ? c.values : Array.isArray(c.items) ? c.items : Array.isArray(c.data) ? c.data : [];
                                     return `<td>${linkify(vals[i] || '')}</td>`;
                                 }).join('')}
                             </tr>`).join('')}</tbody>
                         </table>
                         </div>
                     </div>`;
+                }
 
                 case 'warning_card': {
                     const level = d.level || 'warning';
@@ -1841,23 +1849,29 @@
                     </div>`;
                 }
 
-                case 'action_card':
+                case 'action_card': {
+                    const actionItems = d.actions || d.steps || d.items || d.tasks || d.recommendations || [];
                     return `<div class="p-4">
                         <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Next Steps')}</h3>
                         <div class="space-y-2">
-                        ${(d.actions || []).map((a, i) => {
+                        ${actionItems.map((a, i) => {
                             const aObj = typeof a === 'object' ? a : { label: String(a) };
+                            const aLabel = aObj.label || aObj.name || aObj.title || aObj.text || aObj.action || '';
+                            const aDesc = aObj.description || aObj.detail || aObj.details || aObj.note || aObj.explanation || '';
+                            const aUrl = aObj.url || aObj.link || aObj.href || '';
+                            const aPriority = aObj.priority || aObj.importance || aObj.urgency || aObj.level || '';
                             return `<div class="flex items-start gap-3">
                                 <div class="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">${i + 1}</div>
                                 <div class="min-w-0">
-                                    <div class="text-sm font-medium">${aObj.url ? renderLink(aObj.url, aObj.label || aObj.name || '') : esc(aObj.label || aObj.name || '')}</div>
-                                    ${aObj.description ? `<div class="text-xs text-base-content/50 mt-0.5">${linkify(aObj.description)}</div>` : ''}
-                                    ${aObj.priority ? `<span class="badge badge-xs mt-1 ${aObj.priority === 'high' ? 'badge-error' : aObj.priority === 'medium' ? 'badge-warning' : 'badge-info'}">${esc(aObj.priority)}</span>` : ''}
+                                    <div class="text-sm font-medium">${aUrl ? renderLink(aUrl, aLabel) : esc(aLabel)}</div>
+                                    ${aDesc ? `<div class="text-xs text-base-content/50 mt-0.5">${linkify(typeof aDesc === 'string' ? aDesc : '')}</div>` : ''}
+                                    ${aPriority ? `<span class="badge badge-xs mt-1 ${aPriority === 'high' || aPriority === 'critical' ? 'badge-error' : aPriority === 'medium' ? 'badge-warning' : 'badge-info'}">${esc(aPriority)}</span>` : ''}
                                 </div>
                             </div>`;
                         }).join('')}
                         </div>
                     </div>`;
+                }
 
                 case 'text_extract':
                     return `<div class="p-4">
@@ -2097,28 +2111,36 @@
                     </div>`;
                 }
 
-                case 'order_card':
+                case 'order_card': {
+                    const orderItems = d.items || d.products || d.entries || d.lineItems || d.orderItems || [];
+                    const orderStatus = d.status || d.orderStatus || d.state || '';
+                    const orderTotal = d.total || d.orderTotal || d.grandTotal || d.sum || d.subtotal || '';
+                    const orderEta = d.deliveryTime || d.eta || d.delivery || d.estimatedDelivery || d.shippingTime || '';
                     return `<div class="p-4">
                         <div class="flex items-center gap-2 mb-3">
                             ${d.emoji ? `<span class="text-xl">${esc(d.emoji)}</span>` : ''}
-                            <h3 class="font-bold text-sm text-white">${esc(d.title || 'Order')}</h3>
-                            ${d.status ? `<span class="badge badge-sm badge-success">${esc(d.status)}</span>` : ''}
+                            <h3 class="font-bold text-sm text-white">${esc(d.title || d.name || d.storeName || d.restaurant || 'Order')}</h3>
+                            ${orderStatus ? `<span class="badge badge-sm badge-success">${esc(orderStatus)}</span>` : ''}
                         </div>
                         <div class="divide-y divide-base-300">
-                        ${(d.items || []).map(item => {
+                        ${orderItems.map(item => {
                             const iObj = typeof item === 'object' ? item : { name: String(item) };
+                            const iName = iObj.name || iObj.label || iObj.title || iObj.product || iObj.description || iObj.item || '';
+                            const iPrice = iObj.price || iObj.cost || iObj.amount || iObj.value || '';
+                            const iQty = iObj.quantity || iObj.qty || iObj.count || '';
                             return `<div class="flex items-center justify-between py-2 text-sm">
-                                <span>${iObj.quantity ? `<span class="text-base-content/40">${iObj.quantity}× </span>` : ''}${esc(iObj.name || '')}</span>
-                                ${iObj.price ? `<span class="font-mono font-medium">${esc(iObj.price)}</span>` : ''}
+                                <span>${iQty ? `<span class="text-base-content/40">${iQty}× </span>` : ''}${esc(iName)}</span>
+                                ${iPrice ? `<span class="font-mono font-medium">${esc(String(iPrice))}</span>` : ''}
                             </div>`;
                         }).join('')}
                         </div>
-                        ${d.total ? `<div class="flex justify-between items-center pt-3 mt-1 border-t-2 border-base-300">
+                        ${orderTotal ? `<div class="flex justify-between items-center pt-3 mt-1 border-t-2 border-base-300">
                             <span class="font-bold text-sm">Total</span>
-                            <span class="font-extrabold text-lg text-primary">${esc(d.total)}</span>
+                            <span class="font-extrabold text-lg text-primary">${esc(String(orderTotal))}</span>
                         </div>` : ''}
-                        ${d.deliveryTime ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> ${esc(d.deliveryTime)}</div>` : ''}
+                        ${orderEta ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> ${esc(orderEta)}</div>` : ''}
                     </div>`;
+                }
 
                 case 'stats_grid_card':
                     return `<div class="p-4">
