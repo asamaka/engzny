@@ -110,6 +110,17 @@ tests/
   integration/                # 3 health checks (real API)
 ```
 
+## UI Theme Color Contract
+
+The main UI (`hub-v2.html`) uses DaisyUI semantic color classes exclusively. **All agents MUST follow these rules** when modifying any HTML/CSS in `public/`:
+
+- **NEVER use `text-white`** — use `text-base-content` instead (adapts to light/dark themes)
+- **NEVER hardcode hex colors** (`#fff`, `#0a0d12`) in Tailwind classes or inline styles
+- **NEVER hardcode `rgb()`, `rgba()`, `oklch()`, or `hsl()`** in Tailwind arbitrary values
+- **ALWAYS use DaisyUI semantic classes**: `bg-base-100`, `text-base-content`, `border-base-300`, `text-primary`, `btn-primary`, etc.
+- The UI supports multiple DaisyUI themes via `LAYOUT_THEME_MAP` — hardcoded colors break theme switching
+- Custom CSS variables (`--thinx-*`) are defined in the `<style>` block for sparklines and other SVG elements
+
 ## Key Endpoints
 
 ### User-Facing

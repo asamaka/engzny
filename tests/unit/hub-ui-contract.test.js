@@ -15,12 +15,27 @@ describe('Hub UI contract (Daisy-first)', () => {
     'demo.html',
   ];
 
-  test('head includes DaisyUI/Tailwind and no custom <style> blocks', () => {
+  test('head includes DaisyUI/Tailwind and only theme bridge <style>', () => {
     const headMarkup = hubHtml.split('<body>')[0];
     expect(headMarkup).toContain('cdn.jsdelivr.net/npm/daisyui@5/themes.css');
     expect(headMarkup).toContain('cdn.jsdelivr.net/npm/daisyui@5');
     expect(headMarkup).toContain('cdn.jsdelivr.net/npm/@tailwindcss/browser@4');
-    expect(headMarkup).not.toMatch(/<style[\s>]/i);
+    const styleBlocks = headMarkup.match(/<style[\s>][\s\S]*?<\/style>/gi) || [];
+    expect(styleBlocks.length).toBeLessThanOrEqual(1);
+    if (styleBlocks.length === 1) {
+      expect(styleBlocks[0]).toContain('--thinx-');
+      expect(styleBlocks[0]).not.toMatch(/\.[a-zA-Z]/);
+    }
+  });
+
+  test('hub uses no hardcoded text-white in card renderers', () => {
+    const scriptBody = hubHtml.split('<script>')[1] || '';
+    expect(scriptBody).not.toContain("text-white");
+  });
+
+  test('hub uses no hardcoded rgba/oklch colors in Tailwind classes', () => {
+    const classPatterns = hubHtml.match(/class="[^"]*(?:rgba|oklch)\([^"]*"/g) || [];
+    expect(classPatterns).toEqual([]);
   });
 
   test('hub contains no inline style attributes', () => {

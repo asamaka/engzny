@@ -13,6 +13,28 @@
     <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+    <!--
+      === THEME COLOR CONTRACT ===
+      This UI uses DaisyUI semantic color classes exclusively.
+      DO NOT add hardcoded hex (#fff), rgb(), rgba(), oklch(), or hsl() values
+      in Tailwind classes or inline styles. Use these DaisyUI classes instead:
+
+      Backgrounds:  bg-base-100, bg-base-200, bg-base-300, bg-primary, bg-secondary, etc.
+      Text:         text-base-content, text-base-content/60, text-primary, text-secondary, etc.
+      Borders:      border-base-300, border-primary, border-secondary, etc.
+      Buttons:      btn-primary, btn-secondary, btn-outline btn-primary, etc.
+      Emphasis:     text-base-content (NOT text-white — breaks on light themes)
+
+      These adapt automatically when data-theme changes via LAYOUT_THEME_MAP.
+      Any agent modifying this file MUST use DaisyUI semantic colors only.
+    -->
+    <style>
+      :root {
+        --thinx-sparkline-fill: oklch(from oklch(var(--p)) l c h / 0.25);
+        --thinx-sparkline-stroke: oklch(var(--p));
+        --thinx-capture-bg: oklch(var(--b1));
+      }
+    </style>
 </head>
 <body>
     <!-- Paste State -->
@@ -35,7 +57,7 @@
                     <span class="material-symbols-rounded">play_circle</span>
                     Try Demo
                 </button>
-                <button class="btn btn-outline w-full gap-2" id="uploadBtn">
+                <button class="btn btn-outline btn-primary w-full gap-2" id="uploadBtn">
                     <span class="material-symbols-rounded">photo_library</span>
                     Upload Photo
                 </button>
@@ -322,8 +344,8 @@
             const areaPoints = points + ` ${w},${h} 0,${h}`;
 
             return `<svg class="w-full h-6 mt-2" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-                <polygon points="${areaPoints}" fill="oklch(64% 0.17 260 / 0.25)"/>
-                <polyline points="${points}" fill="none" stroke="oklch(64% 0.17 260)" stroke-width="2" stroke-linecap="round"/>
+                <polygon points="${areaPoints}" fill="var(--thinx-sparkline-fill, oklch(var(--p) / 0.25))"/>
+                <polyline points="${points}" fill="none" stroke="var(--thinx-sparkline-stroke, oklch(var(--p)))" stroke-width="2" stroke-linecap="round"/>
             </svg>`;
         }
 
@@ -1302,7 +1324,7 @@
                         canvas.width = Math.round(w * scale);
                         canvas.height = Math.round(h * scale);
                         const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#0a0d12';
+                        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('background-color') || '#0a0d12';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
                         ctx.scale(scale, scale);
                         ctx.drawImage(img, 0, 0, w, h);
@@ -1329,7 +1351,7 @@
                 return s;
             });
             return html2canvas(target, {
-                backgroundColor: '#0a0d12',
+                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('background-color') || '#0a0d12',
                 scale: Math.min(window.devicePixelRatio || 2, 2),
                 logging: false,
                 useCORS: true,
@@ -1643,7 +1665,7 @@
                         ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
                         ${!heroImg && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
                         ${!heroImg ? renderStatusPill(status) : ''}
-                        <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
+                        <h2 class="text-xl font-extrabold text-base-content leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
                         <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(cleanSummary(d.subtitle || ''))}</p>
                         ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">
                             <p class="text-sm text-base-content/80 leading-relaxed">${linkify(cleanSummary(d.takeaway))}</p>
@@ -1671,7 +1693,7 @@
 
                 case 'info_list':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Details')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Details')}</h3>
                         <div class="divide-y divide-base-300">
                         ${(d.items || []).map(item => {
                             if (typeof item === 'object' && item !== null) {
@@ -1730,7 +1752,7 @@
                                 </div>
                             </div>
                             <div class="min-w-0">
-                                <div class="font-bold text-base text-white truncate">${esc(d.name || 'Unknown')}</div>
+                                <div class="font-bold text-base text-base-content truncate">${esc(d.name || 'Unknown')}</div>
                                 ${d.role ? `<div class="text-xs text-base-content/50">${esc(d.role)}</div>` : ''}
                                 ${d.handle ? `<div class="text-xs text-primary">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
                             </div>
@@ -1751,7 +1773,7 @@
                             ${d.imageUrl ? `<div class="w-20 h-20 rounded-xl bg-base-300 overflow-hidden shrink-0"><img src="${esc(d.imageUrl)}" alt="${esc(d.name)}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded text-base-content/30\\' style=\\'font-size:32px\\'>inventory_2</span>'"></div>` :
                               d.emoji ? `<span class="text-3xl">${esc(d.emoji)}</span>` : ''}
                             <div>
-                                <div class="font-bold text-base text-white">${esc(d.name || 'Product')}</div>
+                                <div class="font-bold text-base text-base-content">${esc(d.name || 'Product')}</div>
                                 ${d.price ? `<div class="text-xl font-extrabold text-success">${esc(d.price)}</div>` : ''}
                                 ${d.rating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded text-sm">star</span> ${esc(d.rating)}</div>` : ''}
                             </div>
@@ -1769,7 +1791,7 @@
 
                 case 'timeline_card':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Timeline')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Timeline')}</h3>
                         <ul class="timeline timeline-vertical timeline-compact ml-0">
                         ${(d.events || []).map((ev, i) => {
                             const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
@@ -1783,7 +1805,7 @@
                             return `<li>
                                 ${i > 0 ? '<hr class="bg-base-300"/>' : ''}
                                 <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evDate)}</div>
-                                <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-[0_0_8px_rgba(91,138,245,0.4)]' : 'bg-base-300'}"></div></div>
+                                <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-md shadow-primary/40' : 'bg-base-300'}"></div></div>
                                 <div class="timeline-end text-sm pb-3">${evObj.url && !evLabel ? renderLink(evObj.url, evText) : displayText}</div>
                                 ${!isLast ? '<hr class="bg-base-300"/>' : ''}
                             </li>`;
@@ -1806,10 +1828,10 @@
 
                 case 'comparison_card':
                     if (!d.columns || !d.columns.length) {
-                        return `<div class="p-4"><h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Comparison')}</h3><p class="text-xs text-base-content/40">No data available</p></div>`;
+                        return `<div class="p-4"><h3 class="font-bold text-sm text-base-content mb-2">${esc(d.title || 'Comparison')}</h3><p class="text-xs text-base-content/40">No data available</p></div>`;
                     }
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Comparison')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Comparison')}</h3>
                         <div class="overflow-x-auto">
                         <table class="table table-xs">
                             <thead><tr class="border-base-300">
@@ -1843,7 +1865,7 @@
 
                 case 'action_card':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Next Steps')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Next Steps')}</h3>
                         <div class="space-y-2">
                         ${(d.actions || []).map((a, i) => {
                             const aObj = typeof a === 'object' ? a : { label: String(a) };
@@ -1861,7 +1883,7 @@
 
                 case 'text_extract':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Extracted Text')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-2">${esc(d.title || 'Extracted Text')}</h3>
                         <div class="text-sm font-mono bg-base-300 p-3 rounded-xl whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed">${linkify(d.text || '')}</div>
                         ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${esc(d.source)}</div>` : ''}
                     </div>`;
@@ -1879,7 +1901,7 @@
                                 ${d.emoji ? `<span class="text-lg">${esc(d.emoji)}</span>` : `<span class="material-symbols-rounded text-primary text-lg">location_on</span>`}
                             </div>
                             <div>
-                                <div class="font-bold text-base text-white">${esc(d.name || 'Location')}</div>
+                                <div class="font-bold text-base text-base-content">${esc(d.name || 'Location')}</div>
                                 ${d.address ? `<div class="text-xs text-base-content/50">${linkify(d.address)}</div>` : ''}
                             </div>
                         </div>
@@ -1893,7 +1915,7 @@
 
                 case 'link_card':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Links')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Links')}</h3>
                         <div class="space-y-2">
                         ${(d.links || []).map(link => {
                             const lObj = typeof link === 'object' ? link : { label: String(link), url: '' };
@@ -1920,7 +1942,7 @@
                         ${d.category ? `<div class="absolute top-2 left-2"><span class="badge badge-sm badge-primary">${esc(d.category)}</span></div>` : ''}
                     </figure>` : ''}
                     <div class="p-4">
-                        <h3 class="font-bold text-base text-white mb-1 leading-tight">${esc(newsHeadline)}</h3>
+                        <h3 class="font-bold text-base text-base-content mb-1 leading-tight">${esc(newsHeadline)}</h3>
                         <div class="flex items-center gap-2 text-xs text-base-content/40 mb-2">
                             <span class="font-semibold">${esc(newsSource)}</span>
                             ${newsDate ? `<span>·</span><span>${esc(newsDate)}</span>` : ''}
@@ -1982,7 +2004,7 @@
                     }
 
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Data')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Data')}</h3>
                         ${chartHtml}
                         ${d.insight ? `<div class="text-xs text-base-content/50 mt-3 p-2 bg-primary/5 rounded-lg">💡 ${linkify(d.insight)}</div>` : ''}
                     </div>`;
@@ -2069,7 +2091,7 @@
 
                 case 'chat_card':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Conversation')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Conversation')}</h3>
                         <div class="space-y-1">
                         ${(d.messages || []).map(msg => {
                             const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
@@ -2101,7 +2123,7 @@
                     return `<div class="p-4">
                         <div class="flex items-center gap-2 mb-3">
                             ${d.emoji ? `<span class="text-xl">${esc(d.emoji)}</span>` : ''}
-                            <h3 class="font-bold text-sm text-white">${esc(d.title || 'Order')}</h3>
+                            <h3 class="font-bold text-sm text-base-content">${esc(d.title || 'Order')}</h3>
                             ${d.status ? `<span class="badge badge-sm badge-success">${esc(d.status)}</span>` : ''}
                         </div>
                         <div class="divide-y divide-base-300">
@@ -2122,7 +2144,7 @@
 
                 case 'stats_grid_card':
                     return `<div class="p-4">
-                        ${d.title ? `<h3 class="font-bold text-sm text-white mb-3">${esc(d.title)}</h3>` : ''}
+                        ${d.title ? `<h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title)}</h3>` : ''}
                         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
                         ${(d.stats || d.data || d.items || []).map(s => {
                             const sObj = typeof s === 'object' ? s : { label: String(s), value: '' };
@@ -2140,7 +2162,7 @@
 
                 case 'gallery_card':
                     return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Gallery')}</h3>
+                        <h3 class="font-bold text-sm text-base-content mb-3">${esc(d.title || 'Gallery')}</h3>
                         <div class="grid grid-cols-2 gap-2">
                         ${(d.images || []).slice(0, 6).map(img => {
                             const iObj = typeof img === 'object' ? img : { url: String(img) };
