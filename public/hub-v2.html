@@ -79,7 +79,18 @@
 
             <div id="cardGrid" class="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3"></div>
 
-            <div id="followUpSection" class="hidden p-4 pt-2">
+            <div id="followUpSection" class="hidden p-4 pt-2 space-y-3">
+                <div id="overallContextCard" class="hidden card bg-primary/5 border border-primary/20 shadow-sm">
+                    <div class="card-body py-3 px-4">
+                        <div class="flex items-start gap-2">
+                            <span class="material-symbols-rounded text-primary text-lg mt-0.5">auto_awesome</span>
+                            <div>
+                                <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Context</div>
+                                <p class="text-sm text-base-content/80 leading-relaxed" id="overallContextText"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="card bg-base-200 border border-base-300 shadow-sm">
                     <div class="card-body">
                         <div class="flex items-center gap-2 text-sm font-semibold text-base-content/70">
@@ -218,6 +229,14 @@
                 .trim();
         }
 
+        function cleanCitations(text) {
+            if (!text) return '';
+            return text
+                .replace(/\[(\d+)\]/g, '')
+                .replace(/\s{2,}/g, ' ')
+                .trim();
+        }
+
         function timeAgo(iso) {
             if (!iso) return '';
             try {
@@ -269,39 +288,68 @@
             const questions = contentAnalysis.followUpQuestions || [];
             const topQ = contentAnalysis.topQuestions || [];
 
-            const allQuestions = [];
+            const answered = [];
+            const unanswered = [];
 
             questions.forEach(q => {
                 if (typeof q === 'object' && q.question) {
-                    allQuestions.push({ question: q.question, answer: q.answer || '' });
+                    if (q.answer) {
+                        answered.push({ question: q.question, answer: cleanCitations(q.answer) });
+                    } else {
+                        unanswered.push(q.question);
+                    }
                 } else if (typeof q === 'string') {
-                    allQuestions.push({ question: q, answer: '' });
+                    unanswered.push(q);
                 }
             });
 
             topQ.forEach(q => {
-                if (!allQuestions.some(aq => aq.question === q)) {
-                    allQuestions.push({ question: q, answer: '' });
+                if (!answered.some(aq => aq.question === q) && !unanswered.includes(q)) {
+                    unanswered.push(q);
                 }
             });
 
-            if (allQuestions.length === 0) return;
+            if (answered.length === 0 && unanswered.length === 0) return;
+
+            // Render overall context if available
+            const ctx = contentAnalysis.overallContext;
+            const ctxCard = document.getElementById('overallContextCard');
+            const ctxText = document.getElementById('overallContextText');
+            if (ctx && ctxCard && ctxText) {
+                ctxText.innerHTML = linkify(cleanCitations(cleanSummary(ctx)));
+                ctxCard.classList.remove('hidden');
+            }
 
             followUpSection.classList.remove('hidden');
             followUpList.innerHTML = '';
 
-            allQuestions.slice(0, 5).forEach((q, i) => {
+            // Answered questions: expandable with answer
+            answered.slice(0, 5).forEach(q => {
                 const item = document.createElement('div');
                 item.className = 'collapse collapse-arrow bg-base-100 border border-base-300';
                 item.innerHTML = `
                     <input type="checkbox" />
                     <div class="collapse-title text-sm font-medium pr-10">${esc(q.question)}</div>
                     <div class="collapse-content">
-                        <div class="text-sm text-base-content/80 leading-relaxed">${q.answer ? linkify(q.answer) : '<span class="text-base-content/50 italic">Expand for quick context…</span>'}</div>
+                        <div class="text-sm text-base-content/80 leading-relaxed">${linkify(cleanSummary(q.answer))}</div>
                     </div>
                 `;
                 followUpList.appendChild(item);
             });
+
+            // Unanswered questions: simple non-expandable list
+            const remaining = 5 - answered.length;
+            if (remaining > 0 && unanswered.length > 0) {
+                unanswered.slice(0, remaining).forEach(q => {
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center gap-2 px-4 py-2.5 bg-base-100 border border-base-300 rounded-lg';
+                    item.innerHTML = `
+                        <span class="material-symbols-rounded text-base-content/30 text-sm">help_outline</span>
+                        <span class="text-sm text-base-content/60">${esc(q)}</span>
+                    `;
+                    followUpList.appendChild(item);
+                });
+            }
         }
 
         function renderSparkline(data) {
@@ -2258,6 +2306,8 @@
             cardGrid.classList.remove('max-w-xl', 'mx-auto');
             followUpSection.classList.add('hidden');
             followUpList.innerHTML = '';
+            const ctxCard = document.getElementById('overallContextCard');
+            if (ctxCard) ctxCard.classList.add('hidden');
             layoutProgress.style.display = '';
             layoutProgressFill.value = 0;
             applyLayoutTheme(DEFAULT_THEME);
