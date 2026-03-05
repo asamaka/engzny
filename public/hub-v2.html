@@ -1680,17 +1680,18 @@
                 case 'hero_summary': {
                     const hasImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
                     const heroImg = hasImage ? d.imageUrl : (typeof currentImageBase64 === 'string' ? currentImageBase64 : '');
-                    const status = d.investigationStatus || 'investigating';
+                    const status = d.investigationStatus || null;
+                    const showPill = status && status !== 'investigating';
                     return `${heroImg ? `<figure class="relative">
                         <img class="w-full h-40 object-cover" src="${hasImage ? esc(d.imageUrl) : heroImg}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
                         <div class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/50 to-transparent"></div>
                         <div class="absolute top-3 left-3">${d.badge ? `<div class="badge badge-primary badge-sm font-bold">${esc(d.badge)}</div>` : ''}</div>
-                        <div class="absolute top-3 right-3">${renderStatusPill(status)}</div>
+                        ${showPill ? `<div class="absolute top-3 right-3">${renderStatusPill(status)}</div>` : ''}
                     </figure>` : ''}
                     <div class="p-4">
                         ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
                         ${!heroImg && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
-                        ${!heroImg ? renderStatusPill(status) : ''}
+                        ${!heroImg && showPill ? renderStatusPill(status) : ''}
                         <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
                         <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(cleanSummary(d.subtitle || ''))}</p>
                         ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">

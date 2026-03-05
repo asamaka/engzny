@@ -24,6 +24,12 @@ const { deepResearch } = require('./deep-researcher');
 const { logger } = require('../lib/logger');
 const { TraceCollector } = require('../lib/llm-trace');
 
+const RESEARCH_WORTHY_TYPES = new Set([
+  'breaking_news', 'news', 'emergency', 'sports', 'science',
+  'health', 'finance', 'tech', 'social_media',
+  'report_significant_event', 'significant_event',
+]);
+
 /**
  * Create a generic skeleton blueprint for instant display.
  */
@@ -396,6 +402,9 @@ async function runPipeline({
 
     logger.info('Orchestrator', 'Phase 2: Parallel Enhancement (Haiku) + Deep Research (Sonar)');
 
+    const contentType = blueprint.contentAnalysis?.contentType || 'general';
+    const skipResearch = !RESEARCH_WORTHY_TYPES.has(contentType);
+
     const enhanceMessages = [
       'Searching source websites...',
       'Validating claims...',
@@ -514,7 +523,7 @@ async function runPipeline({
       },
     }).then(result => {
       enhanceDone = true;
-      if (onProgress) {
+      if (onProgress && !skipResearch) {
         onProgress({
           phase: 'researching',
           progress: 70,
@@ -528,16 +537,22 @@ async function runPipeline({
       return { actions: [], duration: Date.now() - startTime };
     });
 
-    const deepResearchPromise = deepResearch({
-      contentAnalysis: blueprint.contentAnalysis,
-      cards: blueprint.cards,
-      imageData,
-      mediaType,
-      adapterConfig: { ...adapterConfig, traceCollector },
-    }).catch(err => {
-      logger.warn('Orchestrator', 'Deep research failed (non-fatal)', { err: err.message });
-      return { findings: [], duration: Date.now() - startTime };
-    });
+    const deepResearchPromise = skipResearch
+      ? Promise.resolve({ findings: [], duration: 0, skipped: true })
+      : deepResearch({
+          contentAnalysis: blueprint.contentAnalysis,
+          cards: blueprint.cards,
+          imageData,
+          mediaType,
+          adapterConfig: { ...adapterConfig, traceCollector },
+        }).catch(err => {
+          logger.warn('Orchestrator', 'Deep research failed (non-fatal)', { err: err.message });
+          return { findings: [], duration: Date.now() - startTime };
+        });
+
+    if (skipResearch) {
+      logger.info('Orchestrator', 'Skipping deep research — not research-worthy content', { contentType });
+    }
 
     // Wait for enhance to complete first (cards populate during this via SSE)
     const enhanceResult = await enhancePromise;
@@ -902,12 +917,15 @@ async function runPipeline({
       const vCard = Array.from(currentCards.values()).find(c => c.cardType === 'verification_card');
       const vData = vCard ? (vCard.populatedData || vCard.data || {}) : null;
 
-      let investigationStatus = 'unconfirmed';
-      if (vData && vData.status) {
+      let investigationStatus = null;
+      if (skipResearch) {
+        delete heroData.investigationStatus;
+      } else if (vData && vData.status) {
         const vs = vData.status;
         if (vs === 'verified' || vs === 'confirmed') investigationStatus = 'confirmed';
         else if (vs === 'denied' || vs === 'false') investigationStatus = 'unconfirmed';
         else if (vs === 'partially_verified' || vs === 'conflicting') investigationStatus = 'mixed';
+        else investigationStatus = 'unconfirmed';
       } else if (researchResult.findings && researchResult.findings.length > 0) {
         const verdicts = researchResult.findings
           .filter(f => f.factCheck?.verdict)
@@ -915,9 +933,14 @@ async function runPipeline({
         if (verdicts.includes('verified') || verdicts.includes('partially_true')) investigationStatus = 'confirmed';
         else if (verdicts.includes('false') || verdicts.includes('misleading')) investigationStatus = 'unconfirmed';
         else if (verdicts.length > 0) investigationStatus = 'mixed';
+        else investigationStatus = 'unconfirmed';
+      } else {
+        investigationStatus = 'unconfirmed';
       }
 
-      heroData.investigationStatus = investigationStatus;
+      if (investigationStatus) {
+        heroData.investigationStatus = investigationStatus;
+      }
       heroCard.populatedData = heroData;
       heroCard.data = heroData;
       currentCards.set(heroCard.id, heroCard);
@@ -927,7 +950,7 @@ async function runPipeline({
         vCardStatus: vData?.status,
       });
 
-      if (onCardUpdate) {
+      if (onCardUpdate && investigationStatus) {
         onCardUpdate({
           cardId: heroCard.id,
           cardType: 'hero_summary',
