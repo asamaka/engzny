@@ -24,6 +24,14 @@ const { deepResearch } = require('./deep-researcher');
 const { logger } = require('../lib/logger');
 const { TraceCollector } = require('../lib/llm-trace');
 
+function stripFabricatedImageUrls(data) {
+  if (!data || typeof data !== 'object') return data;
+  const cleaned = { ...data };
+  delete cleaned.imageUrl;
+  delete cleaned.photoUrl;
+  return cleaned;
+}
+
 const RESEARCH_WORTHY_TYPES = new Set([
   'breaking_news', 'news', 'emergency', 'sports', 'science',
   'health', 'finance', 'tech', 'social_media',
@@ -368,6 +376,8 @@ async function runPipeline({
 
       // Register all cards (hero is populated, rest are skeletons)
       for (const card of haikuBlueprint.cards) {
+        if (card.populatedData) card.populatedData = stripFabricatedImageUrls(card.populatedData);
+        if (card.data) card.data = stripFabricatedImageUrls(card.data);
         currentCards.set(card.id, card);
         const data = card.populatedData || card.placeholderData;
         if (data && Object.keys(data).length > 0 && card.status === 'populated' && onCardPopulated) {
@@ -453,11 +463,12 @@ async function runPipeline({
           reason: action.reason,
         });
 
+        const safeData = stripFabricatedImageUrls(action.data);
         const existing = currentCards.get(action.cardId);
         if (existing) {
           const mergedData = {
             ...(existing.populatedData || existing.data || existing.placeholderData || {}),
-            ...action.data,
+            ...safeData,
           };
           existing.populatedData = mergedData;
           existing.data = mergedData;
@@ -468,7 +479,7 @@ async function runPipeline({
           onCardUpdate({
             cardId: action.cardId,
             cardType: action.cardType,
-            data: action.data,
+            data: safeData,
             reason: action.reason,
             source: 'enhance',
           });
@@ -481,12 +492,13 @@ async function runPipeline({
           reason: action.reason,
         });
 
+        const safeData = stripFabricatedImageUrls(action.data);
         const newCard = {
           id: action.cardId,
           cardType: action.cardType,
           gridPosition: action.gridPosition,
-          populatedData: action.data,
-          data: action.data,
+          populatedData: safeData,
+          data: safeData,
           status: 'populated',
         };
         currentCards.set(action.cardId, newCard);
@@ -495,7 +507,7 @@ async function runPipeline({
           onCardAdd({
             cardId: action.cardId,
             cardType: action.cardType,
-            data: action.data,
+            data: safeData,
             gridPosition: action.gridPosition,
             reason: action.reason,
             source: 'enhance',
@@ -760,11 +772,12 @@ async function runPipeline({
             reason: action.reason,
           });
 
+          const safeData = stripFabricatedImageUrls(action.data);
           const existing = currentCards.get(action.cardId);
           if (existing) {
             const mergedData = {
               ...(existing.populatedData || existing.data || existing.placeholderData || {}),
-              ...action.data,
+              ...safeData,
             };
             existing.populatedData = mergedData;
             existing.data = mergedData;
@@ -775,7 +788,7 @@ async function runPipeline({
             onCardUpdate({
               cardId: action.cardId,
               cardType: action.cardType,
-              data: action.data,
+              data: safeData,
               reason: action.reason,
               source: 'review',
             });
@@ -787,12 +800,13 @@ async function runPipeline({
             cardType: action.cardType,
           });
 
+          const safeData = stripFabricatedImageUrls(action.data);
           const newCard = {
             id: action.cardId,
             cardType: action.cardType,
             gridPosition: action.gridPosition,
-            populatedData: action.data,
-            data: action.data,
+            populatedData: safeData,
+            data: safeData,
             status: 'populated',
           };
           currentCards.set(action.cardId, newCard);
@@ -801,7 +815,7 @@ async function runPipeline({
             onCardAdd({
               cardId: action.cardId,
               cardType: action.cardType,
-              data: action.data,
+              data: safeData,
               gridPosition: action.gridPosition,
               reason: action.reason,
               source: 'review',
