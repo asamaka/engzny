@@ -6,6 +6,7 @@
     <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
     <!-- DaisyUI 5 + Tailwind CSS 4 (CDN, no build step) -->
@@ -46,10 +47,6 @@
 
     <!-- Main Canvas -->
     <div id="mainCanvas" class="hidden min-h-screen bg-base-100">
-        <div id="screenshotLayer" class="fixed inset-0 z-0 flex items-center justify-center p-4 opacity-0 pointer-events-none hidden">
-            <img id="screenshotImg" alt="" class="max-h-[70vh] max-w-full rounded-box shadow-2xl">
-        </div>
-
         <div id="progressOverlay" class="fixed inset-0 z-10 grid place-items-center bg-base-100/80 backdrop-blur-sm">
             <div class="card bg-base-200 border border-base-300 shadow-xl w-80">
                 <div class="card-body items-center text-center">
@@ -122,8 +119,6 @@
     <script>
         const pasteState = document.getElementById('pasteState');
         const mainCanvas = document.getElementById('mainCanvas');
-        const screenshotLayer = document.getElementById('screenshotLayer');
-        const screenshotImg = document.getElementById('screenshotImg');
         const progressOverlay = document.getElementById('progressOverlay');
         const progressBar = document.getElementById('progressBar');
         const progressPct = document.getElementById('progressPct');
@@ -526,7 +521,6 @@
 
         async function handleImage(blob) {
             currentImageUrl = URL.createObjectURL(blob);
-            screenshotImg.src = currentImageUrl;
             pasteState.classList.add('hidden');
             mainCanvas.classList.remove('hidden');
             progressOverlay.classList.remove('hidden');
