@@ -401,7 +401,7 @@ const LAYOUT_TYPES = {
   breaking_news: {
     description: 'Breaking/developing news — verification first, source tracking, key people and locations',
     columns: 2,
-    suggestedCards: ['hero_summary', 'verification_card', 'person_card', 'location_card', 'timeline_card', 'news_card'],
+    suggestedCards: ['hero_summary', 'verification_card', 'person_card', 'location_card', 'timeline_card', 'news_card', 'did_you_know_card'],
     bestFor: ['breaking news', 'developing stories', 'unverified claims', 'crisis', 'military events'],
   },
   editorial: {
@@ -431,7 +431,7 @@ const LAYOUT_TYPES = {
   messaging: {
     description: 'Chat/messaging conversation — message bubbles, context, action items',
     columns: 1,
-    suggestedCards: ['hero_summary', 'chat_card', 'info_list', 'action_card'],
+    suggestedCards: ['hero_summary', 'chat_card', 'info_list', 'action_card', 'did_you_know_card'],
     bestFor: ['whatsapp', 'telegram', 'sms', 'imessage', 'messenger', 'chat', 'text messages', 'email'],
   },
   location_explorer: {
