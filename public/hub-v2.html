@@ -15,31 +15,73 @@
     <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
 </head>
 <body>
+    <!--
+        LANDING PAGE THEME CONTRACT (for cloud agents / improvement agents):
+        - The landing page MUST use data-theme="night" (set on <html>)
+        - All colors come from DaisyUI night theme: bg-base-100, bg-base-200, border-base-300, text-primary, etc.
+        - Do NOT add inline style attributes — the hub-ui-contract test forbids them
+        - Do NOT add <style> blocks in <head> — the test forbids them
+        - The reset() function already restores data-theme to DEFAULT_THEME ("night") on back navigation
+    -->
+
     <!-- Paste State -->
-    <div id="pasteState" class="fixed inset-0 z-50 grid place-items-center bg-base-100 p-6">
-        <div class="w-full max-w-sm space-y-4 text-center">
-            <div id="pasteZone" class="card bg-base-200 border border-base-300 shadow-xl cursor-pointer transition hover:border-primary">
-                <div class="card-body items-center py-12">
-                    <div class="avatar placeholder">
-                        <div class="bg-primary/20 text-primary rounded-full w-16">
-                            <span class="material-symbols-rounded text-3xl">content_paste</span>
+    <div id="pasteState" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-base-100 p-5">
+        <div class="w-full max-w-sm flex flex-col items-center gap-6">
+
+            <!-- Branding -->
+            <div class="text-center">
+                <h1 class="text-2xl font-bold tracking-tight text-base-content">
+                    thinx<span class="text-primary font-extrabold">.fun</span>
+                </h1>
+                <p class="text-sm mt-1 text-base-content/50">Paste any screenshot. Get instant analysis.</p>
+            </div>
+
+            <!-- Paste Zone -->
+            <div id="pasteZone" class="card bg-base-200 border border-base-300 shadow-xl w-full cursor-pointer transition-all duration-200 hover:border-primary hover:shadow-primary/10 hover:shadow-2xl">
+                <div class="card-body items-center py-10">
+                    <div class="relative">
+                        <div class="absolute inset-0 rounded-full bg-primary/10 animate-ping"></div>
+                        <div class="avatar placeholder relative">
+                            <div class="bg-primary/15 text-primary rounded-full w-16">
+                                <span class="material-symbols-rounded text-3xl">content_paste</span>
+                            </div>
                         </div>
                     </div>
-                    <h2 class="card-title text-base">Tap to paste screenshot</h2>
-                    <p class="text-xs text-base-content/60">or press Ctrl+V / Cmd+V</p>
+                    <h2 class="card-title text-base mt-2">Tap to paste screenshot</h2>
+                    <p class="text-xs text-base-content/50">or press Ctrl+V / Cmd+V</p>
                 </div>
             </div>
 
-            <div class="join join-vertical w-full gap-2">
-                <button class="btn btn-primary w-full gap-2" id="demoBtn">
-                    <span class="material-symbols-rounded">play_circle</span>
+            <!-- Actions -->
+            <div class="w-full flex flex-col gap-2.5">
+                <button class="btn btn-primary w-full gap-2 text-sm h-12 rounded-xl" id="demoBtn">
+                    <span class="material-symbols-rounded text-lg">play_circle</span>
                     Try Demo
                 </button>
-                <button class="btn btn-outline w-full gap-2" id="uploadBtn">
-                    <span class="material-symbols-rounded">photo_library</span>
+                <button class="btn btn-outline btn-ghost w-full gap-2 text-sm h-12 rounded-xl border-base-300 text-base-content/60 hover:border-primary hover:text-primary hover:bg-transparent" id="uploadBtn">
+                    <span class="material-symbols-rounded text-lg">photo_library</span>
                     Upload Photo
                 </button>
             </div>
+
+            <!-- Feature hints -->
+            <div class="flex items-center justify-center gap-4 text-xs text-base-content/40">
+                <span class="flex items-center gap-1">
+                    <span class="material-symbols-rounded text-sm text-primary">bolt</span>
+                    AI-powered
+                </span>
+                <span class="text-base-300">|</span>
+                <span class="flex items-center gap-1">
+                    <span class="material-symbols-rounded text-sm text-primary">lock</span>
+                    Private
+                </span>
+                <span class="text-base-300">|</span>
+                <span class="flex items-center gap-1">
+                    <span class="material-symbols-rounded text-sm text-primary">phone_iphone</span>
+                    Mobile-first
+                </span>
+            </div>
+
             <input type="file" id="photoInput" accept="image/*" class="hidden">
         </div>
     </div>
@@ -2351,7 +2393,7 @@
         }
 
         // === Demo & Upload ===
-        const DEMO_IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/80/Image_in_a_spanish_whatsapp_chat.jpg/640px-Image_in_a_spanish_whatsapp_chat.jpg';
+        const DEMO_IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/6/65/Instagram_blocking_CBC_News_in_Canada.png';
 
         const demoBtn = document.getElementById('demoBtn');
         const uploadBtn = document.getElementById('uploadBtn');
