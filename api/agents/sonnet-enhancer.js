@@ -150,7 +150,7 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 2. POPULATE EACH CARD: For every skeleton card, call update_card with its required + optional fields. Extract data from the screenshot.
 3. VERIFICATION: If there's a verification_card, populate the claim and source NAMES. Set all source statuses to "checking" — a separate research phase will verify them.
 4. ADD CONTEXT: Fill optional fields like emoji, context, notableInfo, details on every card.
-5. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card. Always add did_you_know_card.
+5. ADD MISSING CARDS: If important information is visible but no card exists for it, use add_card.${existingTypes.includes('did_you_know_card') ? ' did_you_know_card already exists — do NOT add another one.' : ' Always add a did_you_know_card with a surprising fact.'}
 
 **DO NOT generate imageUrl or photoUrl** — leave imageUrl empty. A research phase will add real URLs later.
 
@@ -328,6 +328,20 @@ async function enhance({
       }
 
       if (name === 'add_card' && input.cardType && input.data) {
+        const SINGLETON_CARD_TYPES = new Set([
+          'hero_summary', 'verification_card', 'did_you_know_card',
+        ]);
+        if (SINGLETON_CARD_TYPES.has(input.cardType)) {
+          const existsInCurrent = currentCards.some(c => c.cardType === input.cardType);
+          const existsInActions = actions.some(a => a.type === 'add_card' && a.cardType === input.cardType);
+          if (existsInCurrent || existsInActions) {
+            logger.info('SonnetEnhancer', `Skipping duplicate ${input.cardType} — already exists`, {
+              cardType: input.cardType,
+              reason: input.reason,
+            });
+            return;
+          }
+        }
         const cardId = `card-${nextCardId++}`;
         const action = {
           type: 'add_card',
