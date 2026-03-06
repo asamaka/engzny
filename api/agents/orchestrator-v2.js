@@ -101,6 +101,29 @@ function normalizeSourceArray(sources) {
   return sources;
 }
 
+const KNOWN_SOURCE_NAMES = {
+  'reuters.com': 'Reuters', 'apnews.com': 'AP News',
+  'bbc.com': 'BBC', 'bbc.co.uk': 'BBC',
+  'cnn.com': 'CNN', 'aljazeera.com': 'Al Jazeera',
+  'nytimes.com': 'NY Times', 'theguardian.com': 'The Guardian',
+  'washingtonpost.com': 'Washington Post', 'france24.com': 'France 24',
+  'dw.com': 'DW', 'rt.com': 'RT', 'indiatoday.in': 'India Today',
+  'lemonde.fr': 'Le Monde', 'spiegel.de': 'Der Spiegel',
+  'abc.net.au': 'ABC Australia', 'elpais.com': 'El País',
+  'kurdistan24.net': 'Kurdistan24', 'timesofisrael.com': 'Times of Israel',
+};
+
+/**
+ * Convert a hostname to a human-friendly source name.
+ * Uses a known-sources map for major outlets, falls back to cleaned hostname.
+ */
+function hostToSourceName(host) {
+  if (KNOWN_SOURCE_NAMES[host]) return KNOWN_SOURCE_NAMES[host];
+  const cleaned = host.replace(/\.(com|org|net|co\.uk|co|io|gov|edu|news|info|in|fr|de|au)$/i, '');
+  const name = cleaned.split('.').pop();
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
 /**
  * Truncate text at a word boundary, appending "..." if truncated.
  */
@@ -632,11 +655,13 @@ async function runPipeline({
 
         // Haiku's verification statuses are unreliable assumptions —
         // always re-evaluate ALL sources against research findings
+        const matchedFindingSet = new Set();
         for (const source of sources) {
           const sourceName = (source.name || '').toLowerCase();
           const finding = sourceName && findMatchingFinding(sourceName, researchResult.findings);
 
           if (finding) {
+            matchedFindingSet.add(finding);
             const fc = finding.factCheck;
             if (fc && (fc.verdict === 'verified' || fc.verdict === 'partially_true')) {
               source.status = 'confirmed';
@@ -656,18 +681,58 @@ async function runPipeline({
           }
         }
 
+        // Add sources from research URLs not already in the card.
+        // Sonar often finds relevant sources (Kurdistan24, India Today, etc.)
+        // that the enhance LLM didn't include. Surfacing them gives users
+        // a richer multi-source verification grid.
+        const MAX_VERIFICATION_SOURCES = 5;
+        const existingHosts = new Set(sources.map(s => {
+          if (s.url) {
+            try { return new URL(s.url).hostname.replace(/^www\./, ''); } catch (_) { /* ignore */ }
+          }
+          return null;
+        }).filter(Boolean));
+
+        for (const finding of researchResult.findings) {
+          if (sources.length >= MAX_VERIFICATION_SOURCES) break;
+          if (!finding.sourceUrls?.length || !finding.factCheck) continue;
+
+          for (const url of finding.sourceUrls) {
+            if (sources.length >= MAX_VERIFICATION_SOURCES) break;
+            let host;
+            try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (_) { continue; }
+            if (existingHosts.has(host)) continue;
+
+            const fc = finding.factCheck;
+            let status;
+            if (fc.verdict === 'verified' || fc.verdict === 'partially_true') status = 'confirmed';
+            else if (fc.verdict === 'false' || fc.verdict === 'misleading') status = 'denied';
+            else status = 'inconclusive';
+
+            sources.push({
+              name: hostToSourceName(host),
+              status,
+              snippet: truncateAtWord(finding.summary || fc.explanation || '', 200),
+              url,
+            });
+            existingHosts.add(host);
+            updated = true;
+          }
+        }
+
         if (updated) {
           const overallStatus = computeVerificationStatus(sources);
           const updatedData = { ...cardData, sources, status: overallStatus, lastChecked: new Date().toISOString() };
           
-          // Add research summary
-          const researchSummary = researchResult.findings
+          // Build research summary — clean each piece to avoid ".." artifacts
+          const summaryParts = researchResult.findings
             .filter(f => f.factCheck)
-            .map(f => f.factCheck.explanation || f.summary)
-            .filter(Boolean)
-            .join('. ');
+            .map(f => (f.factCheck.explanation || f.summary || '').replace(/\.+\s*$/, '').trim())
+            .filter(Boolean);
+          const uniqueParts = [...new Set(summaryParts)];
+          const researchSummary = uniqueParts.join('. ');
           if (researchSummary) {
-            updatedData.summary = truncateAtWord(researchSummary, 500);
+            updatedData.summary = truncateAtWord(researchSummary + '.', 500);
           }
 
           vCard.populatedData = updatedData;
