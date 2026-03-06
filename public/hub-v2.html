@@ -2136,11 +2136,14 @@
                         <div class="space-y-1">
                         ${(d.messages || []).map(msg => {
                             const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
-                            const isUser = mObj.isUser || mObj.isOwn || mObj.isOwnMessage || false;
+                            const isUser = mObj.isUser || mObj.isOwn || mObj.isOwnMessage
+                                || (mObj.type && (mObj.type === 'sent' || mObj.type === 'outgoing'))
+                                || false;
                             const time = mObj.time || mObj.timestamp || mObj.ts || '';
+                            const translation = mObj.translation || mObj.translatedText || '';
                             return `<div class="chat ${isUser ? 'chat-end' : 'chat-start'}">
                                 <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${time ? `<time>${esc(time)}</time>` : ''}</div>
-                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || mObj.content || mObj.message || '')}</div>
+                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || mObj.content || mObj.message || '')}${translation ? `<div class="border-t border-white/10 mt-1.5 pt-1.5 text-xs opacity-70 italic"><span class="not-italic">🌐</span> ${esc(translation)}</div>` : ''}</div>
                             </div>`;
                         }).join('')}
                         </div>

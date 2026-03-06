@@ -303,9 +303,10 @@ const CARD_TYPES = {
         required: true,
         items: {
           sender: { type: 'string', required: true, description: 'Who sent this message' },
-          text: { type: 'string', required: true, description: 'Message content' },
+          text: { type: 'string', required: true, description: 'Message content (original language)' },
           time: { type: 'string', description: 'Timestamp' },
           isUser: { type: 'boolean', description: 'True if this is the screenshot owner' },
+          translation: { type: 'string', description: 'English translation if text is non-English' },
         },
       },
     },
