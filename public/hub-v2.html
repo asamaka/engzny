@@ -2385,7 +2385,7 @@
         }
 
         // === Demo & Upload ===
-        const DEMO_IMAGE_URL = 'https://upload.wikimedia.org/wikipedia/commons/6/65/Instagram_blocking_CBC_News_in_Canada.png';
+        const DEMO_IMAGE_PATH = '/IMG_1699.png';
 
         const demoBtn = document.getElementById('demoBtn');
         const uploadBtn = document.getElementById('uploadBtn');
@@ -2394,8 +2394,7 @@
         demoBtn.addEventListener('click', async () => {
             demoBtn.classList.add('loading');
             try {
-                const proxyUrl = '/api/example-image?url=' + encodeURIComponent(DEMO_IMAGE_URL);
-                const resp = await fetch(proxyUrl);
+                const resp = await fetch(DEMO_IMAGE_PATH);
                 if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
                 const blob = await resp.blob();
                 if (!blob.type.startsWith('image/')) throw new Error('Not an image');
