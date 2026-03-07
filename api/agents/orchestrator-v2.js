@@ -141,6 +141,18 @@ const KNOWN_SOURCE_NAMES = {
   'sputniknews.com': 'Sputnik', 'tass.com': 'TASS',
 };
 
+const GENERIC_PLATFORMS = new Set([
+  'youtube.com', 'wikipedia.org', 'en.wikipedia.org',
+  'facebook.com', 'twitter.com', 'x.com', 'instagram.com',
+  'tiktok.com', 'reddit.com', 'linkedin.com', 'medium.com',
+  'archive.org', 'web.archive.org', 'docs.google.com',
+]);
+
+function isGenericPlatform(host) {
+  const h = host.replace(/^www\./, '');
+  return GENERIC_PLATFORMS.has(h) || GENERIC_PLATFORMS.has(h.split('.').slice(-2).join('.'));
+}
+
 /**
  * Convert a hostname to a human-friendly source name.
  * Uses a known-sources map for major outlets, falls back to cleaned hostname.
@@ -189,7 +201,12 @@ function cleanResearchData(researchResult) {
 }
 
 function sentenceWords(sentence) {
-  return new Set(sentence.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+  return new Set(sentence.toLowerCase().replace(/[^\w\s]/g, '').replace(/s\b/g, '').split(/\s+/).filter(w => w.length > 3));
+}
+
+function extractAttribution(sentence) {
+  const m = sentence.match(/^(confirmed|according|reported|verified|cited|corroborated)\s+(by|to)\s+(\S+)/i);
+  return m ? m[3].replace(/[''`]s?$/i, '').replace(/[^\w]/g, '').toLowerCase() : null;
 }
 
 function deduplicateSentences(text) {
@@ -197,9 +214,14 @@ function deduplicateSentences(text) {
   const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 10);
   if (sentences.length <= 1) return text;
   const kept = [];
+  const seenAttributions = new Set();
   for (const sentence of sentences) {
     const words = sentenceWords(sentence);
     if (words.size < 2) { kept.push(sentence); continue; }
+
+    const attr = extractAttribution(sentence);
+    if (attr && seenAttributions.has(attr)) continue;
+
     const isDuplicate = kept.some(prev => {
       const prevWords = sentenceWords(prev);
       if (prevWords.size === 0) return false;
@@ -207,7 +229,10 @@ function deduplicateSentences(text) {
       const smaller = Math.min(words.size, prevWords.size);
       return smaller > 0 && overlap / smaller > 0.6;
     });
-    if (!isDuplicate) kept.push(sentence);
+    if (!isDuplicate) {
+      kept.push(sentence);
+      if (attr) seenAttributions.add(attr);
+    }
   }
   return kept.join(' ');
 }
@@ -789,6 +814,7 @@ async function runPipeline({
             let host;
             try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (_) { continue; }
             if (existingHosts.has(host)) continue;
+            if (isGenericPlatform(host)) continue;
 
             const fc = finding.factCheck;
             let status;
