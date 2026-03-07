@@ -162,6 +162,56 @@ function stripCitationMarkers(text) {
   return text.replace(/\[(\d+)\]/g, '').replace(/\s{2,}/g, ' ').trim();
 }
 
+function cleanResearchData(researchResult) {
+  if (!researchResult || !researchResult.findings) return researchResult;
+  researchResult.findings = researchResult.findings.map(f => {
+    const cleaned = { ...f };
+    if (cleaned.summary) cleaned.summary = stripCitationMarkers(cleaned.summary);
+    if (cleaned.details) cleaned.details = stripCitationMarkers(cleaned.details);
+    if (cleaned.topic) cleaned.topic = stripCitationMarkers(cleaned.topic);
+    if (cleaned.factCheck) {
+      cleaned.factCheck = { ...cleaned.factCheck };
+      if (cleaned.factCheck.explanation) cleaned.factCheck.explanation = stripCitationMarkers(cleaned.factCheck.explanation);
+      if (cleaned.factCheck.claim) cleaned.factCheck.claim = stripCitationMarkers(cleaned.factCheck.claim);
+    }
+    return cleaned;
+  });
+  if (researchResult.overallContext) {
+    researchResult.overallContext = stripCitationMarkers(researchResult.overallContext);
+  }
+  if (researchResult.followUpQuestions) {
+    researchResult.followUpQuestions = researchResult.followUpQuestions.map(q => ({
+      ...q,
+      answer: q.answer ? stripCitationMarkers(q.answer) : q.answer,
+    }));
+  }
+  return researchResult;
+}
+
+function sentenceWords(sentence) {
+  return new Set(sentence.toLowerCase().replace(/[^\w\s]/g, '').split(/\s+/).filter(w => w.length > 3));
+}
+
+function deduplicateSentences(text) {
+  if (!text) return text;
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 10);
+  if (sentences.length <= 1) return text;
+  const kept = [];
+  for (const sentence of sentences) {
+    const words = sentenceWords(sentence);
+    if (words.size < 2) { kept.push(sentence); continue; }
+    const isDuplicate = kept.some(prev => {
+      const prevWords = sentenceWords(prev);
+      if (prevWords.size === 0) return false;
+      const overlap = [...words].filter(w => prevWords.has(w)).length;
+      const smaller = Math.min(words.size, prevWords.size);
+      return smaller > 0 && overlap / smaller > 0.6;
+    });
+    if (!isDuplicate) kept.push(sentence);
+  }
+  return kept.join(' ');
+}
+
 function truncateAtWord(text, maxLen) {
   if (!text || text.length <= maxLen) return text;
   const truncated = text.slice(0, maxLen);
@@ -657,6 +707,8 @@ async function runPipeline({
       });
     }
 
+    cleanResearchData(researchResult);
+
     clearInterval(enhanceHeartbeat);
 
     const phase2Duration = Date.now() - startTime;
@@ -759,15 +811,17 @@ async function runPipeline({
           const overallStatus = computeVerificationStatus(sources);
           const updatedData = { ...cardData, sources, status: overallStatus, lastChecked: new Date().toISOString() };
           
-          // Build research summary — clean each piece to avoid ".." artifacts
+          // Build research summary — deduplicate at sentence level to avoid
+          // near-duplicate Sonar explanations repeating the same conclusion
           const summaryParts = researchResult.findings
             .filter(f => f.factCheck)
             .map(f => (f.factCheck.explanation || f.summary || '').replace(/\.+\s*$/, '').trim())
             .filter(Boolean);
           const uniqueParts = [...new Set(summaryParts)];
-          const researchSummary = uniqueParts.join('. ');
-          if (researchSummary) {
-            updatedData.summary = truncateAtWord(researchSummary + '.', 500);
+          const rawSummary = uniqueParts.join('. ');
+          if (rawSummary) {
+            const deduped = deduplicateSentences(rawSummary + '.');
+            updatedData.summary = truncateAtWord(deduped, 500);
           }
 
           vCard.populatedData = updatedData;
@@ -1008,20 +1062,16 @@ async function runPipeline({
     if (researchResult.followUpQuestions?.length || researchResult.additionalQuestions?.length) {
       const ca = blueprint.contentAnalysis;
       if (researchResult.followUpQuestions?.length) {
-        const cleaned = researchResult.followUpQuestions.map(q => ({
-          ...q,
-          answer: stripCitationMarkers(q.answer),
-        }));
         ca.followUpQuestions = [
           ...(ca.followUpQuestions || []),
-          ...cleaned,
+          ...researchResult.followUpQuestions,
         ].slice(0, 5);
       }
       if (researchResult.additionalQuestions?.length) {
         ca.additionalQuestions = researchResult.additionalQuestions.slice(0, 5);
       }
       if (researchResult.overallContext) {
-        ca.overallContext = stripCitationMarkers(researchResult.overallContext);
+        ca.overallContext = researchResult.overallContext;
       }
     }
 
