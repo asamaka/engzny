@@ -111,6 +111,34 @@ const KNOWN_SOURCE_NAMES = {
   'lemonde.fr': 'Le Monde', 'spiegel.de': 'Der Spiegel',
   'abc.net.au': 'ABC Australia', 'elpais.com': 'El País',
   'kurdistan24.net': 'Kurdistan24', 'timesofisrael.com': 'Times of Israel',
+  'latimes.com': 'LA Times', 'theworld.org': 'The World',
+  'youtube.com': 'YouTube', 'wikipedia.org': 'Wikipedia',
+  'en.wikipedia.org': 'Wikipedia',
+  'tribune.com.pk': 'Tribune Pakistan', 'dawn.com': 'Dawn',
+  'geo.tv': 'Geo News', 'thenews.com.pk': 'The News International',
+  'haaretz.com': 'Haaretz', 'jpost.com': 'Jerusalem Post',
+  'ynetnews.com': 'Ynet News',
+  'nhk.or.jp': 'NHK', 'japantimes.co.jp': 'Japan Times',
+  'scmp.com': 'South China Morning Post',
+  'hindustantimes.com': 'Hindustan Times', 'thehindu.com': 'The Hindu',
+  'ndtv.com': 'NDTV', 'timesofindia.indiatimes.com': 'Times of India',
+  'foxnews.com': 'Fox News', 'nbcnews.com': 'NBC News',
+  'abcnews.go.com': 'ABC News', 'cbsnews.com': 'CBS News',
+  'politico.com': 'Politico', 'thehill.com': 'The Hill',
+  'axios.com': 'Axios', 'npr.org': 'NPR',
+  'independent.co.uk': 'The Independent', 'telegraph.co.uk': 'The Telegraph',
+  'sky.com': 'Sky News', 'skynews.com.au': 'Sky News Australia',
+  'globalnews.ca': 'Global News', 'cbc.ca': 'CBC',
+  'abc.es': 'ABC Spain', 'corriere.it': 'Corriere della Sera',
+  'tagesschau.de': 'Tagesschau', 'rte.ie': 'RTE',
+  'almayadeen.net': 'Al Mayadeen', 'middleeasteye.net': 'Middle East Eye',
+  'arabnews.com': 'Arab News', 'alarabiya.net': 'Al Arabiya',
+  'vox.com': 'Vox',
+  'businessinsider.com': 'Business Insider', 'bloomberg.com': 'Bloomberg',
+  'cnbc.com': 'CNBC', 'ft.com': 'Financial Times',
+  'economist.com': 'The Economist', 'foreignpolicy.com': 'Foreign Policy',
+  'euronews.com': 'Euronews', 'theintercept.com': 'The Intercept',
+  'sputniknews.com': 'Sputnik', 'tass.com': 'TASS',
 };
 
 /**
@@ -118,15 +146,22 @@ const KNOWN_SOURCE_NAMES = {
  * Uses a known-sources map for major outlets, falls back to cleaned hostname.
  */
 function hostToSourceName(host) {
-  if (KNOWN_SOURCE_NAMES[host]) return KNOWN_SOURCE_NAMES[host];
-  const cleaned = host.replace(/\.(com|org|net|co\.uk|co|io|gov|edu|news|info|in|fr|de|au)$/i, '');
-  const name = cleaned.split('.').pop();
-  return name.charAt(0).toUpperCase() + name.slice(1);
+  const h = host.replace(/^www\./, '');
+  if (KNOWN_SOURCE_NAMES[h]) return KNOWN_SOURCE_NAMES[h];
+  const withoutSub = h.split('.').slice(-2).join('.');
+  if (KNOWN_SOURCE_NAMES[withoutSub]) return KNOWN_SOURCE_NAMES[withoutSub];
+  const stripped = h
+    .replace(/\.(com|org|net|co|gov|edu|ac)\.[a-z]{2}$/i, '')
+    .replace(/\.[a-z]{2,6}$/i, '');
+  const name = stripped.split('.').pop();
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
-/**
- * Truncate text at a word boundary, appending "..." if truncated.
- */
+function stripCitationMarkers(text) {
+  if (!text) return text;
+  return text.replace(/\[(\d+)\]/g, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 function truncateAtWord(text, maxLen) {
   if (!text || text.length <= maxLen) return text;
   const truncated = text.slice(0, maxLen);
@@ -973,16 +1008,20 @@ async function runPipeline({
     if (researchResult.followUpQuestions?.length || researchResult.additionalQuestions?.length) {
       const ca = blueprint.contentAnalysis;
       if (researchResult.followUpQuestions?.length) {
+        const cleaned = researchResult.followUpQuestions.map(q => ({
+          ...q,
+          answer: stripCitationMarkers(q.answer),
+        }));
         ca.followUpQuestions = [
           ...(ca.followUpQuestions || []),
-          ...researchResult.followUpQuestions,
+          ...cleaned,
         ].slice(0, 5);
       }
       if (researchResult.additionalQuestions?.length) {
         ca.additionalQuestions = researchResult.additionalQuestions.slice(0, 5);
       }
       if (researchResult.overallContext) {
-        ca.overallContext = researchResult.overallContext;
+        ca.overallContext = stripCitationMarkers(researchResult.overallContext);
       }
     }
 
