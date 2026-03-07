@@ -3640,8 +3640,14 @@ app.get(UUID_REGEX, async (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'job.html'));
 });
 
-// Catch-all route
+// Catch-all route — return 404 for scanner probes, serve SPA for clean paths
+const SCANNER_PATH_RE = /\.(php|asp|aspx|jsp|cgi|pl|py|rb|sh|bak|sql|gz|tar|zip|rar|7z|log|ini|cfg|conf|yml|yaml|xml|woff2?|ttf|eot)$/i;
+const SCANNER_PREFIX_RE = /^\/(\.git|\.env|\.svn|\.hg|\.well-known\/security\.txt|wp-admin|wp-content|wp-includes|wp-login|admin|cgi-bin|phpMyAdmin|phpmyadmin|vendor|node_modules|__debug|xmlrpc|actuator|\.DS_Store)(\/|$)/i;
 app.get('*', (req, res) => {
+  const p = req.path;
+  if (SCANNER_PATH_RE.test(p) || SCANNER_PREFIX_RE.test(p)) {
+    return res.status(404).type('text/plain').send('Not Found');
+  }
   res.sendFile(path.join(__dirname, '..', 'public', 'hub-v2.html'));
 });
 
