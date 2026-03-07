@@ -111,16 +111,39 @@ const KNOWN_SOURCE_NAMES = {
   'lemonde.fr': 'Le Monde', 'spiegel.de': 'Der Spiegel',
   'abc.net.au': 'ABC Australia', 'elpais.com': 'El País',
   'kurdistan24.net': 'Kurdistan24', 'timesofisrael.com': 'Times of Israel',
+  'tribune.com.pk': 'Express Tribune', 'dawn.com': 'Dawn',
+  'geo.tv': 'Geo News', 'thenews.com.pk': 'The News International',
+  'hindustantimes.com': 'Hindustan Times', 'ndtv.com': 'NDTV',
+  'almayadeen.net': 'Al Mayadeen', 'middleeasteye.net': 'Middle East Eye',
+  'haaretz.com': 'Haaretz', 'jpost.com': 'Jerusalem Post',
 };
+
+const TLD_PARTS = new Set([
+  'com', 'org', 'net', 'co', 'gov', 'ac', 'edu', 'news', 'info', 'tv',
+  'io', 'me', 'us', 'uk', 'ca', 'au', 'nz', 'in', 'fr', 'de', 'jp',
+  'kr', 'cn', 'br', 'mx', 'ru', 'tr', 'za', 'ng', 'eg', 'pk', 'sa',
+  'ir', 'qa', 'il', 'ae', 'sg', 'my', 'th', 'ph', 'vn', 'id', 'tw',
+  'hk', 'int', 'mil',
+]);
 
 /**
  * Convert a hostname to a human-friendly source name.
- * Uses a known-sources map for major outlets, falls back to cleaned hostname.
+ * Handles compound ccTLDs (e.g. tribune.com.pk → Tribune).
  */
 function hostToSourceName(host) {
   if (KNOWN_SOURCE_NAMES[host]) return KNOWN_SOURCE_NAMES[host];
-  const cleaned = host.replace(/\.(com|org|net|co\.uk|co|io|gov|edu|news|info|in|fr|de|au)$/i, '');
-  const name = cleaned.split('.').pop();
+  const noWww = host.replace(/^www\./, '');
+  if (KNOWN_SOURCE_NAMES[noWww]) return KNOWN_SOURCE_NAMES[noWww];
+
+  const parts = noWww.split('.');
+  const brandParts = parts.filter(p => p.length > 2 && !TLD_PARTS.has(p.toLowerCase()));
+
+  let name;
+  if (brandParts.length > 0) {
+    name = brandParts[brandParts.length - 1];
+  } else {
+    name = parts[0];
+  }
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
