@@ -957,6 +957,30 @@
             layoutProgressText.textContent = 'designing';
         }
 
+        let _revealBatchStart = 0;
+        let _revealBatchCount = 0;
+        const REVEAL_STAGGER_MS = 80;
+        const REVEAL_BATCH_WINDOW = 300;
+
+        function revealCard(el) {
+            const now = Date.now();
+            if (now - _revealBatchStart > REVEAL_BATCH_WINDOW) {
+                _revealBatchStart = now;
+                _revealBatchCount = 0;
+            }
+            const delay = _revealBatchCount * REVEAL_STAGGER_MS;
+            _revealBatchCount++;
+            el.animate([
+                { opacity: 0, transform: 'translateY(10px) scale(0.97)' },
+                { opacity: 1, transform: 'translateY(0) scale(1)' }
+            ], {
+                duration: 350,
+                delay,
+                easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
+                fill: 'backwards'
+            });
+        }
+
         const enhanceStatusMessages = [
             'Searching source websites...',
             'Validating claims...',
@@ -1027,6 +1051,7 @@
 
                 cardGrid.appendChild(el);
                 el.classList.add('transition-all', 'duration-300');
+                if (hasData) revealCard(el);
             });
 
             if (!firstCardShown && populatedCards.length === 0) {
@@ -1085,6 +1110,7 @@
                 el.innerHTML = renderFallbackCard(data.cardType, data.data);
             }
             el._cardData = data.data;
+            revealCard(el);
 
             appendCitations(el, data.data);
 
@@ -1127,6 +1153,7 @@
                 console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
                 el.innerHTML = renderFallbackCard(data.cardType, mergedData);
             }
+            if (isNewlyPopulated) revealCard(el);
 
             appendCitations(el, mergedData);
 
@@ -1191,6 +1218,7 @@
 
             cardGrid.appendChild(el);
             el.classList.add('transition-all', 'duration-300');
+            revealCard(el);
 
             appendCitations(el, data.data);
 
