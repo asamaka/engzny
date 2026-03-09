@@ -123,7 +123,7 @@
                             <span class="material-symbols-rounded text-primary text-lg mt-0.5">auto_awesome</span>
                             <div>
                                 <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Context</div>
-                                <p class="text-sm text-base-content/80 leading-relaxed" id="overallContextText"></p>
+                                <p class="text-sm text-base-content/80 leading-relaxed" id="overallContextText" dir="auto"></p>
                             </div>
                         </div>
                     </div>
@@ -364,9 +364,9 @@
                 item.className = 'collapse collapse-arrow bg-base-100 border border-base-300';
                 item.innerHTML = `
                     <input type="checkbox" />
-                    <div class="collapse-title text-sm font-medium pr-10">${esc(q.question)}</div>
+                    <div class="collapse-title text-sm font-medium pr-10" dir="auto">${esc(q.question)}</div>
                     <div class="collapse-content">
-                        <div class="text-sm text-base-content/80 leading-relaxed">${linkify(cleanSummary(q.answer))}</div>
+                        <div class="text-sm text-base-content/80 leading-relaxed" dir="auto">${linkify(cleanSummary(q.answer))}</div>
                     </div>
                 `;
                 followUpList.appendChild(item);
@@ -380,7 +380,7 @@
                     item.className = 'flex items-center gap-2 px-4 py-2.5 bg-base-100 border border-base-300 rounded-lg';
                     item.innerHTML = `
                         <span class="material-symbols-rounded text-base-content/30 text-sm">help_outline</span>
-                        <span class="text-sm text-base-content/60">${esc(q)}</span>
+                        <span class="text-sm text-base-content/60" dir="auto">${esc(q)}</span>
                     `;
                     followUpList.appendChild(item);
                 });
@@ -1648,8 +1648,8 @@
                 <div class="p-4">
                     ${pd.emoji ? `<span class="text-3xl leading-none block mb-1">${esc(pd.emoji)}</span>` : ''}
                     ${!screenshotSrc ? renderStatusPill(pd.investigationStatus || 'investigating') : ''}
-                    <h2 class="text-xl font-bold leading-tight">${esc(pd.title)}</h2>
-                    ${pd.subtitle ? `<p class="text-sm text-base-content/70 leading-relaxed">${esc(pd.subtitle)}</p>` : ''}
+                    <h2 class="text-xl font-bold leading-tight" dir="auto">${esc(pd.title)}</h2>
+                    ${pd.subtitle ? `<p class="text-sm text-base-content/70 leading-relaxed" dir="auto">${esc(pd.subtitle)}</p>` : ''}
                     <div class="flex items-center gap-2 mt-2">
                         <span class="loading loading-dots loading-xs text-primary"></span>
                         <span class="text-xs text-base-content/50">Investigating...</span>
@@ -1717,8 +1717,8 @@
             const subtitle = d.subtitle || d.context || d.summary || d.description || d.explanation || '';
             return `<div class="p-4">
                 <div class="text-xs font-bold uppercase tracking-wider text-base-content/30 mb-2">${esc((cardType || '').replace(/_/g, ' '))}</div>
-                ${title ? `<div class="text-sm font-medium mb-1">${esc(typeof title === 'string' ? title : JSON.stringify(title))}</div>` : ''}
-                ${subtitle ? `<div class="text-xs text-base-content/60">${esc(typeof subtitle === 'string' ? subtitle.slice(0, 200) : '')}</div>` : ''}
+                ${title ? `<div class="text-sm font-medium mb-1" dir="auto">${esc(typeof title === 'string' ? title : JSON.stringify(title))}</div>` : ''}
+                ${subtitle ? `<div class="text-xs text-base-content/60" dir="auto">${esc(typeof subtitle === 'string' ? subtitle.slice(0, 200) : '')}</div>` : ''}
             </div>`;
         }
 
@@ -1754,10 +1754,10 @@
                         ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
                         ${!heroImg && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
                         ${!heroImg && showPill ? renderStatusPill(status) : ''}
-                        <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1">${esc(d.title || 'Analysis')}</h2>
-                        <p class="text-sm text-base-content/60 leading-relaxed mb-2">${linkify(cleanSummary(d.subtitle || ''))}</p>
+                        <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1" dir="auto">${esc(d.title || 'Analysis')}</h2>
+                        <p class="text-sm text-base-content/60 leading-relaxed mb-2" dir="auto">${linkify(cleanSummary(d.subtitle || ''))}</p>
                         ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">
-                            <p class="text-sm text-base-content/80 leading-relaxed">${linkify(cleanSummary(d.takeaway))}</p>
+                            <p class="text-sm text-base-content/80 leading-relaxed" dir="auto">${linkify(cleanSummary(d.takeaway))}</p>
                         </div>` : ''}
                         ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1">
                             <span class="material-symbols-rounded text-sm">open_in_new</span> Source
@@ -1777,7 +1777,7 @@
                             </span>
                         </div>` : ''}
                         ${Array.isArray(d.sparkline) && d.sparkline.length >= 2 ? renderSparkline(d.sparkline) : ''}
-                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-base-300 rounded-lg">${linkify(d.context)}</div>` : ''}
+                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-base-300 rounded-lg" dir="auto">${linkify(d.context)}</div>` : ''}
                     </div>`;
 
                 case 'info_list':
@@ -1795,7 +1795,7 @@
                                     <span class="text-right font-medium ${item.highlight ? 'text-primary' : ''}">${hasUrl ? renderLink(item.url, value, 'text-primary hover:underline') : linkify(value)}</span>
                                 </div>`;
                             }
-                            return `<div class="py-2 text-sm">${linkify(item)}</div>`;
+                            return `<div class="py-2 text-sm" dir="auto">${linkify(item)}</div>`;
                         }).join('')}
                         </div>
                     </div>`;
@@ -1821,8 +1821,8 @@
                                 ${d.confidence ? `<div class="text-xs text-base-content/40 mt-0.5">${esc(d.confidence)} confidence</div>` : ''}
                             </div>
                         </div>
-                        <p class="text-sm italic text-base-content/70 leading-relaxed mb-2">${linkify(cleanSummary(d.claim || ''))}</p>
-                        ${d.explanation ? `<p class="text-xs text-base-content/60 leading-relaxed">${linkify(cleanSummary(d.explanation))}</p>` : ''}
+                        <p class="text-sm italic text-base-content/70 leading-relaxed mb-2" dir="auto">${linkify(cleanSummary(d.claim || ''))}</p>
+                        ${d.explanation ? `<p class="text-xs text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(d.explanation))}</p>` : ''}
                         ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
                     </div>`;
                 }
@@ -1846,8 +1846,8 @@
                                 ${d.handle ? `<div class="text-xs text-primary">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
                             </div>
                         </div>
-                        ${d.context ? `<p class="text-sm text-base-content/70 leading-relaxed">${linkify(cleanSummary(d.context))}</p>` : ''}
-                        ${d.notableInfo ? `<div class="bg-primary/8 p-2.5 rounded-lg mt-2 text-sm">💡 ${linkify(cleanSummary(d.notableInfo))}</div>` : ''}
+                        ${d.context ? `<p class="text-sm text-base-content/70 leading-relaxed" dir="auto">${linkify(cleanSummary(d.context))}</p>` : ''}
+                        ${d.notableInfo ? `<div class="bg-primary/8 p-2.5 rounded-lg mt-2 text-sm" dir="auto">💡 ${linkify(cleanSummary(d.notableInfo))}</div>` : ''}
                         ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
                             `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
@@ -1875,7 +1875,7 @@
                         ${features.length ? `<div class="flex flex-wrap gap-1.5 mb-2">${features.map(f =>
                             `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded text-[10px]">check</span>${esc(f)}</span>`
                         ).join('')}</div>` : ''}
-                        ${prodVerdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success">${linkify(prodVerdict)}</div>` : ''}
+                        ${prodVerdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success" dir="auto">${linkify(prodVerdict)}</div>` : ''}
                         ${warnings.length ? `<div class="mt-2 space-y-1">${warnings.map(w =>
                             `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded text-xs">warning</span>${esc(w)}</div>`
                         ).join('')}</div>` : ''}
@@ -1900,7 +1900,7 @@
                                 ${i > 0 ? '<hr class="bg-base-300"/>' : ''}
                                 <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evDate)}</div>
                                 <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-[0_0_8px_rgba(91,138,245,0.4)]' : 'bg-base-300'}"></div></div>
-                                <div class="timeline-end text-sm pb-3">${evObj.url && !evLabel ? renderLink(evObj.url, evText) : displayText}</div>
+                                <div class="timeline-end text-sm pb-3" dir="auto">${evObj.url && !evLabel ? renderLink(evObj.url, evText) : displayText}</div>
                                 ${!isLast ? '<hr class="bg-base-300"/>' : ''}
                             </li>`;
                         }).join('')}
@@ -1911,12 +1911,12 @@
                     const hasQuotePhoto = d.photoUrl && typeof d.photoUrl === 'string' && d.photoUrl.startsWith('http');
                     return `<div class="p-4 border-l-3 border-secondary">
                         <div class="text-4xl text-secondary/30 font-serif leading-none mb-1">\u201C</div>
-                        <blockquote class="text-sm text-base-content/80 leading-relaxed italic pl-2">${linkify(d.quote || '')}</blockquote>
+                        <blockquote class="text-sm text-base-content/80 leading-relaxed italic pl-2" dir="auto">${linkify(d.quote || '')}</blockquote>
                         ${d.attribution ? `<div class="flex items-center gap-2 mt-3">
                             ${hasQuotePhoto ? `<div class="avatar"><div class="w-7 h-7 rounded-full"><img src="${esc(d.photoUrl)}" alt="" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'"></div></div>` : ''}
                             <div class="text-xs font-semibold text-secondary">\u2014 ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>
                         </div>` : ''}
-                        ${d.context ? `<p class="text-xs text-base-content/40 mt-2">${linkify(d.context)}</p>` : ''}
+                        ${d.context ? `<p class="text-xs text-base-content/40 mt-2" dir="auto">${linkify(d.context)}</p>` : ''}
                     </div>`;
                 }
 
@@ -1953,9 +1953,9 @@
                     return `<div role="alert" class="alert ${alertClass} rounded-2xl">
                         <span class="material-symbols-rounded text-xl">${icon}</span>
                         <div>
-                            <h3 class="font-bold text-sm">${esc(d.title || 'Warning')}</h3>
-                            ${d.details ? `<div class="text-xs mt-1 opacity-80">${linkify(d.details)}</div>` : ''}
-                            ${d.advice ? `<div class="text-xs mt-2 p-2 bg-base-100/20 rounded-lg">${linkify(d.advice)}</div>` : ''}
+                            <h3 class="font-bold text-sm" dir="auto">${esc(d.title || 'Warning')}</h3>
+                            ${d.details ? `<div class="text-xs mt-1 opacity-80" dir="auto">${linkify(d.details)}</div>` : ''}
+                            ${d.advice ? `<div class="text-xs mt-2 p-2 bg-base-100/20 rounded-lg" dir="auto">${linkify(d.advice)}</div>` : ''}
                         </div>
                     </div>`;
                 }
@@ -1987,7 +1987,7 @@
                 case 'text_extract':
                     return `<div class="p-4">
                         <h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Extracted Text')}</h3>
-                        <div class="text-sm font-mono bg-base-300 p-3 rounded-xl whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed">${linkify(d.text || '')}</div>
+                        <div class="text-sm font-mono bg-base-300 p-3 rounded-xl whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed" dir="auto">${linkify(d.text || '')}</div>
                         ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${esc(d.source)}</div>` : ''}
                     </div>`;
 
@@ -2008,9 +2008,9 @@
                                 ${d.address ? `<div class="text-xs text-base-content/50">${linkify(d.address)}</div>` : ''}
                             </div>
                         </div>
-                        ${d.context ? `<p class="text-sm text-base-content/60 leading-relaxed">${linkify(cleanSummary(d.context))}</p>` : ''}
+                        ${d.context ? `<p class="text-sm text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(d.context))}</p>` : ''}
                         ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
-                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
+                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300" dir="auto">${renderItemValue(det)}</div>`
                         ).join('')}</div>` : ''}
                         ${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1"><span class="material-symbols-rounded text-sm">map</span> View on Map</a>` : ''}
                     </div>`;
@@ -2045,13 +2045,13 @@
                         ${d.category ? `<div class="absolute top-2 left-2"><span class="badge badge-sm badge-primary">${esc(d.category)}</span></div>` : ''}
                     </figure>` : ''}
                     <div class="p-4">
-                        <h3 class="font-bold text-base text-white mb-1 leading-tight">${esc(newsHeadline)}</h3>
+                        <h3 class="font-bold text-base text-white mb-1 leading-tight" dir="auto">${esc(newsHeadline)}</h3>
                         <div class="flex items-center gap-2 text-xs text-base-content/40 mb-2">
                             <span class="font-semibold">${esc(newsSource)}</span>
                             ${newsDate ? `<span>·</span><span>${esc(newsDate)}</span>` : ''}
                         </div>
-                        ${newsSummary ? `<p class="text-sm text-base-content/60 leading-relaxed">${linkify(cleanSummary(newsSummary))}</p>` : ''}
-                        ${d.relatedContext ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg">💡 ${linkify(cleanSummary(d.relatedContext))}</div>` : ''}
+                        ${newsSummary ? `<p class="text-sm text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(newsSummary))}</p>` : ''}
+                        ${d.relatedContext ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg" dir="auto">💡 ${linkify(cleanSummary(d.relatedContext))}</div>` : ''}
                         ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Read article</a>` : ''}
                     </div>`;
                 }
@@ -2122,8 +2122,8 @@
                             <span class="text-xs font-bold uppercase tracking-wider text-primary">Did you know?</span>
                             ${d.category ? `<span class="badge badge-xs badge-outline">${esc(d.category)}</span>` : ''}
                         </div>
-                        <p class="text-sm leading-relaxed">${linkify(cleanSummary(d.fact || ''))}</p>
-                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg">${linkify(cleanSummary(d.context))}</div>` : ''}
+                        <p class="text-sm leading-relaxed" dir="auto">${linkify(cleanSummary(d.fact || d.quote || ''))}</p>
+                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg" dir="auto">${linkify(cleanSummary(d.context))}</div>` : ''}
                         ${d.sourceUrl && d.sourceUrl.startsWith('http') ? (() => { try { return `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>`; } catch(e) { return ''; } })() : ''}
                     </div>`;
                 }
@@ -2181,13 +2181,13 @@
                                     <span class="material-symbols-rounded ${si.cls} mt-0.5 text-lg">${si.icon}</span>
                                     <div class="min-w-0 flex-1">
                                         <div class="font-semibold text-sm">${esc(sObj.name || sObj.source || 'Source')}</div>
-                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed">${linkify(cleanSummary(sObj.snippet))}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : sStatus === 'inconclusive' || sStatus === 'unverified' || sStatus === 'needs_context' ? `<div class="text-xs text-warning/60 italic">Could not confirm or deny</div>` : sStatus === 'not_yet_reported' ? `<div class="text-xs text-base-content/30 italic">Not found in research</div>` : '')}
+                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed" dir="auto">${linkify(cleanSummary(sObj.snippet))}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : sStatus === 'inconclusive' || sStatus === 'unverified' || sStatus === 'needs_context' ? `<div class="text-xs text-warning/60 italic">Could not confirm or deny</div>` : sStatus === 'not_yet_reported' ? `<div class="text-xs text-base-content/30 italic">Not found in research</div>` : '')}
                                         ${hasUrl ? (() => { try { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>`; } catch(e) { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">source</a>`; } })() : ''}
                                     </div>
                                 </div>`;
                             }).join('')}
                         </div>
-                        ${d.summary ? `<div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300 rounded-lg leading-relaxed">${linkify(cleanSummary(d.summary))}</div>` : ''}
+                        ${d.summary ? `<div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300 rounded-lg leading-relaxed" dir="auto">${linkify(cleanSummary(d.summary))}</div>` : ''}
                         ${d.lastChecked ? `<div class="text-xs text-base-content/30 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-xs">schedule</span> Checked ${timeAgo(d.lastChecked) || esc(d.lastChecked)}</div>` : ''}
                     </div>`;
                 }
@@ -2205,7 +2205,7 @@
                             const translation = mObj.translation || mObj.translatedText || '';
                             return `<div class="chat ${isUser ? 'chat-end' : 'chat-start'}">
                                 <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${time ? `<time>${esc(time)}</time>` : ''}</div>
-                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm">${linkify(mObj.text || mObj.content || mObj.message || '')}${translation ? `<div class="border-t border-white/10 mt-1.5 pt-1.5 text-xs opacity-70 italic"><span class="not-italic">🌐</span> ${esc(translation)}</div>` : ''}</div>
+                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm" dir="auto">${linkify(mObj.text || mObj.content || mObj.message || '')}${translation ? `<div class="border-t border-white/10 mt-1.5 pt-1.5 text-xs opacity-70 italic"><span class="not-italic">🌐</span> ${esc(translation)}</div>` : ''}</div>
                             </div>`;
                         }).join('')}
                         </div>
@@ -2220,7 +2220,7 @@
                             <span class="material-symbols-rounded text-primary text-lg">map</span>
                             <span class="font-bold text-sm">${esc(d.name || 'Location')}</span>
                         </div>
-                        ${d.context ? `<p class="text-xs text-base-content/50">${linkify(d.context)}</p>` : ''}
+                        ${d.context ? `<p class="text-xs text-base-content/50" dir="auto">${linkify(d.context)}</p>` : ''}
                         ${mapsLink ? `<a href="${esc(mapsLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Open in Maps</a>` : ''}
                     </div>`;
                 }
