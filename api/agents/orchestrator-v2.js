@@ -603,6 +603,9 @@ async function runPipeline({
             ...(existing.populatedData || existing.data || existing.placeholderData || {}),
             ...safeData,
           };
+          if (existing.cardType === 'verification_card') {
+            mergedData.lastChecked = new Date().toISOString();
+          }
           existing.populatedData = mergedData;
           existing.data = mergedData;
           currentCards.set(action.cardId, existing);
@@ -878,12 +881,11 @@ async function runPipeline({
         const norm = normalizeSourceStatus(source.status);
         if (norm === 'checking') {
           source.status = 'not_yet_reported';
-          if (!source.snippet) source.snippet = 'Unable to verify — check source directly';
           anyStillChecking = true;
         }
       }
       if (anyStillChecking) {
-        const updatedData = { ...cardData, sources, status: cardData.status === 'searching' ? 'unconfirmed' : cardData.status };
+        const updatedData = { ...cardData, sources, status: cardData.status === 'searching' ? 'unconfirmed' : cardData.status, lastChecked: new Date().toISOString() };
         vCard.populatedData = updatedData;
         vCard.data = updatedData;
         currentCards.set(vCard.id, vCard);
@@ -959,6 +961,9 @@ async function runPipeline({
               ...(existing.populatedData || existing.data || existing.placeholderData || {}),
               ...safeData,
             };
+            if (existing.cardType === 'verification_card') {
+              mergedData.lastChecked = new Date().toISOString();
+            }
             existing.populatedData = mergedData;
             existing.data = mergedData;
             currentCards.set(action.cardId, existing);
