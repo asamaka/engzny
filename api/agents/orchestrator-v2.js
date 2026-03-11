@@ -327,10 +327,16 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
     const cardText = `${cardData.title || ''} ${cardData.name || ''} ${cardData.headline || ''} ${cardData.claim || ''} ${cardData.label || ''} ${cardData.fact || ''}`.toLowerCase();
     if (!cardText.trim()) continue;
 
-    const matchedFinding = researchFindings.find(f => {
+    const hasWordOverlap = (f) => {
       const fText = `${f.topic || ''} ${f.summary || ''}`.toLowerCase();
       return fText.split(/\s+/).some(w => w.length > 3 && cardText.includes(w));
-    });
+    };
+    const matchedFinding =
+      researchFindings.find(f => f.relatedCardTypes?.includes(card.cardType) && hasWordOverlap(f)) ||
+      researchFindings.find(f => {
+        if (card.cardType !== 'verification_card' && f.relatedCardTypes?.length && f.relatedCardTypes.every(t => t === 'verification_card')) return false;
+        return hasWordOverlap(f);
+      });
 
     if (!matchedFinding) continue;
 
