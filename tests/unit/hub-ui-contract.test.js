@@ -15,12 +15,15 @@ describe('Hub UI contract (Daisy-first)', () => {
     'demo.html',
   ];
 
-  test('head includes DaisyUI/Tailwind and no custom <style> blocks', () => {
+  test('head includes pre-built Tailwind+DaisyUI CSS and no custom <style> blocks', () => {
     const headMarkup = hubHtml.split('<body>')[0];
-    expect(headMarkup).toContain('cdn.jsdelivr.net/npm/daisyui@5/themes.css');
-    expect(headMarkup).toContain('cdn.jsdelivr.net/npm/daisyui@5');
-    expect(headMarkup).toContain('cdn.jsdelivr.net/npm/@tailwindcss/browser@4');
+    expect(headMarkup).toContain('/styles/output.css');
+    expect(headMarkup).not.toContain('@tailwindcss/browser');
     expect(headMarkup).not.toMatch(/<style[\s>]/i);
+  });
+
+  test('hub does NOT load Tailwind browser JIT (performance)', () => {
+    expect(hubHtml).not.toContain('@tailwindcss/browser');
   });
 
   test('hub contains no inline style attributes', () => {
@@ -44,14 +47,27 @@ describe('Hub UI contract (Daisy-first)', () => {
     expect(fnBody).not.toMatch(/<style>/i);
   });
 
-  test('secondary customer pages use Daisy/Tailwind with no style blocks', () => {
+  test('secondary customer pages use pre-built CSS with no style blocks', () => {
     for (const page of secondaryPages) {
       const html = fs.readFileSync(path.join(__dirname, '../../public', page), 'utf8');
-      expect(html).toContain('cdn.jsdelivr.net/npm/daisyui@5/themes.css');
-      expect(html).toContain('cdn.jsdelivr.net/npm/daisyui@5');
-      expect(html).toContain('cdn.jsdelivr.net/npm/@tailwindcss/browser@4');
+      expect(html).toContain('/styles/output.css');
+      expect(html).not.toContain('@tailwindcss/browser');
       expect(html).not.toMatch(/<style[\s>]/i);
     }
+  });
+
+  test('pre-built CSS file exists and is reasonably sized', () => {
+    const cssPath = path.join(__dirname, '../../public/styles/output.css');
+    expect(fs.existsSync(cssPath)).toBe(true);
+    const stat = fs.statSync(cssPath);
+    expect(stat.size).toBeGreaterThan(10000);
+    expect(stat.size).toBeLessThan(500000);
+  });
+
+  test('html2canvas is lazy-loaded, not in page head', () => {
+    const headMarkup = hubHtml.split('<body>')[0];
+    expect(headMarkup).not.toContain('html2canvas');
+    expect(hubHtml).toContain('function loadHtml2Canvas()');
   });
 });
 

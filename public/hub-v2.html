@@ -6,14 +6,10 @@
     <title>thinx.fun</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
-    <!-- DaisyUI 5 + Tailwind CSS 4 (CDN, no build step) -->
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
-    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+    <!-- Pre-built Tailwind CSS 4 + DaisyUI 5 (static, no runtime JIT) -->
+    <link href="/styles/output.css" rel="stylesheet" type="text/css" />
 </head>
 <body>
     <!--
@@ -446,6 +442,7 @@
         // (~2MB base64) for fast mobile uploads and safe headroom.
         // Claude vision processes at 1568px max anyway — no quality loss.
         const UPLOAD_TARGET_SIZE = 1.5 * 1024 * 1024;
+        const VERCEL_BODY_HARD_LIMIT = 3.5 * 1024 * 1024;
 
         function loadImageEl(src) {
             return new Promise((resolve, reject) => {
@@ -564,12 +561,24 @@
             pasteState.classList.add('hidden');
             mainCanvas.classList.remove('hidden');
             progressOverlay.classList.remove('hidden');
-            updateProgress(0, 'UPLOADING', 'Compressing...');
+            updateProgress(0, 'UPLOADING', 'Optimizing...');
 
-            try {
-                blob = await compressImage(blob);
-            } catch (e) {
-                console.warn('Compression failed, using original:', e);
+            if (blob.size > UPLOAD_TARGET_SIZE) {
+                try {
+                    blob = await compressImage(blob);
+                } catch (e) {
+                    console.warn('Compression failed, trying fallback:', e);
+                    try {
+                        blob = await emergencyCompress(blob);
+                    } catch (e2) {
+                        console.warn('Emergency compression also failed:', e2);
+                    }
+                }
+            }
+
+            if (blob.size > VERCEL_BODY_HARD_LIMIT) {
+                showError('Image is too large (' + Math.round(blob.size / 1024 / 1024) + 'MB). Try a smaller screenshot.');
+                return;
             }
 
             currentThumbBase64 = await generateThumbnail(blob);
@@ -582,6 +591,25 @@
                 startPipeline(currentImageBase64);
             };
             reader.readAsDataURL(blob);
+        }
+
+        async function emergencyCompress(blob) {
+            const url = URL.createObjectURL(blob);
+            try {
+                const img = await loadImageEl(url);
+                const canvas = document.createElement('canvas');
+                const maxDim = 800;
+                let w = img.naturalWidth, h = img.naturalHeight;
+                const s = Math.min(maxDim / w, maxDim / h, 1);
+                canvas.width = Math.round(w * s);
+                canvas.height = Math.round(h * s);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                return new Promise((resolve, reject) =>
+                    canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/jpeg', 0.3)
+                );
+            } finally {
+                URL.revokeObjectURL(url);
+            }
         }
 
         // === Telemetry ===
@@ -1429,6 +1457,17 @@
             });
         }
 
+        function loadHtml2Canvas() {
+            if (typeof html2canvas !== 'undefined') return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                s.onload = resolve;
+                s.onerror = () => reject(new Error('html2canvas load failed'));
+                document.head.appendChild(s);
+            });
+        }
+
         function captureViaHtml2Canvas(target) {
             if (typeof html2canvas === 'undefined') return Promise.reject(new Error('not loaded'));
             const origElements = [target, ...target.querySelectorAll('*')];
@@ -1500,8 +1539,9 @@
                 console.warn('[RenderCapture] foreignObject failed:', e.message);
             }
 
-            // Method 2: html2canvas with aggressive style inlining (strip stylesheets, inline all)
+            // Method 2: html2canvas (lazy-loaded) with aggressive style inlining
             try {
+                await loadHtml2Canvas();
                 const dataUrl = await captureViaHtml2Canvas(target);
                 if (dataUrl && dataUrl.length > 1000) {
                     console.log('[RenderCapture] html2canvas succeeded, size:', Math.round(dataUrl.length / 1024), 'KB');

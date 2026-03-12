@@ -104,10 +104,13 @@ public/
   hub-v2.html                 # Main page (served at /)
   keypoints.html              # Keypoint card navigation view
   canvas.html                 # GIUE canvas view
+  styles/
+    input.css                 # Tailwind CSS source (imports tailwindcss + daisyui)
+    output.css                # Pre-built CSS (committed, rebuild with `npm run build:css`)
 
 tests/
-  unit/                       # 127 unit tests (mocked)
-  integration/                # 3 health checks (real API)
+  unit/                       # Unit tests (mocked)
+  integration/                # Health checks (real API)
 ```
 
 ## Key Endpoints
@@ -191,12 +194,15 @@ editorial, dashboard, product_showcase, social_feed, investigation, simple
 ## Testing
 
 ```bash
-npm test              # All 108 tests (must pass before deploy)
+npm test              # All tests (must pass before deploy)
 npm run test:unit     # Unit tests only (fast, mocked)
 npm run test:health   # Integration health checks (real API)
+npm run build:css     # Rebuild Tailwind CSS (after changing HTML classes)
 ```
 
 Tests MUST pass before any deployment. Run `npx jest --forceExit` if tests hang.
+
+The `frontend-performance.test.js` suite enforces performance budgets (no browser JIT, CSS size limits, no render-blocking scripts). If you add new Tailwind classes, run `npm run build:css` to regenerate `public/styles/output.css`.
 
 ## Deployment
 

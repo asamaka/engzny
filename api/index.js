@@ -5,7 +5,11 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const Anthropic = require('@anthropic-ai/sdk').default;
-const sharp = require('sharp');
+let _sharp = null;
+function getSharp() {
+  if (!_sharp) _sharp = require('sharp');
+  return _sharp;
+}
 const { ClaudeAdapter } = require('./llm/claude');
 const { logger } = require('./lib/logger');
 
@@ -2124,7 +2128,7 @@ async function compressImageForAPI(imageBuffer, mediaType) {
 
   console.log(`Image size ${(originalSize / 1024 / 1024).toFixed(2)}MB exceeds limit, compressing...`);
 
-  let sharpInstance = sharp(imageBuffer);
+  let sharpInstance = getSharp()(imageBuffer);
   const metadata = await sharpInstance.metadata();
   
   // Start with the original dimensions
@@ -2151,7 +2155,7 @@ async function compressImageForAPI(imageBuffer, mediaType) {
     const height = Math.round(targetHeight * scale);
     
     for (const quality of qualityLevels) {
-      sharpInstance = sharp(imageBuffer)
+      sharpInstance = getSharp()(imageBuffer)
         .resize(width, height, {
           fit: 'inside',
           withoutEnlargement: true,
@@ -2215,7 +2219,7 @@ async function compressImageForAPI(imageBuffer, mediaType) {
 
   // Last resort: aggressive compression
   console.log('Using aggressive compression as last resort');
-  const finalBuffer = await sharp(imageBuffer)
+  const finalBuffer = await getSharp()(imageBuffer)
     .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 35, mozjpeg: true })
     .toBuffer();
@@ -2714,8 +2718,14 @@ app.get('/api/jobs', async (req, res) => {
   res.json({ jobs, count: jobs.length });
 });
 
-// Error handling middleware for multer
+// Error handling middleware
 app.use((error, req, res, next) => {
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: 'Image too large for upload',
+      message: 'The image exceeds the server limit. Try a smaller screenshot or lower resolution.',
+    });
+  }
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({

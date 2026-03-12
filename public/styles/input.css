@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@plugin "daisyui" {
+  themes: night -- business -- dim -- synthwave -- dracula -- coffee -- autumn -- emerald -- forest -- abyss -- nord -- sunset;
+}
