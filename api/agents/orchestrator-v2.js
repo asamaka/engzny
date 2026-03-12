@@ -139,6 +139,23 @@ const KNOWN_SOURCE_NAMES = {
   'economist.com': 'The Economist', 'foreignpolicy.com': 'Foreign Policy',
   'euronews.com': 'Euronews', 'theintercept.com': 'The Intercept',
   'sputniknews.com': 'Sputnik', 'tass.com': 'TASS',
+  'news.cn': 'Xinhua', 'english.news.cn': 'Xinhua',
+  'cgtn.com': 'CGTN', 'news.cgtn.com': 'CGTN',
+  'chinadaily.com.cn': 'China Daily', 'globaltimes.cn': 'Global Times',
+  'i24news.tv': 'i24 News', 'gulfnews.com': 'Gulf News',
+  'gmanetwork.com': 'GMA Network', 'airwaysmag.com': 'Airways Magazine',
+  'kfgo.com': 'KFGO', 'palwatch.org': 'Palestinian Media Watch',
+  'majalla.com': 'The Majalla', 'en.majalla.com': 'The Majalla',
+  'merip.org': 'MERIP', 'wionews.com': 'WION',
+  'timesnownews.com': 'Times Now', 'news18.com': 'CNN-News18',
+  'livemint.com': 'Mint', 'deccanherald.com': 'Deccan Herald',
+  'straitstimes.com': 'Straits Times', 'channelnewsasia.com': 'CNA',
+  '9news.com.au': '9 News Australia', 'smh.com.au': 'Sydney Morning Herald',
+  'irishexaminer.com': 'Irish Examiner', 'irishtimes.com': 'Irish Times',
+  'asahi.com': 'Asahi Shimbun', 'mainichi.jp': 'Mainichi',
+  'yomiuri.co.jp': 'Yomiuri Shimbun',
+  'presstv.ir': 'Press TV', 'irna.ir': 'IRNA',
+  'english.alarabiya.net': 'Al Arabiya English',
 };
 
 const GENERIC_PLATFORMS = new Set([
@@ -153,6 +170,8 @@ function isGenericPlatform(host) {
   return GENERIC_PLATFORMS.has(h) || GENERIC_PLATFORMS.has(h.split('.').slice(-2).join('.'));
 }
 
+const COMPOUND_SUFFIXES = /^(.+?)(news|times|post|media|online|wire|today|daily|world|press|mag|monitor|gazette|herald|tribune|journal|report|watch|insider|standard|observer|review|digest|channel|network)$/i;
+
 /**
  * Convert a hostname to a human-friendly source name.
  * Uses a known-sources map for major outlets, falls back to cleaned hostname.
@@ -162,10 +181,19 @@ function hostToSourceName(host) {
   if (KNOWN_SOURCE_NAMES[h]) return KNOWN_SOURCE_NAMES[h];
   const withoutSub = h.split('.').slice(-2).join('.');
   if (KNOWN_SOURCE_NAMES[withoutSub]) return KNOWN_SOURCE_NAMES[withoutSub];
+  const threeLevel = h.split('.').slice(-3).join('.');
+  if (KNOWN_SOURCE_NAMES[threeLevel]) return KNOWN_SOURCE_NAMES[threeLevel];
   const stripped = h
     .replace(/\.(com|org|net|co|gov|edu|ac)\.[a-z]{2}$/i, '')
     .replace(/\.[a-z]{2,6}$/i, '');
   const name = stripped.split('.').pop();
+  const m = name.match(COMPOUND_SUFFIXES);
+  if (m) {
+    const prefix = m[1].charAt(0).toUpperCase() + m[1].slice(1).toLowerCase();
+    const suffix = m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase();
+    return `${prefix} ${suffix}`;
+  }
+  if (name.length <= 4) return name.toUpperCase();
   return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
