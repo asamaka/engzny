@@ -32,6 +32,17 @@ function stripFabricatedImageUrls(data) {
   return cleaned;
 }
 
+function isValidUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  if (/\s/.test(url)) return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 const RESEARCH_WORTHY_TYPES = new Set([
   'breaking_news', 'news', 'emergency', 'sports', 'science',
   'health', 'finance', 'tech', 'social_media',
@@ -209,6 +220,12 @@ function cleanResearchData(researchResult) {
     if (cleaned.summary) cleaned.summary = stripCitationMarkers(cleaned.summary);
     if (cleaned.details) cleaned.details = stripCitationMarkers(cleaned.details);
     if (cleaned.topic) cleaned.topic = stripCitationMarkers(cleaned.topic);
+    if (cleaned.imageUrl && !isValidUrl(cleaned.imageUrl)) {
+      delete cleaned.imageUrl;
+    }
+    if (cleaned.sourceUrls && Array.isArray(cleaned.sourceUrls)) {
+      cleaned.sourceUrls = cleaned.sourceUrls.filter(u => isValidUrl(u));
+    }
     if (cleaned.factCheck) {
       cleaned.factCheck = { ...cleaned.factCheck };
       if (cleaned.factCheck.explanation) cleaned.factCheck.explanation = stripCitationMarkers(cleaned.factCheck.explanation);
@@ -398,7 +415,7 @@ function applyResearchToCards({ currentCards, researchFindings, onCardUpdate }) 
       changed = true;
     }
 
-    if (matchedFinding.imageUrl && !cardData.imageUrl) {
+    if (matchedFinding.imageUrl && !cardData.imageUrl && isValidUrl(matchedFinding.imageUrl)) {
       const imageCardTypes = new Set(['person_card', 'location_card', 'news_card', 'hero_summary', 'product_card']);
       if (imageCardTypes.has(card.cardType)) {
         updates.imageUrl = matchedFinding.imageUrl;
