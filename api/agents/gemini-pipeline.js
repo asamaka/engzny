@@ -1,15 +1,15 @@
 /**
- * Gemini Flash Sequential Pipeline
+ * Gemini Flash-Lite Sequential Pipeline
  *
  * A simpler alternative to the multi-agent orchestrator that sends
- * the screenshot image to Gemini 2.5 Flash for every step, sequentially.
+ * the screenshot image to Gemini 3.1 Flash-Lite for every step, sequentially.
  *
  * Flow:
- *   1. Classify — Gemini Flash sees the screenshot, returns content type +
- *      layout + card list with hero data. (~1-3s)
- *   2. Populate — For each non-hero card, Gemini Flash sees the screenshot
+ *   1. Classify — Gemini Flash-Lite sees the screenshot, returns content type +
+ *      layout + card list with hero data.
+ *   2. Populate — For each non-hero card, Gemini Flash-Lite sees the screenshot
  *      again and populates that card's fields. Cards fire one at a time
- *      via SSE as each completes. (~2-4s per card, sequential)
+ *      via SSE as each completes.
  *
  * The screenshot is sent with EVERY call so Gemini can always reference
  * the original image when extracting data.
@@ -150,7 +150,7 @@ function createSkeletonBlueprint() {
         cardType: 'hero_summary',
         gridPosition: { row: 1, column: 1, columnSpan: 1, rowSpan: 1 },
         researchBrief: '',
-        placeholderData: { title: 'Analyzing screenshot...', subtitle: 'Using Gemini Flash' },
+        placeholderData: { title: 'Analyzing screenshot...', subtitle: 'Using Gemini Flash-Lite' },
         status: 'placeholder',
       },
       {
@@ -234,7 +234,7 @@ function stripFabricatedImageUrls(data) {
 // ─── Main Pipeline ──────────────────────────────────────────────────
 
 /**
- * Run the Gemini Flash sequential pipeline.
+ * Run the Gemini Flash-Lite sequential pipeline.
  *
  * Callback contract (all optional, same as orchestrator-v2):
  *   onBlueprint(blueprint)       — Instant skeleton
@@ -273,20 +273,20 @@ async function runGeminiPipeline({
     if (onBlueprint) onBlueprint(skeleton);
 
     if (onProgress) {
-      onProgress({ phase: 'classifying', progress: 5, message: 'Analyzing screenshot with Gemini Flash...' });
+      onProgress({ phase: 'classifying', progress: 5, message: 'Analyzing screenshot with Gemini Flash-Lite...' });
     }
 
-    // ─── Phase 1: Classify + Design Layout (Gemini Flash) ───
+    // ─── Phase 1: Classify + Design Layout (Gemini Flash-Lite) ─
     if (onPhase) {
-      onPhase({ phase: 'gemini-classify', message: 'Gemini Flash classification...' });
+      onPhase({ phase: 'gemini-classify', message: 'Gemini Flash-Lite classification...' });
     }
 
     const gemini = getAdapter('gemini', {
-      model: adapterConfig.geminiModel || 'gemini-2.5-flash',
+      model: adapterConfig.geminiModel || 'gemini-3.1-flash-lite-preview',
       maxTokens: 4096,
     });
 
-    logger.info('GeminiPipeline', 'Phase 1: Gemini Flash Classification', {
+    logger.info('GeminiPipeline', 'Phase 1: Gemini Flash-Lite Classification', {
       model: gemini.model,
     });
 
@@ -324,7 +324,7 @@ async function runGeminiPipeline({
 
     const rawBlueprint = parseJSON(classifyResult.text);
     if (!rawBlueprint) {
-      throw new Error('Gemini Flash classification returned unparseable response');
+      throw new Error('Gemini Flash-Lite classification returned unparseable response');
     }
 
     const blueprint = normalizeBlueprint(rawBlueprint);
@@ -367,7 +367,7 @@ async function runGeminiPipeline({
 
     // ─── Phase 2: Populate each card sequentially ───────────
     if (onPhase) {
-      onPhase({ phase: 'populating', message: 'Populating cards with Gemini Flash...' });
+      onPhase({ phase: 'populating', message: 'Populating cards with Gemini Flash-Lite...' });
     }
 
     logger.info('GeminiPipeline', 'Phase 2: Sequential Card Population', {
@@ -508,7 +508,7 @@ async function runGeminiPipeline({
 
     if (populatedCount === 0) {
       const degradedError = new Error(
-        'Analysis could not be completed — Gemini Flash service is temporarily unavailable. Please try again.'
+        'Analysis could not be completed — Gemini Flash-Lite service is temporarily unavailable. Please try again.'
       );
       degradedError.code = 'ZERO_CARDS_POPULATED';
       logger.error('GeminiPipeline', 'Pipeline degraded — zero cards populated', { dur: totalDuration });

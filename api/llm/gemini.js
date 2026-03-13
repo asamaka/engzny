@@ -16,7 +16,7 @@ class GeminiAdapter extends LLMAdapter {
       throw new Error('GEMINI_API_KEY is required for GeminiAdapter');
     }
 
-    this.model = config.model || 'gemini-2.5-flash';
+    this.model = config.model || 'gemini-3.1-flash-lite-preview';
     this.maxTokens = config.maxTokens || 8192;
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
   }
@@ -103,20 +103,17 @@ class GeminiAdapter extends LLMAdapter {
   }
 
   async generateText({ prompt, systemPrompt, maxTokens }) {
-    const parts = [];
-    if (systemPrompt) {
-      parts.push({ text: `${systemPrompt}\n\n${prompt}` });
-    } else {
-      parts.push({ text: prompt });
-    }
-
     const body = {
-      contents: [{ role: 'user', parts }],
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
         temperature: 0.2,
         maxOutputTokens: maxTokens || this.maxTokens,
       },
     };
+
+    if (systemPrompt) {
+      body.system_instruction = { parts: [{ text: systemPrompt }] };
+    }
 
     return this._callApi(body);
   }
