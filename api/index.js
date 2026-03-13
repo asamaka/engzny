@@ -2852,7 +2852,7 @@ app.get('/api/r/:requestId/thumb', requirePin, async (req, res) => {
 // Render capture — save device screenshot, DOM snapshot, and client state (open endpoint like client-report)
 app.post('/api/hub/v2/render-capture', async (req, res) => {
   try {
-    const { requestId, image, domSnapshot, cardHtml, clientState, fallback } = req.body || {};
+    const { requestId, image, domSnapshot, cardHtml, clientState, captureMetadata, fallback } = req.body || {};
     if (!requestId) {
       return res.status(400).json({ error: 'requestId required' });
     }
@@ -2870,16 +2870,15 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
       if (sizeKB > 2048) {
         return res.status(413).json({ error: 'Image too large (max 2MB)' });
       }
-      renderMethod = 'client';
+      renderMethod = captureMetadata?.method || 'client';
     }
 
-    // Build a renderable HTML document from whatever the client sent
     let htmlToRender = domSnapshot || null;
     if (!htmlToRender && cardHtml) {
       htmlToRender = buildCardViewHtml(cardHtml, clientState);
     }
 
-    // Server-side render with Puppeteer if we have HTML but no client image
+    // Only fall back to server-side render if client sent no image AND we have HTML
     if (!base64 && htmlToRender) {
       try {
         const snapshotRenderer = require('./lib/snapshot-renderer');
@@ -2888,23 +2887,30 @@ app.post('/api/hub/v2/render-capture', async (req, res) => {
           base64 = rendered;
           sizeKB = Math.round(base64.length * 0.75 / 1024);
           renderMethod = 'server-puppeteer';
-          logger.info('RenderCapture', 'Server-side render succeeded', { requestId, sizeKB });
         }
       } catch (err) {
         logger.warn('RenderCapture', 'Server-side render failed', { requestId, err: err.message });
       }
     }
 
-    if (base64) {
-      await liveReports.saveRenderCapture(requestId, base64, { domSnapshot: htmlToRender, clientState });
-    } else if (htmlToRender || clientState) {
-      await liveReports.saveRenderCapture(requestId, '', { domSnapshot: htmlToRender, clientState });
+    // Merge capture metadata into client state for storage
+    const enrichedClientState = clientState ? { ...clientState } : {};
+    if (captureMetadata) {
+      enrichedClientState.captureMetadata = captureMetadata;
     }
 
-    logger.info('RenderCapture', 'Saved render capture', {
+    if (base64) {
+      await liveReports.saveRenderCapture(requestId, base64, { domSnapshot: htmlToRender, clientState: enrichedClientState });
+    } else if (htmlToRender || Object.keys(enrichedClientState).length) {
+      await liveReports.saveRenderCapture(requestId, '', { domSnapshot: htmlToRender, clientState: enrichedClientState });
+    }
+
+    logger.info('RenderCapture', 'Saved', {
       requestId, sizeKB, renderMethod,
-      hasCardHtml: !!cardHtml, hasDomSnapshot: !!domSnapshot,
-      hasClientState: !!clientState,
+      captureMethod: captureMetadata?.method,
+      viewportCropped: captureMetadata?.viewportCropped,
+      captureDelayMs: captureMetadata?.captureDelayMs,
+      methodsAttempted: captureMetadata?.methods?.length,
       viewport: clientState?.viewport ? `${clientState.viewport.width}x${clientState.viewport.height}` : null,
     });
     res.json({ ok: true, sizeKB, renderMethod });
@@ -3277,7 +3283,24 @@ function getLiveReportViewerHtml(requestId, report, thumbBase64, isAuthenticated
       + '<div class="dm-item"><span class="dm-label">Cards rendered</span><span class="dm-value">'
         + (clientState?.cards ? clientState.cards.populated + '/' + clientState.cards.total + (clientState.cards.loading ? ' (' + clientState.cards.loading + ' loading)' : '') + (clientState.cards.errored ? ' <span style="color:var(--r)">(' + clientState.cards.errored + ' errored)</span>' : '') : cards.length)
         + '</span></div>'
-      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (renderCapture ? 'Rendered screenshot' : hasDomSnapshot ? 'DOM snapshot (live render)' : 'Not available') + '</span></div>'
+      + '<div class="dm-item"><span class="dm-label">Capture</span><span class="dm-value">' + (() => {
+          if (!renderCapture && !hasDomSnapshot) return 'Not available';
+          const cm = clientState?.captureMetadata;
+          if (cm?.method) {
+            let label = cm.method;
+            if (cm.viewportCropped) label += ' (viewport)';
+            if (cm.captureDelayMs) label += ' @ ' + cm.captureDelayMs + 'ms';
+            return label;
+          }
+          return renderCapture ? 'Client screenshot' : 'DOM snapshot (live render)';
+        })() + '</span></div>'
+      + (() => {
+          const cm = clientState?.captureMetadata;
+          if (!cm?.methods?.length) return '';
+          return '<div class="dm-item"><span class="dm-label">Methods tried</span><span class="dm-value" style="font-size:.65rem">'
+            + cm.methods.map(m => '<span style="color:' + (m.success ? 'var(--g)' : 'var(--r)') + '">' + esc(m.method) + (m.success ? ' ✓' : ' ✗') + (m.sizeKB ? ' ' + m.sizeKB + 'KB' : '') + (m.durationMs ? ' ' + m.durationMs + 'ms' : '') + '</span>').join(' → ')
+            + '</span></div>';
+        })()
       + '</div>'
       + '</div>'
 
