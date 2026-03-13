@@ -64,10 +64,11 @@ describe('Hub UI contract (Daisy-first)', () => {
     expect(stat.size).toBeLessThan(500000);
   });
 
-  test('html2canvas is lazy-loaded, not in page head', () => {
+  test('capture libraries are lazy-loaded, not in page head', () => {
     const headMarkup = hubHtml.split('<body>')[0];
     expect(headMarkup).not.toContain('html2canvas');
-    expect(hubHtml).toContain('function loadHtml2Canvas()');
+    expect(headMarkup).not.toContain('dom-to-image');
+    expect(hubHtml).toContain('function loadDomToImage()');
   });
 });
 

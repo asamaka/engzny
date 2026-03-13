@@ -21,86 +21,69 @@ function renderReflection(report) {
 
   const lines = [];
 
-  // What the screenshot contained
+  // Error case — most important, show first
+  if (report.outcome === 'error') {
+    lines.push(`<span style="color:var(--r)">This pipeline failed with error: <strong>${esc(report.error)}</strong>. The user saw an error state instead of cards.</span>`);
+    return lines;
+  }
+
+  // Expected vs Actual framing
   if (ca.contentType || ca.platform) {
-    let what = `The screenshot contained <strong>${esc(ca.contentType || 'content')}</strong>`;
-    if (ca.platform) what += ` from <strong>${esc(ca.platform)}</strong>`;
-    what += '.';
-    if (ca.intent) what += ` The user likely wanted to know: ${esc(ca.intent)}.`;
-    lines.push(what);
+    let expected = `<strong>Input:</strong> A screenshot of <strong>${esc(ca.contentType || 'content')}</strong>`;
+    if (ca.platform) expected += ` from <strong>${esc(ca.platform)}</strong>`;
+    expected += '.';
+    if (ca.intent) expected += ` The user likely wanted: <em>${esc(ca.intent)}</em>.`;
+    lines.push(expected);
   }
 
-  // Layout choice reasoning
-  if (report.layout?.reason) {
-    lines.push(`The system chose a <strong>${esc(report.layout.type)}</strong> layout: ${esc(report.layout.reason)}.`);
-  }
-
-  // Card selection analysis
   if (cardTypes.length > 0) {
-    const hasFactCheck = cardTypes.includes('fact_check');
-    const hasWarning = cardTypes.includes('warning_card');
-    const hasAction = cardTypes.includes('action_card');
-    const hasTimeline = cardTypes.includes('timeline_card');
-    const hasLocation = cardTypes.includes('location_card');
-    const hasPerson = cardTypes.includes('person_card');
-
-    let cardReflection = `<strong>${cards.length} cards</strong> were generated. `;
-    const highlights = [];
-    if (hasFactCheck) highlights.push('a fact-check to verify claims');
-    if (hasWarning) highlights.push('a warning to flag potential issues');
-    if (hasAction) highlights.push('actionable next steps');
-    if (hasTimeline) highlights.push('a timeline of events');
-    if (hasLocation) highlights.push('location context');
-    if (hasPerson) highlights.push('person background');
-    if (highlights.length > 0) {
-      cardReflection += 'The selection includes ' + highlights.join(', ') + ' — ';
-      cardReflection += 'providing a well-rounded analysis beyond just summarising the content.';
-    }
-    lines.push(cardReflection);
+    let output = `<strong>Output:</strong> <strong>${cards.length} cards</strong> (${cardTypes.map(t => t.replace(/_/g, ' ')).join(', ')})`;
+    if (report.layout?.type) output += ` in a <strong>${esc(report.layout.type)}</strong> layout`;
+    output += '.';
+    lines.push(output);
   }
 
-  // Performance reflection
-  if (duration) {
-    let perf = `Total pipeline took <strong>${fmtMs(duration)}</strong>`;
-    if (haikuDur) {
-      perf += ` (Haiku quick cards in ${fmtMs(haikuDur)}`;
-      if (enhanceDur) perf += `, Sonnet enhancement in ${fmtMs(enhanceDur)}`;
-      if (researchDur) perf += `, deep research in ${fmtMs(researchDur)}`;
-      perf += ')';
-    } else if (designDur) {
-      perf += ` (${fmtMs(designDur)} designing layout, ${fmtMs(researchDur)} researching cards in parallel)`;
-    }
-    perf += '.';
-    if (haikuDur && haikuDur < 5000) {
-      perf += ' Users saw real cards within seconds — great first-impression speed.';
-    } else if (duration > 30000) {
-      perf += ' This is on the slower side — but users saw initial cards quickly via Haiku.';
-    } else if (duration < 15000) {
-      perf += ' This is fast — good user experience with minimal wait time.';
-    } else {
-      perf += ' Reasonable performance for a thorough analysis.';
-    }
-    lines.push(perf);
-  }
-
-  // Quality checks on card data
+  // Quality gap analysis
+  const issues = [];
   const emptyCards = cards.filter(c => {
     const d = c.data || {};
     return Object.keys(d).length === 0 || (!d.title && !d.name && !d.claim && !d.quote && !d.label);
   });
   if (emptyCards.length > 0) {
-    lines.push(`<span style="color:var(--y)">${emptyCards.length} card(s) appear to have minimal or missing data, which may have resulted in empty-looking cards for the user.</span>`);
+    issues.push(`${emptyCards.length} card(s) have minimal or missing data`);
+  }
+
+  const verificationCard = cards.find(c => c.cardType === 'verification_card');
+  if (verificationCard?.data) {
+    const sources = verificationCard.data.sources || [];
+    const checking = sources.filter(s => (typeof s === 'object' ? s.status : '') === 'checking').length;
+    if (checking > 0 && checking === sources.length) {
+      issues.push('all verification sources still show "checking"');
+    }
+  }
+
+  if (issues.length > 0) {
+    lines.push(`<strong>Gap:</strong> <span style="color:var(--y)">${issues.join('; ')}.</span>`);
+  } else if (cardTypes.length > 0) {
+    lines.push('<strong>Gap:</strong> <span style="color:var(--g)">Output appears complete and relevant to the input.</span>');
+  }
+
+  // Performance
+  if (duration) {
+    let perf = `<strong>Performance:</strong> ${fmtMs(duration)} total`;
+    if (haikuDur) perf += ` (first cards in ${fmtMs(haikuDur)}`;
+    if (enhanceDur) perf += `, enhance ${fmtMs(enhanceDur)}`;
+    if (researchDur) perf += `, research ${fmtMs(researchDur)}`;
+    if (haikuDur) perf += ')';
+    perf += '.';
+    if (duration > 30000) perf += ' <span style="color:var(--y)">Slow — investigate pipeline bottleneck.</span>';
+    lines.push(perf);
   }
 
   // Top questions
   if (ca.topQuestions?.length > 0) {
-    lines.push(`The AI identified these key questions the user might have:<br>` +
+    lines.push(`<strong>Key questions identified:</strong><br>` +
       ca.topQuestions.map((q, i) => `&nbsp;&nbsp;${i + 1}. ${esc(q)}`).join('<br>'));
-  }
-
-  // Error case
-  if (report.outcome === 'error') {
-    lines.push(`<span style="color:var(--r)">This pipeline failed with error: <strong>${esc(report.error)}</strong>. The user saw an error state instead of cards.</span>`);
   }
 
   return lines;

@@ -21,9 +21,10 @@ describe('Frontend performance budget', () => {
     expect(hubHtml).not.toContain('@tailwindcss/browser');
   });
 
-  test('html2canvas is lazy-loaded, not eagerly fetched', () => {
+  test('capture libraries are lazy-loaded, not eagerly fetched', () => {
     const head = hubHtml.split('</head>')[0];
     expect(head).not.toContain('html2canvas');
+    expect(head).not.toContain('dom-to-image');
   });
 
   test('pre-built CSS exists and is under 200KB', () => {

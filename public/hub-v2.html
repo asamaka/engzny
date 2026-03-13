@@ -1357,8 +1357,8 @@
                 }
             } catch (e) { /* sendBeacon is best-effort */ }
 
-            // Also try the full async capture as a bonus (image + inlined DOM snapshot)
-            setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 500);
+            // Capture what the user actually sees — viewport-clipped screenshot
+            setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 300);
         }
 
         const CAPTURE_STYLE_PROPS = [
@@ -1405,8 +1405,8 @@
             return clone;
         }
 
-        function sendRenderCapture(rid, image, domSnapshot, clientState, method) {
-            const payload = { requestId: rid, domSnapshot, clientState };
+        function sendRenderCapture(rid, image, domSnapshot, clientState, captureMetadata) {
+            const payload = { requestId: rid, domSnapshot, clientState, captureMetadata };
             if (image) payload.image = image;
             else payload.fallback = true;
             fetch('/api/hub/v2/render-capture', {
@@ -1415,15 +1415,20 @@
                 body: JSON.stringify(payload),
             }).then(r => {
                 if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
-                else console.log('[RenderCapture] Saved via', method);
+                else r.json().then(d => console.log('[RenderCapture] Saved:', d.renderMethod, d.sizeKB + 'KB'));
             }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
         }
 
-        function captureViaForeignObject(target) {
+        function captureViaForeignObject(target, opts = {}) {
             const w = target.scrollWidth;
-            const h = Math.min(target.scrollHeight, 4096);
+            const maxH = opts.viewportCrop ? window.innerHeight : 4096;
+            const scrollTop = opts.viewportCrop ? (window.scrollY || 0) : 0;
+            const h = Math.min(target.scrollHeight - scrollTop, maxH);
             const scale = Math.min(window.devicePixelRatio || 2, 2);
             const clone = prepareCloneForCapture(target);
+            if (opts.viewportCrop) {
+                clone.style.marginTop = '-' + scrollTop + 'px';
+            }
             clone.style.width = w + 'px';
             clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
             const xhtml = new XMLSerializer().serializeToString(clone);
@@ -1457,58 +1462,34 @@
             });
         }
 
-        function loadHtml2Canvas() {
-            if (typeof html2canvas !== 'undefined') return Promise.resolve();
+        function loadDomToImage() {
+            if (typeof domtoimage !== 'undefined') return Promise.resolve();
             return new Promise((resolve, reject) => {
                 const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+                s.src = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.5/dist/dom-to-image-more.min.js';
                 s.onload = resolve;
-                s.onerror = () => reject(new Error('html2canvas load failed'));
+                s.onerror = () => reject(new Error('dom-to-image-more load failed'));
                 document.head.appendChild(s);
             });
         }
 
-        function captureViaHtml2Canvas(target) {
-            if (typeof html2canvas === 'undefined') return Promise.reject(new Error('not loaded'));
-            const origElements = [target, ...target.querySelectorAll('*')];
-            const styleCache = origElements.map(el => {
-                const cs = getComputedStyle(el);
-                const s = {};
-                CAPTURE_STYLE_PROPS.forEach(p => { s[p] = cs[p]; });
-                return s;
+        function captureViaDomToImage(target, opts = {}) {
+            if (typeof domtoimage === 'undefined') return Promise.reject(new Error('not loaded'));
+            const maxH = opts.viewportCrop ? window.innerHeight : Math.min(target.scrollHeight, 4096);
+            return domtoimage.toJpeg(target, {
+                quality: 0.82,
+                bgcolor: '#0a0d12',
+                height: maxH,
+                style: { opacity: '1', transform: 'none' },
             });
-            return html2canvas(target, {
-                backgroundColor: '#0a0d12',
-                scale: Math.min(window.devicePixelRatio || 2, 2),
-                logging: false,
-                useCORS: true,
-                allowTaint: true,
-                width: target.scrollWidth,
-                height: Math.min(target.scrollHeight, 4096),
-                windowWidth: target.scrollWidth,
-                windowHeight: target.scrollHeight,
-                onclone: (clonedDoc) => {
-                    clonedDoc.querySelectorAll('style, link[rel="stylesheet"]').forEach(s => s.remove());
-                    const ct = clonedDoc.getElementById('resultsOverlay');
-                    if (!ct) return;
-                    ct.style.opacity = '1';
-                    ct.style.transform = 'none';
-                    const clonedEls = [ct, ...ct.querySelectorAll('*')];
-                    for (let i = 0; i < clonedEls.length && i < styleCache.length; i++) {
-                        const s = styleCache[i];
-                        CAPTURE_STYLE_PROPS.forEach(p => { if (s[p] !== undefined && s[p] !== '') clonedEls[i].style[p] = s[p]; });
-                    }
-                },
-            }).then(canvas => canvas.toDataURL('image/jpeg', 0.82));
         }
 
         async function captureRenderedCards() {
             const rid = telemetry.requestId;
-            if (!rid) {
-                console.warn('[RenderCapture] No requestId, skipping');
-                return;
-            }
+            if (!rid) return;
 
+            const captureStart = performance.now();
+            const methods = [];
             let clientState = null;
             let domSnapshot = null;
 
@@ -1519,43 +1500,88 @@
             }
 
             const target = resultsOverlay;
-            if (!target || !cardGrid.children.length) {
-                console.warn('[RenderCapture] No target or empty card grid');
-                return;
-            }
+            if (!target || !cardGrid.children.length) return;
 
-            try { clientState = collectClientState(); } catch (e) { console.warn('[RenderCapture] collectClientState error:', e.message); }
-            try { domSnapshot = serializeDomSnapshot(target); } catch (e) { console.warn('[RenderCapture] serializeDomSnapshot error:', e.message); }
+            try { clientState = collectClientState(); } catch (e) { /* best-effort */ }
+            try { domSnapshot = serializeDomSnapshot(target); } catch (e) { /* best-effort */ }
 
-            // Method 1: SVG foreignObject — browser's own renderer, no dependencies
+            // Method 1: foreignObject viewport crop — captures what the user actually sees
             try {
-                const dataUrl = await captureViaForeignObject(target);
+                const t0 = performance.now();
+                const dataUrl = await captureViaForeignObject(target, { viewportCrop: true });
+                const dur = Math.round(performance.now() - t0);
                 if (dataUrl && dataUrl.length > 1000) {
-                    console.log('[RenderCapture] foreignObject succeeded, size:', Math.round(dataUrl.length / 1024), 'KB');
-                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, 'foreignObject');
+                    methods.push({ method: 'foreignObject-viewport', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
+                    console.log('[RenderCapture] foreignObject-viewport succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
+                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
+                        method: 'foreignObject-viewport',
+                        viewportCropped: true,
+                        captureDelayMs: Math.round(performance.now() - captureStart),
+                        methods,
+                    });
                     return;
                 }
+                methods.push({ method: 'foreignObject-viewport', success: false, durationMs: dur });
             } catch (e) {
-                console.warn('[RenderCapture] foreignObject failed:', e.message);
+                methods.push({ method: 'foreignObject-viewport', success: false, error: e.message });
+                console.warn('[RenderCapture] foreignObject-viewport failed:', e.message);
             }
 
-            // Method 2: html2canvas (lazy-loaded) with aggressive style inlining
+            // Method 2: foreignObject full page
             try {
-                await loadHtml2Canvas();
-                const dataUrl = await captureViaHtml2Canvas(target);
+                const t0 = performance.now();
+                const dataUrl = await captureViaForeignObject(target, { viewportCrop: false });
+                const dur = Math.round(performance.now() - t0);
                 if (dataUrl && dataUrl.length > 1000) {
-                    console.log('[RenderCapture] html2canvas succeeded, size:', Math.round(dataUrl.length / 1024), 'KB');
-                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, 'html2canvas');
+                    methods.push({ method: 'foreignObject-full', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
+                    console.log('[RenderCapture] foreignObject-full succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
+                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
+                        method: 'foreignObject-full',
+                        viewportCropped: false,
+                        captureDelayMs: Math.round(performance.now() - captureStart),
+                        methods,
+                    });
                     return;
                 }
+                methods.push({ method: 'foreignObject-full', success: false, durationMs: dur });
             } catch (e) {
-                console.warn('[RenderCapture] html2canvas failed:', e.message);
+                methods.push({ method: 'foreignObject-full', success: false, error: e.message });
+                console.warn('[RenderCapture] foreignObject-full failed:', e.message);
             }
 
-            // Method 3: DOM snapshot only — always works, server renders as iframe in report
+            // Method 3: dom-to-image-more (lazy-loaded, lighter than html2canvas)
+            try {
+                const t0 = performance.now();
+                await loadDomToImage();
+                const dataUrl = await captureViaDomToImage(target, { viewportCrop: true });
+                const dur = Math.round(performance.now() - t0);
+                if (dataUrl && dataUrl.length > 1000) {
+                    methods.push({ method: 'dom-to-image', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
+                    console.log('[RenderCapture] dom-to-image succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
+                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
+                        method: 'dom-to-image',
+                        viewportCropped: true,
+                        captureDelayMs: Math.round(performance.now() - captureStart),
+                        methods,
+                    });
+                    return;
+                }
+                methods.push({ method: 'dom-to-image', success: false, durationMs: dur });
+            } catch (e) {
+                methods.push({ method: 'dom-to-image', success: false, error: e.message });
+                console.warn('[RenderCapture] dom-to-image failed:', e.message);
+            }
+
+            // Method 4: DOM snapshot only — always works
             console.warn('[RenderCapture] All image captures failed, sending DOM snapshot only');
+            methods.push({ method: 'dom-only', success: true });
             if (domSnapshot || clientState) {
-                sendRenderCapture(rid, null, domSnapshot, clientState, 'dom-only');
+                sendRenderCapture(rid, null, domSnapshot, clientState, {
+                    method: 'dom-only',
+                    viewportCropped: false,
+                    captureDelayMs: Math.round(performance.now() - captureStart),
+                    methods,
+                });
             }
         }
 
@@ -1567,11 +1593,12 @@
                     checks++;
                     const stillLoading = cardGrid.querySelectorAll('.card.loading').length;
                     const stillAnimating = cardGrid.querySelectorAll('.card:not(.populated)').length;
-                    if ((stillLoading === 0 && stillAnimating === 0) || checks >= maxChecks) {
+                    const runningAnimations = cardGrid.getAnimations?.().filter(a => a.playState === 'running').length || 0;
+                    if ((stillLoading === 0 && stillAnimating === 0 && runningAnimations === 0) || checks >= maxChecks) {
                         clearInterval(interval);
-                        setTimeout(resolve, 800);
+                        setTimeout(resolve, 500);
                     }
-                }, 250);
+                }, 200);
             });
         }
 

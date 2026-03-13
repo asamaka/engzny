@@ -1,35 +1,41 @@
 # Continuous Improvement Backlog
 
-Maintained by the Continuous Improvement Agent. Read at the start of every run, update before pushing.
-**Keep this file under 80 lines.** Completed items belong in git history, not here.
+Maintained by the Continuous Improvement Agent. Read at start of every run, update before pushing.
+**Keep this file under 80 lines.** Completed items belong in git history.
 
 ## Last Run
 
-> **2026-03-12** | Trigger: `healthcheck` | Fixed P1: hallucinated `imageUrl` from Sonar research leaking into cards — added `isValidUrl()` validation at both data-cleaning and enrichment stages.
+> **2026-03-13** | Prompt engineering overhaul — shifted from bug-hunting to product-judging. New philosophy: expected-vs-actual postmortem analysis, experiment-based decisions (10-20 similar reports before fixing), holistic product evaluation. Replaced html2canvas with dom-to-image-more, added viewport-cropped captures with metadata.
 
-## Active Work
+## Open Items
 
 ### P1 — Degraded
 
-- [ ] Sonar deep research often times out (20-25s) before pipeline cap (20s after enhance) — most breaking_news pipelines miss research enrichment entirely. Consider post-complete SSE card_updates so research results arrive late rather than never.
-- [ ] Research-enriched verification sources all get identical generic snippets — same finding text copied to all sources. Low visual impact but noticeable on cards with 3+ sources.
+- [ ] Sonar deep research often times out before pipeline cap — most breaking_news pipelines miss research enrichment. Consider post-complete SSE card_updates so research arrives late rather than never.
 
 ### P2 — Meaningful Polish
 
-- [ ] Render capture shows full-length card grid — consider viewport-height clipping for very long card lists
-- [ ] `getCardTypeLabel` and `CARD_ICONS` for 6 newer card types are dead code — never called anywhere
-- [ ] `completedCards` shows `None` in Redis sessions despite being sent by client — not extracted during persistence
+- [ ] Render capture shows full-length card grid when viewport crop fails — consider improving foreignObject reliability
+- [ ] `getCardTypeLabel` and `CARD_ICONS` for 6 newer card types are dead code — never called
 
-### P3 — Low Priority (do not ship unless combined with higher-priority work)
+### Experiments (gathering evidence)
 
-- [ ] Adapter singleton cache uses module-level Map — could cause subtle issues across warm serverless invocations
-- [ ] Verification sources from research URLs all get identical generic snippets from same finding
+Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-## Key Patterns (for context, not action items)
+_No active experiments yet. Start logging patterns from report analysis._
 
-- 100% of users are mobile (iPhone, 393x852). All UI changes must be mobile-first.
-- LLM field name mismatches are systemic — all card types with structured fields now have defensive normalization. If a new card type is added, it needs the same treatment.
-- Sonar API returns citation markers `[1][2]` — stripped at storage time by `cleanResearchData()`.
-- LLM-generated imageUrl/photoUrl are always hallucinated — stripped by `stripFabricatedImageUrls()` for enhance phase, validated by `isValidUrl()` for research phase.
-- The CSS cascade fix (moving reset into `@layer base`) resolved all DaisyUI spacing issues. If spacing looks broken, check for unlayered CSS rules first.
-- Pipeline durations are now 15-20s for typical content. Sonar deep research (20-25s) is the external bottleneck.
+**Template:**
+```
+## Experiment: [short description]
+- Hypothesis: [what you think is happening and why]
+- Evidence: [id1] [id2] [id3] ... (need 10-20 before acting)
+- Status: gathering | confirmed | rejected
+```
+
+## Key Context (for reference, not action items)
+
+- 100% of users are mobile (iPhone, 393x852). All changes must be mobile-first.
+- LLM field name mismatches are systemic — all card types have defensive normalization now. Fix prompts before adding more fallback chains.
+- Pipeline durations are 15-20s typically. Sonar deep research (20-25s) is the external bottleneck.
+- CSS cascade: the `@layer base` reset fix resolved all DaisyUI spacing issues.
+- Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback. Capture metadata stored with reports for method evaluation.
