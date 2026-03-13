@@ -1189,6 +1189,7 @@ const normalizeImagePayload = ({ image, mediaType }) => {
 // Screenshot → Layout Designer → Parallel Card Research → Populated Layout
 // ============================================
 const { runPipeline } = require('./agents/orchestrator-v2');
+const { runGeminiPipeline } = require('./agents/gemini-pipeline');
 
 // In-memory pipeline job store (keyed by requestId)
 const pipelineJobs = new Map();
@@ -1196,14 +1197,17 @@ const pipelineJobs = new Map();
 // Step 1: POST image, get requestId immediately (no SSE, fast response)
 app.post('/api/hub/v2/start', async (req, res) => {
   try {
-    const { image, question, mediaType: rawMediaType, thumb } = req.body || {};
+    const { image, question, mediaType: rawMediaType, thumb, pipeline } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
+
+    const pipelineType = (pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'default';
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
       mediaType: normalized.mediaType,
       question: question || null,
+      pipeline: pipelineType,
       createdAt: Date.now(),
       _clientThumb: thumb || null,
     });
@@ -1228,7 +1232,7 @@ app.post('/api/hub/v2/start', async (req, res) => {
       }
     }).catch(() => {});
 
-    res.json({ requestId });
+    res.json({ requestId, pipeline: pipelineType });
   } catch (error) {
     logger.error('PipelineStart', 'Failed to start', { err: error.message });
     res.status(400).json({ error: error.message });
@@ -1295,14 +1299,18 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   }, 5000);
 
   const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
+  const useGemini = job.pipeline === 'gemini';
+  const pipelineFn = useGemini ? runGeminiPipeline : runPipeline;
+
   logger.startPipeline(requestId, {
     mediaType: job.mediaType,
     imageSize: `${imageSize}KB`,
     hasQuestion: !!job.question,
     method: 'GET-stream',
+    pipeline: useGemini ? 'gemini' : 'default',
   });
 
-  sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
+  sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: useGemini ? 'gemini' : 'default', timestamp: new Date().toISOString() });
 
   // Store pipeline result so we can save the report BEFORE ending the stream.
   // On Vercel, once res.end() is called the function can be terminated immediately,
@@ -1310,7 +1318,7 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   let pipelineResult = null;
 
   try {
-    await runPipeline({
+    await pipelineFn({
       imageData: job.imageData,
       mediaType: job.mediaType,
       question: job.question,
@@ -1461,17 +1469,20 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
   };
 
   try {
-    const { image, question, mediaType: rawMediaType } = req.body || {};
+    const { image, question, mediaType: rawMediaType, pipeline } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
+    const useGeminiLegacy = pipeline === 'gemini' && process.env.GEMINI_API_KEY;
+    const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : runPipeline;
 
     const imageSize = normalized.imageData ? Math.round(normalized.imageData.length * 0.75 / 1024) : 0;
     logger.startPipeline(requestId, {
       mediaType: normalized.mediaType,
       imageSize: `${imageSize}KB`,
       hasQuestion: !!question,
+      pipeline: useGeminiLegacy ? 'gemini' : 'default',
     });
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!useGeminiLegacy && !process.env.ANTHROPIC_API_KEY) {
       logger.error('Pipeline', 'Missing ANTHROPIC_API_KEY', { requestId });
       return res.status(500).json({
         error: 'API Configuration Missing',
@@ -1511,11 +1522,11 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       }
     }, 5000);
 
-    sendEvent('connected', { message: 'Pipeline started', requestId, timestamp: new Date().toISOString() });
+    sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: useGeminiLegacy ? 'gemini' : 'default', timestamp: new Date().toISOString() });
 
     let pipelineResult = null;
 
-    await runPipeline({
+    await legacyPipelineFn({
       imageData: normalized.imageData,
       mediaType: normalized.mediaType,
       question,

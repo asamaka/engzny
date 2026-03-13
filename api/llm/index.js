@@ -8,11 +8,13 @@
 const { LLMAdapter } = require('./adapter');
 const { ClaudeAdapter } = require('./claude');
 const { PerplexityAdapter } = require('./perplexity');
+const { GeminiAdapter } = require('./gemini');
 
 // Registry of available providers
 const providers = {
   claude: ClaudeAdapter,
   perplexity: PerplexityAdapter,
+  gemini: GeminiAdapter,
 };
 
 // Singleton instances cache
@@ -116,15 +118,25 @@ function clearCache() {
   instances.clear();
 }
 
+/**
+ * Check if Gemini is available
+ * @returns {boolean}
+ */
+function isGeminiAvailable() {
+  return !!process.env.GEMINI_API_KEY;
+}
+
 module.exports = {
   LLMAdapter,
   ClaudeAdapter,
   PerplexityAdapter,
+  GeminiAdapter,
   getAdapter,
   getDefaultAdapter,
   getVisionAdapter,
   getResearchAdapter,
   isPerplexityAvailable,
+  isGeminiAvailable,
   registerProvider,
   listProviders,
   clearCache,

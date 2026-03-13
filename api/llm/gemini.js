@@ -2,7 +2,7 @@
  * Gemini LLM Adapter
  *
  * Implementation of LLMAdapter for Google's Gemini models.
- * Supports vision analysis via the Generative Language API.
+ * Supports vision analysis and text generation via the Generative Language API.
  */
 
 const { LLMAdapter } = require('./adapter');
@@ -17,9 +17,12 @@ class GeminiAdapter extends LLMAdapter {
     }
 
     this.model = config.model || 'gemini-2.5-flash';
-    this.maxTokens = config.maxTokens || 2048;
-    this.endpoint = config.endpoint
-      || `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+    this.maxTokens = config.maxTokens || 8192;
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
+  }
+
+  _getEndpoint() {
+    return `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`;
   }
 
   get providerName() {
@@ -38,7 +41,33 @@ class GeminiAdapter extends LLMAdapter {
     return false;
   }
 
-  async analyzeImage({ imageData, mediaType, prompt, responseFormat }) {
+  async _callApi(body) {
+    const response = await fetch(this._getEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload.error?.message || `Gemini API error (${response.status})`;
+      throw new Error(message);
+    }
+
+    const text = (payload.candidates?.[0]?.content?.parts || [])
+      .map((part) => part.text || '')
+      .join('')
+      .trim();
+
+    return {
+      text,
+      usage: payload.usageMetadata,
+      model: this.model,
+      stopReason: payload.candidates?.[0]?.finishReason,
+    };
+  }
+
+  async analyzeImage({ imageData, mediaType, prompt, responseFormat, maxTokens }) {
     const promptText = responseFormat
       ? `${prompt}\n\nRespond with valid JSON matching this schema:\n${JSON.stringify(responseFormat, null, 2)}`
       : prompt;
@@ -60,7 +89,7 @@ class GeminiAdapter extends LLMAdapter {
       ],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: this.maxTokens,
+        maxOutputTokens: maxTokens || this.maxTokens,
         ...(responseFormat
           ? {
               responseMimeType: 'application/json',
@@ -70,28 +99,26 @@ class GeminiAdapter extends LLMAdapter {
       },
     };
 
-    const response = await fetch(this.endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+    return this._callApi(body);
+  }
 
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = payload.error?.message || `Gemini API error (${response.status})`;
-      throw new Error(message);
+  async generateText({ prompt, systemPrompt, maxTokens }) {
+    const parts = [];
+    if (systemPrompt) {
+      parts.push({ text: `${systemPrompt}\n\n${prompt}` });
+    } else {
+      parts.push({ text: prompt });
     }
 
-    const text = (payload.candidates?.[0]?.content?.parts || [])
-      .map((part) => part.text || '')
-      .join('')
-      .trim();
-
-    return {
-      text,
-      usage: payload.usageMetadata,
-      model: this.model,
+    const body = {
+      contents: [{ role: 'user', parts }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: maxTokens || this.maxTokens,
+      },
     };
+
+    return this._callApi(body);
   }
 }
 
