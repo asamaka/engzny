@@ -76,7 +76,15 @@ function buildResearchPrompt(card, contentAnalysis) {
   - "no_info" = couldn't find relevant info from this source
 - Set status to "searching" if still looking, "partially_verified" if some sources confirm, "verified" if major sources confirm, "denied" if major sources deny, "unconfirmed" if no sources report it.
 - Include source URLs for every source you check.
-- Be HONEST about what you find. If nothing confirms it, say so clearly.`
+- Be HONEST about what you find. If nothing confirms it, say so clearly.
+
+SOURCE SNIPPET RULES (strictly enforced):
+- Each source snippet MUST be unique — NEVER copy the same text across multiple sources.
+- A snippet describes what THIS SPECIFIC SOURCE uniquely reported (1 sentence max, under 25 words).
+- Differentiate by what each source adds: "Confirms with satellite imagery" vs "Reports citing military officials" vs "Has not covered this event".
+- If a source hasn't reported: just use a short phrase like "No coverage found as of [time]" — don't repeat a generic paragraph.
+- The "summary" field is for the overall cross-source assessment. Source snippets are for per-source specifics only.
+- BAD: same 2-sentence paragraph pasted for every source. GOOD: each source gets a distinct 1-sentence observation.`
     : '';
 
   return `You are a research specialist populating a card with accurate, concise data${needsWebResearch ? ' using web search' : ' from a screenshot'}.
@@ -290,12 +298,20 @@ async function researchWithPerplexity(card, contentAnalysis, adapterConfig) {
   const schema = getCardSchema(card.cardType);
   const fieldNames = schema ? Object.keys(schema.schema).join(', ') : '';
 
+  const verificationContext = card.cardType === 'verification_card'
+    ? `\nFor this verification card, search for the claim across MULTIPLE distinct sources. For each source found, report:
+- The source name and URL
+- What THIS source specifically said (unique 1-sentence snippet — different for each source)
+- Whether the source confirms, denies, or hasn't reported the claim
+List 3-5 major sources. Each source snippet must be different.\n`
+    : '';
+
   const query = `Research the following based on a ${contentAnalysis.contentType} screenshot${contentAnalysis.platform ? ` from ${contentAnalysis.platform}` : ''}.
 
 Card type: ${card.cardType}
 Research brief: ${card.researchBrief}
 Required fields: ${fieldNames}
-
+${verificationContext}
 ${card.placeholderData ? `Visible context: ${JSON.stringify(card.placeholderData)}` : ''}
 
 Return ONLY valid JSON with the card data fields. Include sourceUrl if you find relevant URLs.`;
