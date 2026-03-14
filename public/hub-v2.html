@@ -1878,6 +1878,11 @@
                         unverified: { icon: 'help', color: 'info', label: 'Unverified' },
                     };
                     const vc = verdictConfig[verdict] || verdictConfig.unverified;
+                    const confidentVerdicts = new Set(['verified', 'false', 'misleading']);
+                    const uncertainVerdicts = new Set(['unverified', 'needs_context']);
+                    const showConfidence = d.confidence &&
+                        !(confidentVerdicts.has(verdict) && d.confidence === 'low') &&
+                        !(uncertainVerdicts.has(verdict) && d.confidence === 'high');
                     return `<div class="p-4">
                         <div class="flex items-center gap-3 mb-3">
                             <div class="w-10 h-10 rounded-full bg-${vc.color}/15 flex items-center justify-center shrink-0">
@@ -1885,7 +1890,7 @@
                             </div>
                             <div>
                                 <div class="badge badge-${vc.color} badge-sm font-bold">${esc(vc.label)}</div>
-                                ${d.confidence ? `<div class="text-xs text-base-content/40 mt-0.5">${esc(d.confidence)} confidence</div>` : ''}
+                                ${showConfidence ? `<div class="text-xs text-base-content/40 mt-0.5">${esc(d.confidence)} confidence</div>` : ''}
                             </div>
                         </div>
                         <p class="text-sm italic text-base-content/70 leading-relaxed mb-2" dir="auto">${linkify(cleanSummary(d.claim || ''))}</p>

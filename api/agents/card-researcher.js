@@ -94,7 +94,7 @@ Rules:
 3. Keep text SHORT — titles max 8 words, explanations max 1-2 sentences
 4. For product_card: features/warnings must be plain strings
 5. Include visible URLs in url/sourceUrl/mapUrl fields
-6. For breaking news fact_check: use verdict "unverified" or "needs_context" with confidence "low" — never "misleading" or "false" without strong evidence
+6. For fact_check: verdict and confidence MUST be coherent — "verified" requires confidence "high" or "medium", "unverified"/"needs_context" requires confidence "low". Never use "misleading" or "false" without strong evidence from web search
 7. Add emoji field where schema supports it for visual richness
 8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${photoInstructions}${verificationInstructions}
 
