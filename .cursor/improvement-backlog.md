@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-13** | Prompt engineering overhaul — shifted from bug-hunting to product-judging. New philosophy: expected-vs-actual postmortem analysis, experiment-based decisions (10-20 similar reports before fixing), holistic product evaluation. Replaced html2canvas with dom-to-image-more, added viewport-cropped captures with metadata.
+> **2026-03-14** | Fixed fact_check verdict/confidence contradiction — a confirmed pattern where ~38% of fact_check cards showed contradictory signals (e.g. green "Verified" badge + "low confidence" text). Root cause: prompt didn't enforce coherence. Fixed both prompt (card-researcher.js rule 6) and rendering (hub-v2.html defensive suppression). Evidence: f2e3213a, a63d1701, 9e268ef6, 9aeb1bb2 across 13 reviewed cards.
 
 ## Open Items
 
@@ -22,15 +22,10 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-_No active experiments yet. Start logging patterns from report analysis._
-
-**Template:**
-```
-## Experiment: [short description]
-- Hypothesis: [what you think is happening and why]
-- Evidence: [id1] [id2] [id3] ... (need 10-20 before acting)
-- Status: gathering | confirmed | rejected
-```
+## Experiment: did_you_know_card factual accuracy
+- Hypothesis: The did_you_know_card sometimes contains facts that contradict the main article (e.g. f2e3213a claimed "Melbourne ranks 21st" when the article says #1)
+- Evidence: [f2e3213a] (need 10-20 before acting)
+- Status: gathering
 
 ## Key Context (for reference, not action items)
 
@@ -39,3 +34,4 @@ _No active experiments yet. Start logging patterns from report analysis._
 - Pipeline durations are 15-20s typically. Sonar deep research (20-25s) is the external bottleneck.
 - CSS cascade: the `@layer base` reset fix resolved all DaisyUI spacing issues.
 - Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback. Capture metadata stored with reports for method evaluation.
+- fact_check verdict/confidence coherence enforced in prompt + rendering (2026-03-14).
