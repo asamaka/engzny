@@ -735,10 +735,20 @@
         }
 
         let currentEventSource = null;
+        let pipelineSettled = false;
+        let awaitingSettlement = false;
+
+        function getRequestedPipeline() {
+            const pipeline = new URLSearchParams(location.search).get('pipeline');
+            if (pipeline === 'gemini' || pipeline === 'llm2') return pipeline;
+            return null;
+        }
 
         async function startPipelineInner(imageDataUrl) {
             blueprintReceived = false;
             pipelineComplete = false;
+            pipelineSettled = false;
+            awaitingSettlement = false;
             allCardsReadyShown = false;
             lastEventTime = Date.now();
             telemetry.reset();
@@ -787,6 +797,8 @@
                     });
 
                     const payload = { image: imageDataUrl };
+                    const requestedPipeline = getRequestedPipeline();
+                    if (requestedPipeline) payload.pipeline = requestedPipeline;
                     if (currentThumbBase64) payload.thumb = currentThumbBase64;
                     xhr.send(JSON.stringify(payload));
                 });
@@ -809,7 +821,7 @@
                         }
                     }, 30000);
 
-                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'card_update', 'card_add', 'phase', 'complete'];
+                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'card_update', 'card_add', 'phase', 'complete', 'settled'];
                     events.forEach(evt => {
                         es.addEventListener(evt, (e) => {
                             try {
@@ -818,6 +830,14 @@
                                 handleSSEEvent(evt, data);
                                 if (evt !== 'complete') resetStallTimer();
                                 if (evt === 'complete') {
+                                    if (!data?.pendingResearch) {
+                                        es.close();
+                                        currentEventSource = null;
+                                        telemetry.reportSuccess();
+                                        resolve();
+                                    }
+                                }
+                                if (evt === 'settled') {
                                     es.close();
                                     currentEventSource = null;
                                     telemetry.reportSuccess();
@@ -829,7 +849,7 @@
 
                     es.addEventListener('error', (e) => {
                         if (es.readyState === EventSource.CLOSED) {
-                            if (!pipelineComplete) {
+                            if (!pipelineSettled) {
                                 reject(new Error(blueprintReceived ? 'Connection lost during analysis' : 'Connection lost before analysis started'));
                             }
                             return;
@@ -843,7 +863,7 @@
                         } catch {
                             es.close();
                             currentEventSource = null;
-                            if (!pipelineComplete) {
+                            if (!pipelineSettled) {
                                 reject(new Error('Connection to server lost'));
                             }
                         }
@@ -922,6 +942,10 @@
 
                 case 'complete':
                     onPipelineComplete(data);
+                    break;
+
+                case 'settled':
+                    onPipelineSettled(data);
                     break;
 
                 case 'error':
@@ -1293,7 +1317,10 @@
             el.insertAdjacentHTML('beforeend', citHtml);
         }
 
-        function onPipelineComplete(data) {
+        function finalizePipelineView(data) {
+            if (pipelineSettled) return;
+            pipelineSettled = true;
+            awaitingSettlement = false;
             pipelineComplete = true;
             if (data?.layout?.type) applyLayoutTheme(data.layout.type);
             stopAnalysisProgressTick();
@@ -1359,6 +1386,49 @@
 
             // Capture what the user actually sees — viewport-clipped screenshot
             setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 300);
+        }
+
+        function onPipelineComplete(data) {
+            pipelineComplete = true;
+            if (data?.layout?.type) applyLayoutTheme(data.layout.type);
+            stopAnalysisProgressTick();
+            if (completionTimeout) {
+                clearTimeout(completionTimeout);
+                completionTimeout = null;
+            }
+            if (stallTimer) {
+                clearTimeout(stallTimer);
+                stallTimer = null;
+            }
+            if (enhanceMsgInterval) {
+                clearInterval(enhanceMsgInterval);
+                enhanceMsgInterval = null;
+            }
+            if (uploadProgressInterval) {
+                clearInterval(uploadProgressInterval);
+                uploadProgressInterval = null;
+            }
+
+            progressOverlay.classList.add('hidden');
+            if (!firstCardShown) {
+                firstCardShown = true;
+                resultsOverlay.classList.remove('hidden');
+            }
+
+            if (data?.pendingResearch) {
+                awaitingSettlement = true;
+                layoutProgress.style.display = '';
+                layoutProgressFill.value = 98;
+                layoutProgressText.textContent = 'checking sources';
+                progressLabel.textContent = 'Checking external sources...';
+                return;
+            }
+
+            finalizePipelineView(data);
+        }
+
+        function onPipelineSettled(data) {
+            finalizePipelineView(data);
         }
 
         const CAPTURE_STYLE_PROPS = [

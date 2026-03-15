@@ -229,6 +229,50 @@ function buildSkeletonFromClassification(classification) {
 }
 
 /**
+ * Adapt a blueprint for Pipeline 2.0 based on pre-analysis hints.
+ * Keeps the legacy fast-classifier behavior intact for the default pipeline.
+ */
+function adaptBlueprintForPreAnalysis(blueprint, preAnalysis = {}) {
+  if (!blueprint || !Array.isArray(blueprint.cards)) return blueprint;
+
+  const namedPeople = Array.isArray(preAnalysis.namedPeople) ? preAnalysis.namedPeople : [];
+  const hasNamedPerson = namedPeople.some((person) => typeof person?.name === 'string' && person.name.trim());
+  const sourceName = preAnalysis.sourceAttribution?.name || null;
+  const sourceType = preAnalysis.sourceAttribution?.type || 'unknown';
+
+  const nextCards = blueprint.cards.map((card) => ({ ...card }));
+
+  for (let i = 0; i < nextCards.length; i++) {
+    const card = nextCards[i];
+    if (card.cardType !== 'person_card' || hasNamedPerson) continue;
+
+    nextCards[i] = {
+      ...card,
+      cardType: sourceName ? 'source_card' : 'info_list',
+      researchBrief: sourceName
+        ? `Summarize the visible source/account "${sourceName}" and add credibility context without inventing details`
+        : 'Summarize the visible source/account information from the screenshot',
+      placeholderData: sourceName
+        ? {
+            name: sourceName,
+            type: sourceType,
+            credibility: 'unknown',
+            context: 'Visible source/account in the screenshot',
+          }
+        : {
+            title: 'Visible source',
+            items: [],
+          },
+    };
+  }
+
+  return {
+    ...blueprint,
+    cards: nextCards,
+  };
+}
+
+/**
  * Human-readable content type label
  */
 function humanizeContentType(ct) {
@@ -253,4 +297,9 @@ function humanizeContentType(ct) {
   return labels[ct] || ct.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-module.exports = { fastClassify, buildSkeletonFromClassification, humanizeContentType };
+module.exports = {
+  fastClassify,
+  buildSkeletonFromClassification,
+  adaptBlueprintForPreAnalysis,
+  humanizeContentType,
+};

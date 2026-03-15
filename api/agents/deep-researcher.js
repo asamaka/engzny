@@ -10,37 +10,65 @@
 const { getResearchAdapter, getVisionAdapter, isPerplexityAvailable } = require('../llm');
 const { logger } = require('../lib/logger');
 
+function currentDateAnchors() {
+  const now = new Date();
+  const month = now.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+  const year = now.getUTCFullYear();
+  const isoDate = now.toISOString().slice(0, 10);
+  return { month, year, isoDate };
+}
+
 /**
  * Build a research query from the content analysis and card data.
  */
-function buildResearchQuery(contentAnalysis, cards) {
+function buildResearchQuery(contentAnalysis, cards, { preAnalysis, translationVerification } = {}) {
   const cardSummaries = cards.map(c => {
     const data = c.populatedData || c.data || c.placeholderData || {};
     return `- ${c.cardType}: ${data.title || data.name || data.claim || data.label || 'unknown'}`;
   }).join('\n');
+
+  const { month, year, isoDate } = currentDateAnchors();
+  const verifiedClaim = translationVerification?.shouldOverrideClaim
+    ? translationVerification.normalizedTranslation
+    : (translationVerification?.normalizedTranslation || preAnalysis?.visibleClaim || null);
+  const keyTerms = Array.isArray(translationVerification?.keyTerms)
+    ? translationVerification.keyTerms.map((item) => `${item.source} → ${item.translation}`).join('; ')
+    : '';
+  const sourceHint = preAnalysis?.sourceAttribution?.name || 'unknown';
+  const timeHint = preAnalysis?.timeContext?.mentionedDate || preAnalysis?.timeContext?.notes || 'none visible';
+  const contentItems = Array.isArray(preAnalysis?.contentItems)
+    ? preAnalysis.contentItems.map((item) => `- ${item.prominence}: ${item.kind} — ${item.summary}`).join('\n')
+    : '';
 
   return `Research the following based on a screenshot analysis.
 
 **Content Type:** ${contentAnalysis.contentType}
 **Platform:** ${contentAnalysis.platform || 'unknown'}
 **User Intent:** ${contentAnalysis.intent}
+**Current date anchor:** ${isoDate} (${month} ${year})
+**Visible source attribution:** ${sourceHint}
+**Visible date/time context from screenshot:** ${timeHint}
+${verifiedClaim ? `**Verified screenshot claim to research literally:** ${verifiedClaim}` : ''}
+${keyTerms ? `**Translated key terms:** ${keyTerms}` : ''}
 
 **Key Questions to Answer:**
 ${(contentAnalysis.topQuestions || []).map(q => `- ${q}`).join('\n')}
 
 **Current Cards (for context):**
 ${cardSummaries}
+${contentItems ? `\n**Distinct visible content items:**\n${contentItems}` : ''}
 
 **Research Goals:**
-1. VERIFICATION PRIORITY: If any card is a verification_card, your #1 goal is to check the claim against major news sources (Reuters, AP, BBC, CNN, Al Jazeera, etc.). For EACH source, report whether they confirm, deny, or haven't reported the claim. Include source URLs.
+1. VERIFICATION PRIORITY: If any card is a verification_card, your #1 goal is to check the claim against major news sources (Reuters, AP, BBC, CNN, Al Jazeera, etc.). Search using the claim + ${month} ${year}. For EACH source, report whether they confirm, deny, or haven't reported the claim. Include source URLs.
 2. Verify facts and claims visible in the screenshot
-3. Find additional context, background, or recent developments
+3. Find additional context, background, or recent developments grounded in the current event window
 4. Identify any misleading or inaccurate information — but be EXTREMELY cautious with breaking news. A claim being unverified is NOT the same as it being false or misleading.
 5. Find related links, sources, and references
 6. Answer the user's likely questions with factual, sourced data
 7. For breaking news / conflict situations: research ALL SIDES of the event. If one side launched strikes, check whether the other side retaliated. A report about events at location A does not invalidate reports about events at location B — both can be true simultaneously.
 8. NEVER assume a breaking news report is misleading just because the primary story is about a different aspect of the same event. Military conflicts involve simultaneous actions by multiple parties.
 9. For verification findings, structure each source as a separate finding with the source name, what they report, and the source URL.
+10. Prefer sources from ${month} ${year}; for breaking_news, treat obviously stale/outdated results as context, not primary verification.
 
 Return a structured JSON response:
 {
@@ -74,6 +102,8 @@ async function deepResearch({
   cards,
   imageData,
   mediaType,
+  preAnalysis,
+  translationVerification,
   adapterConfig = {},
 }) {
   const startTime = Date.now();
@@ -86,7 +116,10 @@ async function deepResearch({
     contentType: contentAnalysis.contentType,
   });
 
-  const query = buildResearchQuery(contentAnalysis, cards);
+  const query = buildResearchQuery(contentAnalysis, cards, {
+    preAnalysis,
+    translationVerification,
+  });
 
   try {
     let result;
@@ -228,4 +261,4 @@ function parseResearchResponse(text) {
   }
 }
 
-module.exports = { deepResearch };
+module.exports = { deepResearch, buildResearchQuery };

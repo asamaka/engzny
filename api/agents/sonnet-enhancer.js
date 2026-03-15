@@ -112,7 +112,7 @@ function truncateStr(str, max) {
   return str.slice(0, max) + '...';
 }
 
-function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData) {
+function buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData, preAnalysis) {
   const existingTypes = currentCards.map(c => c.cardType);
   const layoutDef = LAYOUT_TYPES[layout?.type];
   const suggestedTypes = layoutDef ? layoutDef.suggestedCards : [];
@@ -144,6 +144,14 @@ ${getCardTypeSchemaForTypes(relevantTypes)}
 ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', ')}` : ''}
 
 **Layout:** ${layout.type}${layoutDef ? ` — ${layoutDef.description}` : ''}
+${preAnalysis ? `\n**Pre-analysis hints:** ${JSON.stringify({
+  language: preAnalysis.language,
+  visibleClaim: preAnalysis.visibleClaim,
+  sourceAttribution: preAnalysis.sourceAttribution,
+  namedPeople: preAnalysis.namedPeople,
+  namedOrganizations: preAnalysis.namedOrganizations,
+  locationHints: preAnalysis.locationHints,
+})}` : ''}
 
 **YOUR TASKS (PRIORITY ORDER):**
 1. POPULATE HERO: Update hero_summary with a proper takeaway and ensure title is under 6 words. Add badge and badgeColor. Keep investigationStatus as "investigating" — it will be resolved when all research completes.
@@ -200,7 +208,7 @@ REVIEW PRIORITIES (act on ALL in a SINGLE batch of tool calls):
   return prompt;
 }
 
-function buildReviewPrompt(currentCards, contentAnalysis, researchData) {
+function buildReviewPrompt(currentCards, contentAnalysis, researchData, preAnalysis) {
   const researchFindings = (researchData && researchData.findings) || [];
 
   const unpopulatedCards = currentCards.filter(c => {
@@ -263,6 +271,12 @@ Cards: ${JSON.stringify(compactCards)}
 Schemas: ${getCardTypeSchemaForTypes(existingTypes)}
 ${researchFindings.length > 0 ? `\nResearch: ${JSON.stringify(compactResearch)}` : ''}
 ${researchData && researchData.overallContext ? `Context: ${truncateStr(researchData.overallContext, 300)}` : ''}${contextLine}
+${preAnalysis ? `\nPre-analysis hints: ${JSON.stringify({
+  language: preAnalysis.language,
+  visibleClaim: preAnalysis.visibleClaim,
+  sourceAttribution: preAnalysis.sourceAttribution,
+  namedPeople: preAnalysis.namedPeople,
+})}` : ''}
 
 Tasks (ALL in ONE batch):${populateInstructions}
 1. verification_card: update source statuses ONLY based on research evidence — set "confirmed" if research supports, "denied" if contradicts, "not_yet_reported" if no evidence
@@ -279,6 +293,7 @@ async function enhance({
   contentAnalysis,
   layout,
   researchData,
+  preAnalysis,
   onCardUpdate,
   onCardAdd,
   onLayoutUpdate,
@@ -295,8 +310,8 @@ async function enhance({
     const adapter = getVisionAdapter(config);
     const traceCollector = adapterConfig.traceCollector;
     const prompt = isReview
-      ? buildReviewPrompt(currentCards, contentAnalysis, researchData)
-      : buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData);
+      ? buildReviewPrompt(currentCards, contentAnalysis, researchData, preAnalysis)
+      : buildEnhancerPrompt(currentCards, contentAnalysis, layout, researchData, preAnalysis);
     const phase = researchData ? 'review' : 'enhance';
 
     logger.info('SonnetEnhancer', `Starting ${phase} pass`, {

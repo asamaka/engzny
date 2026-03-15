@@ -1189,6 +1189,7 @@ const normalizeImagePayload = ({ image, mediaType }) => {
 // Screenshot → Layout Designer → Parallel Card Research → Populated Layout
 // ============================================
 const { runPipeline } = require('./agents/orchestrator-v2');
+const { runPipelineV20 } = require('./agents/orchestrator-v2-0');
 const { runGeminiPipeline } = require('./agents/gemini-pipeline');
 
 // In-memory pipeline job store (keyed by requestId)
@@ -1201,7 +1202,9 @@ app.post('/api/hub/v2/start', async (req, res) => {
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
 
-    const pipelineType = (pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'default';
+    const pipelineType = pipeline === 'llm2'
+      ? 'llm2'
+      : ((pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'default');
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
@@ -1300,17 +1303,19 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
 
   const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
   const useGemini = job.pipeline === 'gemini';
-  const pipelineFn = useGemini ? runGeminiPipeline : runPipeline;
+  const useLlm2 = job.pipeline === 'llm2';
+  const pipelineFn = useGemini ? runGeminiPipeline : (useLlm2 ? runPipelineV20 : runPipeline);
+  const pipelineLabel = useGemini ? 'gemini' : (useLlm2 ? 'llm2' : 'default');
 
   logger.startPipeline(requestId, {
     mediaType: job.mediaType,
     imageSize: `${imageSize}KB`,
     hasQuestion: !!job.question,
     method: 'GET-stream',
-    pipeline: useGemini ? 'gemini' : 'default',
+    pipeline: pipelineLabel,
   });
 
-  sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: useGemini ? 'gemini' : 'default', timestamp: new Date().toISOString() });
+  sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: pipelineLabel, timestamp: new Date().toISOString() });
 
   // Store pipeline result so we can save the report BEFORE ending the stream.
   // On Vercel, once res.end() is called the function can be terminated immediately,
@@ -1375,9 +1380,34 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       },
 
       onComplete: (populatedLayout) => {
+        if (useLlm2) {
+          sendEvent('complete', {
+            layout: populatedLayout.layout,
+            contentAnalysis: populatedLayout.contentAnalysis,
+            meta: populatedLayout.meta || populatedLayout._meta || {},
+            pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
+          });
+          return;
+        }
         clearInterval(keepAlive);
         logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
         sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
+        pipelineResult = { success: true, populatedLayout };
+      },
+
+      onSettled: (populatedLayout) => {
+        clearInterval(keepAlive);
+        logger.pipelineComplete(requestId, {
+          cardCount: populatedLayout.cards?.length,
+          layoutType: populatedLayout.layout?.type,
+          haikuDuration: populatedLayout._meta?.haikuDuration,
+          pipeline: 'llm2',
+        });
+        sendEvent('settled', {
+          layout: populatedLayout.layout,
+          contentAnalysis: populatedLayout.contentAnalysis,
+          meta: populatedLayout._meta,
+        });
         pipelineResult = { success: true, populatedLayout };
       },
 
@@ -1472,14 +1502,16 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     const { image, question, mediaType: rawMediaType, pipeline } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const useGeminiLegacy = pipeline === 'gemini' && process.env.GEMINI_API_KEY;
-    const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : runPipeline;
+    const useLlm2Legacy = pipeline === 'llm2';
+    const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : (useLlm2Legacy ? runPipelineV20 : runPipeline);
+    const legacyPipelineLabel = useGeminiLegacy ? 'gemini' : (useLlm2Legacy ? 'llm2' : 'default');
 
     const imageSize = normalized.imageData ? Math.round(normalized.imageData.length * 0.75 / 1024) : 0;
     logger.startPipeline(requestId, {
       mediaType: normalized.mediaType,
       imageSize: `${imageSize}KB`,
       hasQuestion: !!question,
-      pipeline: useGeminiLegacy ? 'gemini' : 'default',
+      pipeline: legacyPipelineLabel,
     });
 
     if (!useGeminiLegacy && !process.env.ANTHROPIC_API_KEY) {
@@ -1522,7 +1554,7 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       }
     }, 5000);
 
-    sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: useGeminiLegacy ? 'gemini' : 'default', timestamp: new Date().toISOString() });
+    sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: legacyPipelineLabel, timestamp: new Date().toISOString() });
 
     let pipelineResult = null;
 
@@ -1583,6 +1615,15 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       },
 
       onComplete: (populatedLayout) => {
+        if (useLlm2Legacy) {
+          sendEvent('complete', {
+            layout: populatedLayout.layout,
+            contentAnalysis: populatedLayout.contentAnalysis,
+            meta: populatedLayout.meta || populatedLayout._meta || {},
+            pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
+          });
+          return;
+        }
         clearInterval(keepAlive);
         logger.pipelineComplete(requestId, {
           cardCount: populatedLayout.cards?.length,
@@ -1590,6 +1631,22 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
           haikuDuration: populatedLayout._meta?.haikuDuration,
         });
         sendEvent('complete', {
+          layout: populatedLayout.layout,
+          contentAnalysis: populatedLayout.contentAnalysis,
+          meta: populatedLayout._meta,
+        });
+        pipelineResult = { success: true, populatedLayout };
+      },
+
+      onSettled: (populatedLayout) => {
+        clearInterval(keepAlive);
+        logger.pipelineComplete(requestId, {
+          cardCount: populatedLayout.cards?.length,
+          layoutType: populatedLayout.layout?.type,
+          haikuDuration: populatedLayout._meta?.haikuDuration,
+          pipeline: 'llm2',
+        });
+        sendEvent('settled', {
           layout: populatedLayout.layout,
           contentAnalysis: populatedLayout.contentAnalysis,
           meta: populatedLayout._meta,
