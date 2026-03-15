@@ -157,7 +157,7 @@ ${otherTypes.length > 0 ? `\nOther card types you may add: ${otherTypes.join(', 
 **CRITICAL RULES:**
 - POPULATE ALL CARDS — skeleton cards with no data look broken to the user
 - Keep ALL text ultra-concise — no paragraphs. Titles: max 6 words. Values: max 10 words.
-- For person_card: ALWAYS include name, role, and context even if sparse
+- For person_card: MUST be a named individual human being (e.g. "Benjamin Netanyahu", "Elon Musk"). NEVER use person_card for news outlets, organizations, publications, or generic titles like "Japanese Prime Minister". If no specific person is identifiable, use source_card for the news outlet or skip the person_card entirely.
 - For location_card: ALWAYS include name, context, and a Google Maps URL in mapUrl
 - Do NOT fabricate URLs — leave url fields empty if you don't know the real URL
 - Use emoji liberally for visual interest

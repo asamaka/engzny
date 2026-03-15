@@ -78,9 +78,9 @@ const CARD_TYPES = {
   },
 
   person_card: {
-    description: 'Person mentioned or shown — name, role, context. Photo added from web research when available.',
+    description: 'Named individual human being — NEVER for organizations, news outlets, or generic titles. Must have a real full name.',
     schema: {
-      name: { type: 'string', required: true, description: 'Full name' },
+      name: { type: 'string', required: true, description: 'Full name of an actual person (never an organization or outlet)' },
       role: { type: 'string', description: 'Title or descriptor (under 6 words)' },
       emoji: { type: 'string', description: 'Representing emoji (flag, role symbol, etc.)' },
       photoUrl: { type: 'string', description: 'Photo URL — use only URLs found via web search' },

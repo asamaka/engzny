@@ -55,6 +55,14 @@ function buildResearchPrompt(card, contentAnalysis) {
 10. Include source URLs in the sourceUrl field when available from search results`
     : '';
 
+  const personCardInstructions = card.cardType === 'person_card'
+    ? `\n\nPERSON CARD — CRITICAL:
+- This card MUST be about a named individual human being (e.g. "Benjamin Netanyahu", "Elon Musk").
+- NEVER populate with a news outlet, organization, publication, or generic title (e.g. "Al Jazeera", "Iranian Revolutionary Guard", "Japanese Prime Minister").
+- If the screenshot doesn't contain a clearly identifiable named person, return an empty JSON object {}.
+- The "name" field must be the person's actual full name.`
+    : '';
+
   const photoInstructions = ['person_card', 'location_card', 'news_card', 'did_you_know_card'].includes(card.cardType)
     ? `\n\nIMPORTANT — FIND REAL IMAGES:
 - For person_card: Search for "${card.placeholderData?.name || 'the person'}" and find their Wikipedia/official photo URL. Set it in photoUrl.
@@ -104,7 +112,7 @@ Rules:
 5. Include visible URLs in url/sourceUrl/mapUrl fields
 6. For fact_check: verdict and confidence MUST be coherent — "verified" requires confidence "high" or "medium", "unverified"/"needs_context" requires confidence "low". Never use "misleading" or "false" without strong evidence from web search
 7. Add emoji field where schema supports it for visual richness
-8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${photoInstructions}${verificationInstructions}
+8. Focus on information the user likely DIDN'T know — surprising context, background, connections${webSearchInstructions}${personCardInstructions}${photoInstructions}${verificationInstructions}
 
 Return ONLY valid JSON:`;
 }
