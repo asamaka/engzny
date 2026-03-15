@@ -1093,6 +1093,57 @@ async function runPipeline({
     }
 
     // =====================================================
+    // Post-processing: enforce fact_check verdict/confidence coherence
+    // LLMs often return "verified" + "low" confidence (contradictory).
+    // The prompt instructs coherence but the LLM ignores it, so we
+    // enforce it in code — same principle as verification_card reconciliation.
+    // =====================================================
+    for (const [cardId, card] of currentCards) {
+      if (card.cardType !== 'fact_check') continue;
+      const cardData = card.populatedData || card.data || {};
+      if (!cardData.verdict) continue;
+
+      const v = cardData.verdict;
+      const c = cardData.confidence;
+      let newVerdict = v;
+      let newConfidence = c;
+
+      if ((v === 'verified') && (c === 'low' || !c)) {
+        newVerdict = 'needs_context';
+        newConfidence = c || 'low';
+      } else if ((v === 'false' || v === 'misleading') && (c === 'low' || !c)) {
+        newVerdict = 'unverified';
+        newConfidence = c || 'low';
+      } else if ((v === 'unverified' || v === 'needs_context') && c === 'high') {
+        newConfidence = 'medium';
+      } else if (v === 'verified' && !c) {
+        newConfidence = 'medium';
+      }
+
+      if (newVerdict !== v || newConfidence !== c) {
+        logger.info('Orchestrator', 'Reconciled fact_check coherence', {
+          cardId, wasVerdict: v, wasConfidence: c,
+          nowVerdict: newVerdict, nowConfidence: newConfidence,
+        });
+        cardData.verdict = newVerdict;
+        cardData.confidence = newConfidence;
+        card.populatedData = cardData;
+        card.data = cardData;
+        currentCards.set(cardId, card);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId,
+            cardType: 'fact_check',
+            data: { verdict: newVerdict, confidence: newConfidence },
+            reason: `Verdict/confidence reconciled: ${newVerdict} (${newConfidence})`,
+            source: 'reconcile',
+          });
+        }
+      }
+    }
+
+    // =====================================================
     // Post-processing: reconcile verification card statuses
     // The review phase may overwrite Phase 2.5's computed status,
     // causing the overall badge to contradict individual source icons.
