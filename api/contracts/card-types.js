@@ -549,9 +549,18 @@ function getCardTypeSchemaForTypes(cardTypes) {
       for (const [field, fieldDef] of Object.entries(def.schema)) {
         const desc = fieldDef.description || '';
         const enumStr = fieldDef.enum ? ` [${fieldDef.enum.join('|')}]` : '';
-        const line = `${field}: ${fieldDef.type}${enumStr} — ${desc}`;
-        if (fieldDef.required) required.push(line);
-        else optional.push(line);
+        if (fieldDef.type === 'array' && fieldDef.items && typeof fieldDef.items === 'object' && !fieldDef.items.type) {
+          const subFields = Object.entries(fieldDef.items)
+            .map(([sf, sd]) => `${sf}${sd.required ? '*' : ''}`)
+            .join(', ');
+          const line = `${field}: array of {${subFields}} — ${desc}`;
+          if (fieldDef.required) required.push(line);
+          else optional.push(line);
+        } else {
+          const line = `${field}: ${fieldDef.type}${enumStr} — ${desc}`;
+          if (fieldDef.required) required.push(line);
+          else optional.push(line);
+        }
       }
       return `## ${name}\nRequired: ${required.join('; ')}\nOptional: ${optional.join('; ')}`;
     }).join('\n\n');
