@@ -203,21 +203,6 @@ function generateShortCode() {
   return code;
 }
 
-// POST /api/scan - Upload image, get code
-// Simple test endpoint for debugging
-app.post('/api/test', (req, res) => {
-  console.log('[TEST] Headers:', req.headers);
-  console.log('[TEST] Body type:', typeof req.body);
-  console.log('[TEST] Body keys:', Object.keys(req.body || {}));
-  res.json({ 
-    received: true, 
-    bodyType: typeof req.body,
-    hasImage: !!req.body?.image,
-    imageLength: req.body?.image?.length || 0,
-    headers: req.headers['content-type']
-  });
-});
-
 app.post('/api/scan', upload.single('image'), async (req, res) => {
   console.log('[SCAN] Request received');
   console.log('[SCAN] Content-Type:', req.headers['content-type']);
@@ -1202,9 +1187,9 @@ app.post('/api/hub/v2/start', async (req, res) => {
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
 
-    const pipelineType = pipeline === 'llm2'
-      ? 'llm2'
-      : ((pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'default');
+    const pipelineType = pipeline === 'legacy'
+      ? 'legacy'
+      : ((pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'llm2');
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
@@ -1303,9 +1288,9 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
 
   const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
   const useGemini = job.pipeline === 'gemini';
-  const useLlm2 = job.pipeline === 'llm2';
-  const pipelineFn = useGemini ? runGeminiPipeline : (useLlm2 ? runPipelineV20 : runPipeline);
-  const pipelineLabel = useGemini ? 'gemini' : (useLlm2 ? 'llm2' : 'default');
+  const useLegacy = job.pipeline === 'legacy';
+  const pipelineFn = useGemini ? runGeminiPipeline : (useLegacy ? runPipeline : runPipelineV20);
+  const pipelineLabel = useGemini ? 'gemini' : (useLegacy ? 'legacy' : 'llm2');
 
   logger.startPipeline(requestId, {
     mediaType: job.mediaType,
@@ -1380,19 +1365,19 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       },
 
       onComplete: (populatedLayout) => {
-        if (useLlm2) {
-          sendEvent('complete', {
-            layout: populatedLayout.layout,
-            contentAnalysis: populatedLayout.contentAnalysis,
-            meta: populatedLayout.meta || populatedLayout._meta || {},
-            pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
-          });
+        if (useLegacy) {
+          clearInterval(keepAlive);
+          logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
+          sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
+          pipelineResult = { success: true, populatedLayout };
           return;
         }
-        clearInterval(keepAlive);
-        logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
-        sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
-        pipelineResult = { success: true, populatedLayout };
+        sendEvent('complete', {
+          layout: populatedLayout.layout,
+          contentAnalysis: populatedLayout.contentAnalysis,
+          meta: populatedLayout.meta || populatedLayout._meta || {},
+          pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
+        });
       },
 
       onSettled: (populatedLayout) => {
@@ -1502,9 +1487,9 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
     const { image, question, mediaType: rawMediaType, pipeline } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const useGeminiLegacy = pipeline === 'gemini' && process.env.GEMINI_API_KEY;
-    const useLlm2Legacy = pipeline === 'llm2';
-    const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : (useLlm2Legacy ? runPipelineV20 : runPipeline);
-    const legacyPipelineLabel = useGeminiLegacy ? 'gemini' : (useLlm2Legacy ? 'llm2' : 'default');
+    const useLegacyPipeline = pipeline === 'legacy';
+    const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : (useLegacyPipeline ? runPipeline : runPipelineV20);
+    const legacyPipelineLabel = useGeminiLegacy ? 'gemini' : (useLegacyPipeline ? 'legacy' : 'llm2');
 
     const imageSize = normalized.imageData ? Math.round(normalized.imageData.length * 0.75 / 1024) : 0;
     logger.startPipeline(requestId, {
@@ -1615,27 +1600,27 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
       },
 
       onComplete: (populatedLayout) => {
-        if (useLlm2Legacy) {
+        if (useLegacyPipeline) {
+          clearInterval(keepAlive);
+          logger.pipelineComplete(requestId, {
+            cardCount: populatedLayout.cards?.length,
+            layoutType: populatedLayout.layout?.type,
+            haikuDuration: populatedLayout._meta?.haikuDuration,
+          });
           sendEvent('complete', {
             layout: populatedLayout.layout,
             contentAnalysis: populatedLayout.contentAnalysis,
-            meta: populatedLayout.meta || populatedLayout._meta || {},
-            pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
+            meta: populatedLayout._meta,
           });
+          pipelineResult = { success: true, populatedLayout };
           return;
         }
-        clearInterval(keepAlive);
-        logger.pipelineComplete(requestId, {
-          cardCount: populatedLayout.cards?.length,
-          layoutType: populatedLayout.layout?.type,
-          haikuDuration: populatedLayout._meta?.haikuDuration,
-        });
         sendEvent('complete', {
           layout: populatedLayout.layout,
           contentAnalysis: populatedLayout.contentAnalysis,
-          meta: populatedLayout._meta,
+          meta: populatedLayout.meta || populatedLayout._meta || {},
+          pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
         });
-        pipelineResult = { success: true, populatedLayout };
       },
 
       onSettled: (populatedLayout) => {

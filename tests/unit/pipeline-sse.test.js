@@ -27,10 +27,13 @@ jest.mock('@anthropic-ai/sdk', () => ({
   })),
 }));
 
-// Mock the orchestrator to control pipeline behavior
+// Mock both orchestrators to control pipeline behavior
 const mockRunPipeline = jest.fn();
 jest.mock('../../api/agents/orchestrator-v2', () => ({
   runPipeline: mockRunPipeline,
+}));
+jest.mock('../../api/agents/orchestrator-v2-0', () => ({
+  runPipelineV20: mockRunPipeline,
 }));
 
 describe('Pipeline SSE Endpoint', () => {
@@ -60,6 +63,9 @@ describe('Pipeline SSE Endpoint', () => {
 
     jest.mock('../../api/agents/orchestrator-v2', () => ({
       runPipeline: mockRunPipeline,
+    }));
+    jest.mock('../../api/agents/orchestrator-v2-0', () => ({
+      runPipelineV20: mockRunPipeline,
     }));
 
     app = require('../../api/index');
@@ -260,6 +266,9 @@ describe('Pipeline SSE Endpoint', () => {
       }));
       jest.mock('../../api/agents/orchestrator-v2', () => ({
         runPipeline: mockRunPipeline,
+      }));
+      jest.mock('../../api/agents/orchestrator-v2-0', () => ({
+        runPipelineV20: mockRunPipeline,
       }));
 
       // The ClaudeAdapter will throw during construction when API key is missing

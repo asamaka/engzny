@@ -1,6 +1,6 @@
 {
   "name": "thinx-fun",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "thinx.fun Express app",
   "main": "api/index.js",
   "scripts": {
@@ -31,7 +31,7 @@
     "sharp": "^0.34.5"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
