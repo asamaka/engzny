@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-16** | Pipeline 2.0 slow pipeline fix (46.9s → ~39s estimated). Root cause: two sequential bottlenecks in `orchestrator-v2-0.js`. (1) pre_analysis and classify ran sequentially despite being independent — now parallelized with `Promise.all`. (2) deep_research waited for translation_verify to complete before starting (~6s blocked) — now starts immediately using pre-analysis claim. Also added a research duration cap (25s default, configurable via `RESEARCH_CAP_MS`) to prevent runaway Sonar calls from holding the SSE connection open. Triggered by report 2c2ef6ea (breaking_news, Arabic, 46913ms).
+> **2026-03-16** | Tightened post-enhance research grace period. Root cause: after enhance completes (~17-20s), Pipeline 2.0 waited up to 7.5s for deep research that often timed out without findings — inflating the reported pipeline duration past 25s. Fixed by (1) reducing RESEARCH_CAP_MS default from 25s to 20s, (2) adding POST_ENHANCE_GRACE_MS hard cap (5s default) so we never idle >5s after enhance. For the triggering report 4cc0dfaa (breaking_news, Arabic, 25001ms), this would reduce duration to ~20s. User-perceived latency (onComplete) was already ~17.5s — the extra time was only delaying the settled event.
 
 ## Open Items
 
@@ -28,8 +28,13 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Status: gathering (5/10)
 
 ## Experiment: person_card for Facebook commenters (not newsworthy)
-- Hypothesis: person_card gets populated with Facebook commenters/reactors (e.g. "Sherif Salah Afify") who are not relevant to the news story, rather than key figures mentioned in the article
+- Hypothesis: person_card gets populated with Facebook commenters/reactors who are not relevant to the news story
 - Evidence: [2c2ef6ea — "Sherif Salah Afify" as "News analyst/contributor" is actually a Facebook commenter]
+- Status: gathering (1/10)
+
+## Experiment: verification card thin when research times out
+- Hypothesis: When deep research times out, verification cards show only 1 source (from Haiku enhance) with no research summary, making the verification feel incomplete
+- Evidence: [4cc0dfaa — 1 source (Al Jazeera), no summary, research timed out]
 - Status: gathering (1/10)
 
 ## Key Context (for reference, not action items)
@@ -41,4 +46,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback.
 - fact_check verdict/confidence coherence now enforced in code (2026-03-15).
 - person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
-- Research duration cap added (2026-03-16) — 25s default via RESEARCH_CAP_MS env var.
+- Research duration cap tightened (2026-03-16) — 20s default via RESEARCH_CAP_MS + 5s POST_ENHANCE_GRACE_MS.

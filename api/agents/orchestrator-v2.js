@@ -811,8 +811,12 @@ async function runPipeline({
     // (verification sources, context, URLs) which is valuable but not critical.
     const PIPELINE_MAX_MS = parseInt(process.env.PIPELINE_MAX_DURATION || '20000', 10);
     const MIN_RESEARCH_GRACE_MS = 2000;
+    const POST_ENHANCE_GRACE_MS = parseInt(process.env.POST_ENHANCE_GRACE_MS || '5000', 10);
     const elapsedAfterEnhance = Date.now() - startTime;
-    const researchGrace = Math.max(MIN_RESEARCH_GRACE_MS, PIPELINE_MAX_MS - elapsedAfterEnhance);
+    const researchGrace = Math.min(
+      POST_ENHANCE_GRACE_MS,
+      Math.max(MIN_RESEARCH_GRACE_MS, PIPELINE_MAX_MS - elapsedAfterEnhance)
+    );
 
     let researchDeadlineTimer;
     const researchResult = await Promise.race([

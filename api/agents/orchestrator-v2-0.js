@@ -509,9 +509,13 @@ async function runPipelineV20({
       });
     }
 
-    const RESEARCH_CAP_MS = parseInt(process.env.RESEARCH_CAP_MS || '25000', 10);
+    const RESEARCH_CAP_MS = parseInt(process.env.RESEARCH_CAP_MS || '20000', 10);
+    const POST_ENHANCE_GRACE_MS = parseInt(process.env.POST_ENHANCE_GRACE_MS || '5000', 10);
     const elapsedAfterEnhance = Date.now() - startTime;
-    const researchGrace = Math.max(2000, RESEARCH_CAP_MS - elapsedAfterEnhance);
+    const researchGrace = Math.min(
+      POST_ENHANCE_GRACE_MS,
+      Math.max(2000, RESEARCH_CAP_MS - elapsedAfterEnhance)
+    );
 
     let researchCapTimer;
     const cappedResearch = Promise.race([
@@ -525,7 +529,8 @@ async function runPipelineV20({
       clearTimeout(researchCapTimer);
       if (result.timedOut) {
         logger.info('PipelineV20', 'Research cap reached — settling without findings', {
-          capMs: RESEARCH_CAP_MS, elapsed: Date.now() - startTime, graceMs: researchGrace,
+          capMs: RESEARCH_CAP_MS, postEnhanceCapMs: POST_ENHANCE_GRACE_MS,
+          elapsed: Date.now() - startTime, graceMs: researchGrace,
         });
       }
       return result;
