@@ -389,8 +389,8 @@ function findMatchingFinding(sourceName, findings) {
     if (match) return match;
   }
 
-  // 3. Keyword overlap: require ≥50% of significant words (4+ chars) to match
-  const words = (cleaned || name).split(/\s+/).filter(w => w.length >= 4);
+  // 3. Keyword overlap: require ≥50% of significant words (3+ chars) to match
+  const words = (cleaned || name).split(/\s+/).filter(w => w.length >= 3);
   if (words.length >= 1) {
     const threshold = Math.max(1, Math.ceil(words.length / 2));
     match = findings.find(f => {

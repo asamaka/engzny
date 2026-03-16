@@ -111,7 +111,7 @@ function findMatchingFinding(sourceName, findings) {
   return findings.find((finding) => {
     const haystack = findingText(finding);
     if (haystack.includes(normalized)) return true;
-    const words = normalized.split(/\s+/).filter((word) => word.length >= 4);
+    const words = normalized.split(/\s+/).filter((word) => word.length >= 3);
     if (words.length === 0) return false;
     const overlap = words.filter((word) => haystack.includes(word)).length;
     return overlap >= Math.max(1, Math.ceil(words.length / 2));
@@ -248,6 +248,40 @@ function applyResearchFindings(currentCards, researchResult, onCardUpdate) {
   for (const card of verificationCards) {
     const data = card.populatedData || card.data || {};
     const sources = normalizeSourceArray(data.sources);
+
+    if (findings.length === 0) {
+      // Research timed out or returned nothing — clear any LLM-generated summary
+      // that implies research-backed verification (the enhance phase fabricates these)
+      for (const source of sources) {
+        const norm = normalizeSourceStatus(source.status);
+        if (norm === 'checking' || norm === 'confirmed' || norm === 'denied') {
+          source.status = 'not_yet_reported';
+        }
+      }
+      const nextData = {
+        ...data,
+        sources,
+        status: 'unconfirmed',
+        summary: '',
+        lastChecked: new Date().toISOString(),
+      };
+      card.populatedData = nextData;
+      card.data = nextData;
+      currentCards.set(card.id, card);
+      changes++;
+
+      if (onCardUpdate) {
+        onCardUpdate({
+          cardId: card.id,
+          cardType: card.cardType,
+          data: nextData,
+          reason: 'Research unavailable — cleared unverified summary',
+          source: 'research',
+        });
+      }
+      continue;
+    }
+
     let updated = false;
 
     for (const source of sources) {
@@ -260,6 +294,27 @@ function applyResearchFindings(currentCards, researchResult, onCardUpdate) {
       } else if (normalizeSourceStatus(source.status) === 'checking') {
         source.status = 'not_yet_reported';
         updated = true;
+      }
+    }
+
+    // When research has verdicts but some sources weren't matched by name,
+    // infer their status from the dominant verdict. Leaving them as
+    // "not_yet_reported" while the summary says "confirmed" is contradictory.
+    const verdicts = findings
+      .filter((f) => f.factCheck?.verdict)
+      .map((f) => f.factCheck.verdict);
+    if (verdicts.length > 0) {
+      const hasPositive = verdicts.some((v) => v === 'verified' || v === 'partially_true');
+      const hasNegative = verdicts.some((v) => v === 'false' || v === 'misleading');
+      const inferredStatus = hasPositive && !hasNegative ? 'inconclusive'
+        : hasNegative && !hasPositive ? 'denied' : 'inconclusive';
+
+      for (const source of sources) {
+        const norm = normalizeSourceStatus(source.status);
+        if (norm === 'not_yet_reported' || norm === 'checking') {
+          source.status = inferredStatus;
+          updated = true;
+        }
       }
     }
 

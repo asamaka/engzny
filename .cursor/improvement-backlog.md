@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-16** | Tightened post-enhance research grace period. Root cause: after enhance completes (~17-20s), Pipeline 2.0 waited up to 7.5s for deep research that often timed out without findings — inflating the reported pipeline duration past 25s. Fixed by (1) reducing RESEARCH_CAP_MS default from 25s to 20s, (2) adding POST_ENHANCE_GRACE_MS hard cap (5s default) so we never idle >5s after enhance. For the triggering report 4cc0dfaa (breaking_news, Arabic, 25001ms), this would reduce duration to ~20s. User-perceived latency (onComplete) was already ~17.5s — the extra time was only delaying the settled event.
+> **2026-03-16** | Fixed P1: verification card showing fabricated summaries when research times out. Root cause: enhance phase (Haiku) generates plausible verification summaries ("Multiple credible sources confirm...") from screenshot context alone. When deep research times out (grace cap fires before Sonar completes), `applyResearchFindings` didn't trigger because sources weren't in "checking" state, so the fabricated summary persisted — contradicting the "not_yet_reported" source statuses. Fix: (1) Always run `applyResearchFindings` on verification cards — when research has no findings, clear the summary and normalize sources to "not_yet_reported". (2) Improved `findMatchingFinding` word threshold from 4 to 3 chars so "BBC", "CNN", "AP" etc. can match. (3) When research has verdicts but specific source names don't match, infer "inconclusive" for unmatched sources instead of leaving contradictory "not_yet_reported".
 
 ## Open Items
 
@@ -24,8 +24,8 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 ## Experiment: did_you_know_card quality issues
 - Hypothesis: did_you_know_card sometimes contains facts that are redundant with hero takeaway, contradict the main content, or are trivially obvious from the screenshot
-- Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" restates claim], [1ba66d97 — cluster munitions fact duplicates hero takeaway], [caea5011 — generic fact about Japan's missile defense, not wrong but generic]
-- Status: gathering (5/10)
+- Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" restates claim], [1ba66d97 — cluster munitions fact duplicates hero takeaway], [caea5011 — generic fact about Japan's missile defense, not wrong but generic], [4cc0dfaa — "Al Jazeera operates a dedicated Lebanon bureau" irrelevant to missile story]
+- Status: gathering (6/10)
 
 ## Experiment: person_card for Facebook commenters (not newsworthy)
 - Hypothesis: person_card gets populated with Facebook commenters/reactors who are not relevant to the news story
@@ -34,7 +34,12 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 ## Experiment: verification card thin when research times out
 - Hypothesis: When deep research times out, verification cards show only 1 source (from Haiku enhance) with no research summary, making the verification feel incomplete
-- Evidence: [4cc0dfaa — 1 source (Al Jazeera), no summary, research timed out]
+- Evidence: [4cc0dfaa — 1 source, no summary, research timed out], [f256dfce — 2 sources, fabricated summary (now fixed), research timed out at grace cap]
+- Status: gathering (2/10) — partially addressed by clearing fabricated summaries
+
+## Experiment: pipeline duration still exceeds 25s despite grace cap
+- Hypothesis: POST_ENHANCE_GRACE_MS fires correctly but total pipeline duration still exceeds threshold due to other factors (translation verify, quality gate, post-processing)
+- Evidence: [f256dfce — 29684ms despite 2s grace cap, research traces show 24.5s but should have been capped]
 - Status: gathering (1/10)
 
 ## Key Context (for reference, not action items)
@@ -47,3 +52,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - fact_check verdict/confidence coherence now enforced in code (2026-03-15).
 - person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
 - Research duration cap tightened (2026-03-16) — 20s default via RESEARCH_CAP_MS + 5s POST_ENHANCE_GRACE_MS.
+- Verification card: fabricated summaries now cleared when research unavailable (2026-03-16).
