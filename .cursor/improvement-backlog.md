@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-16** | person_card was still showing non-persons in 3/5 recent reports despite prompt-only fix from 2026-03-15. Root cause: Haiku ignores negative instructions ~60% of the time. Added code-level post-processing in orchestrator that detects organizations, news outlets, and generic titles in person_card name/role fields and converts them to source_card. Same dual-enforcement pattern used for fact_check coherence. Evidence: 1ba66d97 ("CNN International"), fce0ac87 ("Al Jazeera Egypt Bureau"), caea5011 ("Japanese Prime Minister"). Only 9f62965e ("Benjamin Netanyahu") and 30162e50 ("Sharon Cohen-ofir") had correct person_cards.
+> **2026-03-16** | Pipeline 2.0 slow pipeline fix (46.9s → ~39s estimated). Root cause: two sequential bottlenecks in `orchestrator-v2-0.js`. (1) pre_analysis and classify ran sequentially despite being independent — now parallelized with `Promise.all`. (2) deep_research waited for translation_verify to complete before starting (~6s blocked) — now starts immediately using pre-analysis claim. Also added a research duration cap (25s default, configurable via `RESEARCH_CAP_MS`) to prevent runaway Sonar calls from holding the SSE connection open. Triggered by report 2c2ef6ea (breaking_news, Arabic, 46913ms).
 
 ## Open Items
 
@@ -27,13 +27,18 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" restates claim], [1ba66d97 — cluster munitions fact duplicates hero takeaway], [caea5011 — generic fact about Japan's missile defense, not wrong but generic]
 - Status: gathering (5/10)
 
+## Experiment: person_card for Facebook commenters (not newsworthy)
+- Hypothesis: person_card gets populated with Facebook commenters/reactors (e.g. "Sherif Salah Afify") who are not relevant to the news story, rather than key figures mentioned in the article
+- Evidence: [2c2ef6ea — "Sherif Salah Afify" as "News analyst/contributor" is actually a Facebook commenter]
+- Status: gathering (1/10)
+
 ## Key Context (for reference, not action items)
 
 - 100% of users are mobile (iPhone, 393x852). All changes must be mobile-first.
-- Array sub-field schemas now included in enhance/review prompts (2026-03-15) — reduces LLM field name improvisation.
+- Pipeline 2.0 (llm2) is default: pre_analysis ∥ classify → enhance ∥ translation_verify ∥ deep_research.
 - Pipeline durations are 15-20s typically. Sonar deep research (20-25s) is the external bottleneck.
 - CSS cascade: the `@layer base` reset fix resolved all DaisyUI spacing issues.
 - Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback.
-- fact_check verdict/confidence coherence now enforced in code (2026-03-15) — prompt + code dual enforcement.
-- verification_card source snippets must be unique per source (2026-03-14).
+- fact_check verdict/confidence coherence now enforced in code (2026-03-15).
 - person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
+- Research duration cap added (2026-03-16) — 25s default via RESEARCH_CAP_MS env var.

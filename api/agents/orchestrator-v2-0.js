@@ -353,37 +353,36 @@ async function runPipelineV20({
     if (onBlueprint) onBlueprint(skeleton);
     if (onProgress) onProgress({ phase: 'pre_analysis', progress: 5, message: 'Scanning screenshot structure...' });
 
-    if (onPhase) onPhase({ phase: 'pre_analysis', message: 'Pre-analysis and language detection...' });
+    if (onPhase) onPhase({ phase: 'pre_analysis', message: 'Pre-analysis and classification...' });
 
-    const preAnalysisStartedAt = Date.now();
-    const preAnalysis = await preAnalyze({
-      imageData,
-      mediaType,
-      question,
-      adapterConfig: { ...adapterConfig, traceCollector },
-    });
-    durations.preAnalysisDuration = Date.now() - preAnalysisStartedAt;
+    const parallelStartedAt = Date.now();
+    const [preAnalysis, rawBlueprint] = await Promise.all([
+      preAnalyze({
+        imageData,
+        mediaType,
+        question,
+        adapterConfig: { ...adapterConfig, traceCollector },
+      }),
+      fastClassify({
+        imageData,
+        mediaType,
+        question,
+        adapterConfig: { ...adapterConfig, traceCollector },
+      }),
+    ]);
+    const parallelDuration = Date.now() - parallelStartedAt;
+    durations.preAnalysisDuration = parallelDuration;
+    durations.classifyDuration = parallelDuration;
 
     if (onProgress) {
       onProgress({
         phase: 'classifying',
         progress: 15,
         message: preAnalysis.requiresTranslationVerification
-          ? 'Verifying translated claim and classifying layout...'
-          : 'Classifying layout...',
+          ? 'Verifying translated claim and populating cards...'
+          : 'Populating cards...',
       });
     }
-
-    if (onPhase) onPhase({ phase: 'classifying', message: 'Verified classification...' });
-
-    const classifyStartedAt = Date.now();
-    const rawBlueprint = await fastClassify({
-      imageData,
-      mediaType,
-      question,
-      adapterConfig: { ...adapterConfig, traceCollector },
-    });
-    durations.classifyDuration = Date.now() - classifyStartedAt;
 
     const adaptedBlueprint = adaptBlueprintForPreAnalysis(rawBlueprint || createSkeletonBlueprint(), preAnalysis);
     const blueprint = {
@@ -460,24 +459,19 @@ async function runPipelineV20({
 
     const contentType = blueprint.contentAnalysis?.contentType || 'general';
     const skipResearch = !RESEARCH_WORTHY_TYPES.has(contentType);
-    const researchPromise = (async () => {
-      const translationVerification = await translationPromise;
-      if (skipResearch) {
-        return { findings: [], duration: 0, skipped: true };
-      }
-      return deepResearch({
-        contentAnalysis: blueprint.contentAnalysis,
-        cards: Array.from(currentCards.values()),
-        imageData,
-        mediaType,
-        preAnalysis,
-        translationVerification,
-        adapterConfig: { ...adapterConfig, traceCollector },
-      }).catch((error) => {
-        logger.warn('PipelineV20', 'Deep research failed (non-fatal)', { err: error.message });
-        return { findings: [], duration: 0, error: error.message };
-      });
-    })();
+    const researchPromise = skipResearch
+      ? Promise.resolve({ findings: [], duration: 0, skipped: true })
+      : deepResearch({
+          contentAnalysis: blueprint.contentAnalysis,
+          cards: Array.from(currentCards.values()),
+          imageData,
+          mediaType,
+          preAnalysis,
+          adapterConfig: { ...adapterConfig, traceCollector },
+        }).catch((error) => {
+          logger.warn('PipelineV20', 'Deep research failed (non-fatal)', { err: error.message });
+          return { findings: [], duration: 0, error: error.message };
+        });
 
     const enhanceResult = await enhancePromise;
     durations.enhanceDuration = Date.now() - enhanceStartedAt;
@@ -515,9 +509,31 @@ async function runPipelineV20({
       });
     }
 
+    const RESEARCH_CAP_MS = parseInt(process.env.RESEARCH_CAP_MS || '25000', 10);
+    const elapsedAfterEnhance = Date.now() - startTime;
+    const researchGrace = Math.max(2000, RESEARCH_CAP_MS - elapsedAfterEnhance);
+
+    let researchCapTimer;
+    const cappedResearch = Promise.race([
+      researchPromise,
+      new Promise((resolve) => {
+        researchCapTimer = setTimeout(() => resolve({
+          findings: [], timedOut: true, duration: Date.now() - startTime,
+        }), researchGrace);
+      }),
+    ]).then((result) => {
+      clearTimeout(researchCapTimer);
+      if (result.timedOut) {
+        logger.info('PipelineV20', 'Research cap reached — settling without findings', {
+          capMs: RESEARCH_CAP_MS, elapsed: Date.now() - startTime, graceMs: researchGrace,
+        });
+      }
+      return result;
+    });
+
     const [translationVerification, researchResult] = await Promise.all([
       translationPromise,
-      researchPromise,
+      cappedResearch,
     ]);
 
     durations.translationVerificationDuration = translationVerification.skipped ? 0 : (translationVerification.duration || 0);
