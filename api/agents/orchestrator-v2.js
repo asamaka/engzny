@@ -43,6 +43,55 @@ function isValidUrl(url) {
   }
 }
 
+const ORG_ROLE_KEYWORDS = new Set([
+  'news organization', 'news source', 'news outlet', 'news agency',
+  'media organization', 'media outlet', 'media company', 'media group',
+  'publication', 'publisher', 'broadcaster', 'network',
+  'government body', 'military organization', 'political party',
+  'organization', 'institution', 'agency', 'bureau',
+  'breaking news', 'news / breaking news',
+]);
+
+const ORG_NAME_PATTERNS = [
+  /\b(News|Bureau|Channel|International|Network|Agency|Organisation|Organization|Guard|Corps|Authority|Ministry|Committee|Foundation|Institute|Council|Commission|Association|Federation|Union)\b/i,
+  /\b(Al Jazeera|CNN|BBC|Reuters|AP News|Fox News|MSNBC|NBC|CBS|ABC|Sky News|France 24|RT|NHK|Xinhua|TASS|DW|NPR)\b/i,
+  /\b(New York Times|Washington Post|Guardian|Financial Times|Wall Street Journal|Times of Israel|Jerusalem Post|Haaretz)\b/i,
+];
+
+const GENERIC_TITLE_PATTERNS = [
+  /^(the\s+)?(president|prime minister|minister|chairman|secretary|director|leader|commander|spokesperson|official|ambassador|governor|mayor|chancellor)\b/i,
+  /^(japanese|chinese|russian|american|british|french|german|iranian|israeli|indian|turkish|saudi|egyptian|iraqi|syrian)\s+(president|prime minister|minister|official|leader|commander|ambassador|spokesman)\b/i,
+];
+
+function isLikelyNotAPerson(name, role) {
+  if (ORG_ROLE_KEYWORDS.has(role.trim())) return true;
+  for (const keyword of ORG_ROLE_KEYWORDS) {
+    if (role.includes(keyword)) return true;
+  }
+
+  for (const pattern of ORG_NAME_PATTERNS) {
+    if (pattern.test(name)) return true;
+  }
+
+  for (const pattern of GENERIC_TITLE_PATTERNS) {
+    if (pattern.test(name)) return true;
+  }
+
+  const nameParts = name.split(/\s+/).filter(p => p.length > 1);
+  if (nameParts.length === 1 && name.length > 3) {
+    if (/^[A-Z]/.test(name) && !/^[A-Z][a-z]+$/.test(name)) return true;
+  }
+
+  return false;
+}
+
+function guessSourceType(role) {
+  if (/news|media|press|broadcast|journal/i.test(role)) return 'news_agency';
+  if (/government|official|ministry/i.test(role)) return 'official';
+  if (/military|guard|army|force/i.test(role)) return 'official';
+  return 'news_agency';
+}
+
 const RESEARCH_WORTHY_TYPES = new Set([
   'breaking_news', 'news', 'emergency', 'sports', 'science',
   'health', 'finance', 'tech', 'social_media',
@@ -1090,6 +1139,52 @@ async function runPipeline({
       });
     } else {
       logger.info('Orchestrator', 'Skipping Phase 3 (no research findings, all cards populated)');
+    }
+
+    // =====================================================
+    // Post-processing: enforce person_card must be a named human
+    // Haiku ignores the prompt instruction ~60% of the time, producing
+    // person_cards for news outlets ("CNN International"), organizations
+    // ("Iranian Revolutionary Guard"), or generic titles ("Japanese
+    // Prime Minister"). Convert these to source_card when detected.
+    // =====================================================
+    for (const [cardId, card] of currentCards) {
+      if (card.cardType !== 'person_card') continue;
+      const cardData = card.populatedData || card.data || {};
+      const name = (cardData.name || '').trim();
+      const role = (cardData.role || '').toLowerCase();
+
+      if (!name || isLikelyNotAPerson(name, role)) {
+        logger.info('Orchestrator', 'Converting non-person person_card to source_card', {
+          cardId, name, role,
+        });
+
+        card.cardType = 'source_card';
+        const sourceData = {
+          name: name || 'Unknown Source',
+          type: guessSourceType(role),
+          credibility: 'unknown',
+          context: cardData.context || '',
+        };
+        if (cardData.handle) sourceData.profileUrl = cardData.profileUrl;
+        if (cardData.details && Array.isArray(cardData.details)) {
+          sourceData.context = (sourceData.context + ' ' + cardData.details.join('. ')).trim().slice(0, 200);
+        }
+
+        card.populatedData = sourceData;
+        card.data = sourceData;
+        currentCards.set(cardId, card);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId,
+            cardType: 'source_card',
+            data: sourceData,
+            reason: `Converted non-person "${name}" from person_card to source_card`,
+            source: 'reconcile',
+          });
+        }
+      }
     }
 
     // =====================================================

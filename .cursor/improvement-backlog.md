@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-15** | Fixed person_card showing non-persons (news outlets, organizations, generic titles). Root cause: enhance prompt said "ALWAYS include name, role, and context even if sparse" without specifying it must be an actual person. Added explicit constraints in enhance prompt, card-researcher prompt, and card-types schema. 5/6 recent reports had non-persons in person_card: fce0ac87 ("Al Jazeera Egypt Bureau"), caea5011 ("Japanese Prime Minister"), fb0258e2 ("Al Jazeera Palestine"), 7b72578c ("Iranian Revolutionary Guard"), f2e3213a ("Time Out Editorial"). Only 9f62965e had correct person ("Benjamin Netanyahu").
+> **2026-03-16** | person_card was still showing non-persons in 3/5 recent reports despite prompt-only fix from 2026-03-15. Root cause: Haiku ignores negative instructions ~60% of the time. Added code-level post-processing in orchestrator that detects organizations, news outlets, and generic titles in person_card name/role fields and converts them to source_card. Same dual-enforcement pattern used for fact_check coherence. Evidence: 1ba66d97 ("CNN International"), fce0ac87 ("Al Jazeera Egypt Bureau"), caea5011 ("Japanese Prime Minister"). Only 9f62965e ("Benjamin Netanyahu") and 30162e50 ("Sharon Cohen-ofir") had correct person_cards.
 
 ## Open Items
 
@@ -23,9 +23,9 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
 ## Experiment: did_you_know_card quality issues
-- Hypothesis: did_you_know_card sometimes contains facts that contradict the main content or are trivially obvious from the screenshot
-- Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" is trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" is restating the claim]
-- Status: gathering (3/10)
+- Hypothesis: did_you_know_card sometimes contains facts that are redundant with hero takeaway, contradict the main content, or are trivially obvious from the screenshot
+- Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" restates claim], [1ba66d97 — cluster munitions fact duplicates hero takeaway], [caea5011 — generic fact about Japan's missile defense, not wrong but generic]
+- Status: gathering (5/10)
 
 ## Key Context (for reference, not action items)
 
@@ -36,4 +36,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback.
 - fact_check verdict/confidence coherence now enforced in code (2026-03-15) — prompt + code dual enforcement.
 - verification_card source snippets must be unique per source (2026-03-14).
-- person_card now explicitly requires a named individual human being (2026-03-15) — prompt + schema enforcement across enhance, card-researcher, and card-types.
+- person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
