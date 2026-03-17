@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-17** | Fixed P1: timeline cards consistently useless — only showed 2-3 generic events restating the headline ("4 hours ago: Al Jazeera posts report"). Root cause: enhance phase (Haiku) only sees the screenshot, which has minimal chronological data, and `applyResearchToCards` had no enrichment path for timeline cards. Fix: added `enrichTimelineFromResearch` that scans all research findings for relevant chronological context, extracts dates when available, deduplicates against existing events, and appends them as new timeline events (capped at 6 total). Called in both LLM review and programmatic enrichment paths.
+> **2026-03-17** | Fixed P1: did_you_know_card consistently low quality — 64% bad/wrong rate across 11 reports. Root cause: enhance prompt gave Haiku zero guidance on DYK quality, so it restated article content, made generic observations, or produced facts about the news source. Fix: (1) Added specific DYK instructions in enhance prompt — must be background context not visible in screenshot, with examples of good vs bad facts; (2) Added post-processing in orchestrator that detects DYK facts with >50% word overlap with hero card and replaces them from research findings when available.
 
 ## Open Items
 
@@ -22,11 +22,6 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-## Experiment: did_you_know_card quality issues
-- Hypothesis: did_you_know_card sometimes contains facts that are redundant with hero takeaway, contradict the main content, or are trivially obvious from the screenshot
-- Evidence: [f2e3213a — "Melbourne ranks 21st" when article says #1], [30162e50 — "post received 6 reactions" trivially visible], [fce0ac87 — "90-minute interval suggests coordinated waves" restates claim], [1ba66d97 — cluster munitions fact duplicates hero takeaway], [caea5011 — generic fact about Japan's missile defense, not wrong but generic], [4cc0dfaa — "Al Jazeera operates a dedicated Lebanon bureau" irrelevant to missile story], [8a28cb0e — عاجل (Ajal) explanation is actually useful for non-Arabic speakers]
-- Status: gathering (7/10) — note: 8a28cb0e was a GOOD example, suggesting quality varies significantly
-
 ## Experiment: person_card for Facebook commenters (not newsworthy)
 - Hypothesis: person_card gets populated with Facebook commenters/reactors who are not relevant to the news story
 - Evidence: [2c2ef6ea — "Sherif Salah Afify" as "News analyst/contributor" is actually a Facebook commenter]
@@ -34,7 +29,7 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 ## Experiment: verification card thin when research times out
 - Hypothesis: When deep research times out, verification cards show only 1 source (from Haiku enhance) with no research summary, making the verification feel incomplete
-- Evidence: [4cc0dfaa — 1 source, no summary, research timed out], [f256dfce — 2 sources, fabricated summary (now fixed), research timed out at grace cap]
+- Evidence: [4cc0dfaa — 1 source, no summary, research timed out], [f256dfce — 2 sources, research timed out at grace cap]
 - Status: gathering (2/10) — partially addressed by clearing fabricated summaries
 
 ## Experiment: pipeline duration still exceeds 25s despite grace cap
@@ -54,3 +49,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Research duration cap tightened (2026-03-16) — 20s default via RESEARCH_CAP_MS + 5s POST_ENHANCE_GRACE_MS.
 - Verification card: fabricated summaries now cleared when research unavailable (2026-03-16).
 - Timeline card: research findings now enriched into timeline events (2026-03-17).
+- DYK card: enhance prompt now has specific quality guidance + post-processing replaces redundant facts from research (2026-03-17).

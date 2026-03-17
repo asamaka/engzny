@@ -171,6 +171,7 @@ ${preAnalysis ? `\n**Pre-analysis hints:** ${JSON.stringify({
 - Use emoji liberally for visual interest
 - Total cards 4-7 — quality over quantity
 - For product_card: features/warnings must be plain strings
+- For did_you_know_card: The fact MUST be background context the user would NOT know just from reading the screenshot. BAD: restating article content, facts about the news source ("Al Jazeera has a bureau in X"), trivially visible info ("post has 6 reactions"), generic observations. GOOD: technical explanations (how cluster munitions work), cultural context (what عاجل means in Arabic media), historical significance, geographical/political background. Think: "What would a knowledgeable editor add as a sidebar to help readers understand?"
 - IMPORTANT: Call MULTIPLE tools in a SINGLE response — populate 3-5 cards at once, not one at a time
 
 **Breaking news rules:**

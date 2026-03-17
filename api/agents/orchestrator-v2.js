@@ -1296,6 +1296,70 @@ async function runPipeline({
     }
 
     // =====================================================
+    // Post-processing: validate did_you_know_card quality
+    // Haiku frequently generates DYK facts that restate the hero card
+    // or paraphrase what's already visible in the screenshot.
+    // Detect high overlap with hero content and replace from research.
+    // =====================================================
+    for (const [cardId, card] of currentCards) {
+      if (card.cardType !== 'did_you_know_card') continue;
+      const dykData = card.populatedData || card.data || {};
+      const fact = (dykData.fact || '').toLowerCase();
+      if (!fact || fact.length < 10) continue;
+
+      const heroEntry = Array.from(currentCards.values()).find(c => c.cardType === 'hero_summary');
+      if (!heroEntry) continue;
+      const heroData = heroEntry.populatedData || heroEntry.data || {};
+      const heroText = `${heroData.title || ''} ${heroData.subtitle || ''} ${heroData.takeaway || ''}`.toLowerCase();
+
+      const factWords = new Set(fact.split(/\s+/).filter(w => w.length > 3));
+      const heroWords = new Set(heroText.split(/\s+/).filter(w => w.length > 3));
+      if (factWords.size === 0) continue;
+      const overlap = [...factWords].filter(w => heroWords.has(w)).length;
+      const overlapRatio = overlap / factWords.size;
+
+      if (overlapRatio > 0.5 && researchResult.findings && researchResult.findings.length > 0) {
+        for (const finding of researchResult.findings) {
+          const summary = (finding.summary || '').trim();
+          if (!summary || summary.length < 30 || summary.length > 300) continue;
+
+          const findingWords = new Set(summary.toLowerCase().split(/\s+/).filter(w => w.length > 3));
+          if (findingWords.size === 0) continue;
+          const findingHeroOverlap = [...findingWords].filter(w => heroWords.has(w)).length;
+          if (findingHeroOverlap / findingWords.size > 0.4) continue;
+
+          if (/^(screenshot source|source attribution)/i.test(finding.topic)) continue;
+
+          logger.info('Orchestrator', 'Replaced redundant DYK fact from research', {
+            cardId,
+            overlapRatio: overlapRatio.toFixed(2),
+            oldFact: truncateAtWord(dykData.fact, 60),
+            newFact: truncateAtWord(summary, 60),
+          });
+
+          dykData.fact = truncateAtWord(summary, 200);
+          if (finding.sourceUrls && finding.sourceUrls[0] && isValidUrl(finding.sourceUrls[0])) {
+            dykData.sourceUrl = finding.sourceUrls[0];
+          }
+          card.populatedData = dykData;
+          card.data = dykData;
+          currentCards.set(cardId, card);
+
+          if (onCardUpdate) {
+            onCardUpdate({
+              cardId,
+              cardType: 'did_you_know_card',
+              data: dykData,
+              reason: 'Replaced redundant DYK fact with research context',
+              source: 'reconcile',
+            });
+          }
+          break;
+        }
+      }
+    }
+
+    // =====================================================
     // Post-processing: enforce fact_check verdict/confidence coherence
     // LLMs often return "verified" + "low" confidence (contradictory).
     // The prompt instructs coherence but the LLM ignores it, so we
