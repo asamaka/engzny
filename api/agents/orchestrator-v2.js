@@ -404,6 +404,96 @@ function findMatchingFinding(sourceName, findings) {
 }
 
 /**
+ * Enrich timeline cards with events derived from research findings.
+ * The enhance phase only sees the screenshot, which rarely has detailed
+ * chronology — just "4 hours ago". Research findings contain richer context
+ * (dates, related events, broader conflict timeline) that makes the
+ * timeline card actually useful.
+ */
+function enrichTimelineFromResearch({ currentCards, researchFindings, onCardUpdate }) {
+  if (!researchFindings || researchFindings.length === 0) return 0;
+  let enrichCount = 0;
+
+  for (const [cardId, card] of currentCards) {
+    if (card.cardType !== 'timeline_card') continue;
+    const cardData = card.populatedData || card.data || {};
+    const events = cardData.events || [];
+    if (events.length === 0) continue;
+
+    const MAX_TIMELINE_EVENTS = 6;
+    const existingEventText = events.map(e => (e.event || '').toLowerCase()).join(' ');
+    let addedAny = false;
+
+    for (const finding of researchFindings) {
+      if (events.length >= MAX_TIMELINE_EVENTS) break;
+
+      const topic = (finding.topic || '').trim();
+      const summary = (finding.summary || '').trim();
+      if (!topic && !summary) continue;
+
+      const fText = `${topic} ${summary}`.toLowerCase();
+      const cardSearchText = `${cardData.title || ''} ${existingEventText}`.toLowerCase();
+
+      const fWords = fText.split(/\s+/).filter(w => w.length > 3);
+      const isRelevant = fWords.some(w => cardSearchText.includes(w));
+      if (!isRelevant) continue;
+
+      const significantWords = new Set(fText.split(/\s+/).filter(w => w.length > 4));
+      if (significantWords.size > 0) {
+        const covered = [...significantWords].filter(w => existingEventText.includes(w)).length;
+        if (covered / significantWords.size > 0.5) continue;
+      }
+
+      if (/^(screenshot source|source attribution|status from other)/i.test(topic)) continue;
+
+      const datePatterns = [
+        /\b((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})\b/i,
+        /\b(\d{4}-\d{2}-\d{2})\b/,
+        /\b(week\s+\d+)\b/i,
+      ];
+      let dateStr = null;
+      for (const pattern of datePatterns) {
+        const m = summary.match(pattern) || topic.match(pattern);
+        if (m) { dateStr = m[1]; break; }
+      }
+
+      const eventDesc = truncateAtWord(topic.length > 5 ? topic : summary, 80);
+      const newEvent = {
+        date: dateStr || 'Context',
+        event: eventDesc,
+        highlight: false,
+      };
+      if (finding.sourceUrls && finding.sourceUrls[0] && isValidUrl(finding.sourceUrls[0])) {
+        newEvent.url = finding.sourceUrls[0];
+      }
+
+      events.push(newEvent);
+      addedAny = true;
+    }
+
+    if (addedAny) {
+      const updatedData = { ...cardData, events };
+      card.populatedData = updatedData;
+      card.data = updatedData;
+      currentCards.set(cardId, card);
+      enrichCount++;
+
+      if (onCardUpdate) {
+        onCardUpdate({
+          cardId,
+          cardType: 'timeline_card',
+          data: updatedData,
+          reason: 'Research findings added as timeline events',
+          source: 'research-enrich',
+        });
+      }
+    }
+  }
+
+  return enrichCount;
+}
+
+/**
  * Programmatically apply research findings to populated cards.
  * Matches findings to cards by keyword overlap and adds sourceUrls,
  * context, and other enrichment data — without an LLM call.
@@ -1127,6 +1217,14 @@ async function runPipeline({
         return { actions: [], duration: 0 };
       });
 
+      if (hasResearchFindings) {
+        enrichTimelineFromResearch({
+          currentCards,
+          researchFindings: researchResult.findings,
+          onCardUpdate,
+        });
+      }
+
       logger.info('Orchestrator', 'Phase 3 complete (LLM)', {
         reviewActions: reviewResult.actions?.length || 0,
       });
@@ -1137,9 +1235,15 @@ async function runPipeline({
         researchFindings: researchResult.findings,
         onCardUpdate,
       });
+      const timelineEnrichCount = enrichTimelineFromResearch({
+        currentCards,
+        researchFindings: researchResult.findings,
+        onCardUpdate,
+      });
       logger.info('Orchestrator', 'Phase 3: Programmatic research enrichment (skipped LLM)', {
         findings: researchResult.findings.length,
         cardsEnriched: enrichCount,
+        timelinesEnriched: timelineEnrichCount,
       });
     } else {
       logger.info('Orchestrator', 'Skipping Phase 3 (no research findings, all cards populated)');
