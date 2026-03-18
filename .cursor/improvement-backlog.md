@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-17** | Fixed P1: did_you_know_card consistently low quality — 64% bad/wrong rate across 11 reports. Root cause: enhance prompt gave Haiku zero guidance on DYK quality, so it restated article content, made generic observations, or produced facts about the news source. Fix: (1) Added specific DYK instructions in enhance prompt — must be background context not visible in screenshot, with examples of good vs bad facts; (2) Added post-processing in orchestrator that detects DYK facts with >50% word overlap with hero card and replaces them from research findings when available.
+> **2026-03-18** | Fixed P1: irrelevant person_card from secondary content. Report 0b69e9a9 (Morocco AFCON) showed a person_card for "Yariv Levin" — an Israeli politician visible only in secondary text at bottom of screenshot, completely unrelated to the main story. The LLM itself said "Connection to this sports story unclear." Root cause: `adaptBlueprintForPreAnalysis` kept person_card for ANY named person regardless of confidence. Fix: (1) Only keep person_card skeleton when pre-analysis has a named person with medium/high confidence — low-confidence names from secondary content get source_card instead; (2) Quality gate safety net detects when enhance LLM flags person as irrelevant (e.g., "unclear", "unrelated" in context) and converts to source_card.
 
 ## Open Items
 
@@ -25,15 +25,15 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 ## Experiment: person_card for Facebook commenters (not newsworthy)
 - Hypothesis: person_card gets populated with Facebook commenters/reactors who are not relevant to the news story
 - Evidence: [2c2ef6ea — "Sherif Salah Afify" as "News analyst/contributor" is actually a Facebook commenter]
-- Status: gathering (1/10)
+- Status: gathering (1/10) — partially addressed by low-confidence filtering
 
 ## Experiment: verification card thin when research times out
-- Hypothesis: When deep research times out, verification cards show only 1 source (from Haiku enhance) with no research summary, making the verification feel incomplete
-- Evidence: [4cc0dfaa — 1 source, no summary, research timed out], [f256dfce — 2 sources, research timed out at grace cap]
+- Hypothesis: When deep research times out, verification cards show only 1 source with no research summary
+- Evidence: [4cc0dfaa — 1 source, no summary], [f256dfce — 2 sources, research timed out at grace cap]
 - Status: gathering (2/10) — partially addressed by clearing fabricated summaries
 
 ## Experiment: pipeline duration still exceeds 25s despite grace cap
-- Hypothesis: POST_ENHANCE_GRACE_MS fires correctly but total pipeline duration still exceeds threshold due to other factors
+- Hypothesis: POST_ENHANCE_GRACE_MS fires correctly but total pipeline duration still exceeds threshold
 - Evidence: [f256dfce — 29684ms], [2c2ef6ea — 46913ms extremely slow]
 - Status: gathering (2/10)
 
@@ -46,6 +46,7 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Client screenshots now use viewport-cropped foreignObject capture with dom-to-image-more fallback.
 - fact_check verdict/confidence coherence now enforced in code (2026-03-15).
 - person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
+- person_card relevance filtering (2026-03-18) — low-confidence pre-analysis people no longer get skeleton cards; quality gate catches LLM-flagged irrelevance.
 - Research duration cap tightened (2026-03-16) — 20s default via RESEARCH_CAP_MS + 5s POST_ENHANCE_GRACE_MS.
 - Verification card: fabricated summaries now cleared when research unavailable (2026-03-16).
 - Timeline card: research findings now enriched into timeline events (2026-03-17).

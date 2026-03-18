@@ -236,7 +236,9 @@ function adaptBlueprintForPreAnalysis(blueprint, preAnalysis = {}) {
   if (!blueprint || !Array.isArray(blueprint.cards)) return blueprint;
 
   const namedPeople = Array.isArray(preAnalysis.namedPeople) ? preAnalysis.namedPeople : [];
-  const hasNamedPerson = namedPeople.some((person) => typeof person?.name === 'string' && person.name.trim());
+  const hasRelevantPerson = namedPeople.some(
+    (person) => typeof person?.name === 'string' && person.name.trim() && person.confidence !== 'low'
+  );
   const sourceName = preAnalysis.sourceAttribution?.name || null;
   const sourceType = preAnalysis.sourceAttribution?.type || 'unknown';
 
@@ -244,7 +246,7 @@ function adaptBlueprintForPreAnalysis(blueprint, preAnalysis = {}) {
 
   for (let i = 0; i < nextCards.length; i++) {
     const card = nextCards[i];
-    if (card.cardType !== 'person_card' || hasNamedPerson) continue;
+    if (card.cardType !== 'person_card' || hasRelevantPerson) continue;
 
     nextCards[i] = {
       ...card,

@@ -140,6 +140,26 @@ function reconcileVerificationData(data = {}) {
   };
 }
 
+const IRRELEVANT_PERSON_SIGNALS = [
+  /\bunclear\b/i,
+  /\bunrelated\b/i,
+  /\brequires?\s+verification\b/i,
+  /\bnot\s+(?:directly\s+)?relat(?:ed|able)\b/i,
+  /\bconnection\b[^.]{0,30}\bunclear\b/i,
+  /\birrelevant\b/i,
+  /\bnot\s+(?:directly\s+)?connected\b/i,
+];
+
+function hasIrrelevanceSignals(data) {
+  const textFields = [
+    data.context || '',
+    data.notableInfo || '',
+    ...(Array.isArray(data.details) ? data.details : []),
+  ].join(' ');
+  if (!textFields.trim()) return false;
+  return IRRELEVANT_PERSON_SIGNALS.some((pattern) => pattern.test(textFields));
+}
+
 function reconcilePersonCard(card, context = {}) {
   const data = sanitizeUrlsDeep(card.populatedData || card.data || {});
   const name = typeof data.name === 'string' ? data.name.trim() : '';
@@ -190,6 +210,30 @@ function reconcilePersonCard(card, context = {}) {
         },
       },
       reason: 'Converted organization-like person_card to source_card',
+    };
+  }
+
+  if (hasIrrelevanceSignals(data)) {
+    const sourceName = context.preAnalysis?.sourceAttribution?.name || name;
+    return {
+      changed: true,
+      card: {
+        ...card,
+        cardType: 'source_card',
+        populatedData: {
+          name: sourceName,
+          type: context.preAnalysis?.sourceAttribution?.type || 'unknown',
+          credibility: 'unknown',
+          context: `${name} mentioned in secondary content. ${data.context || ''}`.trim().slice(0, 200),
+        },
+        data: {
+          name: sourceName,
+          type: context.preAnalysis?.sourceAttribution?.type || 'unknown',
+          credibility: 'unknown',
+          context: `${name} mentioned in secondary content. ${data.context || ''}`.trim().slice(0, 200),
+        },
+      },
+      reason: `Converted irrelevant person_card "${name}" to source_card — LLM flagged unclear relevance`,
     };
   }
 
