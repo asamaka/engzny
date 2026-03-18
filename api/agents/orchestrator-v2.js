@@ -21,6 +21,8 @@
 const { fastClassify } = require('./fast-classifier');
 const { enhance } = require('./sonnet-enhancer');
 const { deepResearch } = require('./deep-researcher');
+const { geminiAnalyze, toBlueprintAndCards } = require('./gemini-analyzer');
+const { isGeminiAvailable } = require('../llm');
 const { logger } = require('../lib/logger');
 const { TraceCollector } = require('../lib/llm-trace');
 
@@ -653,6 +655,25 @@ async function runPipeline({
         phase: 'classifying',
         progress: 5,
         message: 'Analyzing screenshot...',
+      });
+    }
+
+    // =====================================================
+    // Gemini Pipeline: Single-call analysis + web search
+    // When PIPELINE_MODE=gemini, skip the multi-phase flow entirely.
+    // One Gemini call with Google Search grounding does:
+    // classify + enhance + research + verify in ~16-24s.
+    // =====================================================
+    const useGeminiPipeline = (process.env.PIPELINE_MODE || '').toLowerCase() === 'gemini'
+      && isGeminiAvailable();
+
+    if (useGeminiPipeline) {
+      return await runGeminiPipeline({
+        imageData, mediaType, question,
+        skeleton, startTime, traceCollector,
+        onBlueprint, onLayoutUpdate, onCardPopulated, onCardUpdate,
+        onCardAdd, onPhase, onComplete, onError, onProgress,
+        adapterConfig,
       });
     }
 
@@ -1788,6 +1809,231 @@ async function runPipeline({
     logger.error('Orchestrator', 'Pipeline error', {
       err: error.message,
       stack: error.stack?.split('\n').slice(0, 3).join(' | '),
+    });
+    if (onError) {
+      onError(error);
+    } else {
+      throw error;
+    }
+  }
+}
+
+/**
+ * Gemini-only pipeline — single API call replaces classify + enhance + research.
+ * Gemini 2.5 Flash with Google Search grounding sees the screenshot and
+ * searches the web simultaneously, returning fully populated card data.
+ */
+async function runGeminiPipeline({
+  imageData, mediaType, question,
+  skeleton, startTime, traceCollector,
+  onBlueprint, onLayoutUpdate, onCardPopulated, onCardUpdate,
+  onCardAdd, onPhase, onComplete, onError, onProgress,
+  adapterConfig,
+}) {
+  logger.info('Orchestrator', 'Gemini pipeline: single-call analysis + web search');
+
+  if (onPhase) {
+    onPhase({ phase: 'analyzing', message: 'Analyzing with web search...' });
+  }
+
+  const progressMessages = [
+    'Reading screenshot...',
+    'Searching news sources...',
+    'Verifying claims...',
+    'Cross-referencing sources...',
+    'Building timeline...',
+    'Analyzing context...',
+    'Checking multiple outlets...',
+    'Compiling verified findings...',
+    'Almost there...',
+  ];
+  let msgIdx = 0;
+  const heartbeat = setInterval(() => {
+    if (onProgress) {
+      msgIdx = Math.min(msgIdx + 1, progressMessages.length - 1);
+      const progress = Math.min(10 + msgIdx * 10, 90);
+      onProgress({
+        phase: 'analyzing',
+        progress,
+        message: progressMessages[msgIdx],
+      });
+    }
+  }, 3000);
+
+  try {
+    const result = await geminiAnalyze({
+      imageData,
+      mediaType,
+      question,
+      adapterConfig: { ...adapterConfig, traceCollector },
+    });
+
+    clearInterval(heartbeat);
+
+    if (!result || !result.analysis) {
+      logger.warn('Orchestrator', 'Gemini analysis returned null — falling back to classic pipeline');
+      clearInterval(heartbeat);
+      // Fall back: re-enter the classic pipeline by calling runPipeline with
+      // PIPELINE_MODE overridden. We can't easily do this without recursion,
+      // so instead we throw a specific error that the caller can catch.
+      const fallbackError = new Error('Gemini analysis failed — please retry');
+      fallbackError.code = 'GEMINI_FALLBACK';
+      throw fallbackError;
+    }
+
+    const blueprint = toBlueprintAndCards(result.analysis);
+    const geminiDuration = Date.now() - startTime;
+
+    logger.info('Orchestrator', 'Gemini analysis complete', {
+      dur: geminiDuration,
+      contentType: blueprint.contentAnalysis?.contentType,
+      layoutType: blueprint.layout?.type,
+      cardCount: blueprint.cards?.length,
+      groundingSources: result.groundingSources,
+      model: result.model,
+    });
+
+    if (onLayoutUpdate) {
+      onLayoutUpdate(blueprint);
+    }
+
+    if (onProgress) {
+      onProgress({
+        phase: 'populating',
+        progress: 85,
+        message: 'Rendering cards...',
+      });
+    }
+
+    // Send each card as a populated event with a small stagger
+    // for the card-by-card animation effect
+    const finalCards = new Map();
+    for (let i = 0; i < blueprint.cards.length; i++) {
+      const card = blueprint.cards[i];
+      finalCards.set(card.id, card);
+
+      if (onCardPopulated) {
+        onCardPopulated({
+          cardId: card.id,
+          cardType: card.cardType,
+          data: card.populatedData || card.data,
+          completedCount: i + 1,
+          totalCount: blueprint.cards.length,
+        });
+      }
+    }
+
+    // Post-processing: validate verification card status consistency
+    for (const [cardId, card] of finalCards) {
+      if (card.cardType !== 'verification_card') continue;
+      const cardData = card.populatedData || card.data || {};
+      const sources = cardData.sources || [];
+      if (sources.length === 0) continue;
+
+      normalizeSourceArray(sources);
+      for (const src of sources) {
+        if (!src.name && src.source) src.name = src.source;
+        src.status = normalizeSourceStatus(src.status);
+      }
+      const correctStatus = computeVerificationStatus(sources);
+      if (cardData.status !== correctStatus) {
+        cardData.status = correctStatus;
+        card.populatedData = cardData;
+        card.data = cardData;
+        finalCards.set(cardId, card);
+      }
+    }
+
+    // Post-processing: person_card org/generic check
+    for (const [cardId, card] of finalCards) {
+      if (card.cardType !== 'person_card') continue;
+      const cardData = card.populatedData || card.data || {};
+      const name = (cardData.name || '').trim();
+      const role = (cardData.role || '').toLowerCase();
+
+      if (!name || isLikelyNotAPerson(name, role)) {
+        card.cardType = 'source_card';
+        card.populatedData = {
+          name: name || 'Unknown Source',
+          type: guessSourceType(role),
+          credibility: 'unknown',
+          context: cardData.context || '',
+        };
+        card.data = card.populatedData;
+        finalCards.set(cardId, card);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId, cardType: 'source_card',
+            data: card.populatedData,
+            reason: `Converted "${name}" from person_card to source_card`,
+            source: 'reconcile',
+          });
+        }
+      }
+    }
+
+    // Sync hero investigationStatus with verification card
+    const heroCard = Array.from(finalCards.values()).find(c => c.cardType === 'hero_summary');
+    const vCard = Array.from(finalCards.values()).find(c => c.cardType === 'verification_card');
+    if (heroCard && vCard) {
+      const vData = vCard.populatedData || vCard.data || {};
+      const heroData = heroCard.populatedData || heroCard.data || {};
+      const vs = vData.status;
+      let investigationStatus;
+      if (vs === 'verified' || vs === 'confirmed') investigationStatus = 'confirmed';
+      else if (vs === 'denied' || vs === 'false') investigationStatus = 'unconfirmed';
+      else if (vs === 'partially_verified' || vs === 'conflicting') investigationStatus = 'mixed';
+      else investigationStatus = 'unconfirmed';
+
+      if (heroData.investigationStatus !== investigationStatus) {
+        heroData.investigationStatus = investigationStatus;
+        heroCard.populatedData = heroData;
+        heroCard.data = heroData;
+        finalCards.set(heroCard.id, heroCard);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId: heroCard.id, cardType: 'hero_summary',
+            data: { investigationStatus },
+            reason: `Investigation ${investigationStatus}`,
+            source: 'status',
+          });
+        }
+      }
+    }
+
+    const totalDuration = Date.now() - startTime;
+
+    const populatedLayout = {
+      ...blueprint,
+      cards: Array.from(finalCards.values()),
+      _meta: {
+        totalDuration,
+        pipeline: 'gemini',
+        model: result.model,
+        groundingSources: result.groundingSources,
+        citations: result.citations?.length || 0,
+        geminiDuration: result.duration,
+      },
+      _llmTraces: traceCollector.getTraces(),
+      _llmTraceSummary: traceCollector.getSummary(),
+    };
+
+    if (onProgress) {
+      onProgress({ phase: 'complete', progress: 100, message: 'All cards populated' });
+    }
+
+    if (onComplete) {
+      onComplete(populatedLayout);
+    }
+
+    return populatedLayout;
+  } catch (error) {
+    clearInterval(heartbeat);
+    logger.error('Orchestrator', 'Gemini pipeline error', {
+      err: error.message,
+      dur: Date.now() - startTime,
     });
     if (onError) {
       onError(error);
