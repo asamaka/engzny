@@ -534,6 +534,10 @@ app.get('/api/debug/env', requireDebugAuth, async (req, res) => {
     gemini: {
       configured: !!process.env.GEMINI_API_KEY,
     },
+    pipeline: {
+      mode: process.env.PIPELINE_MODE || 'classic',
+      geminiReady: (process.env.PIPELINE_MODE || '').toLowerCase() === 'gemini' && !!process.env.GEMINI_API_KEY,
+    },
     research: {
       provider: process.env.RESEARCH_PROVIDER || 'auto',
       active: process.env.RESEARCH_PROVIDER === 'gemini' ? 'gemini' : (process.env.PERPLEXITY_API_KEY ? 'perplexity' : 'claude'),
