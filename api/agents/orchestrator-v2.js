@@ -1122,10 +1122,48 @@ async function runPipeline({
     // any verification source matching that name should be "confirmed" — the
     // screenshot itself is direct evidence that this source reported the story.
     // Without this, users see "Reuters: Not Yet Reported" on a Reuters screenshot.
+    //
+    // Cross-language matching: sourceAttribution.name may be in Arabic/non-Latin
+    // (e.g. "الجزيرة - مصر") while verification sources use English ("Al Jazeera
+    // (Egypt)"). We build multiple candidate names from intent and source_cards
+    // to bridge the language gap.
     // =====================================================
     const sourceAttribution = blueprint.contentAnalysis?.preAnalysis?.sourceAttribution;
     if (sourceAttribution?.name && sourceAttribution.confidence !== 'low') {
       const attrName = sourceAttribution.name.toLowerCase().trim();
+      const attrCandidates = new Set([attrName]);
+
+      // Extract Latin-script portion from mixed-script names
+      // e.g. "al jazeera - egypt (الجزيرة - مصر)" → "al jazeera - egypt"
+      const latinPortion = attrName
+        .replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, '')
+        .replace(/\s*[(-]+\s*$/g, '').replace(/^\s*[)-]+\s*/g, '').trim();
+      if (latinPortion && latinPortion.length > 3) attrCandidates.add(latinPortion);
+
+      // Extract English source name from intent ("Al Jazeera reports..." → "al jazeera")
+      const intentStr = (blueprint.contentAnalysis?.intent || '');
+      const intentMatch = intentStr.match(
+        /^(.+?)\s+(?:reports?|posts?|shares?|announces?|confirms?|breaks?|covers?|shows?)\b/i
+      );
+      if (intentMatch) {
+        const intentSource = intentMatch[1].trim().toLowerCase();
+        if (intentSource.length > 3) attrCandidates.add(intentSource);
+      }
+
+      // Add English names from high/medium credibility source_cards
+      for (const [, card] of currentCards) {
+        if (card.cardType !== 'source_card') continue;
+        const cd = card.populatedData || card.data || {};
+        if (cd.credibility !== 'high' && cd.credibility !== 'medium') continue;
+        const scName = (cd.name || '').toLowerCase().trim();
+        if (!scName) continue;
+        attrCandidates.add(scName);
+        const scLatin = scName
+          .replace(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g, '')
+          .replace(/\s*[(-]+\s*$/g, '').replace(/^\s*[)-]+\s*/g, '').trim();
+        if (scLatin && scLatin.length > 3) attrCandidates.add(scLatin);
+      }
+
       for (const vCard of verificationCards) {
         const cardData = vCard.populatedData || vCard.data || {};
         const sources = cardData.sources || [];
@@ -1134,9 +1172,14 @@ async function runPipeline({
         for (const source of sources) {
           const srcName = (source.name || '').toLowerCase().trim();
           if (!srcName) continue;
-          const isMatch = srcName === attrName
-            || attrName.includes(srcName)
-            || srcName.includes(attrName);
+          const srcClean = srcName.replace(/\s*\([^)]*\)\s*/g, '').trim();
+          const isMatch = [...attrCandidates].some(candidate => {
+            if (candidate.length < 4) return false;
+            return srcName === candidate
+              || srcClean === candidate
+              || candidate.includes(srcClean || srcName)
+              || (srcClean || srcName).includes(candidate);
+          });
           if (!isMatch) continue;
           if (source.status === 'confirmed') continue;
 
@@ -1552,6 +1595,9 @@ async function runPipeline({
       let fallback;
       if (notYetCount === sources.length && sources.length > 0) {
         fallback = 'This claim could not be independently verified at this time. None of the sources checked have reported on this story. Check major news outlets directly for the latest updates.';
+      } else if (status === 'partially_verified') {
+        const confirmedNames = sources.filter(s => s.status === 'confirmed').map(s => s.name).join(', ');
+        fallback = `Confirmed by the original source (${confirmedNames || 'screenshot publisher'}). Independent verification from additional outlets is still pending — check major news sources for the latest.`;
       } else if (status === 'inconclusive' || inconclusiveCount > 0) {
         fallback = 'Initial source checks were inconclusive. Breaking stories often take time to be independently verified by multiple outlets.';
       } else if (status === 'unconfirmed') {
