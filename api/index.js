@@ -1189,6 +1189,7 @@ const normalizeImagePayload = ({ image, mediaType }) => {
 const { runPipeline } = require('./agents/orchestrator-v2');
 const { runPipelineV20 } = require('./agents/orchestrator-v2-0');
 const { runGeminiPipeline } = require('./agents/gemini-pipeline');
+const { runFactCheckPipeline } = require('./agents/fact-check-pipeline');
 
 // In-memory pipeline job store (keyed by requestId)
 const pipelineJobs = new Map();
@@ -1200,12 +1201,23 @@ app.post('/api/hub/v2/start', async (req, res) => {
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
 
-    const geminiDefault = (process.env.PIPELINE_MODE || '').toLowerCase() === 'gemini' && process.env.GEMINI_API_KEY;
-    const pipelineType = pipeline === 'legacy'
-      ? 'legacy'
-      : pipeline === 'llm2'
-        ? 'llm2'
-        : ((pipeline === 'gemini' || geminiDefault) && process.env.GEMINI_API_KEY) ? 'gemini' : 'llm2';
+    const pipelineMode = (process.env.PIPELINE_MODE || '').toLowerCase();
+    const geminiAvailable = !!process.env.GEMINI_API_KEY;
+    const factcheckDefault = (pipelineMode === 'factcheck' || pipelineMode === '' || !pipelineMode) && geminiAvailable;
+    const geminiDefault = pipelineMode === 'gemini' && geminiAvailable;
+    const pipelineType = pipeline === 'factcheck' && geminiAvailable
+      ? 'factcheck'
+      : pipeline === 'legacy'
+        ? 'legacy'
+        : pipeline === 'llm2'
+          ? 'llm2'
+          : pipeline === 'gemini' && geminiAvailable
+            ? 'gemini'
+            : factcheckDefault
+              ? 'factcheck'
+              : geminiDefault
+                ? 'gemini'
+                : 'llm2';
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
@@ -1303,10 +1315,10 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
   }, 5000);
 
   const imageSize = job.imageData ? Math.round(job.imageData.length * 0.75 / 1024) : 0;
+  const useFactCheck = job.pipeline === 'factcheck';
   const useGemini = job.pipeline === 'gemini';
   const useLegacy = job.pipeline === 'legacy';
-  const pipelineFn = useGemini ? runGeminiPipeline : (useLegacy ? runPipeline : runPipelineV20);
-  const pipelineLabel = useGemini ? 'gemini' : (useLegacy ? 'legacy' : 'llm2');
+  const pipelineLabel = useFactCheck ? 'factcheck' : useGemini ? 'gemini' : (useLegacy ? 'legacy' : 'llm2');
 
   logger.startPipeline(requestId, {
     mediaType: job.mediaType,
@@ -1318,149 +1330,234 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
 
   sendEvent('connected', { message: 'Pipeline started', requestId, pipeline: pipelineLabel, timestamp: new Date().toISOString() });
 
-  // Store pipeline result so we can save the report BEFORE ending the stream.
-  // On Vercel, once res.end() is called the function can be terminated immediately,
-  // so any async work after endStream() is a race against the serverless freeze.
   let pipelineResult = null;
 
   try {
-    await pipelineFn({
-      imageData: job.imageData,
-      mediaType: job.mediaType,
-      question: job.question,
-      adapterConfig: { requestId },
+    if (useFactCheck) {
+      // Fact-check pipeline: stream text directly to client
+      await runFactCheckPipeline({
+        imageData: job.imageData,
+        mediaType: job.mediaType,
+        question: job.question,
+        adapterConfig: { requestId },
 
-      onProgress: (progress) => {
-        logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
-        sendEvent('progress', progress);
-      },
+        onToken: (chunk) => {
+          sendEvent('token', { text: chunk });
+        },
 
-      onBlueprint: (blueprint) => {
-        logger.pipelinePhase(requestId, 'skeleton', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
-        sendEvent('blueprint', blueprint);
-      },
+        onVerdict: (verdict) => {
+          logger.pipelinePhase(requestId, 'verdict', { verdict: verdict.verdict });
+          sendEvent('verdict', verdict);
+        },
 
-      onLayoutPreview: (blueprint) => {
-        logger.pipelinePhase(requestId, 'fast_classify', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown', contentType: blueprint.contentAnalysis?.contentType });
-        sendEvent('layout_preview', blueprint);
-      },
+        onSection: (section) => {
+          logger.pipelinePhase(requestId, 'section', { type: section.type, title: section.title });
+          sendEvent('section', section);
+        },
 
-      onLayoutUpdate: (blueprint) => {
-        logger.pipelinePhase(requestId, 'blueprint', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
-        sendEvent('layout_update', blueprint);
+        onSources: (sources) => {
+          sendEvent('sources', sources);
+        },
 
-        const captureId = job._captureId;
-        if (captureId) {
-          screenshotCapture.updateCapturePipelineResult(captureId, {
-            contentType: blueprint.contentAnalysis?.contentType,
-            platform: blueprint.contentAnalysis?.platform,
-            layoutType: blueprint.layout?.type,
-            cardCount: (blueprint.cards || []).length,
-          }).catch(() => {});
-        }
-      },
+        onProgress: (progress) => {
+          sendEvent('progress', progress);
+        },
 
-      onCardPopulated: (cardUpdate) => {
-        logger.pipelineEvent(requestId, 'card', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, completed: `${cardUpdate.completedCount}/${cardUpdate.totalCount}` });
-        sendEvent('card', cardUpdate);
-      },
-
-      onCardUpdate: (cardUpdate) => {
-        logger.pipelineEvent(requestId, 'card_update', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, source: cardUpdate.source });
-        sendEvent('card_update', cardUpdate);
-      },
-
-      onCardAdd: (cardAdd) => {
-        logger.pipelineEvent(requestId, 'card_add', { cardId: cardAdd.cardId, cardType: cardAdd.cardType, source: cardAdd.source });
-        sendEvent('card_add', cardAdd);
-      },
-
-      onPhase: (phase) => {
-        logger.pipelinePhase(requestId, phase.phase, { message: phase.message });
-        sendEvent('phase', phase);
-      },
-
-      onComplete: (populatedLayout) => {
-        if (useLegacy) {
+        onComplete: (result) => {
           clearInterval(keepAlive);
-          logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
-          sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
-          pipelineResult = { success: true, populatedLayout };
-          return;
-        }
-        sendEvent('complete', {
-          layout: populatedLayout.layout,
-          contentAnalysis: populatedLayout.contentAnalysis,
-          meta: populatedLayout.meta || populatedLayout._meta || {},
-          pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
-        });
-      },
+          logger.pipelineComplete(requestId, {
+            pipeline: 'factcheck',
+            duration: result.duration,
+            model: result.model,
+            citations: result.citations?.length || 0,
+          });
+          sendEvent('complete', {
+            duration: result.duration,
+            model: result.model,
+            citations: result.citations,
+          });
+          pipelineResult = { success: true, factcheck: result };
+        },
 
-      onSettled: (populatedLayout) => {
-        clearInterval(keepAlive);
-        logger.pipelineComplete(requestId, {
-          cardCount: populatedLayout.cards?.length,
-          layoutType: populatedLayout.layout?.type,
-          haikuDuration: populatedLayout._meta?.haikuDuration,
-          pipeline: 'llm2',
-        });
-        sendEvent('settled', {
-          layout: populatedLayout.layout,
-          contentAnalysis: populatedLayout.contentAnalysis,
-          meta: populatedLayout._meta,
-        });
-        pipelineResult = { success: true, populatedLayout };
-      },
+        onError: (error) => {
+          clearInterval(keepAlive);
+          logger.pipelineError(requestId, error, { phase: 'factcheck' });
+          sendEvent('error', { message: error.message });
+          pipelineResult = { success: false, error };
+        },
+      });
 
-      onError: (error) => {
-        clearInterval(keepAlive);
-        logger.pipelineError(requestId, error, { phase: 'pipeline' });
-        sendEvent('error', { message: error.message });
-        pipelineResult = { success: false, error };
-      },
-    });
-
-    // Save report to Redis BEFORE ending the stream.
-    // The client already received the complete/error SSE event above;
-    // we keep the HTTP connection open just long enough for the Redis write.
-    if (pipelineResult) {
-      try {
-        if (pipelineResult.success) {
-          const pl = pipelineResult.populatedLayout;
-          let thumb = job._clientThumb || null;
-          if (!thumb && job._captureId) {
-            thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
+      // Save fact-check report
+      if (pipelineResult) {
+        try {
+          if (pipelineResult.success) {
+            const fc = pipelineResult.factcheck;
+            let thumb = job._clientThumb || null;
+            if (!thumb && job._captureId) {
+              thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
+            }
+            await liveReports.saveLiveReport(requestId, {
+              contentType: 'factcheck',
+              layoutType: 'factcheck',
+              duration: fc.duration,
+              outcome: 'success',
+              imageSize: `${imageSize}KB`,
+              mediaType: job.mediaType,
+              meta: { pipeline: 'factcheck', model: fc.model, duration: fc.duration, citations: fc.citations?.length || 0 },
+              thumb,
+            });
+          } else {
+            await liveReports.saveLiveReport(requestId, {
+              outcome: 'error',
+              error: pipelineResult.error.message,
+              imageSize: `${imageSize}KB`,
+              mediaType: job.mediaType,
+            });
           }
-          await liveReports.saveLiveReport(requestId, {
-            contentType: pl.contentAnalysis?.contentType,
-            platform: pl.contentAnalysis?.platform,
-            layoutType: pl.layout?.type,
-            cardCount: pl.cards?.length,
-            duration: pl._meta?.totalDuration,
-            designDuration: pl._meta?.designDuration || pl._meta?.haikuDuration,
-            haikuDuration: pl._meta?.haikuDuration,
-            outcome: 'success',
-            imageSize: `${imageSize}KB`,
-            mediaType: job.mediaType,
-            contentAnalysis: pl.contentAnalysis,
-            layout: pl.layout,
-            cards: pl.cards,
-            meta: pl._meta,
-            llmTraces: pl._llmTraces || [],
-            llmTraceSummary: pl._llmTraceSummary || null,
-            thumb,
-          });
-          logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
-        } else {
-          await liveReports.saveLiveReport(requestId, {
-            outcome: 'error',
-            error: pipelineResult.error.message,
-            imageSize: `${imageSize}KB`,
-            mediaType: job.mediaType,
-          });
+        } catch (err) {
+          logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
         }
-      } catch (err) {
-        logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
+      }
+    } else {
+      // Card-based pipelines (gemini, legacy, llm2)
+      const pipelineFn = useGemini ? runGeminiPipeline : (useLegacy ? runPipeline : runPipelineV20);
+
+      await pipelineFn({
+        imageData: job.imageData,
+        mediaType: job.mediaType,
+        question: job.question,
+        adapterConfig: { requestId },
+
+        onProgress: (progress) => {
+          logger.pipelinePhase(requestId, progress.phase || 'progress', { progress: progress.progress });
+          sendEvent('progress', progress);
+        },
+
+        onBlueprint: (blueprint) => {
+          logger.pipelinePhase(requestId, 'skeleton', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
+          sendEvent('blueprint', blueprint);
+        },
+
+        onLayoutPreview: (blueprint) => {
+          logger.pipelinePhase(requestId, 'fast_classify', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown', contentType: blueprint.contentAnalysis?.contentType });
+          sendEvent('layout_preview', blueprint);
+        },
+
+        onLayoutUpdate: (blueprint) => {
+          logger.pipelinePhase(requestId, 'blueprint', { cardCount: (blueprint.cards || []).length, layoutType: blueprint.layout?.type || 'unknown' });
+          sendEvent('layout_update', blueprint);
+
+          const captureId = job._captureId;
+          if (captureId) {
+            screenshotCapture.updateCapturePipelineResult(captureId, {
+              contentType: blueprint.contentAnalysis?.contentType,
+              platform: blueprint.contentAnalysis?.platform,
+              layoutType: blueprint.layout?.type,
+              cardCount: (blueprint.cards || []).length,
+            }).catch(() => {});
+          }
+        },
+
+        onCardPopulated: (cardUpdate) => {
+          logger.pipelineEvent(requestId, 'card', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, completed: `${cardUpdate.completedCount}/${cardUpdate.totalCount}` });
+          sendEvent('card', cardUpdate);
+        },
+
+        onCardUpdate: (cardUpdate) => {
+          logger.pipelineEvent(requestId, 'card_update', { cardId: cardUpdate.cardId, cardType: cardUpdate.cardType, source: cardUpdate.source });
+          sendEvent('card_update', cardUpdate);
+        },
+
+        onCardAdd: (cardAdd) => {
+          logger.pipelineEvent(requestId, 'card_add', { cardId: cardAdd.cardId, cardType: cardAdd.cardType, source: cardAdd.source });
+          sendEvent('card_add', cardAdd);
+        },
+
+        onPhase: (phase) => {
+          logger.pipelinePhase(requestId, phase.phase, { message: phase.message });
+          sendEvent('phase', phase);
+        },
+
+        onComplete: (populatedLayout) => {
+          if (useLegacy) {
+            clearInterval(keepAlive);
+            logger.pipelineComplete(requestId, { cardCount: populatedLayout.cards?.length, layoutType: populatedLayout.layout?.type, haikuDuration: populatedLayout._meta?.haikuDuration });
+            sendEvent('complete', { layout: populatedLayout.layout, contentAnalysis: populatedLayout.contentAnalysis, meta: populatedLayout._meta });
+            pipelineResult = { success: true, populatedLayout };
+            return;
+          }
+          sendEvent('complete', {
+            layout: populatedLayout.layout,
+            contentAnalysis: populatedLayout.contentAnalysis,
+            meta: populatedLayout.meta || populatedLayout._meta || {},
+            pendingResearch: !!(populatedLayout.meta || populatedLayout._meta || {}).pendingResearch,
+          });
+        },
+
+        onSettled: (populatedLayout) => {
+          clearInterval(keepAlive);
+          logger.pipelineComplete(requestId, {
+            cardCount: populatedLayout.cards?.length,
+            layoutType: populatedLayout.layout?.type,
+            haikuDuration: populatedLayout._meta?.haikuDuration,
+            pipeline: 'llm2',
+          });
+          sendEvent('settled', {
+            layout: populatedLayout.layout,
+            contentAnalysis: populatedLayout.contentAnalysis,
+            meta: populatedLayout._meta,
+          });
+          pipelineResult = { success: true, populatedLayout };
+        },
+
+        onError: (error) => {
+          clearInterval(keepAlive);
+          logger.pipelineError(requestId, error, { phase: 'pipeline' });
+          sendEvent('error', { message: error.message });
+          pipelineResult = { success: false, error };
+        },
+      });
+
+      // Save report for card-based pipelines
+      if (pipelineResult) {
+        try {
+          if (pipelineResult.success) {
+            const pl = pipelineResult.populatedLayout;
+            let thumb = job._clientThumb || null;
+            if (!thumb && job._captureId) {
+              thumb = await screenshotCapture.getCaptureThumbnail(job._captureId);
+            }
+            await liveReports.saveLiveReport(requestId, {
+              contentType: pl.contentAnalysis?.contentType,
+              platform: pl.contentAnalysis?.platform,
+              layoutType: pl.layout?.type,
+              cardCount: pl.cards?.length,
+              duration: pl._meta?.totalDuration,
+              designDuration: pl._meta?.designDuration || pl._meta?.haikuDuration,
+              haikuDuration: pl._meta?.haikuDuration,
+              outcome: 'success',
+              imageSize: `${imageSize}KB`,
+              mediaType: job.mediaType,
+              contentAnalysis: pl.contentAnalysis,
+              layout: pl.layout,
+              cards: pl.cards,
+              meta: pl._meta,
+              llmTraces: pl._llmTraces || [],
+              llmTraceSummary: pl._llmTraceSummary || null,
+              thumb,
+            });
+            logger.info('LiveReport', `Saved live report ${requestId}`, { requestId });
+          } else {
+            await liveReports.saveLiveReport(requestId, {
+              outcome: 'error',
+              error: pipelineResult.error.message,
+              imageSize: `${imageSize}KB`,
+              mediaType: job.mediaType,
+            });
+          }
+        } catch (err) {
+          logger.warn('LiveReport', `Failed to save report: ${err.message}`, { requestId });
+        }
       }
     }
   } catch (error) {

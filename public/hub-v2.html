@@ -30,7 +30,7 @@
                 <h1 class="text-2xl font-bold tracking-tight text-base-content">
                     thinx<span class="text-primary font-extrabold">.fun</span>
                 </h1>
-                <p class="text-sm mt-1 text-base-content/50">Paste any screenshot. Get instant analysis.</p>
+                <p class="text-sm mt-1 text-base-content/50">Paste a screenshot. Get the truth.</p>
             </div>
 
             <!-- Paste Zone -->
@@ -62,13 +62,13 @@
             <!-- Feature hints -->
             <div class="flex items-center justify-center gap-4 text-xs text-base-content/40">
                 <span class="flex items-center gap-1">
-                    <span class="material-symbols-rounded text-sm text-primary">bolt</span>
-                    AI-powered
+                    <span class="material-symbols-rounded text-sm text-primary">fact_check</span>
+                    Fact-check
                 </span>
                 <span class="text-base-300">|</span>
                 <span class="flex items-center gap-1">
-                    <span class="material-symbols-rounded text-sm text-primary">lock</span>
-                    Private
+                    <span class="material-symbols-rounded text-sm text-primary">travel_explore</span>
+                    Web-verified
                 </span>
                 <span class="text-base-300">|</span>
                 <span class="flex items-center gap-1">
@@ -81,57 +81,60 @@
         </div>
     </div>
 
-    <!-- Main Canvas -->
-    <div id="mainCanvas" class="hidden min-h-screen bg-base-100">
-        <div id="progressOverlay" class="fixed inset-0 z-10 grid place-items-center bg-base-100/80 backdrop-blur-sm">
-            <div class="card bg-base-200 border border-base-300 shadow-xl w-80">
-                <div class="card-body items-center text-center">
-                    <span class="loading loading-ring loading-lg text-primary"></span>
-                    <div class="badge badge-primary badge-outline" id="progressPhase">UPLOADING</div>
-                    <progress id="progressBar" class="progress progress-primary w-full" value="0" max="100"></progress>
-                    <p id="progressPct" class="text-sm font-semibold">0%</p>
-                    <p id="progressLabel" class="text-xs text-base-content/70">Sending screenshot...</p>
-                </div>
+    <!-- Analysis View -->
+    <div id="analysisView" class="hidden min-h-screen bg-base-100">
+
+        <!-- Top bar -->
+        <div class="navbar sticky top-0 z-20 bg-base-100/90 border-b border-base-300 backdrop-blur px-4">
+            <div class="flex-1">
+                <button class="btn btn-ghost btn-sm gap-1" id="backBtn">
+                    <span class="material-symbols-rounded text-base">arrow_back</span>
+                    New
+                </button>
+            </div>
+            <div class="flex-none">
+                <span class="text-xs text-base-content/40" id="statusLabel">Connecting...</span>
             </div>
         </div>
 
-        <div id="resultsOverlay" class="relative z-20 hidden pb-20">
-            <div class="navbar sticky top-0 z-20 bg-base-100/90 border-b border-base-300 backdrop-blur">
-                <div class="flex-1 gap-2">
-                    <button class="btn btn-ghost btn-sm gap-1" id="layoutBack">
-                        <span class="material-symbols-rounded text-base">arrow_back</span>
-                        New
-                    </button>
-                    <span class="badge badge-primary badge-outline" id="layoutBadge"></span>
-                </div>
-                <div class="flex-none items-center gap-2" id="layoutProgress">
-                    <progress class="progress progress-primary w-24" value="0" max="100" id="layoutProgressFill"></progress>
-                    <span class="text-xs text-base-content/60" id="layoutProgressText"></span>
-                </div>
+        <!-- Loading indicator (shows before verdict) -->
+        <div id="loadingState" class="p-6 flex flex-col items-center gap-4 mt-8">
+            <span class="loading loading-ring loading-lg text-primary"></span>
+            <p class="text-sm text-base-content/60" id="loadingMessage">Analyzing screenshot...</p>
+        </div>
+
+        <!-- Verdict Banner -->
+        <div id="verdictBanner" class="hidden mx-4 mt-4 rounded-2xl p-5">
+            <div class="flex items-center gap-3 mb-2">
+                <span class="material-symbols-rounded text-3xl" id="verdictIcon">pending</span>
+                <span class="text-2xl font-extrabold tracking-tight" id="verdictLabel">Checking...</span>
+            </div>
+            <p class="text-sm leading-relaxed opacity-80" id="verdictExplanation"></p>
+        </div>
+
+        <!-- Streaming text content -->
+        <div id="contentArea" class="hidden px-4 pb-24">
+            <!-- Summary section -->
+            <div id="summarySection" class="hidden mt-6">
+                <div class="text-xs font-bold uppercase tracking-widest text-base-content/30 mb-3">Summary</div>
+                <div id="summaryText" class="text-base-content/80 text-sm leading-relaxed whitespace-pre-wrap" dir="auto"></div>
             </div>
 
-            <div id="cardGrid" class="grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-3"></div>
+            <!-- Deep dive angles (dynamically added) -->
+            <div id="anglesContainer" class="mt-6 space-y-6"></div>
 
-            <div id="followUpSection" class="hidden p-4 pt-2 space-y-3">
-                <div id="overallContextCard" class="hidden card bg-primary/5 border border-primary/20 shadow-sm">
-                    <div class="card-body py-3 px-4">
-                        <div class="flex items-start gap-2">
-                            <span class="material-symbols-rounded text-primary text-lg mt-0.5">auto_awesome</span>
-                            <div>
-                                <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">Context</div>
-                                <p class="text-sm text-base-content/80 leading-relaxed" id="overallContextText" dir="auto"></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card bg-base-200 border border-base-300 shadow-sm">
-                    <div class="card-body">
-                        <div class="flex items-center gap-2 text-sm font-semibold text-base-content/70">
-                            <span class="material-symbols-rounded text-primary">forum</span>
-                            Questions you might have
-                        </div>
-                        <div class="space-y-2" id="followUpList"></div>
-                    </div>
+            <!-- Sources section -->
+            <div id="sourcesSection" class="hidden mt-8 mb-6">
+                <div class="text-xs font-bold uppercase tracking-widest text-base-content/30 mb-3">Sources</div>
+                <div id="sourcesText" class="text-sm text-base-content/60 leading-relaxed whitespace-pre-wrap" dir="auto"></div>
+                <div id="groundingSources" class="mt-3 space-y-1.5"></div>
+            </div>
+
+            <!-- Completion meta -->
+            <div id="completionMeta" class="hidden mt-6 pt-4 border-t border-base-300">
+                <div class="flex items-center justify-between text-xs text-base-content/30">
+                    <span id="metaModel"></span>
+                    <span id="metaDuration"></span>
                 </div>
             </div>
         </div>
@@ -154,12 +157,30 @@
 
     <script>
         const pasteState = document.getElementById('pasteState');
-        const mainCanvas = document.getElementById('mainCanvas');
-        const progressOverlay = document.getElementById('progressOverlay');
-        const progressBar = document.getElementById('progressBar');
-        const progressPct = document.getElementById('progressPct');
-        const progressPhase = document.getElementById('progressPhase');
-        const progressLabel = document.getElementById('progressLabel');
+        const analysisView = document.getElementById('analysisView');
+        const loadingState = document.getElementById('loadingState');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const verdictBanner = document.getElementById('verdictBanner');
+        const verdictIcon = document.getElementById('verdictIcon');
+        const verdictLabel = document.getElementById('verdictLabel');
+        const verdictExplanation = document.getElementById('verdictExplanation');
+        const contentArea = document.getElementById('contentArea');
+        const summarySection = document.getElementById('summarySection');
+        const summaryText = document.getElementById('summaryText');
+        const anglesContainer = document.getElementById('anglesContainer');
+        const sourcesSection = document.getElementById('sourcesSection');
+        const sourcesText = document.getElementById('sourcesText');
+        const groundingSources = document.getElementById('groundingSources');
+        const completionMeta = document.getElementById('completionMeta');
+        const metaModel = document.getElementById('metaModel');
+        const metaDuration = document.getElementById('metaDuration');
+        const statusLabel = document.getElementById('statusLabel');
+        const backBtn = document.getElementById('backBtn');
+        const errorState = document.getElementById('errorState');
+        const errorText = document.getElementById('errorText');
+        const retryBtn = document.getElementById('retryBtn');
+        const pasteZone = document.getElementById('pasteZone');
+
         const DEFAULT_THEME = 'night';
         const LAYOUT_THEME_MAP = {
             simple: 'night',
@@ -183,60 +204,32 @@
             return theme;
         }
 
-        function updateProgress(pct, phase, label) {
-            progressBar.value = Math.max(0, Math.min(100, Math.round(pct)));
-            progressPct.textContent = Math.round(pct) + '%';
-            if (phase) progressPhase.textContent = phase;
-            if (label) progressLabel.textContent = label;
-        }
-        const resultsOverlay = document.getElementById('resultsOverlay');
-        const layoutBadge = document.getElementById('layoutBadge');
-        const layoutProgressFill = document.getElementById('layoutProgressFill');
-        const layoutProgressText = document.getElementById('layoutProgressText');
-        const followUpSection = document.getElementById('followUpSection');
-        const followUpList = document.getElementById('followUpList');
-        const cardGrid = document.getElementById('cardGrid');
-        const errorText = document.getElementById('errorText');
-        const retryBtn = document.getElementById('retryBtn');
-        const layoutBack = document.getElementById('layoutBack');
-        const layoutProgress = document.getElementById('layoutProgress');
-        const errorState = document.getElementById('errorState');
-        const pasteZone = document.getElementById('pasteZone');
-
         let currentImageUrl = null;
         let currentImageBase64 = null;
-        let totalCards = 0;
-        let completedCards = 0;
-        let allCardsReadyShown = false;
+        let currentThumbBase64 = null;
+        let currentEventSource = null;
+        let retryCount = 0;
+        let pipelineComplete = false;
 
-        function checkAllCardsReady() {
-            if (allCardsReadyShown || pipelineComplete || totalCards === 0) return;
-            if (completedCards < totalCards) return;
-            allCardsReadyShown = true;
-            layoutProgressFill.value = 100;
-            layoutProgressText.innerHTML = '<span class="text-success flex items-center gap-1"><span class="material-symbols-rounded text-sm">check_circle</span>ready</span>';
-            if (enhanceMsgInterval) {
-                clearInterval(enhanceMsgInterval);
-                enhanceMsgInterval = null;
-            }
-        }
+        // Verdict color mapping
+        const VERDICT_STYLES = {
+            'TRUE': { bg: 'bg-success/15', text: 'text-success', icon: 'check_circle', border: 'border-success/30' },
+            'FALSE': { bg: 'bg-error/15', text: 'text-error', icon: 'cancel', border: 'border-error/30' },
+            'MISLEADING': { bg: 'bg-warning/15', text: 'text-warning', icon: 'warning', border: 'border-warning/30' },
+            'PARTLY TRUE': { bg: 'bg-warning/15', text: 'text-warning', icon: 'help', border: 'border-warning/30' },
+            'UNVERIFIED': { bg: 'bg-info/15', text: 'text-info', icon: 'question_mark', border: 'border-info/30' },
+        };
 
-        function showResultsCanvas() {
-            stopAnalysisProgressTick();
-            updateProgress(95, 'READY', 'Cards ready');
-            progressOverlay.classList.add('hidden');
-            resultsOverlay.classList.remove('hidden');
-        }
+        // Streaming state
+        let fullText = '';
+        let currentParseSection = 'preamble';
+        let currentAngleEl = null;
+        let angleCount = 0;
+        let verdictReceived = false;
 
         // === Utilities ===
         function esc(val) {
             if (val === null || val === undefined) return '';
-            if (typeof val === 'object') {
-                if (Array.isArray(val)) return val.map(v => esc(v)).join(', ');
-                const meaningful = val.label || val.name || val.value || val.text || val.title || val.header || val.event || val.description;
-                if (meaningful) return esc(meaningful);
-                return esc(JSON.stringify(val));
-            }
             const d = document.createElement('div');
             d.textContent = String(val);
             return d.innerHTML;
@@ -244,203 +237,13 @@
 
         function linkify(text) {
             if (!text) return '';
-            const escaped = esc(text);
-            return escaped.replace(
+            return esc(text).replace(
                 /(https?:\/\/[^\s<>"']+)/gi,
                 '<a href="$1" target="_blank" rel="noopener noreferrer" class="link link-primary break-all">$1</a>'
             );
         }
 
-        function cleanSummary(text) {
-            if (!text) return '';
-            return text
-                .replace(/\.{2,}/g, '.')
-                .replace(/(\.\s*){3,}/g, '. ')
-                .replace(/\.\s*$/, '.')
-                .trim();
-        }
-
-        function cleanCitations(text) {
-            if (!text) return '';
-            return text
-                .replace(/\[(\d+)\]/g, '')
-                .replace(/\s{2,}/g, ' ')
-                .trim();
-        }
-
-        function timeAgo(iso) {
-            if (!iso) return '';
-            try {
-                const diff = Date.now() - new Date(iso).getTime();
-                if (diff < 0) return 'Just now';
-                const sec = Math.floor(diff / 1000);
-                if (sec < 60) return 'Just now';
-                const min = Math.floor(sec / 60);
-                if (min < 60) return `${min}m ago`;
-                const hr = Math.floor(min / 60);
-                if (hr < 24) return `${hr}h ago`;
-                const days = Math.floor(hr / 24);
-                return `${days}d ago`;
-            } catch { return ''; }
-        }
-
-        function normalizeFeature(item) {
-            if (typeof item === 'string') return item;
-            if (typeof item === 'object' && item !== null) {
-                return item.label || item.name || item.value || item.text ||
-                       item.description || item.type || item.feature ||
-                       JSON.stringify(item);
-            }
-            return String(item);
-        }
-
-        function renderItemValue(item) {
-            if (typeof item === 'string') return linkify(item);
-            if (typeof item === 'object' && item !== null) {
-                const parts = [];
-                if (item.label || item.name) parts.push(`<strong>${esc(item.label || item.name)}</strong>`);
-                if (item.value) parts.push(linkify(item.value));
-                if (item.description) parts.push(`<span class="text-base-content/70">${linkify(item.description)}</span>`);
-                if (parts.length) return parts.join(': ');
-                return linkify(normalizeFeature(item));
-            }
-            return esc(item);
-        }
-
-        function renderLink(url, label, extraClass) {
-            if (!url || typeof url !== 'string' || !url.startsWith('http')) return '';
-            const cls = extraClass ? ` class="${extraClass}"` : ' class="link link-primary break-all"';
-            return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer"${cls}>${esc(label || url)}</a>`;
-        }
-
-        const CHART_COLORS = ['#5b8af5', '#4cd68a', '#f0c040', '#f06060', '#a07ef0', '#f09040', '#60d0f0', '#f060a0'];
-
-        function renderFollowUpQuestions(contentAnalysis) {
-            const questions = contentAnalysis.followUpQuestions || [];
-            const topQ = contentAnalysis.topQuestions || [];
-
-            const answered = [];
-            const unanswered = [];
-
-            questions.forEach(q => {
-                if (typeof q === 'object' && q.question) {
-                    if (q.answer) {
-                        answered.push({ question: q.question, answer: cleanCitations(q.answer) });
-                    } else {
-                        unanswered.push(q.question);
-                    }
-                } else if (typeof q === 'string') {
-                    unanswered.push(q);
-                }
-            });
-
-            topQ.forEach(q => {
-                if (!answered.some(aq => aq.question === q) && !unanswered.includes(q)) {
-                    unanswered.push(q);
-                }
-            });
-
-            if (answered.length === 0 && unanswered.length === 0) return;
-
-            // Render overall context if available
-            const ctx = contentAnalysis.overallContext;
-            const ctxCard = document.getElementById('overallContextCard');
-            const ctxText = document.getElementById('overallContextText');
-            if (ctx && ctxCard && ctxText) {
-                ctxText.innerHTML = linkify(cleanCitations(cleanSummary(ctx)));
-                ctxCard.classList.remove('hidden');
-            }
-
-            followUpSection.classList.remove('hidden');
-            followUpList.innerHTML = '';
-
-            // Answered questions: expandable with answer
-            answered.slice(0, 5).forEach(q => {
-                const item = document.createElement('div');
-                item.className = 'collapse collapse-arrow bg-base-100 border border-base-300';
-                item.innerHTML = `
-                    <input type="checkbox" />
-                    <div class="collapse-title text-sm font-medium pr-10" dir="auto">${esc(q.question)}</div>
-                    <div class="collapse-content">
-                        <div class="text-sm text-base-content/80 leading-relaxed" dir="auto">${linkify(cleanSummary(q.answer))}</div>
-                    </div>
-                `;
-                followUpList.appendChild(item);
-            });
-
-            // Unanswered questions: simple non-expandable list
-            const remaining = 5 - answered.length;
-            if (remaining > 0 && unanswered.length > 0) {
-                unanswered.slice(0, remaining).forEach(q => {
-                    const item = document.createElement('div');
-                    item.className = 'flex items-center gap-2 px-4 py-2.5 bg-base-100 border border-base-300 rounded-lg';
-                    item.innerHTML = `
-                        <span class="material-symbols-rounded text-base-content/30 text-sm">help_outline</span>
-                        <span class="text-sm text-base-content/60" dir="auto">${esc(q)}</span>
-                    `;
-                    followUpList.appendChild(item);
-                });
-            }
-        }
-
-        function renderSparkline(data) {
-            if (!Array.isArray(data) || data.length < 2) return '';
-            const max = Math.max(...data);
-            const min = Math.min(...data);
-            const range = max - min || 1;
-            const w = 100;
-            const h = 24;
-            const step = w / (data.length - 1);
-
-            const points = data.map((v, i) => {
-                const x = i * step;
-                const y = h - ((v - min) / range) * (h - 4) - 2;
-                return `${x},${y}`;
-            }).join(' ');
-
-            const areaPoints = points + ` ${w},${h} 0,${h}`;
-
-            return `<svg class="w-full h-6 mt-2" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-                <polygon points="${areaPoints}" fill="oklch(64% 0.17 260 / 0.25)"/>
-                <polyline points="${points}" fill="none" stroke="oklch(64% 0.17 260)" stroke-width="2" stroke-linecap="round"/>
-            </svg>`;
-        }
-
-        const CONTENT_TYPE_LABELS = {
-            breaking_news: 'Breaking News',
-            news: 'News',
-            product: 'Product',
-            social_media: 'Social Media',
-            social: 'Social',
-            tech: 'Tech',
-            sports: 'Sports',
-            data: 'Data',
-            analytics: 'Analytics',
-            general: 'Analysis',
-            article: 'Article',
-            report_significant_event: 'Breaking News',
-            significant_event: 'Breaking News',
-            messaging: 'Messaging',
-            chat: 'Chat',
-            settings: 'Settings',
-            finance: 'Finance',
-            health: 'Health',
-            science: 'Science',
-            entertainment: 'Entertainment',
-            analyzing: 'Analyzing...',
-        };
-
-        function humanizeContentType(ct) {
-            if (!ct) return 'Analysis';
-            if (CONTENT_TYPE_LABELS[ct]) return CONTENT_TYPE_LABELS[ct];
-            return ct.replace(/[_-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase()).substring(0, 20);
-        }
-
         // === Image Handling ===
-
-        // Vercel serverless has a 4.5MB body limit. Target 1.5MB binary
-        // (~2MB base64) for fast mobile uploads and safe headroom.
-        // Claude vision processes at 1568px max anyway — no quality loss.
         const UPLOAD_TARGET_SIZE = 1.5 * 1024 * 1024;
         const VERCEL_BODY_HARD_LIMIT = 3.5 * 1024 * 1024;
 
@@ -476,11 +279,8 @@
             }
         }
 
-        let currentThumbBase64 = null;
-
         async function compressImage(blob) {
             if (blob.size <= UPLOAD_TARGET_SIZE) return blob;
-
             const url = URL.createObjectURL(blob);
             try {
                 const img = await loadImageEl(url);
@@ -489,7 +289,6 @@
                 const s = Math.min(MAX_DIM / w, MAX_DIM / h, 1);
                 w = Math.round(w * s);
                 h = Math.round(h * s);
-
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const tryCompress = (tw, th, quality) => {
@@ -498,99 +297,16 @@
                     ctx.drawImage(img, 0, 0, tw, th);
                     return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
                 };
-
-                for (const q of [0.85, 0.7, 0.55, 0.4]) {
-                    const result = await tryCompress(w, h, q);
-                    if (result && result.size <= UPLOAD_TARGET_SIZE) return result;
+                let result = await tryCompress(w, h, 0.85);
+                if (result && result.size > UPLOAD_TARGET_SIZE) result = await tryCompress(w, h, 0.6);
+                if (result && result.size > UPLOAD_TARGET_SIZE) {
+                    const s2 = Math.sqrt(UPLOAD_TARGET_SIZE / result.size) * 0.9;
+                    result = await tryCompress(Math.round(w * s2), Math.round(h * s2), 0.6);
                 }
-                for (const ds of [0.75, 0.5, 0.35]) {
-                    const result = await tryCompress(Math.round(w * ds), Math.round(h * ds), 0.7);
-                    if (result && result.size <= UPLOAD_TARGET_SIZE) return result;
-                }
-                return await tryCompress(Math.round(w * 0.3), Math.round(h * 0.3), 0.5);
+                return result || blob;
             } finally {
                 URL.revokeObjectURL(url);
             }
-        }
-
-        async function readClipboard() {
-            try {
-                const items = await navigator.clipboard.read();
-                for (const item of items) {
-                    const imageType = item.types.find(t => t.startsWith('image/'));
-                    if (imageType) {
-                        const blob = await item.getType(imageType);
-                        handleImage(blob);
-                        return;
-                    }
-                }
-                showError('No image found in clipboard');
-            } catch (err) {
-                if (err.name === 'NotAllowedError') {
-                    showError('Clipboard access denied');
-                } else {
-                    showError('Could not read clipboard');
-                }
-            }
-        }
-
-        let uploadProgressInterval = null;
-        let analysisProgressInterval = null;
-        let currentContinuousPct = 0;
-
-        function startAnalysisProgressTick(fromPct) {
-            if (analysisProgressInterval) clearInterval(analysisProgressInterval);
-            currentContinuousPct = fromPct;
-            analysisProgressInterval = setInterval(() => {
-                if (currentContinuousPct < 88) {
-                    currentContinuousPct += (88 - currentContinuousPct) * 0.02;
-                    updateProgress(currentContinuousPct, null, null);
-                }
-            }, 300);
-        }
-
-        function stopAnalysisProgressTick() {
-            if (analysisProgressInterval) {
-                clearInterval(analysisProgressInterval);
-                analysisProgressInterval = null;
-            }
-        }
-
-        async function handleImage(blob) {
-            currentImageUrl = URL.createObjectURL(blob);
-            pasteState.classList.add('hidden');
-            mainCanvas.classList.remove('hidden');
-            progressOverlay.classList.remove('hidden');
-            updateProgress(0, 'UPLOADING', 'Optimizing...');
-
-            if (blob.size > UPLOAD_TARGET_SIZE) {
-                try {
-                    blob = await compressImage(blob);
-                } catch (e) {
-                    console.warn('Compression failed, trying fallback:', e);
-                    try {
-                        blob = await emergencyCompress(blob);
-                    } catch (e2) {
-                        console.warn('Emergency compression also failed:', e2);
-                    }
-                }
-            }
-
-            if (blob.size > VERCEL_BODY_HARD_LIMIT) {
-                showError('Image is too large (' + Math.round(blob.size / 1024 / 1024) + 'MB). Try a smaller screenshot.');
-                return;
-            }
-
-            currentThumbBase64 = await generateThumbnail(blob);
-
-            updateProgress(5, 'UPLOADING', 'Sending screenshot...');
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                currentImageBase64 = reader.result;
-                startPipeline(currentImageBase64);
-            };
-            reader.readAsDataURL(blob);
         }
 
         async function emergencyCompress(blob) {
@@ -657,12 +373,6 @@
                     firstEventDelay: (this.pipelineStart && this.firstEventAt) ? this.firstEventAt - this.pipelineStart : null,
                     eventsReceived: this.eventsReceived,
                     retries: retryCount,
-                    state: {
-                        blueprintReceived,
-                        pipelineComplete,
-                        totalCards,
-                        completedCards,
-                    },
                     ...extra,
                 };
             },
@@ -695,1781 +405,361 @@
             },
         };
 
-        // === Pipeline ===
-        let blueprintReceived = false;
-        let pipelineComplete = false;
-        let pipelineTimeout = null;
-        let completionTimeout = null;
-        let stallTimer = null;
-        let lastEventTime = 0;
-        let retryCount = 0;
-        const MAX_RETRIES = 2;
-
-        function resetStallTimer() {
-            lastEventTime = Date.now();
-            if (stallTimer) clearTimeout(stallTimer);
-            if (pipelineComplete) return;
-            stallTimer = setTimeout(() => {
-                if (!pipelineComplete && blueprintReceived) {
-                    const stallDuration = Date.now() - lastEventTime;
-                    telemetry.reportError(`SSE stall detected (${Math.round(stallDuration/1000)}s)`, {
-                        type: 'sse_stall',
-                        completedCards,
-                        totalCards,
-                        retryCount,
-                    });
-                    if (retryCount < MAX_RETRIES && currentImageBase64) {
-                        retryCount++;
-                        progressLabel.textContent = `Reconnecting (attempt ${retryCount})...`;
-                        startPipelineInner(currentImageBase64);
-                    } else {
-                        showError('Connection to server lost. Please try again.');
+        // === Clipboard ===
+        async function readClipboard() {
+            try {
+                const items = await navigator.clipboard.read();
+                for (const item of items) {
+                    const imageType = item.types.find(t => t.startsWith('image/'));
+                    if (imageType) {
+                        const blob = await item.getType(imageType);
+                        handleImage(blob);
+                        return;
                     }
                 }
-            }, 20000);
+            } catch {}
+        }
+
+        // === Image Handling ===
+        async function handleImage(blob) {
+            currentImageUrl = URL.createObjectURL(blob);
+            pasteState.classList.add('hidden');
+            analysisView.classList.remove('hidden');
+            loadingState.classList.remove('hidden');
+            loadingMessage.textContent = 'Optimizing image...';
+
+            if (blob.size > UPLOAD_TARGET_SIZE) {
+                try {
+                    blob = await compressImage(blob);
+                } catch (e) {
+                    console.warn('Compression failed, trying fallback:', e);
+                    try {
+                        blob = await emergencyCompress(blob);
+                    } catch (e2) {
+                        console.warn('Emergency compression also failed:', e2);
+                    }
+                }
+            }
+
+            if (blob.size > VERCEL_BODY_HARD_LIMIT) {
+                showError('Image is too large (' + Math.round(blob.size / 1024 / 1024) + 'MB). Try a smaller screenshot.');
+                return;
+            }
+
+            currentThumbBase64 = await generateThumbnail(blob);
+            loadingMessage.textContent = 'Uploading...';
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                currentImageBase64 = reader.result;
+                startPipeline(currentImageBase64);
+            };
+            reader.readAsDataURL(blob);
+        }
+
+        // === Pipeline ===
+        function getRequestedPipeline() {
+            const pipeline = new URLSearchParams(location.search).get('pipeline');
+            if (['factcheck', 'gemini', 'llm2', 'legacy'].includes(pipeline)) return pipeline;
+            return null;
         }
 
         async function startPipeline(imageDataUrl) {
             retryCount = 0;
-            await startPipelineInner(imageDataUrl);
-        }
-
-        let currentEventSource = null;
-        let pipelineSettled = false;
-        let awaitingSettlement = false;
-
-        function getRequestedPipeline() {
-            const pipeline = new URLSearchParams(location.search).get('pipeline');
-            if (pipeline === 'gemini' || pipeline === 'llm2') return pipeline;
-            return null;
-        }
-
-        async function startPipelineInner(imageDataUrl) {
-            blueprintReceived = false;
             pipelineComplete = false;
-            pipelineSettled = false;
-            awaitingSettlement = false;
-            allCardsReadyShown = false;
-            lastEventTime = Date.now();
+            verdictReceived = false;
+            fullText = '';
+            currentParseSection = 'preamble';
+            currentAngleEl = null;
+            angleCount = 0;
             telemetry.reset();
 
-            if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-            if (uploadProgressInterval) { clearInterval(uploadProgressInterval); uploadProgressInterval = null; }
-            stopAnalysisProgressTick();
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             try {
                 telemetry.markUploadStart();
+                loadingMessage.textContent = 'Sending screenshot...';
+                statusLabel.textContent = 'Uploading...';
 
-                const { requestId, status } = await new Promise((resolve, reject) => {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/api/hub/v2/start');
-                    xhr.setRequestHeader('Content-Type', 'application/json');
+                const body = { image: imageDataUrl };
+                const requestedPipeline = getRequestedPipeline();
+                if (requestedPipeline) body.pipeline = requestedPipeline;
+                if (currentThumbBase64) body.thumb = currentThumbBase64;
 
-                    xhr.upload.addEventListener('progress', (e) => {
-                        if (e.lengthComputable) {
-                            const uploadPct = (e.loaded / e.total) * 30;
-                            updateProgress(uploadPct, 'UPLOADING', 'Sending screenshot...');
-                        }
-                    });
-
-                    xhr.addEventListener('load', () => {
-                        telemetry.markUploadEnd();
-                        if (xhr.status >= 200 && xhr.status < 300) {
-                            try {
-                                resolve(JSON.parse(xhr.responseText));
-                            } catch {
-                                reject(new Error('Invalid server response'));
-                            }
-                        } else {
-                            try {
-                                const err = JSON.parse(xhr.responseText);
-                                reject(new Error(err.error || `Upload failed (HTTP ${xhr.status})`));
-                            } catch {
-                                reject(new Error(`Upload failed (HTTP ${xhr.status})`));
-                            }
-                        }
-                    });
-
-                    xhr.addEventListener('error', () => {
-                        telemetry.markUploadEnd();
-                        reject(new Error('Upload failed — network error'));
-                    });
-
-                    const payload = { image: imageDataUrl };
-                    const requestedPipeline = getRequestedPipeline();
-                    if (requestedPipeline) payload.pipeline = requestedPipeline;
-                    if (currentThumbBase64) payload.thumb = currentThumbBase64;
-                    xhr.send(JSON.stringify(payload));
+                const resp = await fetch('/api/hub/v2/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
                 });
 
+                telemetry.markUploadEnd();
+
+                if (!resp.ok) throw new Error('Upload failed');
+                const { requestId } = await resp.json();
                 telemetry.requestId = requestId;
 
-                progressOverlay.classList.remove('hidden');
-                updateProgress(32, 'ANALYZING', 'Starting investigation...');
-                startAnalysisProgressTick(32);
+                loadingMessage.textContent = 'Analyzing and searching the web...';
+                statusLabel.textContent = 'Searching...';
 
-                await new Promise((resolve, reject) => {
-                    const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
-                    currentEventSource = es;
-
-                    pipelineTimeout = setTimeout(() => {
-                        if (!blueprintReceived) {
-                            es.close();
-                            telemetry.reportError('No response from server (30s)', { type: 'timeout_no_skeleton' });
-                            reject(new Error('Could not connect to analysis server. Please try again.'));
-                        }
-                    }, 30000);
-
-                    const events = ['connected', 'progress', 'blueprint', 'layout_preview', 'layout_update', 'card', 'card_update', 'card_add', 'phase', 'complete', 'settled'];
-                    events.forEach(evt => {
-                        es.addEventListener(evt, (e) => {
-                            try {
-                                const data = JSON.parse(e.data);
-                                telemetry.trackEvent(evt);
-                                handleSSEEvent(evt, data);
-                                if (evt !== 'complete') resetStallTimer();
-                                if (evt === 'complete') {
-                                    if (!data?.pendingResearch) {
-                                        es.close();
-                                        currentEventSource = null;
-                                        telemetry.reportSuccess();
-                                        resolve();
-                                    }
-                                }
-                                if (evt === 'settled') {
-                                    es.close();
-                                    currentEventSource = null;
-                                    telemetry.reportSuccess();
-                                    resolve();
-                                }
-                            } catch {}
-                        });
-                    });
-
-                    es.addEventListener('error', (e) => {
-                        if (es.readyState === EventSource.CLOSED) {
-                            if (!pipelineSettled) {
-                                reject(new Error(blueprintReceived ? 'Connection lost during analysis' : 'Connection lost before analysis started'));
-                            }
-                            return;
-                        }
-                        try {
-                            const data = JSON.parse(e.data);
-                            telemetry.trackEvent('error');
-                            es.close();
-                            currentEventSource = null;
-                            reject(new Error(data.message || 'Analysis failed'));
-                        } catch {
-                            es.close();
-                            currentEventSource = null;
-                            if (!pipelineSettled) {
-                                reject(new Error('Connection to server lost'));
-                            }
-                        }
-                    });
-                });
-
+                await connectToStream(requestId);
             } catch (err) {
-                if (retryCount < MAX_RETRIES && currentImageBase64 && !pipelineComplete) {
-                    retryCount++;
-                    progressLabel.textContent = `Reconnecting (attempt ${retryCount})...`;
-                    startPipelineInner(currentImageBase64);
-                    return;
-                }
                 telemetry.reportError(err.message || 'connection failed', { type: 'pipeline_error' });
-                telemetry.reportOutcome('error', err.message);
                 showError(err.message || 'Connection failed');
-            } finally {
-                if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
-                if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
             }
         }
 
-        function handleSSEEvent(event, data) {
-            switch (event) {
+        async function connectToStream(requestId) {
+            return new Promise((resolve, reject) => {
+                const es = new EventSource(`/api/hub/v2/stream/${requestId}`);
+                currentEventSource = es;
+
+                const timeout = setTimeout(() => {
+                    if (!verdictReceived) {
+                        es.close();
+                        telemetry.reportError('No response from server (45s)', { type: 'timeout' });
+                        reject(new Error('Analysis timed out. Please try again.'));
+                    }
+                }, 45000);
+
+                es.addEventListener('message', (e) => {
+                    try {
+                        const evt = e.type || 'message';
+                        const data = JSON.parse(e.data);
+                        const eventType = data._event || evt;
+                        telemetry.trackEvent(eventType);
+                    } catch {}
+                });
+
+                const eventTypes = ['connected', 'token', 'verdict', 'section', 'sources', 'progress', 'complete', 'error'];
+                eventTypes.forEach(evt => {
+                    es.addEventListener(evt, (e) => {
+                        try {
+                            const data = JSON.parse(e.data);
+                            telemetry.trackEvent(evt);
+                            handleEvent(evt, data);
+
+                            if (evt === 'complete') {
+                                clearTimeout(timeout);
+                                es.close();
+                                currentEventSource = null;
+                                telemetry.reportSuccess();
+                                resolve();
+                            }
+                        } catch {}
+                    });
+                });
+
+                es.addEventListener('error', () => {
+                    if (es.readyState === EventSource.CLOSED) {
+                        if (!pipelineComplete) {
+                            clearTimeout(timeout);
+                            reject(new Error(verdictReceived ? 'Connection lost during analysis' : 'Connection lost'));
+                        }
+                        return;
+                    }
+                    es.close();
+                    currentEventSource = null;
+                    clearTimeout(timeout);
+                    if (!pipelineComplete) {
+                        reject(new Error('Connection to server lost'));
+                    }
+                });
+            });
+        }
+
+        // === Event Handling ===
+        function handleEvent(type, data) {
+            switch (type) {
                 case 'connected':
-                    currentContinuousPct = Math.max(currentContinuousPct, 35);
-                    updateProgress(currentContinuousPct, 'ANALYZING', 'Quick analysis starting...');
+                    statusLabel.textContent = 'Connected';
                     break;
 
-                case 'progress': {
-                    const phaseLabels = {
-                        classifying: 'ANALYZING',
-                        designing: 'DESIGNING',
-                        researching: 'RESEARCHING',
-                        enhancing: 'INVESTIGATING',
-                        reviewing: 'INVESTIGATING',
-                    };
-                    const phaseLabel = phaseLabels[data.phase] || 'INVESTIGATING';
-                    const mappedPct = 30 + Math.min(data.progress, 95) * 0.6;
-                    currentContinuousPct = Math.max(currentContinuousPct, mappedPct);
-                    updateProgress(currentContinuousPct, phaseLabel, data.message || 'Processing...');
-                    if (!allCardsReadyShown && (data.phase === 'enhancing' || data.phase === 'researching' || data.phase === 'reviewing')) {
-                        layoutProgressFill.value = data.progress;
-                        layoutProgressText.textContent = `${completedCards}/${totalCards}`;
+                case 'progress':
+                    if (data.message) {
+                        loadingMessage.textContent = data.message;
+                        statusLabel.textContent = data.message;
                     }
                     break;
-                }
 
-                case 'blueprint':
-                    onBlueprintReceived(data);
+                case 'verdict':
+                    showVerdict(data);
                     break;
 
-                case 'layout_preview':
-                    onLayoutPreview(data);
+                case 'token':
+                    appendToken(data.text);
                     break;
 
-                case 'layout_update':
-                    onLayoutUpdate(data);
+                case 'section':
+                    handleSection(data);
                     break;
 
-                case 'card':
-                    onCardReceived(data);
-                    break;
-
-                case 'card_update':
-                    onCardUpdated(data);
-                    break;
-
-                case 'card_add':
-                    onCardAdded(data);
-                    break;
-
-                case 'phase':
-                    onPhaseChange(data);
+                case 'sources':
+                    handleSources(data);
                     break;
 
                 case 'complete':
-                    onPipelineComplete(data);
-                    break;
-
-                case 'settled':
-                    onPipelineSettled(data);
+                    handleComplete(data);
                     break;
 
                 case 'error':
                     telemetry.reportError(data.message || 'analysis failed', { type: 'sse_error' });
                     showError(data.message || 'Analysis failed');
                     break;
+
+                // Handle card-based pipeline events for backward compat
+                case 'blueprint':
+                case 'layout_update':
+                case 'card':
+                case 'card_update':
+                case 'card_add':
+                case 'phase':
+                case 'settled':
+                    break;
             }
         }
 
-        let pendingBlueprint = null;
-        let firstCardShown = false;
-        const populatedCardIds = new Set();
+        function showVerdict(data) {
+            verdictReceived = true;
+            loadingState.classList.add('hidden');
+            verdictBanner.classList.remove('hidden');
+            contentArea.classList.remove('hidden');
 
-        function onBlueprintReceived(blueprint) {
-            blueprintReceived = true;
-            if (pipelineTimeout) {
-                clearTimeout(pipelineTimeout);
-                pipelineTimeout = null;
-            }
+            const style = VERDICT_STYLES[data.verdict] || VERDICT_STYLES['UNVERIFIED'];
+            verdictBanner.className = `mx-4 mt-4 rounded-2xl p-5 border ${style.bg} ${style.border}`;
+            verdictIcon.textContent = style.icon;
+            verdictIcon.className = `material-symbols-rounded text-3xl ${style.text}`;
+            verdictLabel.textContent = data.verdict;
+            verdictLabel.className = `text-2xl font-extrabold tracking-tight ${style.text}`;
+            verdictExplanation.textContent = data.explanation || '';
 
-            if (completionTimeout) clearTimeout(completionTimeout);
-            completionTimeout = setTimeout(() => {
-                if (!pipelineComplete) {
-                    telemetry.reportError('Analysis timed out after skeleton (90s)', {
-                        type: 'timeout_post_skeleton',
-                        completedCards,
-                        totalCards,
-                    });
-                    showError('Analysis is taking too long. Please try again.');
-                }
-            }, 90000);
-
-            pendingBlueprint = blueprint;
-            totalCards = (blueprint.cards || []).length;
-            completedCards = 0;
-
-            const ct = blueprint.contentAnalysis?.contentType || 'analyzing';
-            layoutBadge.textContent = humanizeContentType(ct);
-
-            currentContinuousPct = Math.max(currentContinuousPct, 40);
-            updateProgress(currentContinuousPct, 'ANALYZING', 'Reading your screenshot...');
-            layoutProgressFill.value = 10;
-            layoutProgressText.textContent = 'analyzing';
+            statusLabel.textContent = 'Analyzing...';
         }
 
-        function onLayoutPreview(blueprint) {
-            totalCards = (blueprint.cards || []).length;
-            applyLayoutTheme(blueprint.layout?.type);
-
-            const ct = blueprint.contentAnalysis?.contentType || 'general';
-            layoutBadge.textContent = humanizeContentType(ct);
-
-            if (blueprint.contentAnalysis) {
-                /* removed: intent line no longer shown in user UI */
-                renderFollowUpQuestions(blueprint.contentAnalysis);
-            }
-
-            currentContinuousPct = Math.max(currentContinuousPct, 55);
-            updateProgress(currentContinuousPct, 'DESIGNING', `${ct} detected — designing layout...`);
-            layoutProgressFill.value = 15;
-            layoutProgressText.textContent = 'designing';
-        }
-
-        let _revealBatchStart = 0;
-        let _revealBatchCount = 0;
-        const REVEAL_STAGGER_MS = 80;
-        const REVEAL_BATCH_WINDOW = 300;
-
-        function revealCard(el) {
-            const now = Date.now();
-            if (now - _revealBatchStart > REVEAL_BATCH_WINDOW) {
-                _revealBatchStart = now;
-                _revealBatchCount = 0;
-            }
-            const delay = _revealBatchCount * REVEAL_STAGGER_MS;
-            _revealBatchCount++;
-            el.animate([
-                { opacity: 0, transform: 'translateY(10px) scale(0.97)' },
-                { opacity: 1, transform: 'translateY(0) scale(1)' }
-            ], {
-                duration: 350,
-                delay,
-                easing: 'cubic-bezier(0.16, 1, 0.3, 1)',
-                fill: 'backwards'
-            });
-        }
-
-        const enhanceStatusMessages = [
-            'Searching source websites...',
-            'Validating claims...',
-            'Cross-referencing sources...',
-            'Adding verified data...',
-            'Checking multiple sources...',
-            'Enriching with web results...',
-            'Compiling findings...',
-        ];
-        let enhanceMsgInterval = null;
-
-        function onLayoutUpdate(blueprint) {
-            totalCards = (blueprint.cards || []).length;
-            completedCards = 0;
-            allCardsReadyShown = false;
-            populatedCardIds.clear();
-            applyLayoutTheme(blueprint.layout?.type);
-
-            const ct = blueprint.contentAnalysis?.contentType || 'general';
-            layoutBadge.textContent = humanizeContentType(ct);
-
-            if (blueprint.contentAnalysis) {
-                /* removed: intent line no longer shown in user UI */
-                renderFollowUpQuestions(blueprint.contentAnalysis);
-            }
-
-            cardGrid.innerHTML = '';
-
-            const populatedCards = (blueprint.cards || []).filter(c =>
-                c.populatedData && Object.keys(c.populatedData).length > 0
-            );
-            const unpopulatedCards = (blueprint.cards || []).filter(c =>
-                !c.populatedData || Object.keys(c.populatedData).length === 0
-            );
-
-            if (!firstCardShown && populatedCards.length > 0) {
-                firstCardShown = true;
-                showResultsCanvas();
-            }
-
-            const allCards = [...populatedCards, ...unpopulatedCards];
-            const populatedCount = populatedCards.length;
-
-            if (populatedCount <= 1) {
-                cardGrid.classList.add('max-w-xl', 'mx-auto');
-            } else {
-                cardGrid.classList.remove('max-w-xl', 'mx-auto');
-            }
-
-            allCards.forEach((card, index) => {
-                const hasData = card.populatedData && Object.keys(card.populatedData).length > 0;
-                const el = createCardElement(card);
-
-                if (hasData) {
-                    completedCards++;
-                    populatedCardIds.add(card.id);
-                    el.classList.remove('loading');
-                    el.classList.add('populated');
-                    try {
-                        el.innerHTML = renderCardContent(card.cardType, card.populatedData);
-                    } catch (e) {
-                        console.warn(`[CardRender] ${card.cardType} failed:`, e.message);
-                        el.innerHTML = renderFallbackCard(card.cardType, card.populatedData);
-                    }
-                    el._cardData = card.populatedData;
-                    appendCitations(el, card.populatedData);
-                }
-
-                cardGrid.appendChild(el);
-                el.classList.add('transition-all', 'duration-300');
-                if (hasData) revealCard(el);
-            });
-
-            if (!firstCardShown && populatedCards.length === 0) {
-                showResultsCanvas();
-                firstCardShown = true;
-            }
-
-            checkAllCardsReady();
-            if (!allCardsReadyShown) {
-                layoutProgressFill.value = 25;
-                layoutProgressText.textContent = 'enhancing';
-                startEnhanceStatusRotation();
-            }
-        }
-
-        function startEnhanceStatusRotation() {
-            if (enhanceMsgInterval) clearInterval(enhanceMsgInterval);
-            let msgIdx = 0;
-            enhanceMsgInterval = setInterval(() => {
-                const loadingCards = document.querySelectorAll('.card.loading');
-                if ((loadingCards.length === 0 && pipelineComplete) || allCardsReadyShown) {
-                    clearInterval(enhanceMsgInterval);
-                    enhanceMsgInterval = null;
-                    return;
-                }
-                msgIdx = (msgIdx + 1) % enhanceStatusMessages.length;
-                progressLabel.textContent = enhanceStatusMessages[msgIdx];
-            }, 3000);
-        }
-
-        function onCardReceived(data) {
-            if (populatedCardIds.has(data.cardId)) {
+        function appendToken(text) {
+            if (!verdictReceived) {
+                fullText += text;
+                parseAndRoute(text);
                 return;
             }
-            populatedCardIds.add(data.cardId);
-            completedCards++;
-
-            if (!firstCardShown) {
-                firstCardShown = true;
-                showResultsCanvas();
-            }
-
-            if (completedCards > 1) {
-                cardGrid.classList.remove('max-w-xl', 'mx-auto');
-            }
-
-            const el = document.getElementById(`card-${data.cardId}`);
-            if (!el) return;
-
-            el.classList.remove('loading', 'researching');
-            el.classList.add('populated');
-            try {
-                el.innerHTML = renderCardContent(data.cardType, data.data);
-            } catch (e) {
-                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
-                el.innerHTML = renderFallbackCard(data.cardType, data.data);
-            }
-            el._cardData = data.data;
-            revealCard(el);
-
-            appendCitations(el, data.data);
-
-            checkAllCardsReady();
-            if (!allCardsReadyShown) {
-                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-                layoutProgressFill.value = pct;
-                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
-            }
+            fullText += text;
+            parseAndRoute(text);
         }
 
-        function onCardUpdated(data) {
-            const el = document.getElementById(`card-${data.cardId}`);
-            if (!el) return;
-
-            const isNewlyPopulated = !populatedCardIds.has(data.cardId);
-            if (isNewlyPopulated) {
-                populatedCardIds.add(data.cardId);
-                completedCards++;
-
-                if (!firstCardShown) {
-                    firstCardShown = true;
-                    showResultsCanvas();
-                }
-
-                if (completedCards > 1) {
-                    cardGrid.classList.remove('max-w-xl', 'mx-auto');
-                }
-            }
-
-            const existingData = el._cardData || {};
-            const mergedData = { ...existingData, ...data.data };
-            el._cardData = mergedData;
-
-            el.classList.remove('loading', 'researching');
-            el.classList.add('populated');
-            try {
-                el.innerHTML = renderCardContent(data.cardType, mergedData);
-            } catch (e) {
-                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
-                el.innerHTML = renderFallbackCard(data.cardType, mergedData);
-            }
-            if (isNewlyPopulated) revealCard(el);
-
-            appendCitations(el, mergedData);
-
-            if (isNewlyPopulated) {
-                checkAllCardsReady();
-                if (!allCardsReadyShown) {
-                    const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-                    layoutProgressFill.value = pct;
-                    layoutProgressText.textContent = `${completedCards}/${totalCards}`;
-                }
-            }
-
-            const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched', status: '', reconcile: '' };
-            const sourceLabel = srcLabels[data.source] || 'updated';
-            if (sourceLabel) {
-                const isResearch = data.source === 'review' || data.source === 'research-enrich';
-                const sourceTag = document.createElement('span');
-                sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${isResearch ? 'badge-info' : 'badge-warning'}`;
-                sourceTag.dataset.sourceTag = 'true';
-                sourceTag.textContent = sourceLabel;
-                el.appendChild(sourceTag);
-                setTimeout(() => sourceTag.remove(), 4000);
-            }
-        }
-
-        function onCardAdded(data) {
-            totalCards++;
-            const cardId = data.cardId;
-            if (!populatedCardIds.has(cardId)) {
-                populatedCardIds.add(cardId);
-                completedCards++;
-            }
-            const card = {
-                id: cardId,
-                cardType: data.cardType,
-                gridPosition: data.gridPosition || { row: totalCards, column: 1, columnSpan: 1, rowSpan: 1 },
-                placeholderData: data.data,
-            };
-
-            cardGrid.classList.remove('max-w-xl', 'mx-auto');
-
-            const el = createCardElement(card);
-            el.classList.remove('loading');
-            el.classList.add('populated');
-            try {
-                el.innerHTML = renderCardContent(data.cardType, data.data);
-            } catch (e) {
-                console.warn(`[CardRender] ${data.cardType} failed:`, e.message);
-                el.innerHTML = renderFallbackCard(data.cardType, data.data);
-            }
-            el._cardData = data.data;
-
-            const srcLabels = { enhance: 'web verified', review: 'researched', 'research-enrich': 'enriched' };
-            const sourceLabel = srcLabels[data.source] || 'new';
-            const isResearch = data.source === 'review' || data.source === 'research-enrich';
-            const sourceTag = document.createElement('span');
-            sourceTag.className = `badge badge-xs badge-outline uppercase tracking-wide absolute right-2 top-2 ${isResearch ? 'badge-info' : 'badge-warning'}`;
-            sourceTag.dataset.sourceTag = 'true';
-            sourceTag.textContent = sourceLabel;
-            el.appendChild(sourceTag);
-            setTimeout(() => sourceTag.remove(), 5000);
-
-            cardGrid.appendChild(el);
-            el.classList.add('transition-all', 'duration-300');
-            revealCard(el);
-
-            appendCitations(el, data.data);
-
-            checkAllCardsReady();
-            if (!allCardsReadyShown) {
-                const pct = Math.min(95, 60 + Math.round((completedCards / totalCards) * 35));
-                layoutProgressFill.value = pct;
-                layoutProgressText.textContent = `${completedCards}/${totalCards}`;
-            }
-        }
-
-        function onPhaseChange(data) {
-            const phaseMessages = {
-                haiku: 'Quick analysis...',
-                enhancing: 'Investigating sources...',
-                reviewing: 'Deep research...',
-            };
-            const msg = phaseMessages[data.phase] || data.message || '';
-            if (msg) {
-                progressLabel.textContent = msg;
-            }
-        }
-
-        function appendCitations(el, data) {
-            const citations = data?._researchMeta?.citations || data?._webCitations || [];
-            const validCitations = citations
-                .map(c => typeof c === 'string' ? c : (c.url || c.cited_url || ''))
-                .filter(url => url && url.startsWith('http'));
-            if (validCitations.length === 0) return;
-
-            const existing = el.querySelector('.web-citations');
-            if (existing) existing.remove();
-
-            const citHtml = `<div class="web-citations mt-2 px-4 pb-4">
-                <div class="divider my-1 text-[10px] uppercase tracking-wider text-base-content/40">Sources</div>
-                <div class="flex flex-wrap gap-1.5">
-                ${validCitations.slice(0, 3).map(url => {
-                    let domain;
-                    try { domain = new URL(url).hostname.replace(/^www\./, ''); } catch { domain = url.replace(/^https?:\/\//, '').split('/')[0]; }
-                    return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer" class="badge badge-outline badge-xs">${esc(domain)}</a>`;
-                }).join('')}
-                </div>
-            </div>`;
-            el.insertAdjacentHTML('beforeend', citHtml);
-        }
-
-        function finalizePipelineView(data) {
-            if (pipelineSettled) return;
-            pipelineSettled = true;
-            awaitingSettlement = false;
-            pipelineComplete = true;
-            if (data?.layout?.type) applyLayoutTheme(data.layout.type);
-            stopAnalysisProgressTick();
-            if (completionTimeout) {
-                clearTimeout(completionTimeout);
-                completionTimeout = null;
-            }
-            if (stallTimer) {
-                clearTimeout(stallTimer);
-                stallTimer = null;
-            }
-            if (enhanceMsgInterval) {
-                clearInterval(enhanceMsgInterval);
-                enhanceMsgInterval = null;
-            }
-            if (uploadProgressInterval) {
-                clearInterval(uploadProgressInterval);
-                uploadProgressInterval = null;
-            }
-
-            progressOverlay.classList.add('hidden');
-            cardGrid.classList.remove('max-w-xl', 'mx-auto');
-
-            document.querySelectorAll('[data-source-tag]').forEach(t => t.remove());
-
-            layoutProgress.style.display = 'none';
-
-            if (!firstCardShown) {
-                firstCardShown = true;
-                resultsOverlay.classList.remove('hidden');
-            }
-
-            if (data?.contentAnalysis) {
-                const ca = data.contentAnalysis;
-                if (ca.additionalQuestions?.length) {
-                    ca.followUpQuestions = [
-                        ...(ca.followUpQuestions || []),
-                        ...ca.additionalQuestions.map(q => ({ question: q })),
-                    ];
-                }
-                renderFollowUpQuestions(ca);
-            }
-
-            // Immediately fire-and-forget the rendered card HTML to the server.
-            // sendBeacon is guaranteed to deliver even if the user navigates away.
-            try {
-                const rid = telemetry.requestId;
-                if (rid && cardGrid.children.length) {
-                    const payload = JSON.stringify({
-                        requestId: rid,
-                        cardHtml: cardGrid.outerHTML,
-                        clientState: {
-                            viewport: { width: innerWidth, height: innerHeight, devicePixelRatio: devicePixelRatio || 2 },
-                            screen: { width: screen.width, height: screen.height },
-                            cards: { total: cardGrid.children.length, populated: cardGrid.querySelectorAll('.card.populated').length },
-                            theme: document.documentElement.getAttribute('data-theme') || DEFAULT_THEME,
-                            userAgent: navigator.userAgent,
-                        },
-                    });
-                    navigator.sendBeacon('/api/hub/v2/render-capture', new Blob([payload], { type: 'application/json' }));
-                }
-            } catch (e) { /* sendBeacon is best-effort */ }
-
-            // Capture what the user actually sees — viewport-clipped screenshot
-            setTimeout(() => captureRenderedCards().catch(e => console.warn('[RenderCapture] Fatal:', e.message)), 300);
-        }
-
-        function onPipelineComplete(data) {
-            pipelineComplete = true;
-            if (data?.layout?.type) applyLayoutTheme(data.layout.type);
-            stopAnalysisProgressTick();
-            if (completionTimeout) {
-                clearTimeout(completionTimeout);
-                completionTimeout = null;
-            }
-            if (stallTimer) {
-                clearTimeout(stallTimer);
-                stallTimer = null;
-            }
-            if (enhanceMsgInterval) {
-                clearInterval(enhanceMsgInterval);
-                enhanceMsgInterval = null;
-            }
-            if (uploadProgressInterval) {
-                clearInterval(uploadProgressInterval);
-                uploadProgressInterval = null;
-            }
-
-            progressOverlay.classList.add('hidden');
-            if (!firstCardShown) {
-                firstCardShown = true;
-                resultsOverlay.classList.remove('hidden');
-            }
-
-            if (data?.pendingResearch) {
-                awaitingSettlement = true;
-                layoutProgress.style.display = '';
-                layoutProgressFill.value = 98;
-                layoutProgressText.textContent = 'checking sources';
-                progressLabel.textContent = 'Checking external sources...';
+        function parseAndRoute(chunk) {
+            if (chunk.includes('---SUMMARY')) {
+                currentParseSection = 'summary';
+                summarySection.classList.remove('hidden');
+                const after = chunk.split('---SUMMARY')[1] || '';
+                if (after.trim()) appendToSection('summary', after);
                 return;
             }
 
-            finalizePipelineView(data);
-        }
+            const angleMatch = chunk.match(/---ANGLE:\s*(.+)/);
+            if (angleMatch) {
+                currentParseSection = 'angle';
+                const title = angleMatch[1].trim();
+                createAngleSection(title);
+                const after = chunk.split(/---ANGLE:.+/)[1] || '';
+                if (after.trim()) appendToSection('angle', after);
+                return;
+            }
 
-        function onPipelineSettled(data) {
-            finalizePipelineView(data);
-        }
+            if (chunk.includes('---SOURCES')) {
+                currentParseSection = 'sources';
+                sourcesSection.classList.remove('hidden');
+                const after = chunk.split('---SOURCES')[1] || '';
+                if (after.trim()) appendToSection('sources', after);
+                return;
+            }
 
-        const CAPTURE_STYLE_PROPS = [
-            'color', 'backgroundColor', 'backgroundImage',
-            'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor',
-            'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-            'borderTopStyle', 'borderRightStyle', 'borderBottomStyle', 'borderLeftStyle',
-            'borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomLeftRadius', 'borderBottomRightRadius',
-            'boxShadow', 'textShadow',
-            'fontSize', 'fontFamily', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing',
-            'textAlign', 'textTransform', 'textDecoration',
-            'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-            'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-            'display', 'flexDirection', 'alignItems', 'justifyContent', 'gap', 'flexWrap',
-            'gridTemplateColumns', 'gridTemplateRows',
-            'width', 'maxWidth', 'minWidth', 'height', 'maxHeight', 'minHeight',
-            'overflowX', 'overflowY',
-            'opacity', 'visibility',
-            'position', 'top', 'right', 'bottom', 'left', 'zIndex',
-            'whiteSpace', 'wordBreak', 'wordWrap',
-            'listStyleType',
-        ];
-
-        function inlineComputedStyles(origElements, clonedElements) {
-            for (let i = 0; i < origElements.length && i < clonedElements.length; i++) {
-                const cs = getComputedStyle(origElements[i]);
-                const el = clonedElements[i];
-                CAPTURE_STYLE_PROPS.forEach(p => {
-                    const v = cs[p];
-                    if (v !== undefined && v !== '') el.style[p] = v;
-                });
+            if (currentParseSection !== 'preamble') {
+                appendToSection(currentParseSection, chunk);
             }
         }
 
-        function prepareCloneForCapture(target) {
-            const clone = target.cloneNode(true);
-            clone.querySelectorAll('script, style, link[rel="stylesheet"]').forEach(s => s.remove());
-            const origElements = [target, ...target.querySelectorAll('*')];
-            const clonedElements = [clone, ...clone.querySelectorAll('*')];
-            inlineComputedStyles(origElements, clonedElements);
-            clone.style.opacity = '1';
-            clone.style.transform = 'none';
-            clone.style.position = 'relative';
-            return clone;
-        }
-
-        function sendRenderCapture(rid, image, domSnapshot, clientState, captureMetadata) {
-            const payload = { requestId: rid, domSnapshot, clientState, captureMetadata };
-            if (image) payload.image = image;
-            else payload.fallback = true;
-            fetch('/api/hub/v2/render-capture', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            }).then(r => {
-                if (!r.ok) console.warn('[RenderCapture] Server rejected:', r.status);
-                else r.json().then(d => console.log('[RenderCapture] Saved:', d.renderMethod, d.sizeKB + 'KB'));
-            }).catch(e => console.warn('[RenderCapture] POST failed:', e.message));
-        }
-
-        function captureViaForeignObject(target, opts = {}) {
-            const w = target.scrollWidth;
-            const maxH = opts.viewportCrop ? window.innerHeight : 4096;
-            const scrollTop = opts.viewportCrop ? (window.scrollY || 0) : 0;
-            const h = Math.min(target.scrollHeight - scrollTop, maxH);
-            const scale = Math.min(window.devicePixelRatio || 2, 2);
-            const clone = prepareCloneForCapture(target);
-            if (opts.viewportCrop) {
-                clone.style.marginTop = '-' + scrollTop + 'px';
-            }
-            clone.style.width = w + 'px';
-            clone.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
-            const xhtml = new XMLSerializer().serializeToString(clone);
-            const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
-                + '<foreignObject width="100%" height="100%">' + xhtml + '</foreignObject></svg>';
-            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = Math.round(w * scale);
-                        canvas.height = Math.round(h * scale);
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#0a0d12';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.scale(scale, scale);
-                        ctx.drawImage(img, 0, 0, w, h);
-                        URL.revokeObjectURL(url);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-                        resolve(dataUrl);
-                    } catch (e) {
-                        URL.revokeObjectURL(url);
-                        reject(e);
+        function appendToSection(section, text) {
+            const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            switch (section) {
+                case 'summary':
+                    summaryText.innerHTML += safeText;
+                    break;
+                case 'angle':
+                    if (currentAngleEl) {
+                        const body = currentAngleEl.querySelector('.angle-body');
+                        if (body) body.innerHTML += safeText;
                     }
-                };
-                img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('SVG load failed')); };
-                img.src = url;
+                    break;
+                case 'sources':
+                    sourcesText.innerHTML += safeText;
+                    break;
+            }
+        }
+
+        function createAngleSection(title) {
+            angleCount++;
+            const section = document.createElement('div');
+            section.className = 'border border-base-300 rounded-xl overflow-hidden';
+            section.innerHTML =
+                '<div class="px-4 py-3 bg-base-200 border-b border-base-300 flex items-center gap-2">' +
+                    '<span class="material-symbols-rounded text-primary text-base">search</span>' +
+                    '<span class="text-sm font-semibold text-base-content">' + esc(title) + '</span>' +
+                '</div>' +
+                '<div class="angle-body px-4 py-3 text-sm text-base-content/80 leading-relaxed whitespace-pre-wrap" dir="auto"></div>';
+            anglesContainer.appendChild(section);
+            currentAngleEl = section;
+        }
+
+        function handleSection(data) {
+            // Section events are purely structural markers
+            // The actual content routing happens via token parsing
+        }
+
+        function handleSources(data) {
+            if (!data.citations || !data.citations.length) return;
+            sourcesSection.classList.remove('hidden');
+            groundingSources.innerHTML = '';
+            data.citations.forEach(url => {
+                try {
+                    const hostname = new URL(url).hostname.replace('www.', '');
+                    const el = document.createElement('a');
+                    el.href = url;
+                    el.target = '_blank';
+                    el.rel = 'noopener noreferrer';
+                    el.className = 'flex items-center gap-2 px-3 py-2 rounded-lg bg-base-200 border border-base-300 text-xs hover:border-primary transition-colors';
+                    el.innerHTML =
+                        '<span class="material-symbols-rounded text-primary text-sm">link</span>' +
+                        '<span class="text-base-content/60 truncate">' + esc(hostname) + '</span>';
+                    groundingSources.appendChild(el);
+                } catch {}
             });
         }
 
-        function loadDomToImage() {
-            if (typeof domtoimage !== 'undefined') return Promise.resolve();
-            return new Promise((resolve, reject) => {
-                const s = document.createElement('script');
-                s.src = 'https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.5/dist/dom-to-image-more.min.js';
-                s.onload = resolve;
-                s.onerror = () => reject(new Error('dom-to-image-more load failed'));
-                document.head.appendChild(s);
-            });
+        function handleComplete(data) {
+            pipelineComplete = true;
+            statusLabel.textContent = 'Complete';
+            loadingState.classList.add('hidden');
+
+            if (data.duration) {
+                completionMeta.classList.remove('hidden');
+                metaDuration.textContent = (data.duration / 1000).toFixed(1) + 's';
+                if (data.model) metaModel.textContent = data.model;
+            }
+
+            postProcessText();
         }
 
-        function captureViaDomToImage(target, opts = {}) {
-            if (typeof domtoimage === 'undefined') return Promise.reject(new Error('not loaded'));
-            const maxH = opts.viewportCrop ? window.innerHeight : Math.min(target.scrollHeight, 4096);
-            return domtoimage.toJpeg(target, {
-                quality: 0.82,
-                bgcolor: '#0a0d12',
-                height: maxH,
-                style: { opacity: '1', transform: 'none' },
-            });
+        function postProcessText() {
+            linkifySection(summaryText);
+            anglesContainer.querySelectorAll('.angle-body').forEach(el => linkifySection(el));
+            linkifySection(sourcesText);
         }
 
-        async function captureRenderedCards() {
-            const rid = telemetry.requestId;
-            if (!rid) return;
-
-            const captureStart = performance.now();
-            const methods = [];
-            let clientState = null;
-            let domSnapshot = null;
-
-            try {
-                await waitForCardsToSettle();
-            } catch (e) {
-                console.warn('[RenderCapture] waitForCardsToSettle error:', e.message);
-            }
-
-            const target = resultsOverlay;
-            if (!target || !cardGrid.children.length) return;
-
-            try { clientState = collectClientState(); } catch (e) { /* best-effort */ }
-            try { domSnapshot = serializeDomSnapshot(target); } catch (e) { /* best-effort */ }
-
-            // Method 1: foreignObject viewport crop — captures what the user actually sees
-            try {
-                const t0 = performance.now();
-                const dataUrl = await captureViaForeignObject(target, { viewportCrop: true });
-                const dur = Math.round(performance.now() - t0);
-                if (dataUrl && dataUrl.length > 1000) {
-                    methods.push({ method: 'foreignObject-viewport', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
-                    console.log('[RenderCapture] foreignObject-viewport succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
-                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
-                        method: 'foreignObject-viewport',
-                        viewportCropped: true,
-                        captureDelayMs: Math.round(performance.now() - captureStart),
-                        methods,
-                    });
-                    return;
-                }
-                methods.push({ method: 'foreignObject-viewport', success: false, durationMs: dur });
-            } catch (e) {
-                methods.push({ method: 'foreignObject-viewport', success: false, error: e.message });
-                console.warn('[RenderCapture] foreignObject-viewport failed:', e.message);
-            }
-
-            // Method 2: foreignObject full page
-            try {
-                const t0 = performance.now();
-                const dataUrl = await captureViaForeignObject(target, { viewportCrop: false });
-                const dur = Math.round(performance.now() - t0);
-                if (dataUrl && dataUrl.length > 1000) {
-                    methods.push({ method: 'foreignObject-full', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
-                    console.log('[RenderCapture] foreignObject-full succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
-                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
-                        method: 'foreignObject-full',
-                        viewportCropped: false,
-                        captureDelayMs: Math.round(performance.now() - captureStart),
-                        methods,
-                    });
-                    return;
-                }
-                methods.push({ method: 'foreignObject-full', success: false, durationMs: dur });
-            } catch (e) {
-                methods.push({ method: 'foreignObject-full', success: false, error: e.message });
-                console.warn('[RenderCapture] foreignObject-full failed:', e.message);
-            }
-
-            // Method 3: dom-to-image-more (lazy-loaded, lighter than html2canvas)
-            try {
-                const t0 = performance.now();
-                await loadDomToImage();
-                const dataUrl = await captureViaDomToImage(target, { viewportCrop: true });
-                const dur = Math.round(performance.now() - t0);
-                if (dataUrl && dataUrl.length > 1000) {
-                    methods.push({ method: 'dom-to-image', sizeKB: Math.round(dataUrl.length / 1024), durationMs: dur, success: true });
-                    console.log('[RenderCapture] dom-to-image succeeded:', methods[methods.length - 1].sizeKB, 'KB in', dur, 'ms');
-                    sendRenderCapture(rid, dataUrl, domSnapshot, clientState, {
-                        method: 'dom-to-image',
-                        viewportCropped: true,
-                        captureDelayMs: Math.round(performance.now() - captureStart),
-                        methods,
-                    });
-                    return;
-                }
-                methods.push({ method: 'dom-to-image', success: false, durationMs: dur });
-            } catch (e) {
-                methods.push({ method: 'dom-to-image', success: false, error: e.message });
-                console.warn('[RenderCapture] dom-to-image failed:', e.message);
-            }
-
-            // Method 4: DOM snapshot only — always works
-            console.warn('[RenderCapture] All image captures failed, sending DOM snapshot only');
-            methods.push({ method: 'dom-only', success: true });
-            if (domSnapshot || clientState) {
-                sendRenderCapture(rid, null, domSnapshot, clientState, {
-                    method: 'dom-only',
-                    viewportCropped: false,
-                    captureDelayMs: Math.round(performance.now() - captureStart),
-                    methods,
-                });
-            }
-        }
-
-        function waitForCardsToSettle() {
-            return new Promise(resolve => {
-                let checks = 0;
-                const maxChecks = 20;
-                const interval = setInterval(() => {
-                    checks++;
-                    const stillLoading = cardGrid.querySelectorAll('.card.loading').length;
-                    const stillAnimating = cardGrid.querySelectorAll('.card:not(.populated)').length;
-                    const runningAnimations = cardGrid.getAnimations?.().filter(a => a.playState === 'running').length || 0;
-                    if ((stillLoading === 0 && stillAnimating === 0 && runningAnimations === 0) || checks >= maxChecks) {
-                        clearInterval(interval);
-                        setTimeout(resolve, 500);
-                    }
-                }, 200);
-            });
-        }
-
-        function collectClientState() {
-            const state = {
-                viewport: {
-                    width: window.innerWidth,
-                    height: window.innerHeight,
-                    devicePixelRatio: window.devicePixelRatio || 1,
-                    scrollX: window.scrollX,
-                    scrollY: window.scrollY,
-                    orientation: screen.orientation?.type || (window.innerWidth > window.innerHeight ? 'landscape' : 'portrait'),
-                },
-                screen: {
-                    width: screen.width,
-                    height: screen.height,
-                    colorDepth: screen.colorDepth,
-                },
-                cards: {
-                    total: cardGrid.children.length,
-                    populated: cardGrid.querySelectorAll('.card.populated').length,
-                    loading: cardGrid.querySelectorAll('.card.loading').length,
-                    errored: cardGrid.querySelectorAll('.card.error').length,
-                    types: Array.from(cardGrid.querySelectorAll('.card')).map(c => ({
-                        id: c.id,
-                        type: c.dataset.cardType,
-                        classes: c.className,
-                        rect: { w: c.offsetWidth, h: c.offsetHeight },
-                        overflowing: c.scrollHeight > c.clientHeight || c.scrollWidth > c.clientWidth,
-                    })),
-                },
-                layout: {
-                    gridComputedCols: getComputedStyle(cardGrid).gridTemplateColumns,
-                    gridComputedRows: getComputedStyle(cardGrid).gridTemplateRows,
-                    gridGap: getComputedStyle(cardGrid).gap,
-                    overlayRect: { w: resultsOverlay.offsetWidth, h: resultsOverlay.offsetHeight },
-                    theme: document.documentElement.getAttribute('data-theme') || DEFAULT_THEME,
-                },
-                performance: {},
-                userAgent: navigator.userAgent,
-                timestamp: new Date().toISOString(),
-            };
-
-            try {
-                const entries = performance.getEntriesByType('layout-shift');
-                if (entries.length) {
-                    state.performance.cumulativeLayoutShift = entries.reduce((sum, e) => sum + e.value, 0);
-                }
-                const paintEntries = performance.getEntriesByType('paint');
-                paintEntries.forEach(p => {
-                    state.performance[p.name.replace(/-/g, '_')] = Math.round(p.startTime);
-                });
-                const lcpEntries = performance.getEntriesByType('largest-contentful-paint');
-                if (lcpEntries.length) {
-                    state.performance.lcp = Math.round(lcpEntries[lcpEntries.length - 1].startTime);
-                }
-            } catch (e) { /* performance API may not be fully available */ }
-
-            return state;
-        }
-
-        function serializeDomSnapshot(target) {
-            try {
-                const clone = prepareCloneForCapture(target);
-                const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
-                    + '<meta name="viewport" content="width=device-width,initial-scale=1">'
-                    + '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">'
-                    + '<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">'
-                    + '</head><body>' + clone.outerHTML + '</body></html>';
-                if (html.length > 1024 * 1024) return html.substring(0, 1024 * 1024);
-                return html;
-            } catch (e) {
-                console.warn('[RenderCapture] DOM snapshot failed:', e.message);
-                return null;
-            }
-        }
-
-        // === Card Rendering ===
-        function createCardElement(card) {
-            const el = document.createElement('div');
-            el.id = `card-${card.id}`;
-
-            el.className = 'card bg-base-200 border border-base-300 shadow-sm overflow-hidden loading relative';
-            el.dataset.cardType = card.cardType;
-
-            const span = card.gridPosition?.columnSpan || 1;
-            const fullWidthTypes = ['hero_summary', 'comparison_card', 'verification_card', 'map_card', 'stats_grid_card', 'gallery_card', 'chat_card'];
-            const twoColTypes = ['timeline_card', 'info_list', 'action_card', 'text_extract', 'link_card', 'news_card', 'order_card'];
-
-            if (span >= 3 || fullWidthTypes.includes(card.cardType)) {
-                el.classList.add('col-span-1', 'md:col-span-2', 'xl:col-span-3');
-            } else if (span === 2 || twoColTypes.includes(card.cardType)) {
-                el.classList.add('col-span-1', 'md:col-span-2', 'xl:col-span-2');
-            }
-
-            el.innerHTML = renderPlaceholder(card);
-            return el;
-        }
-
-        function renderPlaceholder(card) {
-            const pd = card.placeholderData || {};
-            const type = card.cardType;
-
-            if (type === 'hero_summary' && pd.title && pd.title !== 'Analyzing...') {
-                const screenshotSrc = typeof currentImageBase64 === 'string' ? currentImageBase64 : '';
-                return `${screenshotSrc ? `<figure class="relative">
-                    <img class="w-full h-40 object-cover" src="${screenshotSrc}" alt="">
-                    <div class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/50 to-transparent"></div>
-                    <div class="absolute top-3 left-3 flex gap-2">
-                        ${pd.badge ? `<div class="badge badge-primary badge-sm font-bold">${esc(pd.badge)}</div>` : ''}
-                    </div>
-                    <div class="absolute top-3 right-3">${renderStatusPill(pd.investigationStatus || 'investigating')}</div>
-                </figure>` : ''}
-                <div class="p-4">
-                    ${pd.emoji ? `<span class="text-3xl leading-none block mb-1">${esc(pd.emoji)}</span>` : ''}
-                    ${!screenshotSrc ? renderStatusPill(pd.investigationStatus || 'investigating') : ''}
-                    <h2 class="text-xl font-bold leading-tight" dir="auto">${esc(pd.title)}</h2>
-                    ${pd.subtitle ? `<p class="text-sm text-base-content/70 leading-relaxed" dir="auto">${esc(pd.subtitle)}</p>` : ''}
-                    <div class="flex items-center gap-2 mt-2">
-                        <span class="loading loading-dots loading-xs text-primary"></span>
-                        <span class="text-xs text-base-content/50">Investigating...</span>
-                    </div>
-                </div>`;
-            }
-
-            if (type === 'hero_summary') {
-                return `<div class="card-body space-y-3">
-                    <div class="skeleton h-6 w-2/3"></div>
-                    <div class="skeleton h-4 w-full"></div>
-                    <div class="skeleton h-4 w-4/5"></div>
-                </div>`;
-            }
-
-            if (type === 'person_card' && pd.name) {
-                return `<div class="p-4 flex items-center gap-3">
-                    <div class="avatar placeholder">
-                        <div class="bg-primary/20 text-primary rounded-full w-12 h-12 flex items-center justify-center">
-                            <span class="text-lg font-bold">${esc(pd.name ? pd.name[0].toUpperCase() : '?')}</span>
-                        </div>
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-bold text-sm">${esc(pd.name)}</div>
-                        <span class="loading loading-dots loading-xs text-base-content/40"></span>
-                    </div>
-                </div>`;
-            }
-
-            if (type === 'location_card' && pd.name) {
-                return `<div class="p-4 flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span class="material-symbols-rounded text-primary text-lg">location_on</span>
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-bold text-sm">${esc(pd.name)}</div>
-                        <span class="loading loading-dots loading-xs text-base-content/40"></span>
-                    </div>
-                </div>`;
-            }
-
-            // Generic skeleton for all other card types
-            const typeLabels = {
-                key_metric: 'Metric', info_list: 'Details', fact_check: 'Fact Check',
-                timeline_card: 'Timeline', quote_card: 'Quote', comparison_card: 'Comparison',
-                warning_card: 'Alert', action_card: 'Actions', text_extract: 'Text',
-                news_card: 'News', chart_card: 'Chart', did_you_know_card: 'Did You Know?',
-                verification_card: 'Verification', link_card: 'Links', product_card: 'Product',
-                chat_card: 'Chat', map_card: 'Map', order_card: 'Order',
-                stats_grid_card: 'Stats', gallery_card: 'Gallery', source_card: 'Source',
-            };
-            const label = typeLabels[type] || type.replace(/_/g, ' ');
-
-            return `<div class="card-body space-y-3">
-                <div class="text-xs font-semibold uppercase tracking-wider text-base-content/40">${esc(label)}</div>
-                <div class="skeleton h-4 w-3/4"></div>
-                <div class="skeleton h-3 w-full"></div>
-                <div class="skeleton h-3 w-2/3"></div>
-            </div>`;
-        }
-
-        function renderFallbackCard(cardType, data) {
-            const d = data || {};
-            const title = d.title || d.name || d.headline || d.label || d.claim || d.quote || '';
-            const subtitle = d.subtitle || d.context || d.summary || d.description || d.explanation || '';
-            return `<div class="p-4">
-                <div class="text-xs font-bold uppercase tracking-wider text-base-content/30 mb-2">${esc((cardType || '').replace(/_/g, ' '))}</div>
-                ${title ? `<div class="text-sm font-medium mb-1" dir="auto">${esc(typeof title === 'string' ? title : JSON.stringify(title))}</div>` : ''}
-                ${subtitle ? `<div class="text-xs text-base-content/60" dir="auto">${esc(typeof subtitle === 'string' ? subtitle.slice(0, 200) : '')}</div>` : ''}
-            </div>`;
-        }
-
-        function renderStatusPill(status) {
-            const configs = {
-                investigating: { icon: 'search', label: 'Investigating', cls: 'badge-warning text-warning-content' },
-                confirmed: { icon: 'check_circle', label: 'Confirmed', cls: 'badge-success text-success-content' },
-                unconfirmed: { icon: 'help', label: 'Unconfirmed', cls: 'badge-neutral text-neutral-content' },
-                mixed: { icon: 'swap_horiz', label: 'Mixed', cls: 'badge-info text-info-content' },
-            };
-            const c = configs[status] || configs.investigating;
-            return `<div class="badge ${c.cls} badge-sm gap-1 font-semibold shadow-sm">
-                <span class="material-symbols-rounded text-xs">${c.icon}</span>${c.label}
-            </div>`;
-        }
-
-        function renderCardContent(cardType, data) {
-            const d = data || {};
-
-            switch (cardType) {
-                case 'hero_summary': {
-                    const hasImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    const heroImg = hasImage ? d.imageUrl : (typeof currentImageBase64 === 'string' ? currentImageBase64 : '');
-                    const status = d.investigationStatus || null;
-                    const showPill = status && status !== 'investigating';
-                    return `${heroImg ? `<figure class="relative">
-                        <img class="w-full h-40 object-cover" src="${hasImage ? esc(d.imageUrl) : heroImg}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
-                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 via-base-200/50 to-transparent"></div>
-                        <div class="absolute top-3 left-3">${d.badge ? `<div class="badge badge-primary badge-sm font-bold">${esc(d.badge)}</div>` : ''}</div>
-                        ${showPill ? `<div class="absolute top-3 right-3">${renderStatusPill(status)}</div>` : ''}
-                    </figure>` : ''}
-                    <div class="p-4">
-                        ${d.emoji ? `<span class="text-3xl mb-1 block leading-none">${esc(d.emoji)}</span>` : ''}
-                        ${!heroImg && d.badge ? `<div class="badge badge-primary badge-sm font-bold mb-2">${esc(d.badge)}</div>` : ''}
-                        ${!heroImg && showPill ? renderStatusPill(status) : ''}
-                        <h2 class="text-xl font-extrabold text-white leading-tight tracking-tight mb-1" dir="auto">${esc(d.title || 'Analysis')}</h2>
-                        <p class="text-sm text-base-content/60 leading-relaxed mb-2" dir="auto">${linkify(cleanSummary(d.subtitle || ''))}</p>
-                        ${d.takeaway ? `<div class="bg-primary/8 p-3 rounded-xl border-l-3 border-primary mt-3">
-                            <p class="text-sm text-base-content/80 leading-relaxed" dir="auto">${linkify(cleanSummary(d.takeaway))}</p>
-                        </div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1">
-                            <span class="material-symbols-rounded text-sm">open_in_new</span> Source
-                        </a>` : ''}
-                    </div>`;
-                }
-
-                case 'key_metric':
-                    return `<div class="stat p-4">
-                        ${d.emoji ? `<div class="stat-figure text-primary text-2xl">${esc(d.emoji)}</div>` : ''}
-                        <div class="stat-title text-xs text-base-content/50">${esc(d.label || '')}</div>
-                        <div class="stat-value text-2xl font-extrabold text-primary">${esc(d.unit && d.unit.length === 1 ? d.unit : '')}${esc(d.value || '—')}</div>
-                        ${d.trend && d.trend !== 'none' ? `<div class="stat-desc">
-                            <span class="badge badge-sm ${d.trend === 'up' ? 'badge-success' : d.trend === 'down' ? 'badge-error' : 'badge-info'} gap-1">
-                                <span class="material-symbols-rounded text-xs">${d.trend === 'up' ? 'trending_up' : d.trend === 'down' ? 'trending_down' : 'trending_flat'}</span>
-                                ${esc(d.trend)}
-                            </span>
-                        </div>` : ''}
-                        ${Array.isArray(d.sparkline) && d.sparkline.length >= 2 ? renderSparkline(d.sparkline) : ''}
-                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-base-300 rounded-lg" dir="auto">${linkify(d.context)}</div>` : ''}
-                    </div>`;
-
-                case 'info_list':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Details')}</h3>
-                        <div class="divide-y divide-base-300">
-                        ${(d.items || []).map(item => {
-                            if (typeof item === 'object' && item !== null) {
-                                const label = item.label || item.name || item.key || '';
-                                const value = item.value || item.description || item.text || '';
-                                const hasUrl = item.url && typeof item.url === 'string' && item.url.startsWith('http');
-                                const emoji = item.emoji || item.icon || '';
-                                return `<div class="flex items-start justify-between gap-3 py-2.5 text-sm ${item.highlight ? 'bg-primary/5 -mx-2 px-2 rounded-lg' : ''}">
-                                    <span class="text-base-content/50 flex items-center gap-1.5 shrink-0">${emoji ? `<span>${esc(emoji)}</span>` : ''}<span>${esc(label)}</span></span>
-                                    <span class="text-right font-medium ${item.highlight ? 'text-primary' : ''}">${hasUrl ? renderLink(item.url, value, 'text-primary hover:underline') : linkify(value)}</span>
-                                </div>`;
-                            }
-                            return `<div class="py-2 text-sm" dir="auto">${linkify(item)}</div>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-
-                case 'fact_check': {
-                    const verdict = d.verdict || 'unverified';
-                    const verdictConfig = {
-                        verified: { icon: 'check_circle', color: 'success', label: 'Verified' },
-                        false: { icon: 'cancel', color: 'error', label: 'False' },
-                        misleading: { icon: 'warning', color: 'warning', label: 'Misleading' },
-                        partially_true: { icon: 'change_circle', color: 'warning', label: 'Partially True' },
-                        needs_context: { icon: 'help', color: 'secondary', label: 'Needs Context' },
-                        unverified: { icon: 'help', color: 'info', label: 'Unverified' },
-                    };
-                    const vc = verdictConfig[verdict] || verdictConfig.unverified;
-                    const confidentVerdicts = new Set(['verified', 'false', 'misleading']);
-                    const uncertainVerdicts = new Set(['unverified', 'needs_context']);
-                    const showConfidence = d.confidence &&
-                        !(confidentVerdicts.has(verdict) && d.confidence === 'low') &&
-                        !(uncertainVerdicts.has(verdict) && d.confidence === 'high');
-                    return `<div class="p-4">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="w-10 h-10 rounded-full bg-${vc.color}/15 flex items-center justify-center shrink-0">
-                                <span class="material-symbols-rounded text-${vc.color} text-xl">${vc.icon}</span>
-                            </div>
-                            <div>
-                                <div class="badge badge-${vc.color} badge-sm font-bold">${esc(vc.label)}</div>
-                                ${showConfidence ? `<div class="text-xs text-base-content/40 mt-0.5">${esc(d.confidence)} confidence</div>` : ''}
-                            </div>
-                        </div>
-                        <p class="text-sm italic text-base-content/70 leading-relaxed mb-2" dir="auto">${linkify(cleanSummary(d.claim || ''))}</p>
-                        ${d.explanation ? `<p class="text-xs text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(d.explanation))}</p>` : ''}
-                        ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${d.sourceUrl ? `Source: ${renderLink(d.sourceUrl, d.source)}` : `Source: ${esc(d.source)}`}</div>` : ''}
-                    </div>`;
-                }
-
-                case 'person_card': {
-                    const hasPhoto = d.photoUrl && typeof d.photoUrl === 'string' && d.photoUrl.startsWith('http');
-                    const initial = d.name ? d.name[0].toUpperCase() : '?';
-                    return `<div class="p-4">
-                        <div class="flex items-center gap-3 mb-3">
-                            <div class="avatar ${hasPhoto ? '' : 'placeholder'}">
-                                <div class="w-14 h-14 rounded-full ${hasPhoto ? 'ring ring-primary ring-offset-base-100 ring-offset-2' : 'bg-gradient-to-br from-primary/30 to-secondary/30 text-primary'}">
-                                    ${hasPhoto
-                                        ? `<img src="${esc(d.photoUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.classList.add('bg-gradient-to-br','from-primary/30','to-secondary/30');this.outerHTML='<span class=\\'text-xl font-bold\\'>${esc(initial)}</span>'">`
-                                        : `<span class="text-xl font-bold">${esc(d.emoji || initial)}</span>`
-                                    }
-                                </div>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="font-bold text-base text-white truncate">${esc(d.name || 'Unknown')}</div>
-                                ${d.role ? `<div class="text-xs text-base-content/50">${esc(d.role)}</div>` : ''}
-                                ${d.handle ? `<div class="text-xs text-primary">${d.profileUrl ? renderLink(d.profileUrl, d.handle) : esc(d.handle)}</div>` : ''}
-                            </div>
-                        </div>
-                        ${d.context ? `<p class="text-sm text-base-content/70 leading-relaxed" dir="auto">${linkify(cleanSummary(d.context))}</p>` : ''}
-                        ${d.notableInfo ? `<div class="bg-primary/8 p-2.5 rounded-lg mt-2 text-sm" dir="auto">💡 ${linkify(cleanSummary(d.notableInfo))}</div>` : ''}
-                        ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
-                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300">${renderItemValue(det)}</div>`
-                        ).join('')}</div>` : ''}
-                    </div>`;
-                }
-
-                case 'product_card': {
-                    const prodName = d.name || d.title || d.product || d.productName || 'Product';
-                    const prodPrice = d.price || d.cost || d.amount || '';
-                    const prodRating = d.rating || d.score || d.stars || '';
-                    const prodVerdict = d.verdict || d.summary || d.conclusion || d.assessment || '';
-                    const features = (d.features || d.specs || d.specifications || d.highlights || d.pros || []).map(normalizeFeature).slice(0, 5);
-                    const warnings = (d.warnings || d.cons || d.concerns || d.drawbacks || d.negatives || d.risks || []).map(normalizeFeature).slice(0, 3);
-                    const prodUrl = d.url || d.link || d.href || d.productUrl || '';
-                    return `<div class="p-4">
-                        <div class="flex gap-3 mb-3">
-                            ${d.imageUrl ? `<div class="w-20 h-20 rounded-xl bg-base-300 overflow-hidden shrink-0"><img src="${esc(d.imageUrl)}" alt="${esc(prodName)}" class="w-full h-full object-cover" loading="lazy" onerror="this.parentElement.innerHTML='<span class=\\'material-symbols-rounded text-base-content/30\\' style=\\'font-size:32px\\'>inventory_2</span>'"></div>` :
-                              d.emoji ? `<span class="text-3xl">${esc(d.emoji)}</span>` : ''}
-                            <div>
-                                <div class="font-bold text-base text-white">${esc(prodName)}</div>
-                                ${prodPrice ? `<div class="text-xl font-extrabold text-success">${esc(prodPrice)}</div>` : ''}
-                                ${prodRating ? `<div class="flex items-center gap-1 text-xs text-warning"><span class="material-symbols-rounded text-sm">star</span> ${esc(prodRating)}</div>` : ''}
-                            </div>
-                        </div>
-                        ${features.length ? `<div class="flex flex-wrap gap-1.5 mb-2">${features.map(f =>
-                            `<span class="badge badge-success badge-outline badge-xs gap-1"><span class="material-symbols-rounded text-[10px]">check</span>${esc(f)}</span>`
-                        ).join('')}</div>` : ''}
-                        ${prodVerdict ? `<div class="text-sm text-base-content/70 p-2.5 bg-success/5 rounded-lg border-l-2 border-success" dir="auto">${linkify(prodVerdict)}</div>` : ''}
-                        ${warnings.length ? `<div class="mt-2 space-y-1">${warnings.map(w =>
-                            `<div class="flex items-start gap-1.5 text-xs text-warning"><span class="material-symbols-rounded text-xs">warning</span>${esc(w)}</div>`
-                        ).join('')}</div>` : ''}
-                        ${prodUrl ? `<a href="${esc(prodUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> View</a>` : ''}
-                    </div>`;
-                }
-
-                case 'timeline_card':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Timeline')}</h3>
-                        <ul class="timeline timeline-vertical timeline-compact ml-0">
-                        ${(d.events || []).map((ev, i) => {
-                            const evObj = typeof ev === 'object' ? ev : { event: String(ev) };
-                            const evDate = evObj.date || evObj.time || evObj.timestamp || evObj.when || evObj.period || '';
-                            const evLabel = evObj.label || evObj.title || evObj.name || '';
-                            const evText = evObj.event || evObj.text || evObj.description || evLabel || '';
-                            const displayText = evLabel && evObj.description && evLabel !== evText
-                                ? `<span class="font-semibold">${esc(evLabel)}</span> — ${linkify(evObj.description)}`
-                                : (evObj.url ? renderLink(evObj.url, evText) : linkify(evText));
-                            const isLast = i === (d.events || []).length - 1;
-                            return `<li>
-                                ${i > 0 ? '<hr class="bg-base-300"/>' : ''}
-                                <div class="timeline-start text-xs text-base-content/40 font-mono">${esc(evDate)}</div>
-                                <div class="timeline-middle"><div class="w-2.5 h-2.5 rounded-full ${evObj.highlight ? 'bg-primary shadow-[0_0_8px_rgba(91,138,245,0.4)]' : 'bg-base-300'}"></div></div>
-                                <div class="timeline-end text-sm pb-3" dir="auto">${evObj.url && !evLabel ? renderLink(evObj.url, evText) : displayText}</div>
-                                ${!isLast ? '<hr class="bg-base-300"/>' : ''}
-                            </li>`;
-                        }).join('')}
-                        </ul>
-                    </div>`;
-
-                case 'quote_card': {
-                    const hasQuotePhoto = d.photoUrl && typeof d.photoUrl === 'string' && d.photoUrl.startsWith('http');
-                    return `<div class="p-4 border-l-3 border-secondary">
-                        <div class="text-4xl text-secondary/30 font-serif leading-none mb-1">\u201C</div>
-                        <blockquote class="text-sm text-base-content/80 leading-relaxed italic pl-2" dir="auto">${linkify(d.quote || '')}</blockquote>
-                        ${d.attribution ? `<div class="flex items-center gap-2 mt-3">
-                            ${hasQuotePhoto ? `<div class="avatar"><div class="w-7 h-7 rounded-full"><img src="${esc(d.photoUrl)}" alt="" loading="lazy" onerror="this.parentElement.parentElement.style.display='none'"></div></div>` : ''}
-                            <div class="text-xs font-semibold text-secondary">\u2014 ${d.sourceUrl ? renderLink(d.sourceUrl, d.attribution) : esc(d.attribution)}</div>
-                        </div>` : ''}
-                        ${d.context ? `<p class="text-xs text-base-content/40 mt-2" dir="auto">${linkify(d.context)}</p>` : ''}
-                    </div>`;
-                }
-
-                case 'comparison_card': {
-                    const compCols = d.columns || d.items || d.options || d.features || [];
-                    const compRows = d.rows || d.categories || d.criteria || d.labels || d.aspects || null;
-                    if (!compCols.length) {
-                        return `<div class="p-4"><h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Comparison')}</h3><p class="text-xs text-base-content/40">No data available</p></div>`;
-                    }
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Comparison')}</h3>
-                        <div class="overflow-x-auto">
-                        <table class="table table-xs">
-                            <thead><tr class="border-base-300">
-                                ${compRows ? '<th></th>' : ''}
-                                ${compCols.map(c => `<th class="text-primary font-bold">${esc(typeof c === 'object' ? (c.header || c.name || c.title || c.label || '') : c)}</th>`).join('')}
-                            </tr></thead>
-                            <tbody>${Array.from({ length: Math.max(...compCols.map(c => (Array.isArray(c.values) ? c.values : Array.isArray(c.items) ? c.items : Array.isArray(c.data) ? c.data : []).length), 0) }, (_, i) => `<tr class="border-base-300">
-                                ${compRows ? `<td class="text-base-content/50 font-medium">${esc(Array.isArray(compRows) ? compRows[i] || '' : '')}</td>` : ''}
-                                ${compCols.map(c => {
-                                    const vals = Array.isArray(c.values) ? c.values : Array.isArray(c.items) ? c.items : Array.isArray(c.data) ? c.data : [];
-                                    return `<td>${linkify(vals[i] || '')}</td>`;
-                                }).join('')}
-                            </tr>`).join('')}</tbody>
-                        </table>
-                        </div>
-                    </div>`;
-                }
-
-                case 'warning_card': {
-                    const level = d.level || 'warning';
-                    const alertClass = level === 'critical' ? 'alert-error' : level === 'info' ? 'alert-info' : 'alert-warning';
-                    const icon = level === 'critical' ? 'error' : level === 'info' ? 'info' : 'warning';
-                    return `<div role="alert" class="alert ${alertClass} rounded-2xl">
-                        <span class="material-symbols-rounded text-xl">${icon}</span>
-                        <div>
-                            <h3 class="font-bold text-sm" dir="auto">${esc(d.title || 'Warning')}</h3>
-                            ${d.details ? `<div class="text-xs mt-1 opacity-80" dir="auto">${linkify(d.details)}</div>` : ''}
-                            ${d.advice ? `<div class="text-xs mt-2 p-2 bg-base-100/20 rounded-lg" dir="auto">${linkify(d.advice)}</div>` : ''}
-                        </div>
-                    </div>`;
-                }
-
-                case 'action_card': {
-                    const actionItems = d.actions || d.steps || d.items || d.tasks || d.recommendations || [];
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Next Steps')}</h3>
-                        <div class="space-y-2">
-                        ${actionItems.map((a, i) => {
-                            const aObj = typeof a === 'object' ? a : { label: String(a) };
-                            const aLabel = aObj.label || aObj.name || aObj.title || aObj.text || aObj.action || '';
-                            const aDesc = aObj.description || aObj.detail || aObj.details || aObj.note || aObj.explanation || '';
-                            const aUrl = aObj.url || aObj.link || aObj.href || '';
-                            const aPriority = aObj.priority || aObj.importance || aObj.urgency || aObj.level || '';
-                            return `<div class="flex items-start gap-3">
-                                <div class="w-6 h-6 rounded-full bg-primary/15 text-primary flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">${i + 1}</div>
-                                <div class="min-w-0">
-                                    <div class="text-sm font-medium">${aUrl ? renderLink(aUrl, aLabel) : esc(aLabel)}</div>
-                                    ${aDesc ? `<div class="text-xs text-base-content/50 mt-0.5">${linkify(typeof aDesc === 'string' ? aDesc : '')}</div>` : ''}
-                                    ${aPriority ? `<span class="badge badge-xs mt-1 ${aPriority === 'high' || aPriority === 'critical' ? 'badge-error' : aPriority === 'medium' ? 'badge-warning' : 'badge-info'}">${esc(aPriority)}</span>` : ''}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-                }
-
-                case 'text_extract':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-2">${esc(d.title || 'Extracted Text')}</h3>
-                        <div class="text-sm font-mono bg-base-300 p-3 rounded-xl whitespace-pre-wrap break-words max-h-40 overflow-y-auto leading-relaxed" dir="auto">${linkify(d.text || '')}</div>
-                        ${d.source ? `<div class="text-xs text-base-content/40 mt-2">${esc(d.source)}</div>` : ''}
-                    </div>`;
-
-                case 'location_card': {
-                    const hasLocImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    const mapsUrl = d.mapUrl || (d.name ? `https://maps.google.com/?q=${encodeURIComponent(d.name)}` : '');
-                    return `${hasLocImage ? `<figure class="relative">
-                        <img class="w-full h-32 object-cover" src="${esc(d.imageUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.style.display='none'">
-                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
-                    </figure>` : ''}
-                    <div class="p-4">
-                        <div class="flex items-center gap-3 mb-2">
-                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                                ${d.emoji ? `<span class="text-lg">${esc(d.emoji)}</span>` : `<span class="material-symbols-rounded text-primary text-lg">location_on</span>`}
-                            </div>
-                            <div>
-                                <div class="font-bold text-base text-white">${esc(d.name || 'Location')}</div>
-                                ${d.address ? `<div class="text-xs text-base-content/50">${linkify(d.address)}</div>` : ''}
-                            </div>
-                        </div>
-                        ${d.context ? `<p class="text-sm text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(d.context))}</p>` : ''}
-                        ${(d.details || []).length ? `<div class="mt-2 space-y-1">${d.details.slice(0, 3).map(det =>
-                            `<div class="text-xs text-base-content/50 pl-3 border-l-2 border-base-300" dir="auto">${renderItemValue(det)}</div>`
-                        ).join('')}</div>` : ''}
-                        ${mapsUrl ? `<a href="${esc(mapsUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-3 gap-1"><span class="material-symbols-rounded text-sm">map</span> View on Map</a>` : ''}
-                    </div>`;
-                }
-
-                case 'link_card':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Links')}</h3>
-                        <div class="space-y-2">
-                        ${(d.links || []).map(link => {
-                            const lObj = typeof link === 'object' ? link : { label: String(link), url: '' };
-                            return `<div class="flex items-start gap-3">
-                                <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><span class="material-symbols-rounded text-primary text-base">link</span></div>
-                                <div class="min-w-0">
-                                    <div class="text-sm font-medium">${lObj.url ? renderLink(lObj.url, lObj.label || lObj.url) : esc(lObj.label || '')}</div>
-                                    ${lObj.description ? `<div class="text-xs text-base-content/40">${esc(lObj.description)}</div>` : ''}
-                                </div>
-                            </div>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-
-                case 'news_card': {
-                    const hasNewsImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    const newsHeadline = d.headline || d.title || d.heading || 'News';
-                    const newsSource = d.source || d.publisher || d.outlet || d.author || '';
-                    const newsDate = d.date || d.publishedAt || d.time || d.timestamp || '';
-                    const newsSummary = d.summary || d.description || d.content || '';
-                    return `${hasNewsImage ? `<figure class="relative">
-                        <img class="w-full h-36 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'">
-                        <div class="absolute inset-0 bg-gradient-to-t from-base-200 to-transparent"></div>
-                        ${d.category ? `<div class="absolute top-2 left-2"><span class="badge badge-sm badge-primary">${esc(d.category)}</span></div>` : ''}
-                    </figure>` : ''}
-                    <div class="p-4">
-                        <h3 class="font-bold text-base text-white mb-1 leading-tight" dir="auto">${esc(newsHeadline)}</h3>
-                        <div class="flex items-center gap-2 text-xs text-base-content/40 mb-2">
-                            <span class="font-semibold">${esc(newsSource)}</span>
-                            ${newsDate ? `<span>·</span><span>${esc(newsDate)}</span>` : ''}
-                        </div>
-                        ${newsSummary ? `<p class="text-sm text-base-content/60 leading-relaxed" dir="auto">${linkify(cleanSummary(newsSummary))}</p>` : ''}
-                        ${d.relatedContext ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg" dir="auto">💡 ${linkify(cleanSummary(d.relatedContext))}</div>` : ''}
-                        ${d.url ? `<a href="${esc(d.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Read article</a>` : ''}
-                    </div>`;
-                }
-
-                case 'chart_card': {
-                    const items = (Array.isArray(d.data) ? d.data : []).map(raw => {
-                        const label = raw.label || raw.name || raw.team || raw.category || raw.key || raw.x || raw.metric || '';
-                        let value = typeof raw.value === 'number' ? raw.value : undefined;
-                        if (value === undefined) {
-                            for (const k of Object.keys(raw)) {
-                                if (typeof raw[k] === 'number') { value = raw[k]; break; }
-                            }
-                        }
-                        if (value === undefined) value = parseFloat(raw.value) || 0;
-                        return { ...raw, label, value };
-                    });
-                    const maxVal = Math.max(...items.map(i => i.value), 1);
-                    const unit = d.unit || '';
-                    const cType = d.chartType || 'bar';
-                    let chartHtml = '';
-
-                    if (cType === 'bar') {
-                        chartHtml = `<div class="space-y-3">${items.slice(0, 8).map((item) => {
-                            const pct = Math.round((item.value / maxVal) * 100);
-                            return `<div>
-                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
-                                <progress class="progress progress-primary w-full h-2" value="${pct}" max="100"></progress>
-                            </div>`;
-                        }).join('')}</div>`;
-                    } else if (cType === 'pie') {
-                        const total = items.reduce((s, i) => s + (typeof i.value === 'number' ? i.value : 0), 0) || 1;
-                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item) => {
-                            const pct = (item.value / total) * 100;
-                            return `<div>
-                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-bold">${Math.round(pct)}%</span></div>
-                                <progress class="progress progress-secondary w-full h-2" value="${Math.round(pct)}" max="100"></progress>
-                            </div>`;
-                        }).join('')}</div>`;
-                    } else if (cType === 'progress') {
-                        chartHtml = `<div class="space-y-3">${items.slice(0, 6).map((item) => {
-                            const pct = Math.min(Math.round((item.value / maxVal) * 100), 100);
-                            return `<div>
-                                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-bold">${item.value}${unit}</span></div>
-                                <progress class="progress progress-accent w-full h-2" value="${pct}" max="100"></progress>
-                            </div>`;
-                        }).join('')}</div>`;
-                    } else {
-                        chartHtml = `<div class="space-y-2">${items.slice(0, 8).map((item) => {
-                            const pct = Math.round((item.value / maxVal) * 100);
-                            return `<div><div class="flex justify-between text-xs mb-1"><span class="text-base-content/60">${esc(item.label || '')}</span><span class="font-mono font-bold">${item.value}${unit}</span></div>
-                                <progress class="progress progress-primary w-full h-2" value="${pct}" max="100"></progress></div>`;
-                        }).join('')}</div>`;
-                    }
-
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Data')}</h3>
-                        ${chartHtml}
-                        ${d.insight ? `<div class="text-xs text-base-content/50 mt-3 p-2 bg-primary/5 rounded-lg">💡 ${linkify(d.insight)}</div>` : ''}
-                    </div>`;
-                }
-
-                case 'did_you_know_card': {
-                    const hasDykImage = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `${hasDykImage ? `<figure><img class="w-full h-28 object-cover" src="${esc(d.imageUrl)}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></figure>` : ''}
-                    <div class="p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="text-xl">${esc(d.emoji || '💡')}</span>
-                            <span class="text-xs font-bold uppercase tracking-wider text-primary">Did you know?</span>
-                            ${d.category ? `<span class="badge badge-xs badge-outline">${esc(d.category)}</span>` : ''}
-                        </div>
-                        <p class="text-sm leading-relaxed" dir="auto">${linkify(cleanSummary(d.fact || d.quote || ''))}</p>
-                        ${d.context ? `<div class="text-xs text-base-content/50 mt-2 p-2 bg-primary/5 rounded-lg" dir="auto">${linkify(cleanSummary(d.context))}</div>` : ''}
-                        ${d.sourceUrl && d.sourceUrl.startsWith('http') ? (() => { try { return `<div class="text-xs text-base-content/40 mt-2">Source: ${renderLink(d.sourceUrl, new URL(d.sourceUrl).hostname)}</div>`; } catch(e) { return ''; } })() : ''}
-                    </div>`;
-                }
-
-                case 'verification_card': {
-                    const vStatus = d.status || 'searching';
-                    const isSearching = vStatus === 'searching';
-                    const statusConfig = {
-                        searching: { icon: 'search', badge: 'badge-info', label: 'Searching sources...' },
-                        partially_verified: { icon: 'pending', badge: 'badge-warning', label: 'Partially verified' },
-                        verified: { icon: 'check_circle', badge: 'badge-success', label: 'Verified by sources' },
-                        denied: { icon: 'cancel', badge: 'badge-error', label: 'Denied by sources' },
-                        unconfirmed: { icon: 'help', badge: 'badge-neutral', label: 'Unconfirmed' },
-                        inconclusive: { icon: 'help_outline', badge: 'badge-warning', label: 'Inconclusive' },
-                        conflicting: { icon: 'warning', badge: 'badge-warning', label: 'Conflicting reports' },
-                    };
-                    const sc = statusConfig[vStatus] || statusConfig.searching;
-                    const sourceIcons = {
-                        checking: { icon: 'hourglass_top', cls: 'text-base-content/30' },
-                        searching: { icon: 'hourglass_top', cls: 'text-base-content/30' },
-                        pending: { icon: 'hourglass_top', cls: 'text-base-content/30' },
-                        confirmed: { icon: 'check_circle', cls: 'text-success' },
-                        verified: { icon: 'check_circle', cls: 'text-success' },
-                        denied: { icon: 'cancel', cls: 'text-error' },
-                        'false': { icon: 'cancel', cls: 'text-error' },
-                        disproven: { icon: 'cancel', cls: 'text-error' },
-                        inconclusive: { icon: 'help_outline', cls: 'text-warning' },
-                        unverified: { icon: 'help_outline', cls: 'text-warning' },
-                        needs_context: { icon: 'help_outline', cls: 'text-warning' },
-                        not_yet_reported: { icon: 'remove_circle_outline', cls: 'text-base-content/40' },
-                        no_info: { icon: 'remove_circle_outline', cls: 'text-base-content/30' },
-                    };
-
-                    return `<div class="p-4">
-                        <div class="flex items-center gap-2 mb-3">
-                            ${isSearching ? `<span class="loading loading-ring loading-md text-primary"></span>` : `<span class="material-symbols-rounded ${sc.badge.replace('badge-','')==='success'?'text-success':sc.badge.replace('badge-','')==='error'?'text-error':'text-warning'} text-2xl">${sc.icon}</span>`}
-                            <span class="badge ${sc.badge} badge-sm font-bold">${esc(sc.label)}</span>
-                        </div>
-                        ${isSearching ? `<div class="w-full bg-base-300 rounded-full h-1 mb-3 overflow-hidden"><div class="h-1 bg-primary rounded-full animate-pulse w-3/5"></div></div>` : ''}
-                        <p class="text-sm italic text-base-content/70 mb-3 leading-relaxed">${linkify(cleanSummary(d.claim || ''))}</p>
-                        <div class="space-y-2">
-                            ${(d.sources || []).map(src => {
-                                const sObj = typeof src === 'object' ? src : (() => {
-                                    const s = String(src);
-                                    if (s.startsWith('http')) {
-                                        try { return { name: new URL(s).hostname.replace(/^www\./, ''), url: s, status: 'confirmed' }; }
-                                        catch(e) { return { name: s, url: s, status: 'confirmed' }; }
-                                    }
-                                    return { name: s, status: 'checking' };
-                                })();
-                                const sStatus = sObj.status || 'checking';
-                                const si = sourceIcons[sStatus] || sourceIcons.checking;
-                                const hasUrl = sObj.url && typeof sObj.url === 'string' && sObj.url.startsWith('http');
-                                return `<div class="flex items-start gap-2.5 p-2 rounded-lg bg-base-300/50">
-                                    <span class="material-symbols-rounded ${si.cls} mt-0.5 text-lg">${si.icon}</span>
-                                    <div class="min-w-0 flex-1">
-                                        <div class="font-semibold text-sm">${esc(sObj.name || sObj.source || 'Source')}</div>
-                                        ${sObj.snippet ? `<div class="text-xs text-base-content/50 mt-0.5 leading-relaxed" dir="auto">${linkify(cleanSummary(sObj.snippet))}</div>` : (sStatus === 'checking' || sStatus === 'searching' || sStatus === 'pending' ? `<div class="text-xs text-base-content/30 italic">Checking...</div>` : sStatus === 'inconclusive' || sStatus === 'unverified' || sStatus === 'needs_context' ? `<div class="text-xs text-warning/60 italic">Could not confirm or deny</div>` : sStatus === 'not_yet_reported' ? `<div class="text-xs text-base-content/30 italic">Not found in research</div>` : '')}
-                                        ${hasUrl ? (() => { try { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">${esc(new URL(sObj.url).hostname)}</a>`; } catch(e) { return `<a href="${esc(sObj.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-primary hover:underline">source</a>`; } })() : ''}
-                                    </div>
-                                </div>`;
-                            }).join('')}
-                        </div>
-                        ${d.summary ? `<div class="text-xs text-base-content/60 mt-3 p-2 bg-base-300 rounded-lg leading-relaxed" dir="auto">${linkify(cleanSummary(d.summary))}</div>` : ''}
-                        ${d.lastChecked ? `<div class="text-xs text-base-content/30 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-xs">schedule</span> Checked ${timeAgo(d.lastChecked) || esc(d.lastChecked)}</div>` : ''}
-                    </div>`;
-                }
-
-                case 'chat_card':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Conversation')}</h3>
-                        <div class="space-y-1">
-                        ${(d.messages || []).map(msg => {
-                            const mObj = typeof msg === 'object' ? msg : { text: String(msg), sender: 'Unknown' };
-                            const isUser = mObj.isUser || mObj.isOwn || mObj.isOwnMessage
-                                || (mObj.type && (mObj.type === 'sent' || mObj.type === 'outgoing'))
-                                || false;
-                            const time = mObj.time || mObj.timestamp || mObj.ts || '';
-                            const translation = mObj.translation || mObj.translatedText || '';
-                            return `<div class="chat ${isUser ? 'chat-end' : 'chat-start'}">
-                                <div class="chat-header text-xs opacity-50">${esc(mObj.sender || '')} ${time ? `<time>${esc(time)}</time>` : ''}</div>
-                                <div class="chat-bubble ${isUser ? 'chat-bubble-primary' : ''} text-sm" dir="auto">${linkify(mObj.text || mObj.content || mObj.message || '')}${translation ? `<div class="border-t border-white/10 mt-1.5 pt-1.5 text-xs opacity-70 italic"><span class="not-italic">🌐</span> ${esc(translation)}</div>` : ''}</div>
-                            </div>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-
-                case 'map_card': {
-                    const hasMapImage = d.mapImageUrl && typeof d.mapImageUrl === 'string' && d.mapImageUrl.startsWith('http');
-                    const mapsLink = d.mapUrl || (d.name ? `https://maps.google.com/?q=${encodeURIComponent(d.name)}` : '');
-                    return `${hasMapImage ? `<figure><img class="w-full h-40 object-cover" src="${esc(d.mapImageUrl)}" alt="${esc(d.name)}" loading="lazy" onerror="this.parentElement.style.display='none'"></figure>` : ''}
-                    <div class="p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="material-symbols-rounded text-primary text-lg">map</span>
-                            <span class="font-bold text-sm">${esc(d.name || 'Location')}</span>
-                        </div>
-                        ${d.context ? `<p class="text-xs text-base-content/50" dir="auto">${linkify(d.context)}</p>` : ''}
-                        ${mapsLink ? `<a href="${esc(mapsLink)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-xs btn-outline mt-2 gap-1"><span class="material-symbols-rounded text-sm">open_in_new</span> Open in Maps</a>` : ''}
-                    </div>`;
-                }
-
-                case 'order_card': {
-                    const orderItems = d.items || d.products || d.entries || d.lineItems || d.orderItems || [];
-                    const orderStatus = d.status || d.orderStatus || d.state || '';
-                    const orderTotal = d.total || d.orderTotal || d.grandTotal || d.sum || d.subtotal || '';
-                    const orderEta = d.deliveryTime || d.eta || d.delivery || d.estimatedDelivery || d.shippingTime || '';
-                    return `<div class="p-4">
-                        <div class="flex items-center gap-2 mb-3">
-                            ${d.emoji ? `<span class="text-xl">${esc(d.emoji)}</span>` : ''}
-                            <h3 class="font-bold text-sm text-white">${esc(d.title || d.name || d.storeName || d.restaurant || 'Order')}</h3>
-                            ${orderStatus ? `<span class="badge badge-sm badge-success">${esc(orderStatus)}</span>` : ''}
-                        </div>
-                        <div class="divide-y divide-base-300">
-                        ${orderItems.map(item => {
-                            const iObj = typeof item === 'object' ? item : { name: String(item) };
-                            const iName = iObj.name || iObj.label || iObj.title || iObj.product || iObj.description || iObj.item || '';
-                            const iPrice = iObj.price || iObj.cost || iObj.amount || iObj.value || '';
-                            const iQty = iObj.quantity || iObj.qty || iObj.count || '';
-                            return `<div class="flex items-center justify-between py-2 text-sm">
-                                <span>${iQty ? `<span class="text-base-content/40">${iQty}× </span>` : ''}${esc(iName)}</span>
-                                ${iPrice ? `<span class="font-mono font-medium">${esc(String(iPrice))}</span>` : ''}
-                            </div>`;
-                        }).join('')}
-                        </div>
-                        ${orderTotal ? `<div class="flex justify-between items-center pt-3 mt-1 border-t-2 border-base-300">
-                            <span class="font-bold text-sm">Total</span>
-                            <span class="font-extrabold text-lg text-primary">${esc(String(orderTotal))}</span>
-                        </div>` : ''}
-                        ${orderEta ? `<div class="text-xs text-base-content/40 mt-2 flex items-center gap-1"><span class="material-symbols-rounded text-sm">schedule</span> ${esc(orderEta)}</div>` : ''}
-                    </div>`;
-                }
-
-                case 'stats_grid_card':
-                    return `<div class="p-4">
-                        ${d.title ? `<h3 class="font-bold text-sm text-white mb-3">${esc(d.title)}</h3>` : ''}
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        ${(d.stats || d.data || d.items || []).map(s => {
-                            const sObj = typeof s === 'object' ? s : { label: String(s), value: '' };
-                            const sLabel = sObj.label || sObj.name || sObj.title || sObj.metric || sObj.key || '';
-                            const sValue = sObj.value != null ? String(sObj.value) : sObj.stat || sObj.number || sObj.amount || '—';
-                            return `<div class="stat p-3 bg-base-300 rounded-xl">
-                                ${sObj.emoji ? `<div class="stat-figure text-lg">${esc(sObj.emoji)}</div>` : ''}
-                                <div class="stat-title text-xs">${esc(sLabel)}</div>
-                                <div class="stat-value text-lg text-primary">${esc(sValue)}</div>
-                                ${sObj.trend ? `<div class="stat-desc"><span class="badge badge-xs ${sObj.trend === 'up' ? 'badge-success' : sObj.trend === 'down' ? 'badge-error' : 'badge-info'}">${sObj.trend}</span></div>` : ''}
-                            </div>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-
-                case 'gallery_card':
-                    return `<div class="p-4">
-                        <h3 class="font-bold text-sm text-white mb-3">${esc(d.title || 'Gallery')}</h3>
-                        <div class="grid grid-cols-2 gap-2">
-                        ${(d.images || []).slice(0, 6).map(img => {
-                            const iObj = typeof img === 'object' ? img : { url: String(img) };
-                            return `<figure class="rounded-xl overflow-hidden aspect-video bg-base-300">
-                                <img src="${esc(iObj.url || '')}" alt="${esc(iObj.caption || '')}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'">
-                            </figure>`;
-                        }).join('')}
-                        </div>
-                    </div>`;
-
-                case 'source_card': {
-                    const credColors = { high: 'badge-success', medium: 'badge-warning', low: 'badge-error', unknown: 'badge-ghost' };
-                    const hasSourceImg = d.imageUrl && typeof d.imageUrl === 'string' && d.imageUrl.startsWith('http');
-                    return `<div class="p-4">
-                        <div class="flex items-center gap-3">
-                            ${hasSourceImg ? `<div class="avatar"><div class="w-10 h-10 rounded-full"><img src="${esc(d.imageUrl)}" alt="" loading="lazy"></div></div>` : `<div class="w-10 h-10 rounded-full bg-base-300 flex items-center justify-center"><span class="material-symbols-rounded text-base-content/40 text-lg">source</span></div>`}
-                            <div class="min-w-0 flex-1">
-                                <div class="font-bold text-sm">${d.profileUrl ? renderLink(d.profileUrl, d.name || 'Source') : esc(d.name || 'Source')}</div>
-                                ${d.type ? `<div class="text-xs text-base-content/40">${esc(d.type)}</div>` : ''}
-                            </div>
-                            ${d.credibility ? `<span class="badge badge-sm ${credColors[d.credibility] || 'badge-ghost'}">${esc(d.credibility)}</span>` : ''}
-                        </div>
-                        ${d.context ? `<p class="text-sm text-base-content/60 mt-2">${linkify(d.context)}</p>` : ''}
-                        ${d.followers ? `<div class="text-xs text-base-content/40 mt-1">${esc(d.followers)} followers</div>` : ''}
-                    </div>`;
-                }
-
-                default:
-                    return `<div class="p-4">
-                        <div class="text-xs font-bold uppercase tracking-wider text-base-content/30 mb-2">${esc(cardType.replace(/_/g, ' '))}</div>
-                        ${Object.entries(d).filter(([k]) => !k.startsWith('_')).map(([key, val]) => {
-                            if (val === null || val === undefined) return '';
-                            if (Array.isArray(val)) {
-                                return `<div class="mb-2">
-                                    <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
-                                    ${val.slice(0, 5).map(v => `<div class="text-sm pl-3 border-l-2 border-base-300 py-0.5">${renderItemValue(v)}</div>`).join('')}
-                                </div>`;
-                            }
-                            if (typeof val === 'object') {
-                                return `<div class="mb-2">
-                                    <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
-                                    <div class="text-sm">${renderItemValue(val)}</div>
-                                </div>`;
-                            }
-                            return `<div class="mb-2">
-                                <div class="text-xs font-bold text-base-content/40 uppercase tracking-wider mb-1">${esc(key.replace(/_/g, ' '))}</div>
-                                <div class="text-sm">${linkify(val)}</div>
-                            </div>`;
-                        }).join('')}
-                    </div>`;
-            }
+        function linkifySection(el) {
+            if (!el || !el.innerHTML) return;
+            el.innerHTML = el.innerHTML.replace(
+                /(https?:\/\/[^\s<>"'&]+)/gi,
+                '<a href="$1" target="_blank" rel="noopener noreferrer" class="link link-primary break-all">$1</a>'
+            );
         }
 
         // === Error & Reset ===
@@ -2477,7 +767,7 @@
             errorText.textContent = message;
             errorState.classList.remove('hidden');
             errorState.classList.add('grid');
-            progressOverlay.classList.add('hidden');
+            loadingState.classList.add('hidden');
         }
 
         function reset() {
@@ -2486,38 +776,37 @@
                 currentImageUrl = null;
             }
             currentImageBase64 = null;
-            totalCards = 0;
-            completedCards = 0;
-            allCardsReadyShown = false;
-            blueprintReceived = false;
-            pipelineComplete = false;
-            firstCardShown = false;
-            pendingBlueprint = null;
-            populatedCardIds.clear();
+            currentThumbBase64 = null;
             retryCount = 0;
-            if (pipelineTimeout) { clearTimeout(pipelineTimeout); pipelineTimeout = null; }
-            if (completionTimeout) { clearTimeout(completionTimeout); completionTimeout = null; }
-            if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
-            if (enhanceMsgInterval) { clearInterval(enhanceMsgInterval); enhanceMsgInterval = null; }
-            if (uploadProgressInterval) { clearInterval(uploadProgressInterval); uploadProgressInterval = null; }
-            stopAnalysisProgressTick();
+            pipelineComplete = false;
+            verdictReceived = false;
+            fullText = '';
+            currentParseSection = 'preamble';
+            currentAngleEl = null;
+            angleCount = 0;
+
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
             pasteState.classList.remove('hidden');
-            mainCanvas.classList.add('hidden');
-            progressOverlay.classList.add('hidden');
-            updateProgress(0, 'UPLOADING', 'Sending screenshot...');
-            resultsOverlay.classList.add('hidden');
+            analysisView.classList.add('hidden');
+            loadingState.classList.add('hidden');
+            verdictBanner.classList.add('hidden');
+            contentArea.classList.add('hidden');
+            summarySection.classList.add('hidden');
+            sourcesSection.classList.add('hidden');
+            completionMeta.classList.add('hidden');
             errorState.classList.add('hidden');
             errorState.classList.remove('grid');
-            cardGrid.innerHTML = '';
-            cardGrid.classList.remove('max-w-xl', 'mx-auto');
-            followUpSection.classList.add('hidden');
-            followUpList.innerHTML = '';
-            const ctxCard = document.getElementById('overallContextCard');
-            if (ctxCard) ctxCard.classList.add('hidden');
-            layoutProgress.style.display = '';
-            layoutProgressFill.value = 0;
+
+            summaryText.innerHTML = '';
+            sourcesText.innerHTML = '';
+            groundingSources.innerHTML = '';
+            anglesContainer.innerHTML = '';
+            verdictExplanation.textContent = '';
+
+            statusLabel.textContent = 'Connecting...';
+            loadingMessage.textContent = 'Analyzing screenshot...';
+
             applyLayoutTheme(DEFAULT_THEME);
             document.getElementById('demoBtn')?.classList.remove('loading');
         }
@@ -2525,7 +814,7 @@
         // === Event Listeners ===
         pasteZone.addEventListener('click', readClipboard);
         retryBtn.addEventListener('click', reset);
-        layoutBack.addEventListener('click', reset);
+        backBtn.addEventListener('click', reset);
 
         document.addEventListener('paste', (e) => {
             const items = e.clipboardData?.items;
@@ -2556,7 +845,6 @@
 
         // === Demo & Upload ===
         const DEMO_IMAGE_PATH = '/IMG_1699.png';
-
         const demoBtn = document.getElementById('demoBtn');
         const uploadBtn = document.getElementById('uploadBtn');
         const photoInput = document.getElementById('photoInput');
@@ -2584,6 +872,18 @@
             }
             photoInput.value = '';
         });
+
+        // === Capture (kept for test contract) ===
+        function loadDomToImage() {
+            if (typeof domtoimage !== 'undefined') return Promise.resolve();
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
     </script>
 </body>
 </html>

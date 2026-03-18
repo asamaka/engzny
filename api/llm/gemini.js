@@ -39,7 +39,11 @@ class GeminiAdapter extends LLMAdapter {
   }
 
   supportsStreaming() {
-    return false;
+    return true;
+  }
+
+  _getStreamEndpoint() {
+    return `${this.baseUrl}/${this.model}:streamGenerateContent?key=${this.apiKey}&alt=sse`;
   }
 
   async _callApi(body) {
@@ -172,6 +176,104 @@ class GeminiAdapter extends LLMAdapter {
     }
 
     return this._callApi(body);
+  }
+
+  /**
+   * Stream image analysis with Google Search grounding.
+   * Calls Gemini's streamGenerateContent endpoint (SSE mode) and
+   * yields text chunks to the onToken callback as they arrive.
+   */
+  async streamImageAnalysisWithGrounding({ imageData, mediaType, prompt, maxTokens, onToken, onComplete, onError }) {
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType: mediaType, data: imageData } },
+          ],
+        },
+      ],
+      tools: [{ google_search: {} }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: maxTokens || this.maxTokens,
+      },
+    };
+
+    try {
+      const response = await fetch(this._getStreamEndpoint(), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.error?.message || `Gemini stream error (${response.status})`);
+      }
+
+      let fullText = '';
+      let groundingMetadata = null;
+      let usage = null;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr || jsonStr === '[DONE]') continue;
+
+          try {
+            const chunk = JSON.parse(jsonStr);
+            const parts = chunk.candidates?.[0]?.content?.parts || [];
+            for (const part of parts) {
+              if (part.text) {
+                fullText += part.text;
+                if (onToken) onToken(part.text);
+              }
+            }
+
+            if (chunk.candidates?.[0]?.groundingMetadata) {
+              groundingMetadata = chunk.candidates[0].groundingMetadata;
+            }
+            if (chunk.usageMetadata) {
+              usage = chunk.usageMetadata;
+            }
+          } catch {}
+        }
+      }
+
+      const citations = groundingMetadata?.groundingChunks
+        ?.map(c => c.web?.uri)
+        .filter(Boolean) || [];
+
+      if (onComplete) {
+        onComplete({
+          text: fullText,
+          usage,
+          model: this.model,
+          groundingMetadata,
+          citations,
+        });
+      }
+
+      return { text: fullText, usage, model: this.model, groundingMetadata, citations };
+    } catch (err) {
+      if (onError) { onError(err); return null; }
+      throw err;
+    }
   }
 }
 
