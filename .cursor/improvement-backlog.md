@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-18** | Fixed P1: irrelevant person_card from secondary content. Report 0b69e9a9 (Morocco AFCON) showed a person_card for "Yariv Levin" — an Israeli politician visible only in secondary text at bottom of screenshot, completely unrelated to the main story. The LLM itself said "Connection to this sports story unclear." Root cause: `adaptBlueprintForPreAnalysis` kept person_card for ANY named person regardless of confidence. Fix: (1) Only keep person_card skeleton when pre-analysis has a named person with medium/high confidence — low-confidence names from secondary content get source_card instead; (2) Quality gate safety net detects when enhance LLM flags person as irrelevant (e.g., "unclear", "unrelated" in context) and converts to source_card.
+> **2026-03-18** | Fixed P1: person_card role presented unverified claim as fact. Reports 79e8e690 and 9802ed7b (Levin PM claim) showed person_card with role "Israeli Prime Minister (interim)" while verification_card said "unconfirmed — no major outlets confirm." Product contradiction misleads users. Fix: post-processing step after investigation status resolved — when claim is "unconfirmed", (1) person_card roles for people named in the claim get "— unverified" suffix; (2) if verification summary contains the person's actual verified role, it's surfaced as notableInfo; (3) news_card summaries echoing the claim get "Per unverified reports:" prefix.
 
 ## Open Items
 
@@ -47,6 +47,7 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - fact_check verdict/confidence coherence now enforced in code (2026-03-15).
 - person_card enforced at code level (2026-03-16) — detects orgs/outlets/generic titles and converts to source_card.
 - person_card relevance filtering (2026-03-18) — low-confidence pre-analysis people no longer get skeleton cards; quality gate catches LLM-flagged irrelevance.
+- person_card unverified role qualification (2026-03-18) — when claim is unconfirmed, person_card roles for named claim subjects get "(unverified)" suffix and verified role from research surfaced.
 - Research duration cap tightened (2026-03-16) — 20s default via RESEARCH_CAP_MS + 5s POST_ENHANCE_GRACE_MS.
 - Verification card: fabricated summaries now cleared when research unavailable (2026-03-16).
 - Timeline card: research findings now enriched into timeline events (2026-03-17).

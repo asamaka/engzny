@@ -1527,6 +1527,92 @@ async function runPipeline({
           source: 'status',
         });
       }
+
+      // =====================================================
+      // Post-processing: qualify person/news cards when claim is unverified
+      // When investigation is "unconfirmed", person_card roles and news_card
+      // summaries may present the unverified claim as established fact,
+      // contradicting the verification card. Qualify them with uncertainty.
+      // =====================================================
+      if (investigationStatus === 'unconfirmed' && vData) {
+        const claim = (vData.claim || '').toLowerCase();
+        const vSummary = vData.summary || '';
+
+        if (claim) {
+          for (const [cardId, card] of currentCards) {
+            if (card.cardType === 'person_card') {
+              const cardData = card.populatedData || card.data || {};
+              const personName = (cardData.name || '').toLowerCase().trim();
+              if (!personName || !cardData.role) continue;
+
+              const nameWords = personName.split(/\s+/).filter(w => w.length > 2);
+              const nameInClaim = nameWords.length > 0 && nameWords.every(w => claim.includes(w));
+              if (!nameInClaim) continue;
+
+              logger.info('Orchestrator', 'Qualifying unverified person_card role', {
+                cardId, name: cardData.name, role: cardData.role,
+              });
+
+              cardData.role = cardData.role + ' — unverified';
+
+              if (vSummary) {
+                const lastName = personName.split(/\s+/).pop();
+                const sentences = vSummary.split(/(?<=[.!?])\s+/);
+                const roleVerbs = /\b(serves?|remains?|holds?|is currently|occupies?|acts? as)\b/i;
+                const verifiedRole = sentences.find(s =>
+                  s.toLowerCase().includes(lastName) && roleVerbs.test(s)
+                );
+                if (verifiedRole && verifiedRole.length < 250) {
+                  cardData.notableInfo = '📋 ' + verifiedRole.trim();
+                }
+              }
+
+              card.populatedData = cardData;
+              card.data = cardData;
+              currentCards.set(cardId, card);
+
+              if (onCardUpdate) {
+                onCardUpdate({
+                  cardId,
+                  cardType: 'person_card',
+                  data: cardData,
+                  reason: 'Qualified role — claim is unverified by major sources',
+                  source: 'reconcile',
+                });
+              }
+            }
+
+            if (card.cardType === 'news_card') {
+              const cardData = card.populatedData || card.data || {};
+              const summary = (cardData.summary || '').toLowerCase();
+              if (!summary) continue;
+
+              const claimWords = claim.split(/\s+/).filter(w => w.length > 3);
+              const summaryWords = summary.split(/\s+/).filter(w => w.length > 3);
+              if (summaryWords.length === 0) continue;
+              const overlap = summaryWords.filter(w => claimWords.includes(w)).length;
+              const echoesRatio = overlap / summaryWords.length;
+
+              if (echoesRatio > 0.25 && cardData.summary && !cardData.summary.toLowerCase().startsWith('per unverified')) {
+                cardData.summary = 'Per unverified reports: ' + cardData.summary;
+                card.populatedData = cardData;
+                card.data = cardData;
+                currentCards.set(cardId, card);
+
+                if (onCardUpdate) {
+                  onCardUpdate({
+                    cardId,
+                    cardType: 'news_card',
+                    data: cardData,
+                    reason: 'Qualified summary — claim is unverified',
+                    source: 'reconcile',
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     // =====================================================
