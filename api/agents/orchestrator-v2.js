@@ -1455,6 +1455,53 @@ async function runPipeline({
     }
 
     // =====================================================
+    // Post-processing: generate fallback verification summary
+    // When research times out or returns no findings, the verification card
+    // ends up with sources set to "not_yet_reported" and an empty summary.
+    // Users see an "Unconfirmed" badge with zero context — useless for
+    // the most important card in breaking news. Generate a contextual
+    // fallback so users always know what was checked and what to do.
+    // =====================================================
+    for (const [cardId, card] of currentCards) {
+      if (card.cardType !== 'verification_card') continue;
+      const cardData = card.populatedData || card.data || {};
+      if (cardData.summary) continue;
+
+      const sources = cardData.sources || [];
+      const status = cardData.status || 'unconfirmed';
+      const notYetCount = sources.filter(s =>
+        s.status === 'not_yet_reported' || s.status === 'checking'
+      ).length;
+      const inconclusiveCount = sources.filter(s => s.status === 'inconclusive').length;
+
+      let fallback;
+      if (notYetCount === sources.length && sources.length > 0) {
+        fallback = 'This claim could not be independently verified at this time. None of the sources checked have reported on this story. Check major news outlets directly for the latest updates.';
+      } else if (status === 'inconclusive' || inconclusiveCount > 0) {
+        fallback = 'Initial source checks were inconclusive. Breaking stories often take time to be independently verified by multiple outlets.';
+      } else if (status === 'unconfirmed') {
+        fallback = 'This claim has not been confirmed by the sources checked. Verify with established news outlets for the most current information.';
+      }
+
+      if (fallback) {
+        cardData.summary = fallback;
+        card.populatedData = cardData;
+        card.data = cardData;
+        currentCards.set(cardId, card);
+
+        if (onCardUpdate) {
+          onCardUpdate({
+            cardId,
+            cardType: 'verification_card',
+            data: { summary: fallback },
+            reason: 'Fallback summary — research data unavailable',
+            source: 'reconcile',
+          });
+        }
+      }
+    }
+
+    // =====================================================
     // Surface research follow-up questions to the frontend.
     // The classifier always returns empty arrays; enrich with
     // the deeper Q&A that came back from Sonar / web search.
