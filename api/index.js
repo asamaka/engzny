@@ -1200,9 +1200,12 @@ app.post('/api/hub/v2/start', async (req, res) => {
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
     const requestId = crypto.randomUUID().slice(0, 8);
 
+    const geminiDefault = (process.env.PIPELINE_MODE || '').toLowerCase() === 'gemini' && process.env.GEMINI_API_KEY;
     const pipelineType = pipeline === 'legacy'
       ? 'legacy'
-      : ((pipeline === 'gemini' && process.env.GEMINI_API_KEY) ? 'gemini' : 'llm2');
+      : pipeline === 'llm2'
+        ? 'llm2'
+        : ((pipeline === 'gemini' || geminiDefault) && process.env.GEMINI_API_KEY) ? 'gemini' : 'llm2';
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
@@ -1499,7 +1502,8 @@ app.post('/api/hub/v2/analyze', async (req, res) => {
   try {
     const { image, question, mediaType: rawMediaType, pipeline } = req.body || {};
     const normalized = normalizeImagePayload({ image, mediaType: rawMediaType });
-    const useGeminiLegacy = pipeline === 'gemini' && process.env.GEMINI_API_KEY;
+    const geminiDefaultLegacy = (process.env.PIPELINE_MODE || '').toLowerCase() === 'gemini' && process.env.GEMINI_API_KEY;
+    const useGeminiLegacy = (pipeline === 'gemini' || geminiDefaultLegacy) && process.env.GEMINI_API_KEY;
     const useLegacyPipeline = pipeline === 'legacy';
     const legacyPipelineFn = useGeminiLegacy ? runGeminiPipeline : (useLegacyPipeline ? runPipeline : runPipelineV20);
     const legacyPipelineLabel = useGeminiLegacy ? 'gemini' : (useLegacyPipeline ? 'legacy' : 'llm2');
