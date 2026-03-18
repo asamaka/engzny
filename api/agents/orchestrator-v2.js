@@ -1096,6 +1096,60 @@ async function runPipeline({
     }
 
     // =====================================================
+    // Post-processing: promote screenshot's original source in verification cards.
+    // When the preAnalysis identifies the screenshot's publisher (e.g. Reuters),
+    // any verification source matching that name should be "confirmed" — the
+    // screenshot itself is direct evidence that this source reported the story.
+    // Without this, users see "Reuters: Not Yet Reported" on a Reuters screenshot.
+    // =====================================================
+    const sourceAttribution = blueprint.contentAnalysis?.preAnalysis?.sourceAttribution;
+    if (sourceAttribution?.name && sourceAttribution.confidence !== 'low') {
+      const attrName = sourceAttribution.name.toLowerCase().trim();
+      for (const vCard of verificationCards) {
+        const cardData = vCard.populatedData || vCard.data || {};
+        const sources = cardData.sources || [];
+        let promoted = false;
+
+        for (const source of sources) {
+          const srcName = (source.name || '').toLowerCase().trim();
+          if (!srcName) continue;
+          const isMatch = srcName === attrName
+            || attrName.includes(srcName)
+            || srcName.includes(attrName);
+          if (!isMatch) continue;
+          if (source.status === 'confirmed') continue;
+
+          source.status = 'confirmed';
+          source.snippet = `Original source — this screenshot is from ${sourceAttribution.name}.`;
+          promoted = true;
+        }
+
+        if (promoted) {
+          const newStatus = computeVerificationStatus(sources);
+          const updatedData = { ...cardData, sources, status: newStatus, lastChecked: new Date().toISOString() };
+          vCard.populatedData = updatedData;
+          vCard.data = updatedData;
+          currentCards.set(vCard.id, vCard);
+
+          logger.info('Orchestrator', 'Promoted original source in verification card', {
+            sourceName: sourceAttribution.name,
+            newStatus,
+          });
+
+          if (onCardUpdate) {
+            onCardUpdate({
+              cardId: vCard.id,
+              cardType: 'verification_card',
+              data: updatedData,
+              reason: `Source "${sourceAttribution.name}" confirmed as original publisher`,
+              source: 'reconcile',
+            });
+          }
+        }
+      }
+    }
+
+    // =====================================================
     // Phase 3: Review — LLM only if cards need population,
     // otherwise apply research data programmatically
     // =====================================================
