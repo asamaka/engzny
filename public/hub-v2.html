@@ -226,6 +226,8 @@
         let currentAngleEl = null;
         let angleCount = 0;
         let verdictReceived = false;
+        let lastParsedOffset = 0;
+        let detectedSections = [];
 
         // === Utilities ===
         function esc(val) {
@@ -472,6 +474,8 @@
             currentParseSection = 'preamble';
             currentAngleEl = null;
             angleCount = 0;
+            lastParsedOffset = 0;
+            detectedSections = [];
             telemetry.reset();
 
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
@@ -636,44 +640,91 @@
         }
 
         function appendToken(text) {
-            if (!verdictReceived) {
-                fullText += text;
-                parseAndRoute(text);
-                return;
-            }
             fullText += text;
-            parseAndRoute(text);
+            parseAccumulatedText();
         }
 
-        function parseAndRoute(chunk) {
-            if (chunk.includes('---SUMMARY')) {
-                currentParseSection = 'summary';
-                summarySection.classList.remove('hidden');
-                const after = chunk.split('---SUMMARY')[1] || '';
-                if (after.trim()) appendToSection('summary', after);
+        function parseAccumulatedText() {
+            const text = fullText;
+
+            const markers = [];
+            let idx;
+
+            idx = text.indexOf('---SUMMARY');
+            if (idx !== -1) markers.push({ pos: idx, type: 'summary', len: '---SUMMARY'.length, title: 'Summary' });
+
+            idx = text.indexOf('---SOURCES');
+            if (idx !== -1) markers.push({ pos: idx, type: 'sources', len: '---SOURCES'.length, title: 'Sources' });
+
+            let searchFrom = 0;
+            while ((idx = text.indexOf('---ANGLE:', searchFrom)) !== -1) {
+                const lineEnd = text.indexOf('\n', idx);
+                const titleEnd = lineEnd === -1 ? text.length : lineEnd;
+                const title = text.slice(idx + '---ANGLE:'.length, titleEnd).trim();
+                if (title) {
+                    markers.push({ pos: idx, type: 'angle', len: titleEnd - idx, title });
+                }
+                searchFrom = titleEnd + 1;
+            }
+
+            markers.sort((a, b) => a.pos - b.pos);
+
+            const newMarkers = markers.filter(m => !detectedSections.some(d => d.pos === m.pos && d.type === m.type));
+
+            for (const marker of newMarkers) {
+                detectedSections.push(marker);
+
+                if (marker.type === 'summary') {
+                    currentParseSection = 'summary';
+                    summarySection.classList.remove('hidden');
+                } else if (marker.type === 'angle') {
+                    currentParseSection = 'angle';
+                    createAngleSection(marker.title);
+                } else if (marker.type === 'sources') {
+                    currentParseSection = 'sources';
+                    sourcesSection.classList.remove('hidden');
+                }
+            }
+
+            renderFromOffset();
+        }
+
+        function renderFromOffset() {
+            const text = fullText;
+            const allMarkers = [...detectedSections].sort((a, b) => a.pos - b.pos);
+
+            if (allMarkers.length === 0) {
                 return;
             }
 
-            const angleMatch = chunk.match(/---ANGLE:\s*(.+)/);
-            if (angleMatch) {
-                currentParseSection = 'angle';
-                const title = angleMatch[1].trim();
-                createAngleSection(title);
-                const after = chunk.split(/---ANGLE:.+/)[1] || '';
-                if (after.trim()) appendToSection('angle', after);
-                return;
+            const regions = [];
+            for (let i = 0; i < allMarkers.length; i++) {
+                const m = allMarkers[i];
+                const contentStart = m.pos + m.len;
+                const contentEnd = i + 1 < allMarkers.length ? allMarkers[i + 1].pos : text.length;
+                regions.push({ type: m.type, title: m.title, start: contentStart, end: contentEnd });
             }
 
-            if (chunk.includes('---SOURCES')) {
-                currentParseSection = 'sources';
-                sourcesSection.classList.remove('hidden');
-                const after = chunk.split('---SOURCES')[1] || '';
-                if (after.trim()) appendToSection('sources', after);
-                return;
-            }
+            for (const region of regions) {
+                const regionText = text.slice(region.start, region.end);
+                const safeText = regionText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-            if (currentParseSection !== 'preamble') {
-                appendToSection(currentParseSection, chunk);
+                switch (region.type) {
+                    case 'summary':
+                        summaryText.innerHTML = safeText;
+                        break;
+                    case 'sources':
+                        sourcesText.innerHTML = safeText;
+                        break;
+                    case 'angle': {
+                        const angleEl = anglesContainer.querySelector(`[data-angle-title="${CSS.escape(region.title)}"]`);
+                        if (angleEl) {
+                            const body = angleEl.querySelector('.angle-body');
+                            if (body) body.innerHTML = safeText;
+                        }
+                        break;
+                    }
+                }
             }
         }
 
@@ -699,6 +750,7 @@
             angleCount++;
             const section = document.createElement('div');
             section.className = 'border border-base-300 rounded-xl overflow-hidden';
+            section.setAttribute('data-angle-title', title);
             section.innerHTML =
                 '<div class="px-4 py-3 bg-base-200 border-b border-base-300 flex items-center gap-2">' +
                     '<span class="material-symbols-rounded text-primary text-base">search</span>' +
@@ -784,6 +836,8 @@
             currentParseSection = 'preamble';
             currentAngleEl = null;
             angleCount = 0;
+            lastParsedOffset = 0;
+            detectedSections = [];
 
             if (currentEventSource) { currentEventSource.close(); currentEventSource = null; }
 
