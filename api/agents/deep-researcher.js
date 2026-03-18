@@ -2,12 +2,15 @@
  * Deep Researcher Agent
  *
  * Runs in parallel with Sonnet enhancement to gather web-based research.
- * Uses Perplexity Sonar (preferred) or Claude web search as fallback.
+ * Provider priority (configurable via RESEARCH_PROVIDER env var):
+ *   1. "gemini"     — Gemini 2.5 Flash with Google Search grounding (image + web)
+ *   2. "perplexity"  — Perplexity Sonar (text-only web search, default when available)
+ *   3. "claude"     — Claude web search fallback
  *
  * Produces structured research findings that feed into Sonnet's review pass.
  */
 
-const { getResearchAdapter, getVisionAdapter, isPerplexityAvailable } = require('../llm');
+const { getResearchAdapter, getVisionAdapter, getAdapter, isPerplexityAvailable, isGeminiAvailable } = require('../llm');
 const { logger } = require('../lib/logger');
 
 function currentDateAnchors() {
@@ -95,7 +98,84 @@ Return a structured JSON response:
 }
 
 /**
- * Run deep research using Sonar or Claude web search.
+ * Pick the research provider based on configuration and availability.
+ * RESEARCH_PROVIDER env var overrides auto-detection.
+ */
+function resolveResearchProvider() {
+  const override = (process.env.RESEARCH_PROVIDER || '').toLowerCase();
+  if (override === 'gemini' && isGeminiAvailable()) return 'gemini';
+  if (override === 'perplexity' && isPerplexityAvailable()) return 'perplexity';
+  if (override === 'claude') return 'claude';
+  if (override && override !== 'auto') {
+    logger.warn('DeepResearcher', `RESEARCH_PROVIDER="${override}" unavailable, falling back`, {
+      gemini: isGeminiAvailable(),
+      perplexity: isPerplexityAvailable(),
+    });
+  }
+  if (isPerplexityAvailable()) return 'perplexity';
+  return 'claude';
+}
+
+/**
+ * Build a Gemini-specific research prompt that leverages Google Search grounding.
+ * Unlike Sonar which gets a text-only query, Gemini also sees the screenshot
+ * and uses grounding to search the web in real-time.
+ */
+function buildGeminiResearchPrompt(contentAnalysis, cards, { preAnalysis, translationVerification } = {}) {
+  const { month, year, isoDate } = currentDateAnchors();
+  const cardSummaries = cards.map(c => {
+    const data = c.populatedData || c.data || c.placeholderData || {};
+    return `- ${c.cardType}: ${data.title || data.name || data.claim || data.label || 'unknown'}`;
+  }).join('\n');
+
+  const verifiedClaim = translationVerification?.shouldOverrideClaim
+    ? translationVerification.normalizedTranslation
+    : (translationVerification?.normalizedTranslation || preAnalysis?.visibleClaim || null);
+
+  return `You are an expert news analyst with web search access. Today is ${isoDate} (${month} ${year}).
+
+Analyze this screenshot and use Google Search to verify the claims and find current information.
+
+**Content Type:** ${contentAnalysis.contentType}
+**Platform:** ${contentAnalysis.platform || 'unknown'}
+**User Intent:** ${contentAnalysis.intent}
+${verifiedClaim ? `**Claim to verify:** ${verifiedClaim}` : ''}
+
+**Cards to enrich:**
+${cardSummaries}
+
+Return ONLY valid JSON (no markdown code blocks) with this structure:
+{
+  "findings": [
+    {
+      "topic": "what this finding is about",
+      "summary": "key finding in 1-2 sentences",
+      "details": "detailed information",
+      "confidence": "high|medium|low",
+      "sourceUrls": ["actual URLs from search results"],
+      "relatedCardTypes": ["verification_card", "timeline_card", etc.],
+      "factCheck": {
+        "claim": "the factual claim (state neutrally)",
+        "verdict": "verified|misleading|unverified|false|partially_true|needs_context",
+        "explanation": "what search results show about this claim"
+      }
+    }
+  ],
+  "followUpQuestions": [{"question": "what users would ask", "answer": "brief answer from search"}],
+  "overallContext": "overall context from search results"
+}
+
+IMPORTANT:
+- Use web search for EVERY claim. Cite real URLs from ${month} ${year} search results.
+- For verification: check Reuters, AP, BBC, CNN, Al Jazeera. Report which confirm/deny/haven't covered.
+- Create separate findings for: (1) main claim verification, (2) each key fact, (3) timeline context.
+- For breaking news: a claim being unverified ≠ false. Only mark as false with strong evidence.
+- Return at least 3-5 findings with source URLs.`;
+}
+
+/**
+ * Run deep research using Gemini (with Google Search grounding),
+ * Perplexity Sonar, or Claude web search.
  */
 async function deepResearch({
   contentAnalysis,
@@ -108,24 +188,44 @@ async function deepResearch({
 }) {
   const startTime = Date.now();
   const traceCollector = adapterConfig.traceCollector;
-  const usePerplexity = isPerplexityAvailable();
+  const provider = resolveResearchProvider();
 
   logger.info('DeepResearcher', 'Starting deep research', {
-    method: usePerplexity ? 'perplexity' : 'claude-web-search',
+    method: provider,
     cardCount: cards.length,
     contentType: contentAnalysis.contentType,
-  });
-
-  const query = buildResearchQuery(contentAnalysis, cards, {
-    preAnalysis,
-    translationVerification,
   });
 
   try {
     let result;
     let citations = [];
+    let query;
 
-    if (usePerplexity) {
+    if (provider === 'gemini') {
+      query = buildGeminiResearchPrompt(contentAnalysis, cards, {
+        preAnalysis,
+        translationVerification,
+      });
+
+      const adapter = getAdapter('gemini', {
+        ...adapterConfig,
+        model: process.env.GEMINI_RESEARCH_MODEL || 'gemini-2.5-flash',
+      });
+
+      result = await adapter.analyzeImageWithGrounding({
+        imageData,
+        mediaType,
+        prompt: query,
+        maxTokens: 4096,
+      });
+
+      citations = result.citations || [];
+    } else if (provider === 'perplexity') {
+      query = buildResearchQuery(contentAnalysis, cards, {
+        preAnalysis,
+        translationVerification,
+      });
+
       const adapter = getResearchAdapter({
         ...adapterConfig,
         model: 'sonar',
@@ -138,6 +238,11 @@ async function deepResearch({
 
       citations = result.citations || [];
     } else {
+      query = buildResearchQuery(contentAnalysis, cards, {
+        preAnalysis,
+        translationVerification,
+      });
+
       const adapter = getVisionAdapter({
         ...adapterConfig,
         model: adapterConfig.model || 'claude-sonnet-4-20250514',
@@ -165,9 +270,10 @@ async function deepResearch({
 
     logger.info('DeepResearcher', 'Research complete', {
       dur: duration,
-      method: usePerplexity ? 'perplexity' : 'claude',
+      method: provider,
       findingCount: parsed.findings?.length || 0,
       citations: citations.length,
+      groundingSources: result.groundingMetadata?.groundingChunks?.length || 0,
       model: result.model,
     });
 
@@ -175,11 +281,11 @@ async function deepResearch({
       traceCollector.record({
         phase: 'deep_research',
         agent: 'DeepResearcher',
-        model: result.model || (usePerplexity ? 'sonar' : 'claude-sonnet-4-20250514'),
+        model: result.model || (provider === 'perplexity' ? 'sonar' : provider),
         duration,
         request: {
           userPrompt: query,
-          hasImage: !usePerplexity,
+          hasImage: provider !== 'perplexity',
           webSearchEnabled: true,
         },
         response: {
@@ -195,20 +301,21 @@ async function deepResearch({
       ...parsed,
       citations,
       duration,
-      method: usePerplexity ? 'perplexity' : 'claude',
+      method: provider,
     };
   } catch (error) {
     const duration = Date.now() - startTime;
     logger.error('DeepResearcher', 'Research failed', {
       err: error.message,
       dur: duration,
+      method: provider,
     });
 
     if (traceCollector) {
       traceCollector.record({
         phase: 'deep_research',
         agent: 'DeepResearcher',
-        model: usePerplexity ? 'sonar' : 'claude-sonnet-4-20250514',
+        model: provider === 'perplexity' ? 'sonar' : provider,
         duration,
         request: { userPrompt: query },
         response: {},

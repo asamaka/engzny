@@ -2,7 +2,8 @@
  * Gemini LLM Adapter
  *
  * Implementation of LLMAdapter for Google's Gemini models.
- * Supports vision analysis and text generation via the Generative Language API.
+ * Supports vision analysis, text generation, and Google Search grounding
+ * via the Generative Language API.
  */
 
 const { LLMAdapter } = require('./adapter');
@@ -16,7 +17,7 @@ class GeminiAdapter extends LLMAdapter {
       throw new Error('GEMINI_API_KEY is required for GeminiAdapter');
     }
 
-    this.model = config.model || 'gemini-3.1-flash-lite-preview';
+    this.model = config.model || 'gemini-2.5-flash';
     this.maxTokens = config.maxTokens || 8192;
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
   }
@@ -59,11 +60,15 @@ class GeminiAdapter extends LLMAdapter {
       .join('')
       .trim();
 
+    const grounding = payload.candidates?.[0]?.groundingMetadata;
+
     return {
       text,
       usage: payload.usageMetadata,
       model: this.model,
       stopReason: payload.candidates?.[0]?.finishReason,
+      groundingMetadata: grounding || null,
+      citations: grounding?.groundingChunks?.map(chunk => chunk.web?.uri).filter(Boolean) || [],
     };
   }
 
@@ -98,6 +103,57 @@ class GeminiAdapter extends LLMAdapter {
           : {}),
       },
     };
+
+    return this._callApi(body);
+  }
+
+  /**
+   * Analyze an image with Google Search grounding enabled.
+   * Gemini performs real-time web searches to verify and enrich its analysis.
+   * Returns structured findings with grounding citations.
+   */
+  async analyzeImageWithGrounding({ imageData, mediaType, prompt, maxTokens }) {
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: mediaType,
+                data: imageData,
+              },
+            },
+          ],
+        },
+      ],
+      tools: [{ google_search: {} }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: maxTokens || this.maxTokens,
+      },
+    };
+
+    return this._callApi(body);
+  }
+
+  /**
+   * Text-only query with Google Search grounding.
+   */
+  async generateTextWithGrounding({ prompt, systemPrompt, maxTokens }) {
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: maxTokens || this.maxTokens,
+      },
+    };
+
+    if (systemPrompt) {
+      body.system_instruction = { parts: [{ text: systemPrompt }] };
+    }
 
     return this._callApi(body);
   }
