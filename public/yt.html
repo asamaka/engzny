@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+        #player { width: 100%; height: 100%; }
+        #player iframe { width: 100%; height: 100%; border: none; }
+    </style>
+</head>
+<body>
+    <div id="player"></div>
+    <script>
+        var params = new URLSearchParams(window.location.search);
+        var vID = params.get('v');
+        if (vID) {
+            var ifrm = document.createElement('iframe');
+            ifrm.src = 'https://www.youtube.com/embed/' + vID +
+                '?enablejsapi=1&origin=https://thinx.fun&autoplay=1&rel=0&modestbranding=1&iv_load_policy=3&playsinline=1';
+            ifrm.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
+            ifrm.setAttribute('allowfullscreen', 'true');
+            ifrm.setAttribute('frameborder', '0');
+            document.getElementById('player').appendChild(ifrm);
+        }
+    </script>
+</body>
+</html>
