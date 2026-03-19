@@ -180,8 +180,9 @@ class GeminiAdapter extends LLMAdapter {
 
   /**
    * Stream image analysis with Google Search grounding.
-   * Calls Gemini's streamGenerateContent endpoint (SSE mode) and
-   * yields text chunks to the onToken callback as they arrive.
+   * Tries streaming first via streamGenerateContent. If streaming yields
+   * no tokens (can happen with grounding), falls back to non-streaming
+   * analyzeImageWithGrounding and emits the full text as a single token.
    */
   async streamImageAnalysisWithGrounding({ imageData, mediaType, prompt, maxTokens, onToken, onComplete, onError }) {
     const body = {
@@ -202,57 +203,76 @@ class GeminiAdapter extends LLMAdapter {
     };
 
     try {
-      const response = await fetch(this._getStreamEndpoint(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.error?.message || `Gemini stream error (${response.status})`);
-      }
-
       let fullText = '';
       let groundingMetadata = null;
       let usage = null;
+      let streamWorked = false;
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      try {
+        const response = await fetch(this._getStreamEndpoint(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr || jsonStr === '[DONE]') continue;
-
-          try {
-            const chunk = JSON.parse(jsonStr);
-            const parts = chunk.candidates?.[0]?.content?.parts || [];
-            for (const part of parts) {
-              if (part.text) {
-                fullText += part.text;
-                if (onToken) onToken(part.text);
-              }
-            }
-
-            if (chunk.candidates?.[0]?.groundingMetadata) {
-              groundingMetadata = chunk.candidates[0].groundingMetadata;
-            }
-            if (chunk.usageMetadata) {
-              usage = chunk.usageMetadata;
-            }
-          } catch {}
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          throw new Error(payload.error?.message || `Gemini stream error (${response.status})`);
         }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr || jsonStr === '[DONE]') continue;
+
+            try {
+              const chunk = JSON.parse(jsonStr);
+              const parts = chunk.candidates?.[0]?.content?.parts || [];
+              for (const part of parts) {
+                if (part.text) {
+                  fullText += part.text;
+                  streamWorked = true;
+                  if (onToken) onToken(part.text);
+                }
+              }
+
+              if (chunk.candidates?.[0]?.groundingMetadata) {
+                groundingMetadata = chunk.candidates[0].groundingMetadata;
+              }
+              if (chunk.usageMetadata) {
+                usage = chunk.usageMetadata;
+              }
+            } catch {}
+          }
+        }
+      } catch (streamErr) {
+        console.warn('[Gemini] Streaming failed, falling back to non-streaming:', streamErr.message);
+        streamWorked = false;
+      }
+
+      // Fallback: if streaming yielded no text, use non-streaming endpoint
+      if (!streamWorked) {
+        console.log('[Gemini] Using non-streaming fallback with grounding');
+        const result = await this.analyzeImageWithGrounding({ imageData, mediaType, prompt, maxTokens });
+        fullText = result.text || '';
+        groundingMetadata = result.groundingMetadata;
+        usage = result.usage;
+
+        // Emit the full text as one chunk so the pipeline can parse it
+        if (fullText && onToken) onToken(fullText);
       }
 
       const citations = groundingMetadata?.groundingChunks
