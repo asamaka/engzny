@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-19** | Fixed P0: Gemini quota/rate-limit errors crashed factcheck pipeline with no fallback. Report `006045e9` showed "free_tier_requests, limit: 20" error — user saw nothing. Fix: added Claude web search as automatic fallback in `fact-check-pipeline.js`. When Gemini fails for any reason, pipeline resets parser state and uses `analyzeImageWithWebSearch` via Claude Sonnet. Citations are extracted and normalized. Users now get a complete analysis even when Gemini is unavailable.
+> **2026-03-19** | Fixed P1: Factcheck verdict explanation truncated during streaming. Report `12018dc0` showed explanation "The" instead of the full sentence. Root cause: streaming parser regex `(.+?)(?:\n|$)` fired prematurely — the lazy quantifier + end-of-string anchor matched partial text at chunk boundaries. Also fixed `^` anchor that prevented verdict detection when Gemini outputs any preamble. Added server-side fallback to extract verdict/angles from complete text if streaming parser misses them. Reports `70b731b6` and `0a60cc9a` (zero factcheck data) were likely caused by the anchor issue.
 
 ## Open Items
 
@@ -44,8 +44,8 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 ## Experiment: factcheck pipeline zero grounding citations
 - Hypothesis: Gemini grounding returns 0 citations for some factcheck analyses, meaning no web-verified sources
-- Evidence: [0a60cc9a — 0 citations, FALSE verdict], [70b731b6 — 0 citations, 7.8s duration]
-- Status: gathering (2/10) — monitor citation rate; Claude fallback now provides alternative source
+- Evidence: [0a60cc9a — 0 citations, FALSE verdict], [70b731b6 — 0 citations, 7.8s], [12018dc0 — 0 citations, PARTLY TRUE]
+- Status: gathering (3/10) — monitor citation rate; Claude fallback provides alternative source
 
 ## Key Context (for reference, not action items)
 
@@ -55,3 +55,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Source attribution promotion: now works cross-language via intent + source_card matching (2026-03-18).
 - Factcheck reports now include verdict, explanation, angles, and citation data (2026-03-19).
 - Factcheck pipeline now has Claude fallback when Gemini fails (2026-03-19).
+- Verdict streaming parser fixed: requires complete line before emitting, handles preamble (2026-03-19).

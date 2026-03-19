@@ -1390,6 +1390,21 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         },
       });
 
+      // Fallback: extract verdict from complete text if streaming parser missed it
+      if (!fcVerdict && pipelineResult?.success && pipelineResult.factcheck?.text) {
+        const fullText = pipelineResult.factcheck.text;
+        const fallbackMatch = fullText.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n(.+?)(?:\n|$)/);
+        if (fallbackMatch) {
+          fcVerdict = { verdict: fallbackMatch[1], explanation: fallbackMatch[2].trim() };
+          logger.info('FactCheckReport', 'Extracted verdict from complete text (streaming parser missed it)', { requestId, verdict: fcVerdict.verdict });
+        }
+      }
+      if (fcAngles.length === 0 && pipelineResult?.success && pipelineResult.factcheck?.text) {
+        const fullText = pipelineResult.factcheck.text;
+        const angleMatches = fullText.matchAll(/---ANGLE:\s*(.+)/g);
+        for (const m of angleMatches) fcAngles.push(m[1].trim());
+      }
+
       // Save fact-check report with verdict and investigation data
       if (pipelineResult) {
         try {
