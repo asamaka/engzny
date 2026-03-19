@@ -6,57 +6,54 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
         #player { width: 100%; height: 100%; }
-        #player iframe { width: 100%; height: 100%; border: none; }
     </style>
 </head>
 <body>
     <div id="player"></div>
     <script>
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        var firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        var ytPlayer;
         var params = new URLSearchParams(window.location.search);
         var vID = params.get('v');
-        if (vID) {
-            var embedParams = {
-                enablejsapi: '1',
-                origin: 'https://thinx.fun',
-                autoplay: '1',
-                rel: params.get('rel') || '0',
-                modestbranding: params.get('modestbranding') || '1',
-                iv_load_policy: params.get('iv_load_policy') || '3',
-                playsinline: '1'
+
+        window.onYouTubeIframeAPIReady = function() {
+            if (!vID) return;
+
+            var playerVars = {
+                autoplay: 1,
+                rel: parseInt(params.get('rel') || '0'),
+                modestbranding: parseInt(params.get('modestbranding') || '1'),
+                iv_load_policy: parseInt(params.get('iv_load_policy') || '3'),
+                playsinline: 1
             };
 
             var passthrough = ['controls', 'showinfo', 'fs', 'disablekb', 'start', 'end', 'cc_load_policy'];
             for (var i = 0; i < passthrough.length; i++) {
                 var val = params.get(passthrough[i]);
-                if (val !== null) embedParams[passthrough[i]] = val;
+                if (val !== null) playerVars[passthrough[i]] = parseInt(val);
             }
 
-            var qs = [];
-            for (var key in embedParams) {
-                qs.push(key + '=' + encodeURIComponent(embedParams[key]));
-            }
-
-            var ifrm = document.createElement('iframe');
-            ifrm.src = 'https://www.youtube.com/embed/' + vID + '?' + qs.join('&');
-            ifrm.setAttribute('allow', 'autoplay; encrypted-media; fullscreen');
-            ifrm.setAttribute('allowfullscreen', 'true');
-            ifrm.setAttribute('frameborder', '0');
-            document.getElementById('player').appendChild(ifrm);
-
-            window.addEventListener('message', function(event) {
-                if (!ifrm || !ifrm.contentWindow) return;
-                try {
-                    var data = (typeof event.data === 'string') ? JSON.parse(event.data) : event.data;
-                    if (data.action) {
-                        ifrm.contentWindow.postMessage(JSON.stringify({
-                            event: 'command',
-                            func: data.action,
-                            args: data.args || ''
-                        }), '*');
-                    }
-                } catch(e) {}
+            ytPlayer = new YT.Player('player', {
+                videoId: vID,
+                width: '100%',
+                height: '100%',
+                playerVars: playerVars
             });
-        }
+        };
+
+        window.addEventListener('message', function(event) {
+            if (!ytPlayer) return;
+            try {
+                var data = (typeof event.data === 'string') ? JSON.parse(event.data) : event.data;
+                if (data.action && typeof ytPlayer[data.action] === 'function') {
+                    ytPlayer[data.action].apply(ytPlayer, data.args || []);
+                }
+            } catch(e) {}
+        });
     </script>
 </body>
 </html>
