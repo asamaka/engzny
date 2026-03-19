@@ -112,13 +112,13 @@ async function runFactCheckPipeline({
       textSoFar += newChunk;
 
       if (!verdictSent) {
-        const verdictMatch = textSoFar.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n(.+)\n/);
+        const verdictMatch = textSoFar.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/);
         if (verdictMatch) {
           verdictSent = true;
           if (onVerdict) {
             onVerdict({
               verdict: verdictMatch[1],
-              explanation: verdictMatch[2].trim(),
+              explanation: verdictMatch[2].trim().replace(/\n/g, ' '),
             });
           }
           if (onProgress) {

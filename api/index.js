@@ -1393,9 +1393,9 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
       // Fallback: extract verdict from complete text if streaming parser missed it
       if (!fcVerdict && pipelineResult?.success && pipelineResult.factcheck?.text) {
         const fullText = pipelineResult.factcheck.text;
-        const fallbackMatch = fullText.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n(.+?)(?:\n|$)/);
+        const fallbackMatch = fullText.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---|$)/);
         if (fallbackMatch) {
-          fcVerdict = { verdict: fallbackMatch[1], explanation: fallbackMatch[2].trim() };
+          fcVerdict = { verdict: fallbackMatch[1], explanation: fallbackMatch[2].trim().replace(/\n/g, ' ') };
           logger.info('FactCheckReport', 'Extracted verdict from complete text (streaming parser missed it)', { requestId, verdict: fcVerdict.verdict });
         }
       }

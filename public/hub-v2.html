@@ -821,9 +821,9 @@
 
         function tryParseFullText(text) {
             // Try to extract verdict from accumulated text
-            const verdictMatch = text.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n(.+)\n/);
+            const verdictMatch = text.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/);
             if (verdictMatch) {
-                showVerdict({ verdict: verdictMatch[1], explanation: verdictMatch[2].trim() });
+                showVerdict({ verdict: verdictMatch[1], explanation: verdictMatch[2].trim().replace(/\n/g, ' ') });
             } else {
                 // No structured verdict — show text as-is with a neutral verdict
                 showVerdict({ verdict: 'UNVERIFIED', explanation: 'Analysis complete' });
