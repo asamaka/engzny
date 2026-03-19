@@ -791,6 +791,25 @@
             statusLabel.textContent = 'Complete';
             loadingState.classList.add('hidden');
 
+            // If no verdict was ever received but we have accumulated text,
+            // try to parse it now (handles non-streaming fallback or missed events)
+            if (!verdictReceived && fullText.length > 0) {
+                tryParseFullText(fullText);
+            }
+
+            // If still nothing rendered, show a fallback message
+            if (!verdictReceived && fullText.length === 0) {
+                verdictBanner.classList.remove('hidden');
+                contentArea.classList.remove('hidden');
+                const style = VERDICT_STYLES['UNVERIFIED'];
+                verdictBanner.className = `mx-4 mt-4 rounded-2xl p-5 border ${style.bg} ${style.border}`;
+                verdictIcon.textContent = 'info';
+                verdictIcon.className = `material-symbols-rounded text-3xl ${style.text}`;
+                verdictLabel.textContent = 'Analysis Complete';
+                verdictLabel.className = `text-2xl font-extrabold tracking-tight ${style.text}`;
+                verdictExplanation.textContent = 'The analysis completed but no structured result was returned. Try again.';
+            }
+
             if (data.duration) {
                 completionMeta.classList.remove('hidden');
                 metaDuration.textContent = (data.duration / 1000).toFixed(1) + 's';
@@ -798,6 +817,27 @@
             }
 
             postProcessText();
+        }
+
+        function tryParseFullText(text) {
+            // Try to extract verdict from accumulated text
+            const verdictMatch = text.match(/VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n(.+?)(?:\n|$)/);
+            if (verdictMatch) {
+                showVerdict({ verdict: verdictMatch[1], explanation: verdictMatch[2].trim() });
+            } else {
+                // No structured verdict — show text as-is with a neutral verdict
+                showVerdict({ verdict: 'UNVERIFIED', explanation: 'Analysis complete' });
+            }
+
+            // Re-parse sections from full text
+            parseAccumulatedText();
+            
+            // If no sections were detected, show the full text as summary
+            if (detectedSections.length === 0 && text.length > 0) {
+                summarySection.classList.remove('hidden');
+                const cleanText = text.replace(/^VERDICT:.*\n.*\n?/, '').trim();
+                summaryText.innerHTML = cleanText.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
         }
 
         function postProcessText() {

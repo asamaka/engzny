@@ -1203,8 +1203,8 @@ app.post('/api/hub/v2/start', async (req, res) => {
 
     const pipelineMode = (process.env.PIPELINE_MODE || '').toLowerCase();
     const geminiAvailable = !!process.env.GEMINI_API_KEY;
-    const factcheckDefault = (pipelineMode === 'factcheck' || pipelineMode === '' || !pipelineMode) && geminiAvailable;
-    const geminiDefault = pipelineMode === 'gemini' && geminiAvailable;
+    // factcheck is the default for gemini mode (factcheck supersedes old gemini card pipeline)
+    const factcheckDefault = (pipelineMode === 'factcheck' || pipelineMode === 'gemini' || pipelineMode === '' || !pipelineMode) && geminiAvailable;
     const pipelineType = pipeline === 'factcheck' && geminiAvailable
       ? 'factcheck'
       : pipeline === 'legacy'
@@ -1215,9 +1215,7 @@ app.post('/api/hub/v2/start', async (req, res) => {
             ? 'gemini'
             : factcheckDefault
               ? 'factcheck'
-              : geminiDefault
-                ? 'gemini'
-                : 'llm2';
+              : 'llm2';
 
     pipelineJobs.set(requestId, {
       imageData: normalized.imageData,
