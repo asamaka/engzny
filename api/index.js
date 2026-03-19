@@ -1332,7 +1332,10 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
 
   try {
     if (useFactCheck) {
-      // Fact-check pipeline: stream text directly to client
+      // Collect structured data during streaming for report storage
+      let fcVerdict = null;
+      const fcAngles = [];
+
       await runFactCheckPipeline({
         imageData: job.imageData,
         mediaType: job.mediaType,
@@ -1344,11 +1347,13 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         },
 
         onVerdict: (verdict) => {
+          fcVerdict = verdict;
           logger.pipelinePhase(requestId, 'verdict', { verdict: verdict.verdict });
           sendEvent('verdict', verdict);
         },
 
         onSection: (section) => {
+          if (section.type === 'angle') fcAngles.push(section.title);
           logger.pipelinePhase(requestId, 'section', { type: section.type, title: section.title });
           sendEvent('section', section);
         },
@@ -1385,7 +1390,7 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
         },
       });
 
-      // Save fact-check report
+      // Save fact-check report with verdict and investigation data
       if (pipelineResult) {
         try {
           if (pipelineResult.success) {
@@ -1401,11 +1406,20 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
               outcome: 'success',
               imageSize: `${imageSize}KB`,
               mediaType: job.mediaType,
+              factcheck: {
+                verdict: fcVerdict?.verdict || null,
+                explanation: fcVerdict?.explanation || null,
+                angles: fcAngles,
+                citationCount: fc.citations?.length || 0,
+                citationUrls: (fc.citations || []).slice(0, 10),
+              },
               meta: { pipeline: 'factcheck', model: fc.model, duration: fc.duration, citations: fc.citations?.length || 0 },
               thumb,
             });
           } else {
             await liveReports.saveLiveReport(requestId, {
+              contentType: 'factcheck',
+              layoutType: 'factcheck',
               outcome: 'error',
               error: pipelineResult.error.message,
               imageSize: `${imageSize}KB`,

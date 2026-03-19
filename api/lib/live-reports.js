@@ -48,6 +48,7 @@ function tryParse(str, fb) {
 }
 
 function buildSummary(entry) {
+  const fc = entry.factcheck;
   return {
     requestId: entry.requestId,
     createdAt: entry.createdAt,
@@ -60,8 +61,9 @@ function buildSummary(entry) {
     outcome: entry.outcome || null,
     imageSize: entry.imageSize || null,
     hasThumb: !!entry.thumb,
-    heroTitle: entry.cards?.[0]?.data?.title || null,
-    intent: entry.contentAnalysis?.intent || null,
+    heroTitle: entry.cards?.[0]?.data?.title || fc?.explanation || null,
+    intent: entry.contentAnalysis?.intent || (fc ? `[${fc.verdict}] ${fc.explanation || ''}`.trim() : null),
+    ...(fc ? { factcheck: { verdict: fc.verdict, explanation: fc.explanation, angles: fc.angles, citationCount: fc.citationCount } } : {}),
   };
 }
 
@@ -240,7 +242,9 @@ async function searchArchive({ q, contentType, layoutType, outcome, from, to, ca
       (s.intent && s.intent.toLowerCase().includes(ql)) ||
       (s.contentType && s.contentType.toLowerCase().includes(ql)) ||
       (s.platform && s.platform.toLowerCase().includes(ql)) ||
-      (s.requestId && s.requestId.toLowerCase().includes(ql))
+      (s.requestId && s.requestId.toLowerCase().includes(ql)) ||
+      (s.factcheck?.verdict && s.factcheck.verdict.toLowerCase().includes(ql)) ||
+      (s.factcheck?.explanation && s.factcheck.explanation.toLowerCase().includes(ql))
     );
   }
   if (contentType) filtered = filtered.filter(s => s.contentType === contentType);

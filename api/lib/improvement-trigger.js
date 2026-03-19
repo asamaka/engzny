@@ -181,6 +181,7 @@ async function clearSkippedReports() {
  * Keeps it small — GitHub limits event payloads to 10 client_payload keys.
  */
 function buildReportSummary(report) {
+  const fc = report.factcheck;
   return {
     requestId: report.requestId,
     outcome: report.outcome,
@@ -193,6 +194,7 @@ function buildReportSummary(report) {
     imageSize: report.imageSize || null,
     cardTypes: (report.cards || []).map(c => c.cardType).filter(Boolean),
     llmTraceSummary: report.llmTraceSummary || null,
+    ...(fc ? { factcheck: { verdict: fc.verdict, explanation: fc.explanation, angles: fc.angles, citationCount: fc.citationCount } } : {}),
   };
 }
 
