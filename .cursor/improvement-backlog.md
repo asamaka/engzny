@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-19** | Fixed P1: factcheck pipeline saved no content data to reports — verdict, claim, angles, and citation URLs were all missing. Report `0a60cc9a` (FALSE verdict on UAE MOD drone claim) had `heroTitle: null`, `intent: null`, `cardCount: null` despite the pipeline delivering a complete analysis with two investigation angles. Fix: capture verdict + angle titles during streaming callbacks, store in `factcheck` field on report. Updated `buildSummary` to populate `heroTitle`/`intent` from factcheck data. Updated `searchArchive` to support verdict text search. Updated `buildReportSummary` in improvement-trigger to include factcheck data in GitHub dispatch payload.
+> **2026-03-19** | Fixed P0: Gemini quota/rate-limit errors crashed factcheck pipeline with no fallback. Report `006045e9` showed "free_tier_requests, limit: 20" error — user saw nothing. Fix: added Claude web search as automatic fallback in `fact-check-pipeline.js`. When Gemini fails for any reason, pipeline resets parser state and uses `analyzeImageWithWebSearch` via Claude Sonnet. Citations are extracted and normalized. Users now get a complete analysis even when Gemini is unavailable.
 
 ## Open Items
 
@@ -24,28 +24,28 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 ## Experiment: hero subtitle factual errors from classify phase
 - Hypothesis: When classify phase sets intent with location errors (e.g. "Gaza region" instead of "Israeli cities"), the error propagates to hero subtitle because translation verification results don't feed back to update cards
-- Evidence: [051bb8d8 — hero says "Gaza region" but targets are Acre/Haifa/Tel Aviv/Beersheba in Israel; translation_verify caught the correct locations but enhance used the original wrong intent]
-- Status: gathering (1/10) — monitor whether this occurs systematically
+- Evidence: [051bb8d8 — hero says "Gaza region" but targets are Acre/Haifa/Tel Aviv/Beersheba in Israel]
+- Status: gathering (1/10)
 
 ## Experiment: verification card thin when research times out
 - Hypothesis: When deep research times out, verification cards show only 1-2 sources with no research summary
-- Evidence: [4cc0dfaa — 1 source, no summary], [f256dfce — 2 sources, research timed out], [89b92015 — 2 sources, empty summary], [051bb8d8 — 1 source, no research], [0fc73c87 — 1 source, no research]
+- Evidence: [4cc0dfaa, f256dfce, 89b92015, 051bb8d8, 0fc73c87]
 - Status: gathering (5/10) — partially addressed by fallback summary + source promotion
 
 ## Experiment: deep research silently fails (no trace recorded)
 - Hypothesis: Deep research sometimes doesn't run at all for breaking_news — no trace in LLM trace summary
-- Evidence: [89b92015 — 3 traces, no deep_research], [051bb8d8 — 4 traces, no deep_research], [0fc73c87 — 4 traces, no deep_research]
+- Evidence: [89b92015, 051bb8d8, 0fc73c87]
 - Status: gathering (3/10) — likely times out before any LLM call is made
 
 ## Experiment: pipeline duration still exceeds 25s despite grace cap
 - Hypothesis: POST_ENHANCE_GRACE_MS fires correctly but total pipeline duration still exceeds threshold
-- Evidence: [f256dfce — 29684ms], [2c2ef6ea — 46913ms], [0fc73c87 — 26583ms]
+- Evidence: [f256dfce — 29684ms, 2c2ef6ea — 46913ms, 0fc73c87 — 26583ms]
 - Status: gathering (3/10)
 
 ## Experiment: factcheck pipeline zero grounding citations
 - Hypothesis: Gemini grounding returns 0 citations for some factcheck analyses, meaning no web-verified sources
-- Evidence: [0a60cc9a — 0 citations, FALSE verdict on UAE MOD drone claim]
-- Status: gathering (1/10) — first factcheck report; monitor citation rate across future factchecks
+- Evidence: [0a60cc9a — 0 citations, FALSE verdict], [70b731b6 — 0 citations, 7.8s duration]
+- Status: gathering (2/10) — monitor citation rate; Claude fallback now provides alternative source
 
 ## Key Context (for reference, not action items)
 
@@ -54,3 +54,4 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - CSS cascade: the `@layer base` reset fix resolved all DaisyUI spacing issues.
 - Source attribution promotion: now works cross-language via intent + source_card matching (2026-03-18).
 - Factcheck reports now include verdict, explanation, angles, and citation data (2026-03-19).
+- Factcheck pipeline now has Claude fallback when Gemini fails (2026-03-19).

@@ -95,9 +95,6 @@ async function runFactCheckPipeline({
   const requestId = adapterConfig.requestId || 'unknown';
 
   try {
-    const model = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-2.5-flash';
-    const adapter = getAdapter('gemini', { model, maxTokens: 8192 });
-
     let prompt = buildFactCheckPrompt();
     if (question) {
       prompt += `\n\nThe user specifically asks: "${question}"`;
@@ -106,8 +103,6 @@ async function runFactCheckPipeline({
     if (onProgress) {
       onProgress({ phase: 'searching', progress: 10, message: 'Analyzing screenshot and searching the web...' });
     }
-
-    logger.info('FactCheckPipeline', 'Starting streaming analysis', { model, requestId });
 
     let verdictSent = false;
     let currentSection = null;
@@ -158,16 +153,68 @@ async function runFactCheckPipeline({
       }
     };
 
-    const result = await adapter.streamImageAnalysisWithGrounding({
-      imageData,
-      mediaType,
-      prompt,
-      maxTokens: 8192,
-      onToken: (chunk) => {
-        parseAndEmitStructure(chunk);
-        if (onToken) onToken(chunk);
-      },
-    });
+    let result = null;
+
+    // Try Gemini first (streaming with Google Search grounding)
+    try {
+      const model = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-2.5-flash';
+      const adapter = getAdapter('gemini', { model, maxTokens: 8192 });
+
+      logger.info('FactCheckPipeline', 'Starting Gemini streaming analysis', { model, requestId });
+
+      result = await adapter.streamImageAnalysisWithGrounding({
+        imageData,
+        mediaType,
+        prompt,
+        maxTokens: 8192,
+        onToken: (chunk) => {
+          parseAndEmitStructure(chunk);
+          if (onToken) onToken(chunk);
+        },
+      });
+    } catch (geminiError) {
+      // Gemini failed (quota, rate limit, outage) — fall back to Claude with web search
+      logger.warn('FactCheckPipeline', 'Gemini failed, falling back to Claude', {
+        requestId,
+        geminiErr: geminiError.message,
+      });
+
+      // Reset parser state for clean fallback
+      textSoFar = '';
+      verdictSent = false;
+      currentSection = null;
+
+      if (onProgress) {
+        onProgress({ phase: 'searching', progress: 15, message: 'Switching to backup analysis...' });
+      }
+
+      const fallbackModel = process.env.FACTCHECK_FALLBACK_MODEL || 'claude-sonnet-4-20250514';
+      const claudeAdapter = getAdapter('claude', { model: fallbackModel, maxTokens: 8192 });
+
+      logger.info('FactCheckPipeline', 'Starting Claude fallback analysis', { model: fallbackModel, requestId });
+
+      const claudeResult = await claudeAdapter.analyzeImageWithWebSearch({
+        imageData,
+        mediaType,
+        prompt,
+        maxSearches: 5,
+      });
+
+      if (claudeResult.text) {
+        parseAndEmitStructure(claudeResult.text);
+        if (onToken) onToken(claudeResult.text);
+      }
+
+      const citationUrls = extractClaudeCitations(claudeResult);
+
+      result = {
+        text: claudeResult.text,
+        usage: claudeResult.usage,
+        model: claudeResult.model,
+        groundingMetadata: null,
+        citations: citationUrls,
+      };
+    }
 
     const duration = Date.now() - startTime;
 
@@ -194,7 +241,7 @@ async function runFactCheckPipeline({
       onComplete({
         text: result?.text || textSoFar,
         duration,
-        model: result?.model || model,
+        model: result?.model || 'unknown',
         citations: result?.citations || [],
         groundingMetadata: result?.groundingMetadata || null,
       });
@@ -209,6 +256,21 @@ async function runFactCheckPipeline({
     });
     if (onError) { onError(error); } else { throw error; }
   }
+}
+
+function extractClaudeCitations(claudeResult) {
+  const urls = new Set();
+  for (const c of claudeResult.citations || []) {
+    if (c.url) urls.add(c.url);
+  }
+  for (const sr of claudeResult.searchResults || []) {
+    if (sr.content && Array.isArray(sr.content)) {
+      for (const item of sr.content) {
+        if (item.url) urls.add(item.url);
+      }
+    }
+  }
+  return [...urls];
 }
 
 module.exports = { runFactCheckPipeline };
