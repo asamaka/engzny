@@ -56,14 +56,15 @@ List each source you used, one per line, formatted as:
 
 CRITICAL RULES:
 1. The VERDICT line must be the VERY FIRST line of your response. No preamble, no thinking out loud.
-2. Use Google Search aggressively. Search for specific claims, names, dates, and quotes from the screenshot.
-3. Search authoritative sources: Reuters, AP, BBC, CNN, official statements, peer-reviewed studies.
-4. If the screenshot is in a non-English language, translate the key content and analyze in English.
-5. Be honest about uncertainty. "UNVERIFIED" is better than a wrong verdict.
-6. Each ANGLE must have a distinct title and cover a different dimension — don't repeat the summary.
-7. Never fabricate sources or URLs. Only cite what you actually found via search.
-8. Write for a general audience. No jargon. Short sentences. Be concise but thorough.
-9. If the screenshot is not a claim (e.g., a product page, settings screen, meme), adjust your analysis accordingly — still provide useful context and verification where possible.`;
+2. The verdict explanation MUST be a single, complete sentence of at least 15 words on the SAME LINE as the text after VERDICT. It must stand alone as a clear summary of your reasoning. Never write just a word or fragment — always a full sentence.
+3. Use Google Search aggressively. Search for specific claims, names, dates, and quotes from the screenshot.
+4. Search authoritative sources: Reuters, AP, BBC, CNN, official statements, peer-reviewed studies.
+5. If the screenshot is in a non-English language, translate the key content and analyze in English.
+6. Be honest about uncertainty. "UNVERIFIED" is better than a wrong verdict.
+7. Each ANGLE must have a distinct title and cover a different dimension — don't repeat the summary.
+8. Never fabricate sources or URLs. Only cite what you actually found via search.
+9. Write for a general audience. No jargon. Short sentences. Be concise but thorough.
+10. If the screenshot is not a claim (e.g., a product page, settings screen, meme), adjust your analysis accordingly — still provide useful context and verification where possible.`;
 }
 
 /**
@@ -105,24 +106,52 @@ async function runFactCheckPipeline({
     }
 
     let verdictSent = false;
+    let pendingVerdict = null;
     let currentSection = null;
     let textSoFar = '';
+
+    const MIN_EXPLANATION_LENGTH = 30;
+
+    const emitVerdict = (verdict) => {
+      if (verdictSent) return;
+      verdictSent = true;
+      pendingVerdict = null;
+      if (onVerdict) onVerdict(verdict);
+      if (onProgress) {
+        onProgress({ phase: 'analyzing', progress: 30, message: 'Verdict delivered, analyzing deeper...' });
+      }
+    };
+
+    const extractVerdictFromText = () => {
+      const verdictMatch = textSoFar.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/);
+      if (!verdictMatch) return null;
+      return {
+        verdict: verdictMatch[1],
+        explanation: verdictMatch[2].trim().replace(/\n/g, ' '),
+      };
+    };
+
+    const enhanceExplanationFromSummary = (verdict) => {
+      const summaryMatch = textSoFar.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+      if (!summaryMatch) return verdict;
+      const summaryText = summaryMatch[1].trim();
+      const firstSentence = summaryText.split(/(?<=\.)\s/)[0];
+      if (firstSentence && firstSentence.length >= MIN_EXPLANATION_LENGTH) {
+        return { ...verdict, explanation: firstSentence };
+      }
+      return verdict;
+    };
 
     const parseAndEmitStructure = (newChunk) => {
       textSoFar += newChunk;
 
       if (!verdictSent) {
-        const verdictMatch = textSoFar.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/);
-        if (verdictMatch) {
-          verdictSent = true;
-          if (onVerdict) {
-            onVerdict({
-              verdict: verdictMatch[1],
-              explanation: verdictMatch[2].trim().replace(/\n/g, ' '),
-            });
-          }
-          if (onProgress) {
-            onProgress({ phase: 'analyzing', progress: 30, message: 'Verdict delivered, analyzing deeper...' });
+        const parsed = extractVerdictFromText();
+        if (parsed) {
+          if (parsed.explanation.length >= MIN_EXPLANATION_LENGTH) {
+            emitVerdict(parsed);
+          } else {
+            pendingVerdict = parsed;
           }
         }
       }
@@ -150,6 +179,11 @@ async function runFactCheckPipeline({
         if (onProgress) {
           onProgress({ phase: 'sources', progress: 85, message: 'Compiling sources...' });
         }
+      }
+
+      if (pendingVerdict && !verdictSent && textSoFar.includes('---SUMMARY')) {
+        const enhanced = enhanceExplanationFromSummary(pendingVerdict);
+        emitVerdict(enhanced);
       }
     };
 
@@ -182,6 +216,7 @@ async function runFactCheckPipeline({
       // Reset parser state for clean fallback
       textSoFar = '';
       verdictSent = false;
+      pendingVerdict = null;
       currentSection = null;
 
       if (onProgress) {
@@ -217,6 +252,16 @@ async function runFactCheckPipeline({
     }
 
     const duration = Date.now() - startTime;
+
+    if (pendingVerdict && !verdictSent) {
+      const enhanced = enhanceExplanationFromSummary(pendingVerdict);
+      emitVerdict(enhanced);
+    }
+
+    if (!verdictSent) {
+      const lastChance = extractVerdictFromText();
+      if (lastChance) emitVerdict(lastChance);
+    }
 
     logger.info('FactCheckPipeline', 'Analysis complete', {
       requestId,

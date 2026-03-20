@@ -791,8 +791,16 @@
             statusLabel.textContent = 'Complete';
             loadingState.classList.add('hidden');
 
-            // If no verdict was ever received but we have accumulated text,
-            // try to parse it now (handles non-streaming fallback or missed events)
+            if (verdictReceived && verdictExplanation.textContent.length < 30 && fullText.length > 0) {
+                const summaryMatch = fullText.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+                if (summaryMatch) {
+                    const firstSentence = summaryMatch[1].trim().split(/(?<=\.)\s/)[0];
+                    if (firstSentence && firstSentence.length >= 30) {
+                        verdictExplanation.textContent = firstSentence;
+                    }
+                }
+            }
+
             if (!verdictReceived && fullText.length > 0) {
                 tryParseFullText(fullText);
             }
@@ -820,12 +828,18 @@
         }
 
         function tryParseFullText(text) {
-            // Try to extract verdict from accumulated text
             const verdictMatch = text.match(/(?:^|\n)VERDICT:\s*(TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/);
             if (verdictMatch) {
-                showVerdict({ verdict: verdictMatch[1], explanation: verdictMatch[2].trim().replace(/\n/g, ' ') });
+                let explanation = verdictMatch[2].trim().replace(/\n/g, ' ');
+                if (explanation.length < 30) {
+                    const summaryMatch = text.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+                    if (summaryMatch) {
+                        const firstSentence = summaryMatch[1].trim().split(/(?<=\.)\s/)[0];
+                        if (firstSentence && firstSentence.length >= 30) explanation = firstSentence;
+                    }
+                }
+                showVerdict({ verdict: verdictMatch[1], explanation });
             } else {
-                // No structured verdict — show text as-is with a neutral verdict
                 showVerdict({ verdict: 'UNVERIFIED', explanation: 'Analysis complete' });
             }
 

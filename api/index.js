@@ -1399,6 +1399,20 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
           logger.info('FactCheckReport', 'Extracted verdict from complete text (streaming parser missed it)', { requestId, verdict: fcVerdict.verdict });
         }
       }
+
+      // Enhance short explanations from summary section
+      if (fcVerdict && fcVerdict.explanation && fcVerdict.explanation.length < 30 && pipelineResult?.success && pipelineResult.factcheck?.text) {
+        const fullText = pipelineResult.factcheck.text;
+        const summaryMatch = fullText.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+        if (summaryMatch) {
+          const firstSentence = summaryMatch[1].trim().split(/(?<=\.)\s/)[0];
+          if (firstSentence && firstSentence.length >= 30) {
+            logger.info('FactCheckReport', 'Enhanced short explanation from summary', { requestId, original: fcVerdict.explanation, enhanced: firstSentence.slice(0, 80) });
+            fcVerdict.explanation = firstSentence;
+          }
+        }
+      }
+
       if (fcAngles.length === 0 && pipelineResult?.success && pipelineResult.factcheck?.text) {
         const fullText = pipelineResult.factcheck.text;
         const angleMatches = fullText.matchAll(/---ANGLE:\s*(.+)/g);
