@@ -184,7 +184,7 @@ class GeminiAdapter extends LLMAdapter {
    * no tokens (can happen with grounding), falls back to non-streaming
    * analyzeImageWithGrounding and emits the full text as a single token.
    */
-  async streamImageAnalysisWithGrounding({ imageData, mediaType, prompt, maxTokens, onToken, onComplete, onError }) {
+  async streamImageAnalysisWithGrounding({ imageData, mediaType, prompt, maxTokens, systemInstruction, onToken, onComplete, onError }) {
     const body = {
       contents: [
         {
@@ -200,6 +200,7 @@ class GeminiAdapter extends LLMAdapter {
         temperature: 0.3,
         maxOutputTokens: maxTokens || this.maxTokens,
       },
+      ...(systemInstruction ? { system_instruction: { parts: [{ text: systemInstruction }] } } : {}),
     };
 
     try {

@@ -26,12 +26,24 @@ function buildFactCheckPrompt() {
   const month = now.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
   const year = now.getUTCFullYear();
 
-  return `You are a world-class fact-checker and investigative analyst with access to Google Search. Today is ${isoDate} (${month} ${year}).
+  return `You are a world-class fact-checker and investigative analyst. Today is ${isoDate} (${month} ${year}).
 
-You will be shown a screenshot. Your job is to:
-1. Determine what claims or information the screenshot contains
-2. Use Google Search to verify those claims against authoritative sources
-3. Deliver a clear verdict followed by structured analysis
+IMPORTANT — WEB SEARCH IS MANDATORY:
+You have access to Google Search. You MUST search the web before writing your analysis. Do NOT rely on your training data for any factual claims. Your job is to find what real sources say RIGHT NOW, not to recall what you were trained on.
+
+Before writing anything, perform at least 3-5 Google searches:
+- Search for the specific claims, names, and events in the screenshot
+- Search for the original source of the content shown
+- Search for counter-arguments or fact-checks by authoritative outlets (Reuters, AP, BBC, AFP, official statements)
+- Search in the language of the screenshot if it's not English, then also in English
+
+Your analysis is only as good as the web sources backing it. An analysis without web sources is just an opinion — users need verified facts.
+
+You will be shown a screenshot. Your workflow:
+1. READ the screenshot — identify the key claims, people, events, dates
+2. SEARCH the web — multiple searches for each major claim
+3. ANALYZE what you found — compare sources, note agreements and contradictions
+4. WRITE your response grounded in what your searches returned
 
 YOUR RESPONSE MUST FOLLOW THIS EXACT FORMAT (including the section markers):
 
@@ -39,32 +51,31 @@ VERDICT: [exactly one of: TRUE, FALSE, MISLEADING, PARTLY TRUE, UNVERIFIED]
 [One sentence explaining your verdict — this is the first thing the user sees, make it count]
 
 ---SUMMARY
-Write 2-3 paragraphs analyzing what the screenshot shows. What are the key claims? What did your web searches find? Give the user a clear, readable overview. Be direct and specific — no filler phrases like "upon examination" or "it's worth noting". Just state what you found.
+Write 2-3 paragraphs analyzing what the screenshot shows. Reference specific findings from your web searches — name the sources, cite dates, quote key facts. Be direct and specific — no filler phrases like "upon examination" or "it's worth noting". State what your searches found.
 
 ---ANGLE: [Title — the most important investigative angle]
-Deep-dive into this specific aspect. 2-3 paragraphs. Cite specific sources, dates, and facts from your web searches. If sources disagree, say so clearly.
+Deep-dive into this specific aspect. 2-3 paragraphs. You MUST cite specific sources, dates, and facts from your web searches. If sources disagree, say so clearly. Name the publications and dates.
 
 ---ANGLE: [Title — a second distinct angle or dimension]
-Another deep-dive. Different perspective from the first angle. Could be: source credibility, historical context, related events, counter-arguments, or broader implications.
+Another deep-dive. Different perspective from the first angle. Could be: source credibility, historical context, related events, counter-arguments, or broader implications. Again, ground every claim in your web search results.
 
 ---ANGLE: [Title — a third angle if warranted]
 Only include this if there's genuinely a third distinct dimension worth exploring. Skip it if two angles cover the story adequately.
 
 ---SOURCES
-List each source you used, one per line, formatted as:
-• Source Name — brief description of what it confirmed/denied (URL if available)
+List each source you found via web search, one per line, formatted as:
+• Source Name (date) — what it confirmed or denied (URL if available)
 
 CRITICAL RULES:
 1. The VERDICT line must be the VERY FIRST line of your response. No preamble, no thinking out loud.
-2. The verdict explanation MUST be a single, complete sentence of at least 15 words on the SAME LINE as the text after VERDICT. It must stand alone as a clear summary of your reasoning. Never write just a word or fragment — always a full sentence.
-3. Use Google Search aggressively. Search for specific claims, names, dates, and quotes from the screenshot.
-4. Search authoritative sources: Reuters, AP, BBC, CNN, official statements, peer-reviewed studies.
-5. If the screenshot is in a non-English language, translate the key content and analyze in English.
-6. Be honest about uncertainty. "UNVERIFIED" is better than a wrong verdict.
-7. Each ANGLE must have a distinct title and cover a different dimension — don't repeat the summary.
-8. Never fabricate sources or URLs. Only cite what you actually found via search.
-9. Write for a general audience. No jargon. Short sentences. Be concise but thorough.
-10. If the screenshot is not a claim (e.g., a product page, settings screen, meme), adjust your analysis accordingly — still provide useful context and verification where possible.`;
+2. The verdict explanation MUST be a single, complete sentence of at least 15 words. It must stand alone as a clear summary. Never write just a word or fragment.
+3. You MUST use Google Search for every analysis. Do not skip searching. The user is counting on web-verified facts, not AI opinions.
+4. If the screenshot is in a non-English language, translate the key content and search in both the original language and English.
+5. Be honest about uncertainty. "UNVERIFIED" is better than a wrong verdict.
+6. Each ANGLE must have a distinct title and cover a different dimension — don't repeat the summary.
+7. Never fabricate sources or URLs. Only cite what you actually found via search.
+8. Write for a general audience. No jargon. Short sentences. Be concise but thorough.
+9. If the screenshot is not a claim (e.g., a product page, settings screen, meme), still search for context and provide useful verification where possible.`;
 }
 
 /**
@@ -201,6 +212,7 @@ async function runFactCheckPipeline({
         mediaType,
         prompt,
         maxTokens: 8192,
+        systemInstruction: 'You are a fact-checking assistant. You MUST use Google Search to find and cite real web sources for every analysis. Never answer from memory alone — always search first.',
         onToken: (chunk) => {
           parseAndEmitStructure(chunk);
           if (onToken) onToken(chunk);
@@ -263,13 +275,22 @@ async function runFactCheckPipeline({
       if (lastChance) emitVerdict(lastChance);
     }
 
+    const citationCount = result?.citations?.length || 0;
     logger.info('FactCheckPipeline', 'Analysis complete', {
       requestId,
       duration,
       model: result?.model,
       textLength: result?.text?.length,
-      citations: result?.citations?.length || 0,
+      citations: citationCount,
     });
+
+    if (citationCount === 0) {
+      logger.warn('FactCheckPipeline', 'Zero web citations returned — Gemini may have skipped search', {
+        requestId,
+        model: result?.model,
+        duration,
+      });
+    }
 
     if (result?.citations?.length && onSources) {
       onSources({

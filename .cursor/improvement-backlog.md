@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-20** (run 3) | Fixed P1: Verdict explanation truncation in factcheck reports. Reports `12018dc0` (explanation = "The"), `8c195750` (cut off mid-sentence) showed users absurdly short or incomplete verdict explanations — the first thing they see. Root cause: streaming parser accepted any text between VERDICT line and first blank line. When Gemini output "The\n\n---SUMMARY", the lazy regex captured just "The". Fix: added quality gate (30-char minimum), summary-sentence fallback for short explanations, and prompt rule requiring complete explanation sentences. Applied to all 3 parsers (streaming, server fallback, client fallback).
+> **2026-03-20** (run 4) | Fixed P1: Gemini skipping web search in ~85% of factcheck analyses. Reports had 0 citations because the prompt buried search instructions in rules at the bottom. Fix: restructured prompt to put "WEB SEARCH IS MANDATORY" front and center, added explicit search workflow (read→search→analyze→write), added system_instruction to Gemini API call reinforcing search-first behavior, added warning log when 0 citations returned. Evidence: 7/8 recent reports had 0 citations [0a60cc9a, 70b731b6, 12018dc0, 8c195750, 0a706c65, 3c55f876, 8c195750]; only 09f878c8 (23s, 12 citations) actually searched.
 
 ## Open Items
 
@@ -21,11 +21,11 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-## Experiment: factcheck pipeline zero grounding citations
-- Hypothesis: Gemini grounding returns 0 citations for many factcheck analyses, meaning no web-verified sources
-- Evidence: [0a60cc9a, 70b731b6, 12018dc0, 8c195750, 0a706c65, 3c55f876] — 6 reports with 0 citations
-- Only 09f878c8 had citations (12) — took 23s vs ~7s for others
-- Status: gathering (6/10) — Gemini may be skipping search when it thinks it knows the answer
+## Experiment: factcheck zero citations post-prompt-fix
+- Hypothesis: The restructured prompt (run 4) will increase Gemini's search tool usage from ~12% to >50%
+- Baseline: 1/8 reports had citations before fix (09f878c8 only)
+- Evidence post-fix: [] (need 10-20 reports to evaluate)
+- Status: gathering — monitor next 10-20 factcheck reports to validate the fix worked
 
 ## Experiment: hero subtitle factual errors from classify phase
 - Hypothesis: When classify phase sets intent with location errors, the error propagates to hero subtitle
@@ -46,6 +46,7 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 - 100% of users are mobile (iPhone, 393x852). All changes must be mobile-first.
 - Factcheck pipeline is default for all content. Uses Gemini 2.5 Flash with Google Search grounding.
-- Verdict streaming parser fixed: quality gate + summary fallback for short explanations (2026-03-20).
+- Zero-citation prompt fix applied (2026-03-20 run 4): mandatory search framing + system_instruction.
+- Verdict explanation quality gate + summary fallback for short explanations (2026-03-20 run 3).
 - Verdict explanation multi-line capture with section delimiter lookahead (2026-03-19).
 - Source attribution promotion: works cross-language via intent + source_card matching (2026-03-18).
