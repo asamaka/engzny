@@ -2,8 +2,10 @@
   "agentRunAt": "2026-03-22T00:00:00+02:00",
   "generatedAt": "2026-03-22T00:00:00+02:00",
   "timezone": "Africa/Cairo",
-  "location": { "city": "New Cairo", "country": "Egypt" },
-
+  "location": {
+    "city": "New Cairo",
+    "country": "Egypt"
+  },
   "liveFeeds": {
     "weather": {
       "url": "https://api.open-meteo.com/v1/forecast?latitude=30.04&longitude=31.24&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Africa%2FCairo&forecast_days=1",
@@ -14,13 +16,20 @@
       "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true",
       "refreshSeconds": 600,
       "parser": "coingecko",
-      "display": { "label": "Bitcoin", "prefix": "$", "changeKey": "usd_24h_change" }
+      "display": {
+        "label": "Bitcoin",
+        "prefix": "$",
+        "changeKey": "usd_24h_change"
+      }
     },
     "sports": {
       "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
       "refreshSeconds": 120,
       "parser": "espn",
-      "display": { "label": "Liverpool", "teamFilter": "Liverpool" }
+      "display": {
+        "label": "Liverpool",
+        "teamFilter": "Liverpool"
+      }
     },
     "breakingNews": {
       "url": "https://saurav.tech/NewsAPI/top-headlines/category/general/us.json",
@@ -33,7 +42,6 @@
       "parser": "self"
     }
   },
-
   "header": {
     "weather": {
       "temperatureC": 14,
@@ -77,22 +85,20 @@
       }
     ]
   },
-
   "hero": {
     "greeting": "Good Evening, Aser!",
     "context": "Trump says Iran war is 'winding down' but rejects ceasefire while Iran reopens Hormuz to everyone except the US. Liverpool fell 2-1 at Brighton without Salah. Oracle and Atlassian announced massive AI-driven layoffs. OpenAI is building an autonomous AI researcher. Eid continues through Monday.",
     "photoOfDay": {
-      "imageUrl": "https://images.unsplash.com/photo-7n6fKjUikCM?auto=format&fit=crop&w=1600&q=80",
+      "imageUrl": "https://images.unsplash.com/photo-1746424919575-af1c193de14d?auto=format&fit=crop&w=1600&q=80",
       "title": "Bioluminescent Waves",
-      "caption": "The ocean glows electric blue as billions of microscopic organisms light up the surf — nature's own light show, no electricity required.",
+      "caption": "The ocean glows electric blue as billions of microscopic organisms light up the surf \u2014 nature's own light show, no electricity required.",
       "internalReason": "Chose bioluminescence for visual contrast to the heavy war/layoff news cycle. Beautiful, calming, scientifically fascinating, completely unrelated to user's daily concerns. Different from previous aurora photo."
     }
   },
-
   "videoRecommendations": [
     {
       "id": "story-trump-wind-down-iran",
-      "storyTitle": "Trump Signals Wind-Down of Iran War — But Rejects Ceasefire",
+      "storyTitle": "Trump Signals Wind-Down of Iran War \u2014 But Rejects Ceasefire",
       "storyContext": "Biggest geopolitical shift today: Trump says US is 'getting very close to meeting objectives' in 4-6 weeks",
       "tag": "Breaking",
       "label": "Iran War",
@@ -110,7 +116,7 @@
       "storyPublishedAt": "2026-03-21T18:00:00Z",
       "searchQuery": "Trump Iran war winding down ceasefire March 2026",
       "searchIterations": 1,
-      "internalReason": "Top story of the day — Trump's first wind-down signal while rejecting ceasefire is the most significant geopolitical development. BBC News coverage with proper context.",
+      "internalReason": "Top story of the day \u2014 Trump's first wind-down signal while rejecting ceasefire is the most significant geopolitical development. BBC News coverage with proper context.",
       "previousPosition": null,
       "playable": true
     },
@@ -123,7 +129,7 @@
       "ongoingStory": true,
       "ongoingStoryId": "iran-war-2026",
       "videoId": "KqN7hvC8c_U",
-      "videoTitle": "BREAKING: Iran Opens Hormuz for Everyone Except America — Trump COLLAPSES as Strategy Burns",
+      "videoTitle": "BREAKING: Iran Opens Hormuz for Everyone Except America \u2014 Trump COLLAPSES as Strategy Burns",
       "videoChannel": "Global Politics",
       "videoPublishedAt": "2026-03-21T12:00:00Z",
       "videoDurationText": "12:15",
@@ -134,13 +140,13 @@
       "storyPublishedAt": "2026-03-21T10:00:00Z",
       "searchQuery": "Iran opens Hormuz except America Trump 2026",
       "searchIterations": 1,
-      "internalReason": "Fresh twist on the Hormuz crisis — Iran's selective reopening is a major strategic development that directly impacts oil prices and Egypt's energy costs.",
+      "internalReason": "Fresh twist on the Hormuz crisis \u2014 Iran's selective reopening is a major strategic development that directly impacts oil prices and Egypt's energy costs.",
       "previousPosition": null,
       "playable": true
     },
     {
       "id": "story-oracle-30000-layoffs",
-      "storyTitle": "Oracle Plans 30,000 Layoffs — Largest AI-Driven Cut of 2026",
+      "storyTitle": "Oracle Plans 30,000 Layoffs \u2014 Largest AI-Driven Cut of 2026",
       "storyContext": "Oracle burning $58B in debt to fund AI data centers while cutting 18% of workforce",
       "tag": "Career",
       "label": "Career",
@@ -182,14 +188,14 @@
       "storyPublishedAt": "2026-03-20T10:00:00Z",
       "searchQuery": "Atlassian layoffs 1600 jobs 2026 AI CTO",
       "searchIterations": 1,
-      "internalReason": "The 'knowledge extraction sprint' angle is chilling for EMs — company recorded engineers' workflows for 6 months before replacing them. CTO replaced by 'AI talent'. Stock at 6-year low.",
+      "internalReason": "The 'knowledge extraction sprint' angle is chilling for EMs \u2014 company recorded engineers' workflows for 6 months before replacing them. CTO replaced by 'AI talent'. Stock at 6-year low.",
       "previousPosition": null,
       "playable": true
     },
     {
       "id": "story-brighton-liverpool-2-1",
-      "storyTitle": "Brighton 2-1 Liverpool — Welbeck Double Sinks Depleted Reds",
-      "storyContext": "No Salah, Ekitike off at 8 minutes — Liverpool's 10th defeat damages top-4 hopes",
+      "storyTitle": "Brighton 2-1 Liverpool \u2014 Welbeck Double Sinks Depleted Reds",
+      "storyContext": "No Salah, Ekitike off at 8 minutes \u2014 Liverpool's 10th defeat damages top-4 hopes",
       "tag": "Sports",
       "label": "Liverpool",
       "ongoingStory": false,
@@ -206,13 +212,13 @@
       "storyPublishedAt": "2026-03-21T17:00:00Z",
       "searchQuery": "Brighton Liverpool highlights 2-1 March 2026",
       "searchIterations": 2,
-      "internalReason": "Just happened today. Welbeck double, Salah missing, Ekitike injured at 8'. Reaction video is best available — official highlights not yet published. Liverpool's 10th defeat this season.",
+      "internalReason": "Just happened today. Welbeck double, Salah missing, Ekitike injured at 8'. Reaction video is best available \u2014 official highlights not yet published. Liverpool's 10th defeat this season.",
       "previousPosition": null,
       "playable": true
     },
     {
       "id": "story-natanz-iaea-radiation",
-      "storyTitle": "Natanz Nuclear Site Struck Again — IAEA Warns of Radiation Risk",
+      "storyTitle": "Natanz Nuclear Site Struck Again \u2014 IAEA Warns of Radiation Risk",
       "storyContext": "Nuclear safety crisis remains the most alarming angle in the Iran war",
       "tag": "Breaking",
       "label": "Iran War",
@@ -230,7 +236,7 @@
       "storyPublishedAt": "2026-03-21T14:00:00Z",
       "searchQuery": "Natanz nuclear struck IAEA radiation Chernobyl 2026",
       "searchIterations": 1,
-      "internalReason": "Still the most alarming angle in the war — IAEA Chernobyl warning. Shifted from position 1 to make room for the wind-down development.",
+      "internalReason": "Still the most alarming angle in the war \u2014 IAEA Chernobyl warning. Shifted from position 1 to make room for the wind-down development.",
       "previousPosition": 1,
       "playable": true
     },
@@ -273,19 +279,19 @@
       "videoDurationText": null,
       "videoDurationSeconds": null,
       "thumbnailUrl": null,
-      "storySummary": "OpenAI is building an autonomous AI research intern targeting September 2026, with a full multi-agent system by 2028. Chief scientist Pachocki says they're approaching models that 'work indefinitely in a coherent way just like people do' — a whole research lab in a data center.",
+      "storySummary": "OpenAI is building an autonomous AI research intern targeting September 2026, with a full multi-agent system by 2028. Chief scientist Pachocki says they're approaching models that 'work indefinitely in a coherent way just like people do' \u2014 a whole research lab in a data center.",
       "storySource": "MIT Technology Review",
       "storyPublishedAt": "2026-03-20T14:00:00Z",
       "searchQuery": "OpenAI autonomous AI researcher 2026",
       "searchIterations": 2,
-      "internalReason": "MIT Tech Review exclusive from March 20. No qualifying video within 48h — the Karpathy and Mark Chen videos are from 2025. Story itself is tier-1 AI breakthrough territory.",
+      "internalReason": "MIT Tech Review exclusive from March 20. No qualifying video within 48h \u2014 the Karpathy and Mark Chen videos are from 2025. Story itself is tier-1 AI breakthrough territory.",
       "previousPosition": null,
       "playable": false
     },
     {
       "id": "story-egypt-closures-march-28",
       "storyTitle": "Egypt 9PM Closures + 17% Fuel Hike Take Effect March 28",
-      "storyContext": "Energy costs doubled since the war began — government mandates conservation measures after Eid",
+      "storyContext": "Energy costs doubled since the war began \u2014 government mandates conservation measures after Eid",
       "tag": "Local",
       "label": "Egypt",
       "ongoingStory": true,
@@ -321,7 +327,7 @@
       "videoDurationText": null,
       "videoDurationSeconds": null,
       "thumbnailUrl": null,
-      "storySummary": "Anthropic launched Claude Code channels — MCP server bridges that let Claude react to events from messaging apps while running in background. Also added scheduled cloud-based task execution. Countering the open-source OpenClaw project (250K+ GitHub stars).",
+      "storySummary": "Anthropic launched Claude Code channels \u2014 MCP server bridges that let Claude react to events from messaging apps while running in background. Also added scheduled cloud-based task execution. Countering the open-source OpenClaw project (250K+ GitHub stars).",
       "storySource": "How Do I Use AI / Gentic News",
       "storyPublishedAt": "2026-03-21T10:00:00Z",
       "searchQuery": "Claude Code agent channels Anthropic 2026",
@@ -331,12 +337,11 @@
       "playable": false
     }
   ],
-
   "bannerItems": [
     {
       "id": "banner-trump-wind-down",
       "tag": "Breaking",
-      "text": "Trump signals Iran war wind-down in 4-6 weeks but rejects ceasefire — Iran skeptical.",
+      "text": "Trump signals Iran war wind-down in 4-6 weeks but rejects ceasefire \u2014 Iran skeptical.",
       "priority": 100,
       "kind": "breaking",
       "timestamp": "2026-03-21T20:00:00+02:00"
@@ -352,7 +357,7 @@
     {
       "id": "banner-eid-day-2",
       "tag": "Alert",
-      "text": "Eid Al-Fitr continues through Monday March 23 — work resumes Tuesday.",
+      "text": "Eid Al-Fitr continues through Monday March 23 \u2014 work resumes Tuesday.",
       "priority": 92,
       "kind": "alert",
       "timestamp": "2026-03-21T06:00:00+02:00"
@@ -360,7 +365,7 @@
     {
       "id": "banner-oracle-30k",
       "tag": "Context",
-      "text": "Oracle planning 30,000 layoffs — potentially the largest single AI-driven cut in tech history.",
+      "text": "Oracle planning 30,000 layoffs \u2014 potentially the largest single AI-driven cut in tech history.",
       "priority": 88,
       "kind": "breaking",
       "timestamp": "2026-03-21T10:00:00+02:00"
@@ -368,7 +373,7 @@
     {
       "id": "banner-liverpool-loss",
       "tag": "Local",
-      "text": "Liverpool fell 2-1 at Brighton — 10th defeat this season, top-4 race tightens.",
+      "text": "Liverpool fell 2-1 at Brighton \u2014 10th defeat this season, top-4 race tightens.",
       "priority": 80,
       "kind": "context",
       "timestamp": "2026-03-21T19:00:00+02:00"
@@ -384,7 +389,7 @@
     {
       "id": "banner-us-oil-sanctions-waiver",
       "tag": "Context",
-      "text": "US lifts sanctions on 140M barrels of Iranian oil for 30 days — third waiver in two weeks.",
+      "text": "US lifts sanctions on 140M barrels of Iranian oil for 30 days \u2014 third waiver in two weeks.",
       "priority": 76,
       "kind": "context",
       "timestamp": "2026-03-21T14:00:00+02:00"
@@ -392,13 +397,12 @@
     {
       "id": "banner-openai-researcher",
       "tag": "Follow",
-      "text": "OpenAI targeting September for an autonomous AI research intern — full system by 2028.",
+      "text": "OpenAI targeting September for an autonomous AI research intern \u2014 full system by 2028.",
       "priority": 72,
       "kind": "context",
       "timestamp": "2026-03-20T16:00:00+02:00"
     }
   ],
-
   "storyTracker": {
     "iran-war-2026": {
       "firstSeen": "2026-03-18",
@@ -416,6 +420,9 @@
       "status": "active"
     }
   },
-
-  "watchLog": ["65C0XcmruTI", "QtUD9AxBan8", "aDT9bBt9HxM"]
+  "watchLog": [
+    "65C0XcmruTI",
+    "QtUD9AxBan8",
+    "aDT9bBt9HxM"
+  ]
 }

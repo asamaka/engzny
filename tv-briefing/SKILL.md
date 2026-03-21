@@ -72,10 +72,36 @@ Set `header.weather` with approximate current Cairo weather as fallback (TV show
 
 Pick a photo that is **NOT** directly related to the user's explicit interests. Surprise, wonder, a window into a different world.
 
-- Use Unsplash: search for a striking image, use URL format `https://images.unsplash.com/photo-XXXXX?auto=format&fit=crop&w=1600&q=80`
+- Use Unsplash: search for a striking image
 - `title`: what the viewer sees
 - `caption`: one sentence giving context and inviting curiosity
 - `internalReason`: why you picked it (not displayed)
+
+**CRITICAL — Unsplash URL format:**
+
+The image URL MUST use the **full photo ID** from Unsplash, not the short slug from the page URL.
+
+```
+CORRECT: https://images.unsplash.com/photo-1746424919575-af1c193de14d?auto=format&fit=crop&w=1600&q=80
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                          Full photo ID (timestamp-hash format)
+
+WRONG:   https://images.unsplash.com/photo-7n6fKjUikCM?auto=format&fit=crop&w=1600&q=80
+                                          ^^^^^^^^^^^
+                                          This is the PAGE slug, NOT the image ID. Will return 404.
+```
+
+**How to get the correct URL:**
+1. Find the photo on Unsplash (e.g. `unsplash.com/photos/some-title-7n6fKjUikCM`)
+2. Fetch the page and look for the `<img>` tag or `og:image` meta — it contains the real photo ID
+3. The real ID always looks like `photo-XXXXXXXXXX-XXXXXXXXXXXX` (a Unix timestamp dash a 12-char hash)
+4. Build the URL: `https://images.unsplash.com/photo-{REAL_ID}?auto=format&fit=crop&w=1600&q=80`
+
+**Validation — MUST do before uploading:**
+```bash
+curl -sf "${IMAGE_URL}" -o /dev/null -w "%{http_code}"
+# Must return 200. If it returns 404 or anything else, the URL is wrong.
+```
 
 ### Step 3 — News Curation + Video Search
 
@@ -206,7 +232,15 @@ Curate `bannerItems` from the past 48h:
 2. Set `hero.greeting`: "Good Morning, Aser!" (05-11 Cairo), "Good Afternoon, Aser!" (12-16), "Good Evening, Aser!" (17-04)
 3. Build the full JSON per the schema below
 4. Write to a temp file
-5. Upload:
+5. **Validate all image URLs before uploading** (photoOfDay, thumbnails):
+
+```bash
+# MUST return 200 for every image URL in the briefing
+curl -sf "PHOTO_OF_DAY_URL" -o /dev/null -w "%{http_code}\n"
+# If any URL returns non-200, fix it BEFORE uploading.
+```
+
+6. Upload:
 
 ```bash
 source tv-briefing/.env
@@ -256,7 +290,7 @@ See `tv-briefing/briefing-example.json` for a full working example. Here's the s
     "greeting": "Good Evening, Aser!",
     "context": "Brief 1-2 sentence summary of the past 48 hours...",
     "photoOfDay": {
-      "imageUrl": "https://images.unsplash.com/photo-...",
+      "imageUrl": "https://images.unsplash.com/photo-1746424919575-af1c193de14d?auto=format&fit=crop&w=1600&q=80",
       "title": "Visible title",
       "caption": "One-sentence story",
       "internalReason": "Why you picked this (NOT displayed)"
