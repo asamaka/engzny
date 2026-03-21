@@ -353,7 +353,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// TV Briefing — public read, token-protected write
+// ============================================
+// TV Briefing — public read, token-protected write, hourly agent trigger
+// ============================================
+const tvBriefingTrigger = require('./lib/tv-briefing-trigger');
+tvBriefingTrigger.init(getRedis);
+
 app.get('/api/tv/briefing', async (req, res) => {
   try {
     const r = await getRedis();
@@ -361,6 +366,7 @@ app.get('/api/tv/briefing', async (req, res) => {
     const raw = await r.get('tv:briefing');
     if (!raw) return res.status(404).json({ error: 'No briefing' });
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    tvBriefingTrigger.recordView().catch(() => {});
     res.set('Cache-Control', 'public, max-age=60');
     res.set('Access-Control-Allow-Origin', '*');
     res.json(data);
@@ -377,10 +383,47 @@ app.post('/api/tv/briefing', express.json({ limit: '1mb' }), async (req, res) =>
   try {
     const r = await getRedis();
     if (!r) return res.status(503).json({ error: 'Redis not configured' });
+    const existingRaw = await r.get('tv:briefing');
+    if (existingRaw) {
+      const existing = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      tvBriefingTrigger.archiveBriefing(existing).catch(() => {});
+    }
     await r.set('tv:briefing', JSON.stringify(req.body));
     res.json({ ok: true, storedAt: new Date().toISOString() });
   } catch (err) {
     res.status(500).json({ error: 'Failed to write briefing' });
+  }
+});
+
+// TV Briefing Agent — trigger, context, status (debug-auth protected)
+app.post('/api/tv/briefing/trigger', requireDebugAuth, async (req, res) => {
+  try {
+    const { source, focus, force } = req.body || {};
+    const result = await tvBriefingTrigger.trigger({ source, focus, force });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/tv/briefing/context', requireDebugAuth, async (req, res) => {
+  try {
+    const ctx = await tvBriefingTrigger.getBriefingContext();
+    res.json(ctx);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/tv/briefing/status', requireDebugAuth, async (req, res) => {
+  try {
+    const [status, history] = await Promise.all([
+      tvBriefingTrigger.getStatus(),
+      tvBriefingTrigger.getTriggerHistory(parseInt(req.query.limit || '20', 10)),
+    ]);
+    res.json({ status, history });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

@@ -10,6 +10,7 @@ You are a cloud Cursor agent running on the `engzny` repo. Your job: research fr
 | Example briefing | `tv-briefing/briefing-example.json` | Reference for the JSON schema |
 | Upload API | `POST https://www.thinx.fun/api/tv/briefing` | Auth: `Bearer <token>` |
 | Current briefing | `GET https://www.thinx.fun/api/tv/briefing` | Read current state before updating |
+| Briefing context | `GET https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026` | Unseen stories, view history, merge state |
 | TV health | `GET https://www.thinx.fun/api/tv/health` | Feed status, user interactions, errors |
 | API token | `tv-briefing/.env` | Contains `TV_BRIEFING_TOKEN=...` — source it before uploading |
 
@@ -22,7 +23,10 @@ source tv-briefing/.env
 # 2. Read current state
 curl -s https://www.thinx.fun/api/tv/briefing > /tmp/current-briefing.json
 
-# 3. After building the new briefing JSON:
+# 3. Read merge context (unseen stories, view history)
+curl -s 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026' > /tmp/briefing-context.json
+
+# 4. After building the new briefing JSON:
 curl -X POST "https://www.thinx.fun/api/tv/briefing" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TV_BRIEFING_TOKEN" \
@@ -40,10 +44,13 @@ Follow these steps IN ORDER.
 
 1. Read `tv-briefing/news-profile.json` for user preferences
 2. Fetch current briefing: `curl -s https://www.thinx.fun/api/tv/briefing`
-3. Note `storyTracker` — ongoing stories needing fresh coverage
-4. Note `watchLog` — videos already watched (don't re-feature)
-5. Note `agentRunAt` — how stale is the current briefing?
-6. Optionally check TV health: `curl -s https://www.thinx.fun/api/tv/health`
+3. Fetch merge context: `curl -s 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'`
+4. Note `storyTracker` — ongoing stories needing fresh coverage
+5. Note `watchLog` — videos already watched (don't re-feature)
+6. Note `agentRunAt` — how stale is the current briefing?
+7. Note `unseenStories` from context — stories the user has NOT seen yet (see Step 3f)
+8. Note `briefingsSinceLastView` — how many briefings were generated since the user last opened the TV
+9. Optionally check TV health: `curl -s https://www.thinx.fun/api/tv/health`
 
 ### Step 1 — Top Bar Metrics + Live Feed Config
 
@@ -191,6 +198,43 @@ Check `storyTracker`. For active stories (Iran war, energy crisis):
 - Watched videos (in `watchLog`) push further down
 - New stories get top positions
 - Video cards always sort before story cards
+
+#### 3f. Merge — Never Lose Unseen Stories
+
+This agent runs every hour. The user may not open the TV between runs. **You MUST preserve stories the user hasn't seen yet.**
+
+The `/api/tv/briefing/context` response tells you:
+
+| Field | Meaning |
+|-------|---------|
+| `lastViewedAt` | When the user last opened the TV (null = never viewed) |
+| `briefingsSinceLastView` | How many briefings were generated since the user last looked |
+| `unseenStories` | Array of stories from previous briefings that were generated AFTER `lastViewedAt` and are NOT in the current briefing |
+| `storyTracker` | Ongoing story state from current briefing |
+| `watchLog` | Videos already watched |
+
+**Merge rules:**
+
+1. **If `briefingsSinceLastView` > 0** (user hasn't opened TV since last briefing):
+   - For each story in `unseenStories`:
+     - If still newsworthy (< 48h old based on `storyPublishedAt`): **carry it forward** into the new briefing
+     - Set `previousPosition` to indicate it's carried forward (not new)
+     - Demote its position (middle of the list, below new stories)
+     - If it had a `videoId`, keep the same video unless a better/newer one exists
+   - This ensures the user never misses important stories even if they skip multiple hours
+
+2. **If `briefingsSinceLastView` === 0** (user viewed the current briefing):
+   - No unseen stories to carry forward — generate fresh content only
+   - Still check `storyTracker` for ongoing stories needing updates
+
+3. **If `lastViewedAt` is null** (TV has never fetched the briefing):
+   - Treat all previous stories as unseen — carry forward any still-newsworthy ones
+
+4. **Position ordering for the final `videoRecommendations` array:**
+   - Slots 1-4: NEW stories (researched this run, highest score)
+   - Slots 5-8: Carried-forward unseen stories (still newsworthy, user hasn't seen)
+   - Slots 9+: Ongoing story updates, lower-priority new stories
+   - Bottom: Stories the user already saw (from `watchLog`) — only include if there's a NEW video angle
 
 ### Step 4 — Breaking News Ticker
 

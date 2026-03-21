@@ -135,6 +135,17 @@ tests/
 | `/api/r/:requestId/data` | GET | Full report data (live + archive fallback) |
 | `/api/r/:requestId/thumb` | GET | Screenshot thumbnail JPEG (live + archive fallback) |
 
+### TV Briefing API
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/tv/briefing` | GET | Read current briefing (public, CORS enabled). Also records a "last viewed" timestamp for merge tracking. |
+| `/api/tv/briefing` | POST | Write new briefing (auth: `Bearer <TV_BRIEFING_TOKEN>`). Archives the previous briefing to history before replacing. |
+| `/api/tv/briefing/trigger` | POST | Trigger the hourly briefing agent (require `?token=` auth). Body: `{"source":"cron","force":true}` |
+| `/api/tv/briefing/context` | GET | Briefing merge context for the agent — unseen stories, view history, story tracker (require `?token=` auth) |
+| `/api/tv/briefing/status` | GET | Trigger status, history, and last viewed timestamp (require `?token=` auth) |
+| `/api/tv/health` | GET | Read TV app health entries from Redis |
+| `/api/tv/health` | POST | Receive TV diagnostics from the Samsung app |
+
 ### Debug & Monitoring (require `?token=` auth)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -231,6 +242,67 @@ Alternatively, push to a `claude/*` branch to trigger the auto-deploy GitHub Act
 - **Vercel env vars (for continuous improvement):** GITHUB_DISPATCH_TOKEN (fine-grained PAT), IMPROVEMENT_ENABLED (`true` to enable)
 - **GitHub Secrets (for continuous improvement):** FIX_IT (Cursor API key — never stored in Vercel)
 - **Cursor Cloud Agent secret:** VERCEL_TOKEN (for agents to query Vercel API directly — never store in Vercel env vars)
+
+## TV Briefing Agent (Hourly)
+
+An hourly Cursor Cloud Agent that generates fresh news briefings for a Samsung TV app. The agent researches news, finds YouTube videos, and pushes a complete briefing JSON to the thinx.fun API.
+
+### How it works
+
+```
+GitHub Actions cron (every hour) → POST /api/tv/briefing/trigger
+    │
+    ├─ Rate limit check (50 min between triggers)
+    ├─ Build briefing context (unseen stories, view history)
+    │
+    v
+GitHub workflow_dispatch → tv-briefing-agent.yml
+    │
+    v
+Cursor Cloud Agent (reads SKILL.md, researches news, builds JSON)
+    │
+    v
+POST /api/tv/briefing → Redis (tv:briefing)
+    │
+    v
+Samsung TV app polls GET /api/tv/briefing (every 5 min)
+```
+
+### Merge logic — never lose unseen stories
+
+The system tracks when the user last viewed the briefing. Each time the agent runs:
+1. Fetches `/api/tv/briefing/context` which includes `unseenStories` (from briefings generated after the user last viewed)
+2. Carries forward unseen newsworthy stories into the new briefing
+3. New stories get top positions, carried-forward stories fill the middle
+4. Stories in `watchLog` (already watched) are demoted or dropped
+
+### Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TV_BRIEFING_ENABLED` | `true` (when GITHUB_DISPATCH_TOKEN exists) | Set to `false` to disable |
+| `TV_BRIEFING_MIN_INTERVAL` | `3000` (50 min) | Minimum seconds between triggers |
+| `TV_BRIEFING_TOKEN` | (required) | Bearer token for writing briefings |
+
+### Manual trigger
+
+```bash
+curl -X POST 'https://www.thinx.fun/api/tv/briefing/trigger?token=thinx-debug-2026' \
+  -H 'Content-Type: application/json' \
+  -d '{"source":"manual","focus":"fresh evening briefing"}'
+```
+
+### View status
+
+```bash
+curl 'https://www.thinx.fun/api/tv/briefing/status?token=thinx-debug-2026'
+```
+
+### View merge context (what the agent sees)
+
+```bash
+curl 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'
+```
 
 ## Continuous Improvement
 

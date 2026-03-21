@@ -1,0 +1,171 @@
+name: TV Briefing Agent
+
+# Spawns a Cursor Cloud Agent to generate a fresh TV briefing.
+# Triggered via workflow_dispatch from the thinx.fun API (hourly cron or manual).
+#
+# The Cursor API key (FIX_IT) stays in GitHub Secrets — never in Vercel.
+# The agent reads SKILL.md, fetches current briefing state, researches news,
+# and uploads the new briefing to the thinx.fun API.
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Trigger reason (hourly_cron, manual)'
+        required: true
+        type: string
+      detail:
+        description: 'Detail about the trigger'
+        required: true
+        type: string
+      briefing_context:
+        description: 'JSON-encoded current briefing context (storyTracker, watchLog, unseen stories)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  spawn-agent:
+    name: Spawn TV Briefing Agent
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify secrets
+        run: |
+          if [ -z "${{ secrets.FIX_IT }}" ]; then
+            echo "::error::FIX_IT secret (Cursor API key) not configured"
+            exit 1
+          fi
+
+      - name: Build agent prompt
+        env:
+          REASON: ${{ inputs.reason }}
+          DETAIL: ${{ inputs.detail }}
+          BRIEFING_CONTEXT: ${{ inputs.briefing_context }}
+        run: |
+          cat > /tmp/agent-prompt.txt << 'PROMPT_END'
+          You are the TV Briefing Agent for thinx.fun. Your job: research fresh news, find YouTube videos, and push a complete briefing JSON to the thinx.fun API. A Samsung TV app polls that API and displays the content.
+
+          ## IMPORTANT: Read the Skill Playbook First
+
+          Read and follow `tv-briefing/SKILL.md` — it is your complete playbook with step-by-step instructions.
+
+          Also read:
+          - `tv-briefing/news-profile.json` — user preferences, interests, scoring model
+          - `tv-briefing/briefing-example.json` — reference for the exact JSON schema
+
+          ## Your Mission This Run
+
+          1. Load the TV_BRIEFING_TOKEN from `tv-briefing/.env`
+          2. Fetch the current briefing: `curl -s https://www.thinx.fun/api/tv/briefing`
+          3. Fetch the briefing context (unseen stories, history): `curl -s 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'`
+          4. Follow SKILL.md pipeline (Steps 0-5)
+          5. Upload the new briefing
+
+          ## Merge Logic — Never Lose Unseen Stories
+
+          This agent runs every hour. The user may not open the TV between runs. You MUST preserve important stories the user hasn't seen yet.
+
+          **How to merge:**
+
+          1. Fetch `/api/tv/briefing/context` — it tells you:
+             - `currentBriefing`: the live briefing
+             - `lastViewedAt`: when the user last opened the TV
+             - `unseenStories`: story IDs from previous briefings that were generated AFTER the user last viewed
+             - `briefingsSinceLastView`: how many briefings were generated since the user last looked
+
+          2. For each unseen story from previous briefings:
+             - If the story is still newsworthy (< 48h old), carry it forward into the new briefing
+             - Demote its position (it's not new anymore) but DO NOT drop it
+             - Set `previousPosition` to its old position number
+             - If the story had a video, keep the same video unless a better/newer one exists
+
+          3. For ongoing stories in `storyTracker`:
+             - Find the LATEST development (not the same angle as before)
+             - Increment `updateCount`
+             - Search for a NEW video covering the latest angle
+
+          4. For stories in `watchLog`:
+             - These videos were already watched — push them way down or drop them
+             - But if there's a NEW video on the same story, that's fine to include
+
+          5. New stories always get top positions, unseen carried-forward stories fill the middle, stale stories go to the bottom.
+
+          ## Hard Rules
+
+          - Your ONLY output is the briefing JSON uploaded via the API
+          - Do NOT modify any code, deploy anything, or change repo files
+          - Do NOT create PRs or push to any branch
+          - Follow SKILL.md exactly for content generation
+          - Every video card MUST have a fresh, specific YouTube video
+          - Never reuse watched videos from watchLog
+          PROMPT_END
+
+          if [ -n "$BRIEFING_CONTEXT" ] && [ "$BRIEFING_CONTEXT" != "" ]; then
+            cat >> /tmp/agent-prompt.txt << PROMPT_END
+
+          ## Current Briefing Context (from API)
+
+          \`\`\`json
+          ${BRIEFING_CONTEXT}
+          \`\`\`
+          PROMPT_END
+          fi
+
+          cat >> /tmp/agent-prompt.txt << PROMPT_END
+
+          ## Trigger Info
+
+          **Reason:** ${REASON}
+          **Detail:** ${DETAIL}
+          PROMPT_END
+
+      - name: Launch Cursor Cloud Agent
+        id: launch
+        run: |
+          PROMPT=$(cat /tmp/agent-prompt.txt)
+          PROMPT_JSON=$(echo "$PROMPT" | jq -Rs .)
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.cursor.com/v0/agents" \
+            -H "Authorization: Bearer ${{ secrets.FIX_IT }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"prompt\": { \"text\": $PROMPT_JSON },
+              \"source\": {
+                \"repository\": \"https://github.com/${{ github.repository }}\"
+              },
+              \"target\": {
+                \"autoCreatePr\": false,
+                \"autoBranch\": false
+              }
+            }")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            AGENT_ID=$(echo "$BODY" | jq -r '.id // "unknown"')
+            AGENT_URL=$(echo "$BODY" | jq -r '.target.url // "unknown"')
+            AGENT_STATUS=$(echo "$BODY" | jq -r '.status // "unknown"')
+            echo "Agent launched: $AGENT_ID ($AGENT_STATUS)"
+            echo "URL: $AGENT_URL"
+            echo "agent_id=$AGENT_ID" >> $GITHUB_OUTPUT
+            echo "agent_url=$AGENT_URL" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Cursor API returned $HTTP_CODE: $BODY"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          echo "### TV Briefing Agent Launched" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Reason** | ${{ inputs.reason }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Detail** | ${{ inputs.detail }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Agent ID** | \`${{ steps.launch.outputs.agent_id }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Agent URL** | ${{ steps.launch.outputs.agent_url }} |" >> $GITHUB_STEP_SUMMARY
