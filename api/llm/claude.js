@@ -177,6 +177,67 @@ class ClaudeAdapter extends LLMAdapter {
   }
 
   /**
+   * Text-only query with web search tool enabled.
+   * Claude will search the web to find real-time sources for the given claims.
+   * Returns text with citation URLs.
+   */
+  async generateTextWithWebSearch({ prompt, systemPrompt, maxSearches = 5, maxTokens }) {
+    const messages = [
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ];
+
+    const requestOptions = {
+      model: this.model,
+      max_tokens: maxTokens || this.maxTokens,
+      messages,
+      tools: [
+        {
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: maxSearches,
+        },
+      ],
+    };
+
+    if (systemPrompt) {
+      requestOptions.system = systemPrompt;
+    }
+
+    const response = await this.client.messages.create(requestOptions);
+
+    const textBlocks = [];
+    const searchResults = [];
+    const citations = [];
+
+    for (const block of response.content) {
+      if (block.type === 'text') {
+        textBlocks.push(block.text);
+        if (block.citations) {
+          citations.push(...block.citations);
+        }
+      } else if (block.type === 'web_search_tool_result') {
+        searchResults.push(block);
+      }
+    }
+
+    const citationUrls = [...new Set(citations.filter(c => c.url).map(c => c.url))];
+
+    return {
+      text: textBlocks.join('\n'),
+      usage: response.usage,
+      model: response.model,
+      stopReason: response.stop_reason,
+      webSearchUsed: searchResults.length > 0,
+      searchResults,
+      citations,
+      citationUrls,
+    };
+  }
+
+  /**
    * Analyze an image with tool_use enabled.
    * Used by the Sonnet enhancer for progressive card operations.
    */

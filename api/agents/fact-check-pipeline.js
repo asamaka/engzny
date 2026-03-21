@@ -284,12 +284,14 @@ async function runFactCheckPipeline({
       citations: citationCount,
     });
 
-    // When Gemini skips web search (0 citations), run a supplementary
-    // text-only search call to find actual sources for the claims.
-    // Text-only queries are more reliable at triggering Google Search
-    // because the model knows it needs current data without image context.
+    // When Gemini skips web search (0 citations), use Claude's web_search
+    // tool to find real sources. Claude reliably searches when the tool is
+    // available, unlike Gemini which decides internally and usually opts not to.
     if (citationCount === 0 && result?.text) {
-      logger.info('FactCheckPipeline', 'Running supplementary search for citations', { requestId });
+      logger.info('FactCheckPipeline', 'Running supplementary search for citations via Claude', { requestId });
+      if (onProgress) {
+        onProgress({ phase: 'verifying', progress: 90, message: 'Verifying sources...' });
+      }
 
       try {
         const supplementaryCitations = await runSupplementarySearch(result.text, requestId);
@@ -302,10 +304,10 @@ async function runFactCheckPipeline({
             citations: citationCount,
           });
         } else {
-          logger.warn('FactCheckPipeline', 'Supplementary search also returned 0 citations', { requestId });
+          logger.warn('FactCheckPipeline', 'Claude supplementary search returned 0 citations', { requestId });
         }
       } catch (err) {
-        logger.warn('FactCheckPipeline', 'Supplementary search failed (non-fatal)', {
+        logger.warn('FactCheckPipeline', 'Claude supplementary search failed (non-fatal)', {
           requestId,
           err: err.message,
         });
@@ -346,9 +348,10 @@ async function runFactCheckPipeline({
 }
 
 /**
- * When the main analysis returns 0 citations, extract the key claim
- * and run a focused text-only Gemini search to find web sources.
- * Text-only queries trigger Google Search more reliably than image+text.
+ * When the main Gemini analysis returns 0 citations, use Claude's web_search
+ * tool to find real sources. Claude's web search is tool-based (it explicitly
+ * searches when the tool is available), unlike Gemini which decides internally
+ * whether to search and frequently opts not to.
  */
 async function runSupplementarySearch(analysisText, requestId) {
   const verdictMatch = analysisText.match(
@@ -366,30 +369,31 @@ async function runSupplementarySearch(analysisText, requestId) {
   const month = now.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
   const year = now.getUTCFullYear();
 
-  const searchPrompt = `Today is ${isoDate} (${month} ${year}). Search Google for recent news about this claim and find real source URLs.
+  const searchPrompt = `Today is ${isoDate} (${month} ${year}). Find real web sources about this claim.
 
 Claim: "${claim}"
 
 ${summary ? `Context: ${summary.slice(0, 300)}` : ''}
 
-Search for this topic on Reuters, AP News, BBC, CNN, Al Jazeera, and other major outlets. Report what each source says with their actual URLs. Be thorough — search in multiple languages if relevant.`;
+Search for this claim on major news outlets (Reuters, AP, BBC, CNN, Al Jazeera, etc). For each source you find, report its URL and what it says about the claim. Search in the language of the claim and in English.`;
 
-  const model = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-2.5-flash';
-  const adapter = getAdapter('gemini', { model });
+  const fallbackModel = process.env.FACTCHECK_FALLBACK_MODEL || 'claude-sonnet-4-20250514';
+  const adapter = getAdapter('claude', { model: fallbackModel, maxTokens: 2048 });
 
-  const result = await adapter.generateTextWithGrounding({
+  const result = await adapter.generateTextWithWebSearch({
     prompt: searchPrompt,
-    systemPrompt: 'You are a news verification assistant. You MUST use Google Search to find real, current news articles. Always search — never answer from memory.',
+    systemPrompt: 'You are a news verification assistant. Search the web to find real, current sources for the claim. Be thorough.',
+    maxSearches: 5,
     maxTokens: 2048,
   });
 
-  const citations = result.citations || [];
+  const citations = result.citationUrls || [];
 
   logger.info('FactCheckPipeline', 'Supplementary search result', {
     requestId,
     citations: citations.length,
     model: result.model,
-    searchQueries: result.groundingMetadata?.webSearchQueries?.length || 0,
+    webSearchUsed: result.webSearchUsed,
   });
 
   return citations;

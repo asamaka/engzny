@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-21** (run 5) | Fixed P1: Gemini still returning 0 citations in 100% of post-fix reports. Run 4's prompt-only fix didn't work — Gemini 2.5 Flash's `google_search` tool decision is internal, not prompt-controllable. Fix: added supplementary text-only search when main analysis returns 0 citations. Text-only queries trigger Google Search more reliably (no image processing overhead, model recognizes need for current data). Evidence: 12/12 reports since run 4 had 0 citations [8de4eb06, a32ab6a9, 3c55f876, 0a706c65, 8c195750, 12018dc0, 70b731b6, 0a60cc9a + 4 pre-fix]. Only 09f878c8 ever had citations (12, 23s duration vs 6-10s for others — confirms model skipped search entirely).
+> **2026-03-21** (run 6) | Fixed P1: Supplementary search still producing 0 citations. Root cause: Gemini 2.5 Flash's `google_search` tool is unreliable — model internally decides whether to search and skips it ~95% of the time. Both the main streaming analysis and the run-5 supplementary text-only Gemini call failed identically. Fix: switched supplementary search from Gemini to Claude with `web_search_20250305` tool. Claude's web search is tool-based (explicitly searches when the tool is available). Evidence: 7/7 post-run-5 reports had 0 citations from Gemini supplementary search [f1f498f0 gap=2.2s, 8de4eb06, a32ab6a9, 3c55f876, 0a706c65, 8c195750, 12018dc0]. Added `generateTextWithWebSearch` to Claude adapter, added "Verifying sources..." progress phase for UX.
 
 ## Open Items
 
@@ -21,11 +21,16 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-## Experiment: supplementary search citation yield
-- Hypothesis: Text-only supplementary Gemini calls will yield citations >70% of the time (vs 0% from image+text streaming)
-- Baseline: 0/12 reports had citations before this fix
+## Experiment: Claude supplementary search citation yield
+- Hypothesis: Claude web_search will yield citations >70% of the time (replacing Gemini supplementary search which yielded 0%)
+- Baseline: 0/7 Gemini supplementary searches produced citations (run 5)
 - Evidence post-fix: [] (need 10-20 reports to evaluate)
 - Status: gathering — monitor next 10-20 factcheck reports
+
+## Experiment: factcheck verdict inconsistency for same content
+- Hypothesis: Same screenshot can get different verdicts (MISLEADING vs UNVERIFIED) depending on whether Gemini searched
+- Evidence: [f1f498f0=MISLEADING, 8de4eb06=UNVERIFIED, a32ab6a9=MISLEADING — all same HRW/Netanyahu topic]
+- Status: gathering (3/10) — may improve once citations provide grounding
 
 ## Experiment: hero subtitle factual errors from classify phase
 - Hypothesis: When classify phase sets intent with location errors, the error propagates to hero subtitle
@@ -37,17 +42,10 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 - Evidence: [4cc0dfaa, f256dfce, 89b92015, 051bb8d8, 0fc73c87]
 - Status: gathering (5/10) — partially addressed by fallback summary + source promotion
 
-## Experiment: deep research silently fails (no trace recorded)
-- Hypothesis: Deep research sometimes doesn't run at all for breaking_news
-- Evidence: [89b92015, 051bb8d8, 0fc73c87]
-- Status: gathering (3/10) — likely times out before any LLM call is made
-
 ## Key Context (for reference, not action items)
 
 - 100% of users are mobile (iPhone, 393x852). All changes must be mobile-first.
 - Factcheck pipeline is default for all content. Uses Gemini 2.5 Flash with Google Search grounding.
-- Supplementary text-only search added (2026-03-21 run 5): fallback when streaming returns 0 citations.
+- Supplementary search switched to Claude web_search (2026-03-21 run 6): Gemini grounding unreliable.
 - Zero-citation prompt fix applied (2026-03-20 run 4): mandatory search framing — insufficient alone.
 - Verdict explanation quality gate + summary fallback for short explanations (2026-03-20 run 3).
-- Verdict explanation multi-line capture with section delimiter lookahead (2026-03-19).
-- Source attribution promotion: works cross-language via intent + source_card matching (2026-03-18).
