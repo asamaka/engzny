@@ -185,23 +185,39 @@ Use these as starting points — search for the topic ON these channels:
 | Science/Viral | Veritasium, SmarterEveryDay, Tom Scott, Mark Rober |
 | Construction/Industry | B1M, The Practical Engineer, Machine Herald |
 
-#### 5d. Video Requirements
+#### 5d. Video Requirements — Freshness Is Non-Negotiable
+
+**The 48-hour rule is HARD. Do not rationalize stale videos.**
+
+A video published 6+ days ago about the "same topic" is NOT acceptable even if it's high-quality. The TV must feel like RIGHT NOW, not "here's a good explainer from last week." A fresh story card always beats a stale video card.
 
 **Video must:**
-- Be published within 48h of the story (not 48h of now — the story's date)
+- Be published within 48h of NOW (not 48h of the story — of the current briefing generation time)
 - Title references the specific event (not a general topic overview)
 - Duration: 3-20min news, 1-10min sports highlights, 5-25min AI deep dives
 - From a recognizable channel (not spam/clickbait)
+
+**Freshness hierarchy (in order of preference):**
+1. Video published today covering today's development → BEST
+2. Video published yesterday covering yesterday's development → GOOD
+3. Video published 2 days ago on a still-active story → ACCEPTABLE (edge of window)
+4. Video published 3+ days ago → REJECT, even if it's the best video ever made on the topic
+5. No qualifying video found → Story card (this is FINE — a fresh story card beats a stale video)
 
 **Duration exceptions:**
 - Sports highlights: 90 seconds is PERFECT. Short clips of actual goals/plays are ideal.
 - Breaking news: 30-second clips from major outlets are acceptable if they show actual footage.
 - Deep dives: Up to 30 minutes for exceptionally well-produced content.
 
+**Common trap to avoid:**
+You find a 15-minute DW News deep dive on Hormuz from 10 days ago. It's brilliant analysis. You want to include it because it's "still relevant." DON'T. The Hormuz situation 10 days ago is materially different from today. Find a video about TODAY's Hormuz development, or make it a story card.
+
 **Outcome per story:**
-- Video found → video card (with `videoId`, YouTube metadata, thumbnail)
-- No video after thorough search (3+ approaches) → story card (`videoId: null`, headline + source + summary)
-- NEVER use an old or loosely-related video
+- Fresh video found (within 48h) → video card
+- No fresh video after thorough search (3+ approaches) → story card (`videoId: null`)
+- NEVER use a stale video to inflate the video card ratio
+
+**Ratio target vs freshness:** The 60-70% video card ratio is a GOAL, not a rule. Freshness always wins. A 40% ratio with all-fresh content is better than 60% padded with week-old videos. Breaking news cycles naturally have fewer videos — that's expected.
 
 #### 5e. Sports Video Rules (OVERRIDE general rules)
 
