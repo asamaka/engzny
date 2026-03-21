@@ -384,8 +384,37 @@ app.post('/api/tv/briefing', express.json({ limit: '1mb' }), async (req, res) =>
   }
 });
 
-// CORS preflight for TV briefing
-app.options('/api/tv/briefing', (req, res) => {
+// TV Health — the TV app posts diagnostics, anyone can read them
+app.post('/api/tv/health', express.json({ limit: '64kb' }), async (req, res) => {
+  try {
+    const r = await getRedis();
+    if (!r) return res.status(503).json({ error: 'Redis not configured' });
+    const entry = { ...req.body, receivedAt: new Date().toISOString() };
+    await r.lpush('tv:health', JSON.stringify(entry));
+    await r.ltrim('tv:health', 0, 99);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to write health' });
+  }
+});
+
+app.get('/api/tv/health', async (req, res) => {
+  try {
+    const r = await getRedis();
+    if (!r) return res.status(503).json({ error: 'Redis not configured' });
+    const raw = await r.lrange('tv:health', 0, 49);
+    const entries = (raw || []).map(e => typeof e === 'string' ? JSON.parse(e) : e);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'no-cache');
+    res.json({ count: entries.length, entries });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read health' });
+  }
+});
+
+// CORS preflight for TV endpoints
+app.options('/api/tv/:path', (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -1439,20 +1468,6 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
           logger.info('FactCheckReport', 'Extracted verdict from complete text (streaming parser missed it)', { requestId, verdict: fcVerdict.verdict });
         }
       }
-
-      // Enhance short explanations from summary section
-      if (fcVerdict && fcVerdict.explanation && fcVerdict.explanation.length < 30 && pipelineResult?.success && pipelineResult.factcheck?.text) {
-        const fullText = pipelineResult.factcheck.text;
-        const summaryMatch = fullText.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
-        if (summaryMatch) {
-          const firstSentence = summaryMatch[1].trim().split(/(?<=\.)\s/)[0];
-          if (firstSentence && firstSentence.length >= 30) {
-            logger.info('FactCheckReport', 'Enhanced short explanation from summary', { requestId, original: fcVerdict.explanation, enhanced: firstSentence.slice(0, 80) });
-            fcVerdict.explanation = firstSentence;
-          }
-        }
-      }
-
       if (fcAngles.length === 0 && pipelineResult?.success && pipelineResult.factcheck?.text) {
         const fullText = pipelineResult.factcheck.text;
         const angleMatches = fullText.matchAll(/---ANGLE:\s*(.+)/g);
