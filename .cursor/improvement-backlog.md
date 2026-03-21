@@ -5,7 +5,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ## Last Run
 
-> **2026-03-20** (run 4) | Fixed P1: Gemini skipping web search in ~85% of factcheck analyses. Reports had 0 citations because the prompt buried search instructions in rules at the bottom. Fix: restructured prompt to put "WEB SEARCH IS MANDATORY" front and center, added explicit search workflow (read→search→analyze→write), added system_instruction to Gemini API call reinforcing search-first behavior, added warning log when 0 citations returned. Evidence: 7/8 recent reports had 0 citations [0a60cc9a, 70b731b6, 12018dc0, 8c195750, 0a706c65, 3c55f876, 8c195750]; only 09f878c8 (23s, 12 citations) actually searched.
+> **2026-03-21** (run 5) | Fixed P1: Gemini still returning 0 citations in 100% of post-fix reports. Run 4's prompt-only fix didn't work — Gemini 2.5 Flash's `google_search` tool decision is internal, not prompt-controllable. Fix: added supplementary text-only search when main analysis returns 0 citations. Text-only queries trigger Google Search more reliably (no image processing overhead, model recognizes need for current data). Evidence: 12/12 reports since run 4 had 0 citations [8de4eb06, a32ab6a9, 3c55f876, 0a706c65, 8c195750, 12018dc0, 70b731b6, 0a60cc9a + 4 pre-fix]. Only 09f878c8 ever had citations (12, 23s duration vs 6-10s for others — confirms model skipped search entirely).
 
 ## Open Items
 
@@ -21,11 +21,11 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 Track patterns here. Log requestIds as evidence. When an experiment has 10-20 data points, it's ready to implement.
 
-## Experiment: factcheck zero citations post-prompt-fix
-- Hypothesis: The restructured prompt (run 4) will increase Gemini's search tool usage from ~12% to >50%
-- Baseline: 1/8 reports had citations before fix (09f878c8 only)
+## Experiment: supplementary search citation yield
+- Hypothesis: Text-only supplementary Gemini calls will yield citations >70% of the time (vs 0% from image+text streaming)
+- Baseline: 0/12 reports had citations before this fix
 - Evidence post-fix: [] (need 10-20 reports to evaluate)
-- Status: gathering — monitor next 10-20 factcheck reports to validate the fix worked
+- Status: gathering — monitor next 10-20 factcheck reports
 
 ## Experiment: hero subtitle factual errors from classify phase
 - Hypothesis: When classify phase sets intent with location errors, the error propagates to hero subtitle
@@ -46,7 +46,8 @@ Track patterns here. Log requestIds as evidence. When an experiment has 10-20 da
 
 - 100% of users are mobile (iPhone, 393x852). All changes must be mobile-first.
 - Factcheck pipeline is default for all content. Uses Gemini 2.5 Flash with Google Search grounding.
-- Zero-citation prompt fix applied (2026-03-20 run 4): mandatory search framing + system_instruction.
+- Supplementary text-only search added (2026-03-21 run 5): fallback when streaming returns 0 citations.
+- Zero-citation prompt fix applied (2026-03-20 run 4): mandatory search framing — insufficient alone.
 - Verdict explanation quality gate + summary fallback for short explanations (2026-03-20 run 3).
 - Verdict explanation multi-line capture with section delimiter lookahead (2026-03-19).
 - Source attribution promotion: works cross-language via intent + source_card matching (2026-03-18).

@@ -263,7 +263,7 @@ async function runFactCheckPipeline({
       };
     }
 
-    const duration = Date.now() - startTime;
+    let duration = Date.now() - startTime;
 
     if (pendingVerdict && !verdictSent) {
       const enhanced = enhanceExplanationFromSummary(pendingVerdict);
@@ -275,7 +275,7 @@ async function runFactCheckPipeline({
       if (lastChance) emitVerdict(lastChance);
     }
 
-    const citationCount = result?.citations?.length || 0;
+    let citationCount = result?.citations?.length || 0;
     logger.info('FactCheckPipeline', 'Analysis complete', {
       requestId,
       duration,
@@ -284,12 +284,33 @@ async function runFactCheckPipeline({
       citations: citationCount,
     });
 
-    if (citationCount === 0) {
-      logger.warn('FactCheckPipeline', 'Zero web citations returned — Gemini may have skipped search', {
-        requestId,
-        model: result?.model,
-        duration,
-      });
+    // When Gemini skips web search (0 citations), run a supplementary
+    // text-only search call to find actual sources for the claims.
+    // Text-only queries are more reliable at triggering Google Search
+    // because the model knows it needs current data without image context.
+    if (citationCount === 0 && result?.text) {
+      logger.info('FactCheckPipeline', 'Running supplementary search for citations', { requestId });
+
+      try {
+        const supplementaryCitations = await runSupplementarySearch(result.text, requestId);
+        if (supplementaryCitations.length > 0) {
+          result.citations = supplementaryCitations;
+          result.groundingMetadata = result.groundingMetadata || {};
+          citationCount = supplementaryCitations.length;
+          logger.info('FactCheckPipeline', 'Supplementary search found citations', {
+            requestId,
+            citations: citationCount,
+          });
+        } else {
+          logger.warn('FactCheckPipeline', 'Supplementary search also returned 0 citations', { requestId });
+        }
+      } catch (err) {
+        logger.warn('FactCheckPipeline', 'Supplementary search failed (non-fatal)', {
+          requestId,
+          err: err.message,
+        });
+      }
+      duration = Date.now() - startTime;
     }
 
     if (result?.citations?.length && onSources) {
@@ -322,6 +343,56 @@ async function runFactCheckPipeline({
     });
     if (onError) { onError(error); } else { throw error; }
   }
+}
+
+/**
+ * When the main analysis returns 0 citations, extract the key claim
+ * and run a focused text-only Gemini search to find web sources.
+ * Text-only queries trigger Google Search more reliably than image+text.
+ */
+async function runSupplementarySearch(analysisText, requestId) {
+  const verdictMatch = analysisText.match(
+    /(?:^|\n)VERDICT:\s*(?:TRUE|FALSE|MISLEADING|PARTLY TRUE|UNVERIFIED)\s*\n([\s\S]+?)(?=\n\n|\n---)/
+  );
+  const summaryMatch = analysisText.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+
+  const claim = verdictMatch?.[1]?.trim() || '';
+  const summary = summaryMatch?.[1]?.trim().slice(0, 500) || '';
+
+  if (!claim && !summary) return [];
+
+  const now = new Date();
+  const isoDate = now.toISOString().slice(0, 10);
+  const month = now.toLocaleString('en-US', { month: 'long', timeZone: 'UTC' });
+  const year = now.getUTCFullYear();
+
+  const searchPrompt = `Today is ${isoDate} (${month} ${year}). Search Google for recent news about this claim and find real source URLs.
+
+Claim: "${claim}"
+
+${summary ? `Context: ${summary.slice(0, 300)}` : ''}
+
+Search for this topic on Reuters, AP News, BBC, CNN, Al Jazeera, and other major outlets. Report what each source says with their actual URLs. Be thorough — search in multiple languages if relevant.`;
+
+  const model = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-2.5-flash';
+  const adapter = getAdapter('gemini', { model });
+
+  const result = await adapter.generateTextWithGrounding({
+    prompt: searchPrompt,
+    systemPrompt: 'You are a news verification assistant. You MUST use Google Search to find real, current news articles. Always search — never answer from memory.',
+    maxTokens: 2048,
+  });
+
+  const citations = result.citations || [];
+
+  logger.info('FactCheckPipeline', 'Supplementary search result', {
+    requestId,
+    citations: citations.length,
+    model: result.model,
+    searchQueries: result.groundingMetadata?.webSearchQueries?.length || 0,
+  });
+
+  return citations;
 }
 
 function extractClaudeCitations(claudeResult) {
