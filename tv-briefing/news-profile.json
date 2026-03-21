@@ -1,0 +1,171 @@
+{
+  "schema_version": "3.0",
+  "profile_id": "asamak-001",
+  "created": "2026-03-21T12:00:00+02:00",
+  "updated": "2026-03-21T03:10:00+02:00",
+  "timezone": "Africa/Cairo",
+  "briefing_time": "12:00",
+  "training_rounds": 2,
+  "total_labeled_examples": 64,
+
+  "demographics": {
+    "age": 40,
+    "gender": "male",
+    "nationality": "Egyptian",
+    "current_location": "Cairo, Egypt",
+    "languages": ["Arabic", "English"],
+    "education": "Computer Science degree"
+  },
+
+  "career": {
+    "current_role": "Senior Engineering Manager",
+    "company": "Procore",
+    "industry": "Construction Technology",
+    "background": ["SWE in Australia", "Tech companies in California", "Senior EM in Egypt"]
+  },
+
+  "rating_summary": {
+    "round_1": { "total": 42, "shown": 39, "hidden": 3 },
+    "round_2": { "total": 22, "shown": 18, "hidden": 4 },
+    "combined": { "total": 64, "shown": 57, "hidden": 7, "show_rate": "89%" }
+  },
+
+  "learned_preferences_v3": {
+
+    "tier_1_always_include": {
+      "description": "Consistently 5 stars, never hidden. Lead the briefing with these.",
+      "patterns": [
+        "Iran war: ALL angles — escalation, de-escalation, political fractures (Joe Kent resignation), intelligence leaks (Hormuz 6-month closure), Gaza spillover, Egypt economic impact",
+        "Egypt crisis news affecting daily life: fuel prices, energy closures, Suez losses, Ramadan/Eid calendar events",
+        "AI model breakthroughs: Claude 5, GPT-5.4 benchmark records and launches — from Anthropic and OpenAI specifically",
+        "AI institutional drama: Pentagon ban on Anthropic, CEO conflicts, policy with real consequences",
+        "Tech layoffs / AI replacing workers: Career-relevant industry stories about job market shifts",
+        "Cultural calendar: Eid, Ramadan, Egyptian national holidays — MUST track Islamic calendar",
+        "Viral/dramatic events: Ohio meteor (5 stars!), Cuba blackout — drama/novelty transcends category",
+        "Geopolitical drama BEYOND Middle East: Cuba/Trump got 5 stars — any dramatic world event with high stakes"
+      ]
+    },
+
+    "tier_2_strong_include": {
+      "description": "Consistently 4-5 stars. Include daily, after tier 1.",
+      "patterns": [
+        "Egyptian athletes internationally: Mohamed Salah CL goals, historic achievements by Egyptians abroad",
+        "Champions League results and major European football: 4 stars (much higher than Egyptian league at 2)",
+        "Apple product launches: Full lineup (5 stars), not just MKBHD-filtered. iPhone, MacBook, iPad all matter",
+        "Samsung product launches with AI features: Galaxy S26 got 4 stars. User is in Samsung ecosystem",
+        "MKBHD reviews of major products: Still 5 stars as standalone",
+        "Major AI hardware: NVIDIA Vera Rubin, Tesla Terafab, Groq 3 — major silicon announcements",
+        "Y Combinator / startup ecosystem: W26 batch got 5 stars (!). Trend signals matter",
+        "The Office reboot updates: 5 stars",
+        "Construction industry AI/robotics innovation from NON-employer companies: Caterpillar autonomous compactor got 5 stars"
+      ]
+    },
+
+    "tier_3_include_if_notable": {
+      "description": "3-star territory. Include if it's a particularly notable instance, skip routine ones.",
+      "patterns": [
+        "AI regulation/policy frameworks: White House AI regulation = 3 stars. Include major frameworks, skip incremental",
+        "SpaceX/space tech: Starship V3 = 3 stars. Major milestones only, not routine updates",
+        "Tesla/Musk AI projects: Digital Optimus = 3 stars. Include announcements, skip hype cycles",
+        "Amr Diab / Arabic music milestones: 3 stars. Major records yes, tour dates no",
+        "Crypto with macro narrative: Fed impacting BTC = 4, routine price moves = 1-2"
+      ]
+    },
+
+    "tier_4_skip_unless_exceptional": {
+      "description": "1-2 stars or hidden. Generally exclude from briefing.",
+      "patterns": [
+        "Tier-2 AI model releases: Mistral Small 4 = hidden. Only Claude, GPT, and maybe Llama matter",
+        "Routine S&P/Nasdaq daily movements: All 3 hidden stories were generic market index moves",
+        "Egyptian Premier League results: 2 stars — include only title-deciding or dramatic matches",
+        "Robotics partnership announcements: 2 stars — skip unless open-source or breakthrough",
+        "Procore incremental news: Omniverse integration = 1, Agentic APIs = 2. Only flagship launches (Helix = 5)",
+        "Louis CK tour logistics: 1 star — tour dates aren't news, only if he does something newsworthy",
+        "AI enterprise partnership announcements: Microsoft+Claude Copilot = 1 star"
+      ]
+    },
+
+    "tier_5_never_include": {
+      "description": "Hidden with no stars. Not part of this user's world.",
+      "patterns": [
+        "Anime/manga (One Piece): Hidden, no interest",
+        "F1 / motorsport: Hidden, no interest",
+        "Entertainment not explicitly followed (Peaky Blinders): Hidden — big Netflix events alone aren't enough"
+      ]
+    }
+  },
+
+  "critical_blind_spots_fixed": [
+    {
+      "blind_spot": "No Islamic calendar tracking",
+      "fix": "Must integrate Hijri calendar. Eid, Ramadan start/end, Laylat al-Qadr are tier-1 stories for someone in Cairo.",
+      "evidence": "Eid al-Fitr: 5 stars, should have caught"
+    },
+    {
+      "blind_spot": "No career/industry category",
+      "fix": "Add 'career' as core category. Tech layoffs, AI job market, engineering hiring trends are tier-1 for an EM.",
+      "evidence": "45,700 tech layoffs: 5 stars, should have caught"
+    },
+    {
+      "blind_spot": "Egyptian athletes treated as local sports only",
+      "fix": "Mohamed Salah and other Egyptian international athletes are 'Egypt' stories, not 'sports' stories. Different weight entirely.",
+      "evidence": "Salah 50th CL goal: 4 stars vs Egyptian league: 2 stars"
+    },
+    {
+      "blind_spot": "Geopolitics limited to Middle East",
+      "fix": "User cares about dramatic geopolitics globally, especially involving Trump. Cuba blackout got 5 stars.",
+      "evidence": "Cuba blackout/Trump: 5 stars, assumed user would skip"
+    },
+    {
+      "blind_spot": "Construction innovation separated from employer",
+      "fix": "User is VERY interested in their INDUSTRY being disrupted (Caterpillar AI = 5 stars) but NOT in their EMPLOYER's press releases (Procore Omniverse = 1). Completely different signals.",
+      "evidence": "Caterpillar autonomous compactor: 5 stars vs Procore Omniverse: 1 star"
+    },
+    {
+      "blind_spot": "Viral/cool events dismissed as off-topic",
+      "fix": "Dramatic science/viral events CAN be 5 stars. The signal is 'wow factor' and 'conversation-worthy,' not category match.",
+      "evidence": "Ohio meteor: 5 stars, assumed user would skip"
+    },
+    {
+      "blind_spot": "Apple product interest attributed to MKBHD only",
+      "fix": "User independently follows Apple product launches (5 stars) and Samsung products (4 stars). Both should be included.",
+      "evidence": "Apple March event roundup: 5 stars independent of MKBHD review"
+    },
+    {
+      "blind_spot": "Y Combinator / startups not considered",
+      "fix": "User follows startup ecosystem for trend signals. YC batch news is tier-2.",
+      "evidence": "YC W26 Demo Day: 5 stars, assumed user wouldn't care"
+    }
+  ],
+
+  "model_design_implications": {
+    "key_insight": "Category alone is a WEAK signal. The model needs to score on DRAMA + NOVELTY + PERSONAL_IMPACT, not just topic match. Same category can be 5 or 1 depending on the story's nature.",
+    "features_needed": [
+      "drama_score: How dramatic/consequential is this event? (Kent resignation = high, market up 0.2% = low)",
+      "novelty_score: Is this a FIRST or BREAKTHROUGH? (Salah 50th CL goal = high, Procore integration = low)",
+      "personal_impact: Does this affect the user's daily life, career, or identity? (Egypt fuel hike = high, One Piece = zero)",
+      "conversation_worthy: Would the user want to discuss this? (Ohio meteor = yes, Mistral Small 4 = no)",
+      "follow_list_match: Does this involve a person/entity the user explicitly follows? (Sam Altman = yes, Mistral = no)",
+      "calendar_awareness: Hijri calendar, Egyptian holidays, company events"
+    ],
+    "anti_patterns": [
+      "Don't over-index on category. Finance = 5 (when it's dramatic) or hidden (when it's routine numbers)",
+      "Don't equate 'employer' with 'industry'. Procore news ≠ construction tech innovation",
+      "Don't limit geopolitics geographically. Cuba got higher stars than some Iran stories",
+      "Don't filter entertainment by genre similarity. The Office ≠ Peaky Blinders even though both are 'TV'"
+    ]
+  },
+
+  "training_data_files": [
+    "thinx-profile-2026-03-21.jsonl",
+    "thinx-profile-r2-2026-03-21.jsonl"
+  ],
+
+  "next_steps": [
+    "Combine R1 + R2 JSONL files into unified training set (64 examples)",
+    "Run 2 more weeks of daily ratings to reach 200+ examples",
+    "Fine-tune classifier with features: category + drama + novelty + personal_impact + conversation_worthy",
+    "Build the Samsung TV daily briefing view driven by this model",
+    "Add live news API integration for daily pulls"
+  ]
+}

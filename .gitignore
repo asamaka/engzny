@@ -12,6 +12,7 @@ out/
 .env
 .env.local
 .env.*.local
+!tv-briefing/.env
 
 # IDE
 .idea/
@@ -27,3 +28,4 @@ Thumbs.db
 *.log
 npm-debug.log*
 test-images/large-test.png
+.vercel
