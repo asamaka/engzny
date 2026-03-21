@@ -353,6 +353,46 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// TV Briefing — public read, token-protected write
+app.get('/api/tv/briefing', async (req, res) => {
+  try {
+    const r = await getRedis();
+    if (!r) return res.status(503).json({ error: 'Redis not configured' });
+    const raw = await r.get('tv:briefing');
+    if (!raw) return res.status(404).json({ error: 'No briefing' });
+    const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    res.set('Cache-Control', 'public, max-age=60');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read briefing' });
+  }
+});
+
+app.post('/api/tv/briefing', express.json({ limit: '1mb' }), async (req, res) => {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  if (!process.env.TV_BRIEFING_TOKEN || token !== process.env.TV_BRIEFING_TOKEN) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    const r = await getRedis();
+    if (!r) return res.status(503).json({ error: 'Redis not configured' });
+    await r.set('tv:briefing', JSON.stringify(req.body));
+    res.json({ ok: true, storedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to write briefing' });
+  }
+});
+
+// CORS preflight for TV briefing
+app.options('/api/tv/briefing', (req, res) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '86400');
+  res.status(204).end();
+});
+
 // GET /api/example-image?url=... — Proxy for example screenshot images
 // Only allows fetching from upload.wikimedia.org to prevent open-relay abuse
 app.get('/api/example-image', async (req, res) => {
