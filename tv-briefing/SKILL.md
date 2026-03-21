@@ -34,18 +34,64 @@ curl -X POST "https://www.thinx.fun/api/tv/briefing" \
 
 ## Content Generation Pipeline
 
-Follow these steps IN ORDER.
+Follow these steps IN ORDER. The order matters — you research fresh news FIRST, then merge with existing state. Never start from the old briefing.
 
-### Step 0 — Load State
+### Step 0 — Check TV Health & User Activity (MANDATORY)
+
+**This is the most important step. Do it first.**
+
+1. Fetch TV health: `curl -s https://www.thinx.fun/api/tv/health`
+2. Parse the `recentLog` entries. Look for these event types:
+   - `user-play-video` → User watched this video. Add `videoId` to `watchLog`. Do NOT re-feature this exact video.
+   - `user-switch-video` → User switched to this video mid-playback. Also counts as watched.
+   - `user-select-story` → User clicked a story card (especially one without a video). This is HIGH SIGNAL — the user wanted to engage but couldn't watch. Try harder to find a video for this topic next time.
+   - `user-navigate` → User scrolled to this story. Frequent returns to the same card = interest. Cards never navigated to = low interest.
+   - `user-close-video` → User closed video player.
+3. Build a picture of what the user has already seen, what they tried to watch but couldn't, and what they skipped.
+4. Note any `feedErrors` or `render-*-fail` errors.
+
+**Use this data to:**
+- Populate `watchLog` with watched videoIds (prevent re-featuring)
+- Prioritize finding videos for stories the user clicked but couldn't watch
+- Drop stories the user scrolled past repeatedly without engaging
+- Bring in fresh angles on topics the user showed strong interest in
+
+### Step 1 — Read Profile & Current State
 
 1. Read `tv-briefing/news-profile.json` for user preferences
 2. Fetch current briefing: `curl -s https://www.thinx.fun/api/tv/briefing`
 3. Note `storyTracker` — ongoing stories needing fresh coverage
 4. Note `watchLog` — videos already watched (don't re-feature)
 5. Note `agentRunAt` — how stale is the current briefing?
-6. Optionally check TV health: `curl -s https://www.thinx.fun/api/tv/health`
+6. **DO NOT start building the new briefing from the old one.** The old briefing is reference only.
 
-### Step 1 — Top Bar Metrics + Live Feed Config
+### Step 2 — Fresh News Research (INDEPENDENT of old briefing)
+
+**CRITICAL: Research the news FIRST, then merge with existing state. Do NOT start by looking at the old stories and updating them.**
+
+Start with a wide sweep of the user's tier 1-2 interests from `news-profile.json`. Search the web broadly:
+
+- What happened in the world in the last 48 hours?
+- What's the biggest story right now?
+- What would this specific user care about based on their profile?
+
+Score each story: `drama + novelty + personal_impact + conversation_worthy`
+
+**Search categories (open-ended, not a fixed list):**
+- Start with "top news today" / "breaking news" to catch stories you'd never predict
+- Then sweep each tier-1 interest area for fresh developments
+- Look for NEW stories that weren't in the previous briefing at all
+- Check if any previous ongoing stories have had significant NEW developments
+
+Aim for **8-12 stories**.
+
+**After gathering stories, THEN merge with existing state:**
+- Ongoing stories from `storyTracker` that have new developments → keep and update
+- Old stories with no new angle and already seen by user → drop
+- Old stories the user engaged with (from health data) but need better coverage → improve
+- Brand new stories → add at top priority
+
+### Step 3 — Top Bar Metrics + Live Feed Config
 
 Set **up to 4 contextual metric pills** in `header.metrics`:
 - Holiday/calendar context (Hijri calendar, Egyptian holidays, Eid)
@@ -68,7 +114,7 @@ All keyless. Change the ESPN league path based on what's playing today:
 
 Set `header.weather` with approximate current Cairo weather as fallback (TV shows this until live feed loads).
 
-### Step 2 — Photo of the Day
+### Step 4 — Photo of the Day
 
 Pick a photo that is **NOT** directly related to the user's explicit interests. Surprise, wonder, a window into a different world.
 
@@ -77,122 +123,123 @@ Pick a photo that is **NOT** directly related to the user's explicit interests. 
 - `caption`: one sentence giving context and inviting curiosity
 - `internalReason`: why you picked it (not displayed)
 
-### Step 3 — News Curation + Video Search
+### Step 5 — Video Search (AGENTIC, not keyword scripting)
 
-**CRITICAL RULES:**
-1. This is a TV. Users watch videos. Every video card MUST have a fresh, specific video covering the exact story. Never show old or tangentially related videos.
-2. Never hide a curated story. If you picked it, it appears — as a video card (with qualifying video) or story card (text-only). Nothing is hidden from the user.
-3. Your job is to be GOOD at finding videos. A story without a video is your failure, not the story's failure.
+**YOUR #1 JOB IS FINDING VIDEOS. This is a TV. The user watches things.**
 
-#### 3a. Gather Stories
+Target: **at least 60-70% of stories should have videos.** If you have 10 stories, at least 6-7 should be video cards. A story without a video is your failure.
 
-Search the web for stories from the past 48 hours matching tier 1-2 interests from `news-profile.json`:
+#### 5a. Think Like a Human, Not a Search Script
 
-- Iran war: ALL angles — escalation, de-escalation, intelligence, political fractures
-- Egypt crisis: fuel, energy, closures, Suez, calendar events
-- AI breakthroughs: Claude, GPT — from Anthropic and OpenAI specifically
-- AI institutional drama: Pentagon bans, CEO conflicts, real-consequence policy
-- Tech layoffs / AI replacing workers
-- Cultural calendar: Eid, Ramadan, Egyptian holidays (track Islamic calendar)
-- Viral/dramatic: meteor, blackout, anything with "wow factor"
-- Geopolitical drama: Cuba/Trump, dramatic world events
-- Egyptian athletes: Salah milestones, historic achievements
-- Champions League / European football
-- Apple/Samsung launches
-- AI hardware: NVIDIA, Tesla, Groq
-- Y Combinator / startup signals
-- Construction AI/robotics (NOT employer PR)
+Before searching, THINK about each story:
+- **Who would cover this on YouTube?** Think specific channels, not keywords.
+- **What would the video title look like?** YouTube titles are clickbaity — imagine the actual title.
+- **Is this a "footage" story or an "analysis" story?** Sports = footage. War = both. AI = analysis/explainer.
+- **What language might coverage be in?** Egypt stories → Arabic channels. War → English + Hindi news.
 
-Score: `drama + novelty + personal_impact + conversation_worthy`
+#### 5b. Search Strategy Per Story (do ALL of these, not just the first one)
 
-Aim for **8-12 stories**.
+For each story, try **at least 3 different search approaches** before giving up:
 
-#### 3b. Video Search Per Story
+1. **Channel-first search**: Search for the topic on a specific known channel.
+   ```
+   "WION Iran war" or "CNBC tech layoffs" or "Sky Sports Liverpool"
+   ```
 
-For each story, search YouTube to find a fresh, specific video.
+2. **Title-guess search**: Imagine what the actual YouTube title would be and search for that.
+   ```
+   "Iran fires missiles Diego Garcia" (not "Iran war update")
+   "Atlassian cuts 1600 jobs AI" (not "tech layoffs 2026")
+   ```
 
-**How to search**: Use web search for `site:youtube.com <specific query>`. Extract video ID from the URL (`v=` param). Get metadata (title, channel, duration, publish date) from the page. Iterate with different queries.
+3. **Recency-focused search**: Add time markers.
+   ```
+   "Iran war today" or "Iran war March 21"
+   ```
+
+4. **Alternative angle search**: Same story, different framing.
+   ```
+   Story: "Oil prices surge 50%"
+   Try: "oil price crisis Hormuz" AND "gas prices America 2026" AND "oil market analysis"
+   ```
+
+5. **Regional/language search**: Try non-English queries for regional stories.
+   ```
+   "مصر اغلاق المحلات" (Egypt shop closures in Arabic)
+   ```
+
+6. **Fetch the video page** to verify: date, duration, channel, and that it actually covers YOUR story (not a tangential topic).
+
+#### 5c. Known Reliable YouTube Channels by Beat
+
+Use these as starting points — search for the topic ON these channels:
+
+| Beat | Channels |
+|------|----------|
+| Geopolitics/War | WION, NDTV, CNN, BBC News, Al Jazeera English, DW News, Firstpost, Hindustan Times |
+| US Politics | Forbes Breaking News, NBC News, ABC News, CBS News, Fox News |
+| AI/Tech | Fireship, Matt Wolfe, AI Explained, Two Minute Papers, TheAIGRID, Dave's Garage |
+| Tech Business | CNBC, Bloomberg, The Verge, TechCrunch, Linus Tech Tips |
+| Football/Sports | Sky Sports, BT Sport, beIN Sports, CBS Sports Golazo, DAZN, Liverpool FC official |
+| Egypt/Arabic | Al Jazeera Arabic, BBC Arabic, Egyptian Streets, MBC |
+| Science/Viral | Veritasium, SmarterEveryDay, Tom Scott, Mark Rober |
+| Construction/Industry | B1M, The Practical Engineer, Machine Herald |
+
+#### 5d. Video Requirements
 
 **Video must:**
-- Be published within 48h of the story
+- Be published within 48h of the story (not 48h of now — the story's date)
 - Title references the specific event (not a general topic overview)
 - Duration: 3-20min news, 1-10min sports highlights, 5-25min AI deep dives
-- From a recognizable channel
+- From a recognizable channel (not spam/clickbait)
+
+**Duration exceptions:**
+- Sports highlights: 90 seconds is PERFECT. Short clips of actual goals/plays are ideal.
+- Breaking news: 30-second clips from major outlets are acceptable if they show actual footage.
+- Deep dives: Up to 30 minutes for exceptionally well-produced content.
 
 **Outcome per story:**
 - Video found → video card (with `videoId`, YouTube metadata, thumbnail)
-- No video after thorough search → story card (`videoId: null`, headline + source + summary)
+- No video after thorough search (3+ approaches) → story card (`videoId: null`, headline + source + summary)
 - NEVER use an old or loosely-related video
 
-#### 3c. Video Search Playbook — Examples
+#### 5e. Sports Video Rules (OVERRIDE general rules)
 
-**Geopolitics:**
-```
-Story: "US Sends 2,500 Marines as Ground Option Emerges"
-Search: "site:youtube.com US marines Iran ground war 2026" → WION, 9:48, 12h old → QUALIFIES
-```
+The user wants to SEE the goal, not hear about it.
 
-**Tech:**
-```
-Story: "Tesla Launches Terafab"
-Search: "site:youtube.com Tesla Terafab launch" → Bloomberg, 11:32, 6h old → QUALIFIES
-Backup: "site:youtube.com Tesla AI chip factory March 2026"
-Channels: CNBC, Bloomberg, The Verge, MKBHD
-```
-
-**Sports — DIFFERENT RULES** (user wants to SEE the goal, not hear about it):
 ```
 Story: "Salah Scores 50th Champions League Goal"
 WRONG: "Salah 50th goal news" → talking head → BAD
 RIGHT: "Salah goal Liverpool highlights" → actual footage → GOOD
 
-Search 1: "site:youtube.com Salah goal Liverpool highlights Champions League"
-Search 2: "site:youtube.com Liverpool highlights UCL"
-Channels: UEFA (official), Sky Sports, BT Sport, beIN
-Duration: 1-10min. A 90-second goal clip is perfect.
+Search 1: "Liverpool Galatasaray highlights all goals"
+Search 2: "Salah goal Champions League" on Sky Sports / BT Sport channel
+Search 3: "Liverpool 4-0 Galatasaray" (just the scoreline — often in titles)
+Search 4: CBS Sports Golazo channel (they post extended UCL highlights)
+Search 5: beIN Sports, DAZN (alternative broadcasters)
 ```
 
-**Sports search rules (override general rules):**
-- Search for FOOTAGE first: "highlights", "goal", "replay"
-- Short is good: 90-second highlight clips are ideal
-- Include opponent + competition in query
-- If footage unavailable, THEN try "post-match reaction"
+- Search for FOOTAGE first: "highlights", "goal", "replay", "all goals"
+- Short is GOOD: 90-second highlight clips are ideal
+- Include opponent + competition + scoreline in query
+- If footage unavailable, THEN try "post-match reaction" or "analysis"
 
-**Local (Egypt):**
-```
-Search: "site:youtube.com Egypt fuel price increase 2026"
-Also try Arabic: "اسعار البنزين مصر"
-Channels: Al Jazeera English, BBC Arabic, Reuters, Egyptian Streets
-```
-
-**AI:**
-```
-Search: "site:youtube.com GPT-5.4 launch enterprise"
-Channels: Matt Wolfe, AI Explained, Fireship, Two Minute Papers
-```
-
-**Key patterns:**
-- Specific proper nouns + dates/years, not generic topic words
-- Try the outlet's YouTube channel by name
-- Know 3-5 reliable channels per beat
-- For regional stories: try Arabic queries
-- Search for the EVENT, then coverage OF the event only if footage isn't available
-
-#### 3d. Ongoing Stories
+#### 5f. Ongoing Stories
 
 Check `storyTracker`. For active stories (Iran war, energy crisis):
-- Find NEW video about the LATEST development
-- Never reuse the same video from a previous briefing
+- Find NEW video about the LATEST development (not the same angle as before)
+- Never reuse a video from `watchLog`
 - Increment `updateCount`
 
-#### 3e. Rotation
+#### 5g. Rotation
 
-- Previous stories with `previousPosition` shift down
-- Watched videos (in `watchLog`) push further down
+- Watched videos (in `watchLog`) → these stories need a FRESH video or get pushed down
+- Stories the user selected/clicked → find a video this time
 - New stories get top positions
 - Video cards always sort before story cards
+- Previous stories with `previousPosition` shift down if no new development
 
-### Step 4 — Breaking News Ticker
+### Step 6 — Breaking News Ticker
 
 Curate `bannerItems` from the past 48h:
 - `timestamp` for client-side time-decay
@@ -200,7 +247,7 @@ Curate `bannerItems` from the past 48h:
 - `kind`: `"alert"`, `"breaking"`, `"context"`
 - Include curated stories as ticker items too (additive to the wall)
 
-### Step 5 — Build and Upload
+### Step 7 — Build and Upload
 
 1. Set `agentRunAt` and `generatedAt` to current UTC time in ISO format
 2. Set `hero.greeting`: "Good Morning, Aser!" (05-11 Cairo), "Good Afternoon, Aser!" (12-16), "Good Evening, Aser!" (17-04)
@@ -288,7 +335,8 @@ See `tv-briefing/briefing-example.json` for a full working example. Here's the s
       "searchQuery": "What you searched on YouTube",
       "searchIterations": 2,
       "internalReason": "Why you picked this (NOT displayed)",
-      "previousPosition": null
+      "previousPosition": null,
+      "playable": true
     }
   ],
 
@@ -307,7 +355,7 @@ See `tv-briefing/briefing-example.json` for a full working example. Here's the s
     "story-slug": { "firstSeen": "2026-03-18", "updateCount": 5, "status": "active" }
   },
 
-  "watchLog": []
+  "watchLog": ["videoId1", "videoId2"]
 }
 ```
 
