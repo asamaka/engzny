@@ -200,6 +200,12 @@ async function runFactCheckPipeline({
 
     let result = null;
 
+    // Speculative supplementary search: starts mid-stream once we have
+    // enough context (verdict + summary), runs in parallel with the rest
+    // of the Gemini stream. Used only if Gemini returns 0 citations.
+    let speculativeSearchPromise = null;
+    let speculativeSearchStarted = false;
+
     // Try Gemini first (streaming with Google Search grounding)
     try {
       const model = process.env.GEMINI_ANALYSIS_MODEL || 'gemini-2.5-flash';
@@ -216,6 +222,20 @@ async function runFactCheckPipeline({
         onToken: (chunk) => {
           parseAndEmitStructure(chunk);
           if (onToken) onToken(chunk);
+
+          // Start supplementary search speculatively once we have
+          // verdict + summary (detected by first ---ANGLE marker).
+          // This runs in parallel with the rest of the Gemini stream,
+          // saving 10-20s when Gemini skips web search.
+          if (!speculativeSearchStarted && textSoFar.includes('---ANGLE')) {
+            speculativeSearchStarted = true;
+            logger.info('FactCheckPipeline', 'Starting speculative supplementary search mid-stream', { requestId });
+            speculativeSearchPromise = runSupplementarySearch(textSoFar, requestId)
+              .catch(err => {
+                logger.warn('FactCheckPipeline', 'Speculative search failed (non-fatal)', { requestId, err: err.message });
+                return [];
+              });
+          }
         },
       });
     } catch (geminiError) {
@@ -285,16 +305,31 @@ async function runFactCheckPipeline({
     });
 
     // When Gemini skips web search (0 citations), use Claude's web_search
-    // tool to find real sources. Claude reliably searches when the tool is
-    // available, unlike Gemini which decides internally and usually opts not to.
+    // tool to find real sources. If the speculative search was started
+    // mid-stream, it may already be done — saving 10-20s of latency.
     if (citationCount === 0 && result?.text) {
-      logger.info('FactCheckPipeline', 'Running supplementary search for citations via Claude', { requestId });
       if (onProgress) {
         onProgress({ phase: 'verifying', progress: 90, message: 'Verifying sources...' });
       }
 
       try {
-        const supplementaryCitations = await runSupplementarySearch(result.text, requestId);
+        // Use speculative search if it was started, otherwise start fresh
+        if (!speculativeSearchPromise) {
+          logger.info('FactCheckPipeline', 'Starting supplementary search post-stream', { requestId });
+          speculativeSearchPromise = runSupplementarySearch(result.text, requestId);
+        } else {
+          logger.info('FactCheckPipeline', 'Using speculative supplementary search started mid-stream', { requestId });
+        }
+
+        const SUPP_TIMEOUT = parseInt(process.env.SUPPLEMENTARY_SEARCH_TIMEOUT || '12000', 10);
+        const supplementaryCitations = await Promise.race([
+          speculativeSearchPromise,
+          new Promise(resolve => setTimeout(() => {
+            logger.warn('FactCheckPipeline', 'Supplementary search timed out', { requestId, timeoutMs: SUPP_TIMEOUT });
+            resolve([]);
+          }, SUPP_TIMEOUT)),
+        ]);
+
         if (supplementaryCitations.length > 0) {
           result.citations = supplementaryCitations;
           result.groundingMetadata = result.groundingMetadata || {};
@@ -377,14 +412,14 @@ ${summary ? `Context: ${summary.slice(0, 300)}` : ''}
 
 Search for this claim on major news outlets (Reuters, AP, BBC, CNN, Al Jazeera, etc). For each source you find, report its URL and what it says about the claim. Search in the language of the claim and in English.`;
 
-  const fallbackModel = process.env.FACTCHECK_FALLBACK_MODEL || 'claude-sonnet-4-20250514';
-  const adapter = getAdapter('claude', { model: fallbackModel, maxTokens: 2048 });
+  const searchModel = process.env.SUPPLEMENTARY_SEARCH_MODEL || 'claude-haiku-4-5-20251001';
+  const adapter = getAdapter('claude', { model: searchModel, maxTokens: 1024 });
 
   const result = await adapter.generateTextWithWebSearch({
     prompt: searchPrompt,
-    systemPrompt: 'You are a news verification assistant. Search the web to find real, current sources for the claim. Be thorough.',
+    systemPrompt: 'You are a news verification assistant. Search the web to find real, current sources for the claim. Be thorough but concise — focus on finding URLs.',
     maxSearches: 5,
-    maxTokens: 2048,
+    maxTokens: 1024,
   });
 
   const citations = result.citationUrls || [];
