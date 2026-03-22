@@ -1520,6 +1520,20 @@ app.get('/api/hub/v2/stream/:requestId', async (req, res) => {
           logger.info('FactCheckReport', 'Extracted verdict from complete text (streaming parser missed it)', { requestId, verdict: fcVerdict.verdict });
         }
       }
+
+      // Fix short explanations from full text (streaming parser may have
+      // captured a truncated fragment like "The" before summary streamed)
+      if (fcVerdict && fcVerdict.explanation && fcVerdict.explanation.length < 30 && pipelineResult?.success && pipelineResult.factcheck?.text) {
+        const fullText = pipelineResult.factcheck.text;
+        const summaryMatch = fullText.match(/---SUMMARY\s*\n([\s\S]+?)(?=\n---|$)/);
+        if (summaryMatch) {
+          const firstSentence = summaryMatch[1].trim().split(/(?<=\.)\s/)[0];
+          if (firstSentence && firstSentence.length >= 30) {
+            logger.info('FactCheckReport', 'Enhanced short verdict explanation from summary', { requestId, was: fcVerdict.explanation.slice(0, 20), now: firstSentence.slice(0, 60) });
+            fcVerdict.explanation = firstSentence;
+          }
+        }
+      }
       if (fcAngles.length === 0 && pipelineResult?.success && pipelineResult.factcheck?.text) {
         const fullText = pipelineResult.factcheck.text;
         const angleMatches = fullText.matchAll(/---ANGLE:\s*(.+)/g);

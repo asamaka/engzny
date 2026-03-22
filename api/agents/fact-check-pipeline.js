@@ -194,7 +194,9 @@ async function runFactCheckPipeline({
 
       if (pendingVerdict && !verdictSent && textSoFar.includes('---SUMMARY')) {
         const enhanced = enhanceExplanationFromSummary(pendingVerdict);
-        emitVerdict(enhanced);
+        if (enhanced.explanation.length >= MIN_EXPLANATION_LENGTH) {
+          emitVerdict(enhanced);
+        }
       }
     };
 
