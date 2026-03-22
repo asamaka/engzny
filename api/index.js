@@ -367,7 +367,6 @@ app.get('/api/tv/briefing', async (req, res) => {
     if (!raw) return res.status(404).json({ error: 'No briefing' });
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     tvBriefingTrigger.recordView().catch(() => {});
-    tvBriefingTrigger.checkAndTriggerIfStale().catch(() => {});
     res.set('Cache-Control', 'public, max-age=60');
     res.set('Access-Control-Allow-Origin', '*');
     res.json(data);
@@ -404,6 +403,21 @@ app.post('/api/tv/briefing/trigger', requireDebugAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+function requireCronOrDebugAuth(req, res, next) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && req.headers['authorization'] === `Bearer ${cronSecret}`) return next();
+  return requireDebugAuth(req, res, next);
+}
+
+app.get('/api/tv/briefing/cron', requireCronOrDebugAuth, async (req, res) => {
+  try {
+    const result = await tvBriefingTrigger.checkAndTriggerIfStale();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

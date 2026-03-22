@@ -1,9 +1,8 @@
 name: TV Briefing Cron
 
-# Hourly cron — one of THREE trigger sources for the TV briefing agent:
-#   1. This cron (GitHub Actions schedule) — backup, can be unreliable
-#   2. TV app polling GET /api/tv/briefing — auto-triggers when briefing is stale (most reliable)
-#   3. Manual POST /api/tv/briefing/trigger — on-demand
+# Hourly cron — BACKUP trigger for the TV briefing agent.
+# Primary trigger is Vercel Cron (vercel.json), which is more reliable.
+# This fires as a fallback in case Vercel Cron misses. — on-demand
 #
 # Calls /api/tv/briefing/cron which checks staleness + rate limits before dispatching.
 # Cost: ~1 curl call per hour = ~24/day. Exits immediately if briefing is fresh.

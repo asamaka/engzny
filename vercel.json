@@ -21,6 +21,12 @@
       "dest": "/api/index.js"
     }
   ],
+  "crons": [
+    {
+      "path": "/api/tv/briefing/cron",
+      "schedule": "0 * * * *"
+    }
+  ],
   "env": {
     "NODE_ENV": "production"
   }

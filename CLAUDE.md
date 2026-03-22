@@ -138,7 +138,7 @@ tests/
 ### TV Briefing API
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/tv/briefing` | GET | Read current briefing (public, CORS enabled). Records "last viewed" timestamp + auto-triggers refresh if stale (>70 min). |
+| `/api/tv/briefing` | GET | Read current briefing (public, CORS enabled). Records "last viewed" timestamp for merge tracking. |
 | `/api/tv/briefing` | POST | Write new briefing (auth: `Bearer <TV_BRIEFING_TOKEN>`). Archives the previous briefing to history before replacing. |
 | `/api/tv/briefing/trigger` | POST | Force-trigger the briefing agent (require `?token=` auth). Body: `{"source":"manual","force":true}` |
 | `/api/tv/briefing/cron` | POST | Staleness-aware trigger — only dispatches if briefing is >70 min old (require `?token=` auth). Called by GitHub Actions cron. |
@@ -251,14 +251,14 @@ An hourly Cursor Cloud Agent that generates fresh news briefings for a Samsung T
 ### How it works
 
 ```
-[Three trigger sources — any one is enough]
+[Two cron sources + manual — any one is enough]
 
-1. GitHub Actions cron (every hour) → POST /api/tv/briefing/cron
-2. TV app polls GET /api/tv/briefing → auto-triggers when stale (>70 min)
+1. Vercel Cron (primary, every hour) → GET /api/tv/briefing/cron
+2. GitHub Actions cron (backup, every hour) → POST /api/tv/briefing/cron
 3. Manual POST /api/tv/briefing/trigger
     │
-    ├─ Rate limit check (30 min between triggers)
     ├─ Staleness check (briefing agentRunAt > 70 min old)
+    ├─ Rate limit check (30 min between triggers)
     ├─ Build briefing context (unseen stories, view history)
     │
     v
@@ -274,7 +274,7 @@ POST /api/tv/briefing → Redis (tv:briefing)
 Samsung TV app polls GET /api/tv/briefing (every 5 min)
 ```
 
-The TV app polling is the most reliable trigger — as long as the TV is on and polling every 5 minutes, a stale briefing will self-heal even if GitHub Actions cron skips hours.
+Vercel Cron runs on Vercel infrastructure (reliable). GitHub Actions cron is a backup (can skip hours due to scheduler delays).
 
 ### Merge logic — never lose unseen stories
 
@@ -290,8 +290,9 @@ The system tracks when the user last viewed the briefing. Each time the agent ru
 |----------|---------|-------------|
 | `TV_BRIEFING_ENABLED` | `true` (when GITHUB_DISPATCH_TOKEN exists) | Set to `false` to disable |
 | `TV_BRIEFING_MIN_INTERVAL` | `1800` (30 min) | Minimum seconds between triggers |
-| `TV_BRIEFING_STALE_THRESHOLD` | `4200000` (70 min, in ms) | Briefing age before auto-refresh triggers |
+| `TV_BRIEFING_STALE_THRESHOLD` | `4200000` (70 min, in ms) | Briefing age before cron triggers a refresh |
 | `TV_BRIEFING_TOKEN` | (required) | Bearer token for writing briefings |
+| `CRON_SECRET` | (optional) | Vercel Cron secret — auto-sent as `Authorization: Bearer` header by Vercel |
 
 ### Manual trigger
 
