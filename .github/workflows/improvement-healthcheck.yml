@@ -1,10 +1,10 @@
 name: Improvement Healthcheck
 
-# Lightweight cron that picks up pipeline reports skipped due to rate limiting.
-# Calls the Vercel API which checks Redis for queued reports and dispatches
-# the improvement workflow if any exist. Does nothing otherwise.
+# Lightweight cron that runs every 15 min:
+#   1. Picks up improvement reports skipped due to rate limiting
+#   2. Checks if TV briefing is stale and triggers refresh agent
 #
-# Cost: ~1 curl call every 15 min = ~96/day. Exits immediately when idle.
+# Cost: ~2 curl calls every 15 min = ~192/day. Exits immediately when idle.
 
 on:
   schedule:
@@ -16,10 +16,10 @@ permissions:
 
 jobs:
   healthcheck:
-    name: Check for skipped reports
+    name: Check for skipped reports + stale briefing
     runs-on: ubuntu-latest
     steps:
-      - name: Ping healthcheck endpoint
+      - name: Ping improvement healthcheck
         env:
           DEBUG_TOKEN: ${{ secrets.DEBUG_TOKEN }}
         run: |
@@ -44,9 +44,35 @@ jobs:
             echo "### Improvement Agent Dispatched" >> $GITHUB_STEP_SUMMARY
             echo "Picked up **${SKIPPED}** skipped report(s)" >> $GITHUB_STEP_SUMMARY
           else
-            echo "### No action needed" >> $GITHUB_STEP_SUMMARY
+            echo "### Improvement: No action" >> $GITHUB_STEP_SUMMARY
             echo "Reason: ${REASON}" >> $GITHUB_STEP_SUMMARY
             if [ "$SKIPPED" != "0" ] && [ "$SKIPPED" != "null" ]; then
               echo "${SKIPPED} report(s) queued, waiting for rate limit" >> $GITHUB_STEP_SUMMARY
             fi
+          fi
+
+      - name: Check TV briefing staleness
+        env:
+          DEBUG_TOKEN: ${{ secrets.DEBUG_TOKEN }}
+        run: |
+          TOKEN="${DEBUG_TOKEN:-thinx-debug-2026}"
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://www.thinx.fun/api/tv/briefing/cron?token=${TOKEN}" \
+            -H "Content-Type: application/json" \
+            --max-time 30)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "HTTP $HTTP_CODE"
+          echo "$BODY" | jq . 2>/dev/null || echo "$BODY"
+
+          TRIGGERED=$(echo "$BODY" | jq -r '.triggered // false' 2>/dev/null)
+          REASON=$(echo "$BODY" | jq -r '.reason // "unknown"' 2>/dev/null)
+
+          if [ "$TRIGGERED" = "true" ]; then
+            echo "### TV Briefing Agent Dispatched" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### TV Briefing: No action (${REASON})" >> $GITHUB_STEP_SUMMARY
           fi

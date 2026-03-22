@@ -406,21 +406,6 @@ app.post('/api/tv/briefing/trigger', requireDebugAuth, async (req, res) => {
   }
 });
 
-function requireCronOrDebugAuth(req, res, next) {
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && req.headers['authorization'] === `Bearer ${cronSecret}`) return next();
-  return requireDebugAuth(req, res, next);
-}
-
-app.get('/api/tv/briefing/cron', requireCronOrDebugAuth, async (req, res) => {
-  try {
-    const result = await tvBriefingTrigger.checkAndTriggerIfStale();
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 app.post('/api/tv/briefing/cron', requireDebugAuth, async (req, res) => {
   try {
     const result = await tvBriefingTrigger.checkAndTriggerIfStale();
