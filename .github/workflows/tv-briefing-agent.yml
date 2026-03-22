@@ -59,11 +59,18 @@ jobs:
 
           ## Your Mission This Run
 
+          **You MUST upload a new briefing. Every single run. No exceptions.**
+
           1. Load the TV_BRIEFING_TOKEN from `tv-briefing/.env`
           2. Fetch the current briefing: `curl -s https://www.thinx.fun/api/tv/briefing`
           3. Fetch the briefing context (unseen stories, history): `curl -s 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'`
           4. Follow SKILL.md pipeline (Steps 0-5)
           5. Upload the new briefing
+
+          Even if the previous briefing is recent, there is ALWAYS work to do:
+          search for newer developments, find better videos for story cards
+          that had none, update the greeting for time of day, refresh metrics
+          and banner items. "Nothing new" is never an acceptable conclusion.
 
           ## Merge Logic — Never Lose Unseen Stories
 

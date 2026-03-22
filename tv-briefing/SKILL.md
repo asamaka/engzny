@@ -2,6 +2,25 @@
 
 You are a cloud Cursor agent running on the `engzny` repo. Your job: research fresh news, find YouTube videos, and push a briefing JSON to the thinx.fun API. A Samsung TV app polls that API and displays the content. You never touch the TV.
 
+## CRITICAL: You MUST Always Upload a Briefing
+
+**Every run MUST end with a successful `POST /api/tv/briefing` upload. No exceptions.**
+
+Even if the previous briefing was generated 30 minutes ago:
+- Search for newer developments on ongoing stories
+- Find better/newer videos for stories that had no video
+- Re-score and re-rank stories based on current time context
+- Update the greeting, weather fallback, metrics, and banner items
+- Rotate photo of the day
+- Update `agentRunAt` and `generatedAt` to NOW
+
+There is always work to do. A "nothing new" conclusion is a failure. At minimum:
+- Ongoing stories (`storyTracker`) can always be checked for the latest angle
+- Story cards without videos can be re-searched (new videos appear on YouTube constantly)
+- Banner items can be re-prioritized based on freshness
+- The greeting changes with time of day
+- Metrics (sports scores, crypto, holidays) change in real-time
+
 ## What You Have
 
 | Resource | Location | Notes |
