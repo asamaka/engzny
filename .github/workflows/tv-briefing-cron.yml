@@ -1,9 +1,12 @@
 name: TV Briefing Cron
 
-# Hourly cron that triggers a Cursor Cloud Agent to generate a fresh TV briefing.
-# Calls the thinx.fun API which checks rate limits and dispatches the agent workflow.
+# Hourly cron — one of THREE trigger sources for the TV briefing agent:
+#   1. This cron (GitHub Actions schedule) — backup, can be unreliable
+#   2. TV app polling GET /api/tv/briefing — auto-triggers when briefing is stale (most reliable)
+#   3. Manual POST /api/tv/briefing/trigger — on-demand
 #
-# Cost: ~1 curl call per hour = ~24/day. Exits immediately if rate-limited.
+# Calls /api/tv/briefing/cron which checks staleness + rate limits before dispatching.
+# Cost: ~1 curl call per hour = ~24/day. Exits immediately if briefing is fresh.
 
 on:
   schedule:
@@ -18,16 +21,15 @@ jobs:
     name: Trigger TV briefing agent
     runs-on: ubuntu-latest
     steps:
-      - name: Call thinx.fun trigger endpoint
+      - name: Call thinx.fun cron endpoint
         env:
           DEBUG_TOKEN: ${{ secrets.DEBUG_TOKEN }}
         run: |
           TOKEN="${DEBUG_TOKEN:-thinx-debug-2026}"
 
           RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "https://www.thinx.fun/api/tv/briefing/trigger?token=${TOKEN}" \
+            "https://www.thinx.fun/api/tv/briefing/cron?token=${TOKEN}" \
             -H "Content-Type: application/json" \
-            -d '{"source":"cron"}' \
             --max-time 30)
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)

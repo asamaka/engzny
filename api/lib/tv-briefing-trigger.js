@@ -220,6 +220,40 @@ async function dispatchGitHub(config, inputs) {
 }
 
 /**
+ * Check if the current briefing is stale and auto-trigger a refresh.
+ * Called passively from GET /api/tv/briefing (fire-and-forget) and
+ * from POST /api/tv/briefing/cron. Provides reliability beyond
+ * GitHub Actions cron, which can skip hours.
+ *
+ * Staleness threshold: 70 minutes (gives 10 min buffer over 1-hour cycle).
+ */
+const STALE_THRESHOLD_MS = parseInt(process.env.TV_BRIEFING_STALE_THRESHOLD || '4200000', 10);
+
+async function checkAndTriggerIfStale() {
+  const config = getConfig();
+  if (!config.enabled || !config.githubToken) {
+    return { triggered: false, reason: 'disabled' };
+  }
+
+  const r = await redis();
+  if (!r) return { triggered: false, reason: 'no_redis' };
+
+  const raw = await r.get('tv:briefing');
+  if (!raw) return { triggered: false, reason: 'no_briefing' };
+
+  const briefing = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  const agentRunAt = briefing.agentRunAt;
+  if (!agentRunAt) return { triggered: false, reason: 'no_timestamp' };
+
+  const age = Date.now() - new Date(agentRunAt).getTime();
+  if (age < STALE_THRESHOLD_MS) {
+    return { triggered: false, reason: 'fresh', ageMinutes: Math.round(age / 60000) };
+  }
+
+  return trigger({ source: 'stale_check' });
+}
+
+/**
  * Trigger the TV briefing agent.
  * Called by the hourly cron (via API endpoint) or manually.
  */
@@ -255,8 +289,10 @@ async function trigger(options = {}) {
     console.warn(`[TV Briefing] Failed to build context: ${err.message}`);
   }
 
-  const reason = options.source === 'cron' ? 'hourly_cron' : 'manual';
-  const detail = options.focus || `Hourly briefing refresh at ${new Date().toISOString()}`;
+  const reason = options.source === 'cron' ? 'hourly_cron'
+    : options.source === 'stale_check' ? 'stale_auto'
+    : 'manual';
+  const detail = options.focus || `Briefing refresh (${reason}) at ${new Date().toISOString()}`;
 
   await dispatchGitHub(config, {
     reason,
@@ -328,6 +364,7 @@ async function getStatus() {
 module.exports = {
   init,
   trigger,
+  checkAndTriggerIfStale,
   archiveBriefing,
   recordView,
   getBriefingContext,

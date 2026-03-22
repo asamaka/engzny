@@ -367,6 +367,7 @@ app.get('/api/tv/briefing', async (req, res) => {
     if (!raw) return res.status(404).json({ error: 'No briefing' });
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
     tvBriefingTrigger.recordView().catch(() => {});
+    tvBriefingTrigger.checkAndTriggerIfStale().catch(() => {});
     res.set('Cache-Control', 'public, max-age=60');
     res.set('Access-Control-Allow-Origin', '*');
     res.json(data);
@@ -395,7 +396,7 @@ app.post('/api/tv/briefing', express.json({ limit: '1mb' }), async (req, res) =>
   }
 });
 
-// TV Briefing Agent — trigger, context, status (debug-auth protected)
+// TV Briefing Agent — trigger, cron, context, status (debug-auth protected)
 app.post('/api/tv/briefing/trigger', requireDebugAuth, async (req, res) => {
   try {
     const { source, focus, force } = req.body || {};
@@ -403,6 +404,15 @@ app.post('/api/tv/briefing/trigger', requireDebugAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/tv/briefing/cron', requireDebugAuth, async (req, res) => {
+  try {
+    const result = await tvBriefingTrigger.checkAndTriggerIfStale();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
