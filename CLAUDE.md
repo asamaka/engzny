@@ -281,7 +281,7 @@ The system tracks when the user last viewed the briefing. Each time the agent ru
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `TV_BRIEFING_ENABLED` | `true` (when GITHUB_DISPATCH_TOKEN exists) | Set to `false` to disable |
-| `TV_BRIEFING_MIN_INTERVAL` | `3000` (50 min) | Minimum seconds between triggers |
+| `TV_BRIEFING_MIN_INTERVAL` | `1800` (30 min) | Minimum seconds between triggers |
 | `TV_BRIEFING_TOKEN` | (required) | Bearer token for writing briefings |
 
 ### Manual trigger

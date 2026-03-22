@@ -14,7 +14,7 @@
  *
  * Optional env vars (Vercel):
  *   TV_BRIEFING_ENABLED     — "true" to enable (default: true when GITHUB_DISPATCH_TOKEN exists)
- *   TV_BRIEFING_MIN_INTERVAL — Min seconds between triggers (default: 3000 = 50 min)
+ *   TV_BRIEFING_MIN_INTERVAL — Min seconds between triggers (default: 1800 = 30 min)
  */
 
 const GITHUB_API = 'https://api.github.com';
@@ -43,7 +43,7 @@ function getConfig() {
     githubToken: process.env.GITHUB_DISPATCH_TOKEN || '',
     repoOwner: process.env.IMPROVEMENT_REPO_OWNER || 'asamaka',
     repoName: process.env.IMPROVEMENT_REPO_NAME || 'engzny',
-    minInterval: parseInt(process.env.TV_BRIEFING_MIN_INTERVAL || '3000', 10),
+    minInterval: parseInt(process.env.TV_BRIEFING_MIN_INTERVAL || '1800', 10),
   };
 }
 
