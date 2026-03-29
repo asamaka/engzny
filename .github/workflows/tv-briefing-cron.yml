@@ -1,14 +1,16 @@
 name: TV Briefing Cron
 
-# Hourly backup cron for the TV briefing agent.
+# DISABLED — TV briefing agent turned off by user request.
+#
+# Previously: Hourly backup cron for the TV briefing agent.
 # Primary: improvement-healthcheck.yml (every 15 min, more frequent).
 # This is a secondary backup — calls POST /api/tv/briefing/cron which
 # checks staleness + rate limits before dispatching. Only fires if
 # the briefing is >70 min stale AND 30 min since last trigger.
 
 on:
-  schedule:
-    - cron: '0 * * * *'
+  # schedule:
+  #   - cron: '0 * * * *'
   workflow_dispatch:
 
 permissions:
