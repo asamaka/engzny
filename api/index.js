@@ -887,22 +887,27 @@ const WAR_YT_CHANNELS = {
   'UC52X5wxOL_s5yw0dQk7NtgA': 'Al Jazeera English',
   'UCupvZG-5ko_eiXAupbDfxWw': 'CNN',
   'UCXIJgqnII2ZOINSValKDNAQ': 'BBC News',
-  'UCef1-8eOpJgud7szVPlZQAQ': 'WION',
-  'UCYxRlFDqcWM4y7FfpiAN3KQ': 'Fox News',
-  'UCBi2mrWuNuyYy4gbM6fU18Q': 'ABC News',
   'UCaXkIU1QidjPwiAYu6GcHjg': 'TRT World',
   'UCNye-wNBqNL5ZzHSJj3l8Bg': 'France 24 English',
-  'UC_gUM8rL-Lrg6O3adPW9K1g': 'Sky News',
   'UC16niRr50-MSBwiO3YDb3RA': 'DW News',
   'UCAql2DyGU2un1Ei2nMYsqOA': 'PBS NewsHour',
+  'UCBi2mrWuNuyYy4gbM6fU18Q': 'ABC News',
+  'UC_gUM8rL-Lrg6O3adPW9K1g': 'Sky News',
   'UCIRYBXDze5krPDzAEOxFGVA': 'i24NEWS English',
+  'UCYxRlFDqcWM4y7FfpiAN3KQ': 'Fox News',
 };
 
 const WAR_YT_QUERIES = ['Iran war 2026', 'Iran Israel war latest', 'Strait of Hormuz crisis 2026', 'Iran nuclear strikes', 'IRGC military operation'];
 
-function isLiveStream(title) {
+function isLiveOrCompilation(title) {
   const t = (title || '').trim();
-  return /^LIVE\s*[:|]/i.test(t) || /\bLIVE\s*$/i.test(t) || /\|\s*LIVE\s*$/i.test(t);
+  if (/^LIVE\s*[:|]/i.test(t) || /\bLIVE\s*$/i.test(t) || /\|\s*LIVE\s*$/i.test(t)) return true;
+  // Indian TV channels pack multiple stories under one title; detect by pipe-separated multi-topic patterns
+  const pipeSegments = t.split('|').length;
+  if (pipeSegments >= 4) return true;
+  // Detect "N18G", "N18L", "N18S" tags used by News18 live/compilation uploads
+  if (/\|\s*N1[89][A-Z]/i.test(t)) return true;
+  return false;
 }
 
 async function fetchWarVideos() {
@@ -923,7 +928,7 @@ async function fetchWarVideos() {
           const title = item.snippet?.title || '';
           if (!vid || seenIds.has(vid)) continue;
           if (item.snippet?.liveBroadcastContent === 'live' || item.snippet?.liveBroadcastContent === 'upcoming') continue;
-          if (isLiveStream(title)) continue;
+          if (isLiveOrCompilation(title)) continue;
           seenIds.add(vid);
           videos.push({
             videoId: vid,
@@ -965,7 +970,7 @@ async function fetchWarVideos() {
   );
 
   const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId) && !isLiveStream(v.title));
+  const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId) && !isLiveOrCompilation(v.title));
   const rssRelevant = await filterIranWarRelevant(rssUnseen, 'videos');
   for (const v of rssRelevant) {
     seenIds.add(v.videoId);
@@ -1015,35 +1020,54 @@ app.get('/api/tv/war/videos', requireWarToken, async (req, res) => {
 
 // --- AI-ENRICHED UPDATES ---
 
+function isGoodImage(imgUrl) {
+  if (!imgUrl) return false;
+  if (imgUrl.includes('googleusercontent.com') && !imgUrl.includes('photo.jpg')) return false;
+  if (imgUrl.includes('google.com/s2/favicons')) return false;
+  if (imgUrl.length < 30) return false;
+  return true;
+}
+
 async function extractOgImage(url) {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
-    const r = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'ThinxTV/1.0' } });
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const r = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ThinxTV/1.0)' },
+    });
     clearTimeout(timer);
     if (!r.ok) return null;
     const html = await r.text();
     const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
                || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-    return match ? match[1] : null;
+    const img = match ? match[1] : null;
+    return isGoodImage(img) ? img : null;
   } catch { return null; }
 }
 
 async function fetchWarUpdates() {
   const headlinesData = await fetchWarHeadlines();
-  const topStories = headlinesData.headlines.slice(0, 8);
-  if (topStories.length === 0) {
+  const candidates = headlinesData.headlines.slice(0, 15);
+  if (candidates.length === 0) {
     return { updates: [], fetchedAt: new Date().toISOString(), error: 'no_headlines' };
   }
 
   const ogImages = await Promise.allSettled(
-    topStories.map(h => h.link ? extractOgImage(h.link) : Promise.resolve(null))
+    candidates.map(h => h.link ? extractOgImage(h.link) : Promise.resolve(null))
   );
 
-  const storiesWithImages = topStories.map((h, i) => ({
+  const allWithImages = candidates.map((h, i) => ({
     ...h,
     ogImage: ogImages[i].status === 'fulfilled' ? ogImages[i].value : null,
   }));
+
+  // Hero cards MUST have good images — prioritize stories with real photos
+  const withImages = allWithImages.filter(h => isGoodImage(h.ogImage) || isGoodImage(h.imageUrl));
+  const withoutImages = allWithImages.filter(h => !isGoodImage(h.ogImage) && !isGoodImage(h.imageUrl));
+  const topStories = [...withImages.slice(0, 6), ...withoutImages.slice(0, Math.max(0, 6 - withImages.length))].slice(0, 8);
+  const storiesWithImages = topStories;
 
   const apiKey = process.env.GEMINI_API_KEY;
   let updates = [];
