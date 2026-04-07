@@ -29,3 +29,4 @@ Thumbs.db
 npm-debug.log*
 test-images/large-test.png
 .vercel
+.env*.local

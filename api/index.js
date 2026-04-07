@@ -12,6 +12,7 @@ function getSharp() {
 }
 const { ClaudeAdapter } = require('./llm/claude');
 const { logger } = require('./lib/logger');
+const RssParser = require('rss-parser');
 
 const app = express();
 
@@ -465,13 +466,539 @@ app.get('/api/tv/health', async (req, res) => {
   }
 });
 
-// CORS preflight for TV endpoints
-app.options('/api/tv/:path', (req, res) => {
+// CORS preflight for TV endpoints (including /api/tv/war/*)
+app.options('/api/tv/*', (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Max-Age', '86400');
   res.status(204).end();
+});
+
+// ============================================================
+// WAR DASHBOARD API — /api/tv/war/*
+// ============================================================
+
+function requireWarToken(req, res, next) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  const valid = process.env.TV_WAR_TOKEN || process.env.TV_BRIEFING_TOKEN;
+  if (!valid || token !== valid) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  next();
+}
+
+function setCorsHeaders(res) {
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Cache-Control', 'public, max-age=30');
+}
+
+// --- WAR RSS FEED REGISTRY ---
+const WAR_FEEDS = [
+  { id: 'bbc-mideast', name: 'BBC', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', category: 'western' },
+  { id: 'cnn-mideast', name: 'CNN', url: 'http://rss.cnn.com/rss/edition_meast.rss', category: 'western' },
+  { id: 'fox-world', name: 'Fox News', url: 'https://moxie.foxnews.com/google-publisher/world.xml', category: 'western' },
+  { id: 'france24', name: 'France 24', url: 'https://www.france24.com/en/middle-east/rss', category: 'western' },
+  { id: 'guardian', name: 'The Guardian', url: 'https://www.theguardian.com/world/middleeast/rss', category: 'western' },
+  { id: 'dw', name: 'DW News', url: 'https://rss.dw.com/xml/rss-en-all', category: 'western' },
+  { id: 'google-war', name: 'Google News', url: 'https://news.google.com/rss/search?q=iran+israel+war&hl=en-US&gl=US&ceid=US:en', category: 'western' },
+  { id: 'jpost', name: 'Jerusalem Post', url: 'https://www.jpost.com/rss/rssfeedsarabisraeliconflict.aspx', category: 'israeli' },
+  { id: 'presstv', name: 'Press TV', url: 'https://www.presstv.ir/rss.xml', category: 'iranian' },
+  { id: 'tehrantimes', name: 'Tehran Times', url: 'https://www.tehrantimes.com/rss', category: 'iranian' },
+  { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab' },
+];
+
+const WAR_KEYWORDS = /iran|israel|strike|missile|hormuz|nuclear|sanction|military|war|ceasefire|troops|drone|hezbollah|houthi|yemen|irgc|pentagon|airbase|bombing|retaliat/i;
+
+const rssParser = new RssParser({ timeout: 6000, headers: { 'User-Agent': 'ThinxTV/1.0' } });
+
+async function fetchWarHeadlines() {
+  const results = await Promise.allSettled(
+    WAR_FEEDS.map(async (feed) => {
+      try {
+        const parsed = await rssParser.parseURL(feed.url);
+        return (parsed.items || []).map(item => ({
+          feedId: feed.id,
+          source: feed.name,
+          sourceCategory: feed.category,
+          title: (item.title || '').trim(),
+          link: item.link || '',
+          description: (item.contentSnippet || item.content || '').substring(0, 200),
+          publishedAt: item.isoDate || item.pubDate || null,
+          imageUrl: item.enclosure?.url || null,
+        }));
+      } catch { return []; }
+    })
+  );
+
+  const sourceStatus = {};
+  WAR_FEEDS.forEach((feed, i) => {
+    const r = results[i];
+    sourceStatus[feed.id] = r.status === 'fulfilled' && r.value.length > 0 ? 'ok' : (r.status === 'rejected' ? 'error' : 'empty');
+  });
+
+  let allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  allItems = allItems.filter(item => item.title && WAR_KEYWORDS.test(item.title + ' ' + item.description));
+
+  // Deduplicate: require >60% of significant words to overlap (not just 4 words)
+  const seen = [];
+  const deduped = [];
+  for (const item of allItems) {
+    const norm = item.title.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    const words = norm.split(/\s+/).filter(w => w.length > 3);
+    if (words.length === 0) continue;
+    let isDupe = false;
+    for (const prev of seen) {
+      if (prev.norm === norm) { isDupe = true; break; }
+      const overlap = words.filter(w => prev.words.includes(w)).length;
+      const ratio = overlap / Math.max(words.length, prev.words.length);
+      if (ratio > 0.6) { isDupe = true; break; }
+    }
+    if (isDupe) continue;
+    seen.push({ norm, words });
+    deduped.push(item);
+  }
+
+  const now = Date.now();
+  deduped.forEach(item => {
+    item._ts = item.publishedAt ? new Date(item.publishedAt).getTime() : (now - 3600000);
+  });
+  deduped.sort((a, b) => b._ts - a._ts);
+
+  // Ensure category diversity: reserve minimum slots per category
+  const categoryBuckets = { western: [], iranian: [], israeli: [], arab: [] };
+  for (const item of deduped) {
+    const bucket = categoryBuckets[item.sourceCategory];
+    if (bucket) bucket.push(item);
+  }
+  const minPerCategory = 5;
+  const reserved = [];
+  for (const [cat, items] of Object.entries(categoryBuckets)) {
+    reserved.push(...items.slice(0, minPerCategory));
+  }
+  const reservedIds = new Set(reserved.map(i => i.feedId + ':' + i.title));
+  const remaining = deduped.filter(i => !reservedIds.has(i.feedId + ':' + i.title));
+  const final = [...reserved, ...remaining].slice(0, 50);
+  final.sort((a, b) => b._ts - a._ts);
+
+  return {
+    headlines: final.map((item, i) => ({
+      id: `${item.feedId}-${i}`,
+      source: item.source,
+      sourceCategory: item.sourceCategory,
+      title: item.title,
+      link: item.link,
+      description: item.description,
+      publishedAt: item.publishedAt,
+      imageUrl: item.imageUrl,
+    })),
+    sourceStatus,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+app.get('/api/tv/war/headlines', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:headlines');
+      if (cached) {
+        const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+        return res.json(data);
+      }
+    }
+    const data = await fetchWarHeadlines();
+    if (r) { await r.set('tv:war:headlines', JSON.stringify(data), { ex: 300 }); }
+    res.json(data);
+  } catch (err) {
+    logger.error('WarHeadlines', 'Failed', { error: err.message });
+    res.status(500).json({ error: 'Failed to fetch headlines', details: err.message });
+  }
+});
+
+// --- POLYMARKET MARKETS ---
+
+async function fetchWarMarkets() {
+  const keywords = ['iran', 'israel', 'war', 'hormuz', 'ceasefire', 'nuclear', 'middle east', 'military', 'strike', 'oil', 'troops', 'missile'];
+  let allMarkets = [];
+
+  try {
+    const eventsRes = await fetch('https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false');
+    if (eventsRes.ok) {
+      const events = await eventsRes.json();
+      for (const event of events) {
+        const text = ((event.title || '') + ' ' + (event.description || '')).toLowerCase();
+        if (keywords.some(k => text.includes(k))) {
+          const markets = event.markets || [];
+          for (const m of markets) {
+            const prices = m.outcomePrices ? (typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices) : [];
+            const yesPrice = parseFloat(prices[0]) || 0;
+            allMarkets.push({
+              id: m.id || m.conditionId || `poly-${allMarkets.length}`,
+              question: m.question || event.title,
+              probability: Math.round(yesPrice * 1000) / 1000,
+              volume: m.volume ? `$${(parseFloat(m.volume) / 1e6).toFixed(1)}M` : null,
+              imageUrl: event.image || m.image || null,
+              updatedAt: m.updatedAt || event.updatedAt || null,
+              eventSlug: event.slug || null,
+            });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn('WarMarkets', 'Gamma events fetch failed', { error: err.message });
+  }
+
+  if (allMarkets.length === 0) {
+    try {
+      for (const q of ['Iran', 'Israel', 'war', 'Middle East']) {
+        const searchRes = await fetch(`https://gamma-api.polymarket.com/events?limit=20&active=true&closed=false&title=${encodeURIComponent(q)}`);
+        if (searchRes.ok) {
+          const events = await searchRes.json();
+          for (const event of events) {
+            for (const m of (event.markets || [])) {
+              const prices = m.outcomePrices ? (typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices) : [];
+              allMarkets.push({
+                id: m.id || m.conditionId || `poly-${allMarkets.length}`,
+                question: m.question || event.title,
+                probability: Math.round((parseFloat(prices[0]) || 0) * 1000) / 1000,
+                volume: m.volume ? `$${(parseFloat(m.volume) / 1e6).toFixed(1)}M` : null,
+                imageUrl: event.image || m.image || null,
+                updatedAt: m.updatedAt || event.updatedAt || null,
+                eventSlug: event.slug || null,
+              });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn('WarMarkets', 'Gamma search failed', { error: err.message });
+    }
+  }
+
+  const seen = new Set();
+  allMarkets = allMarkets.filter(m => {
+    if (seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+
+  return { markets: allMarkets, fetchedAt: new Date().toISOString() };
+}
+
+app.get('/api/tv/war/markets', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:markets');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    const data = await fetchWarMarkets();
+    if (r) { await r.set('tv:war:markets', JSON.stringify(data), { ex: 120 }); }
+    res.json(data);
+  } catch (err) {
+    logger.error('WarMarkets', 'Failed', { error: err.message });
+    res.json({ markets: [], error: 'upstream_error', fetchedAt: new Date().toISOString() });
+  }
+});
+
+// --- YOUTUBE VIDEOS ---
+
+const WAR_YT_CHANNELS = {
+  'UCknLrEdhRCp1aegoMqRhGGw': 'Reuters',
+  'UC52X5wxOL_s5yw0dQk7NtgA': 'Al Jazeera English',
+  'UCupvZG-5ko_eiXAupbDfxWw': 'CNN',
+  'UCXIJgqnII2ZOINSValKDNAQ': 'BBC News',
+  'UCef1-8eOpJgud7szVPlZQAQ': 'WION',
+  'UCYxRlFDqcWM4y7FfpiAN3KQ': 'Fox News',
+  'UCBi2mrWuNuyYy4gbM6fU18Q': 'ABC News',
+  'UCaXkIU1QidjPwiAYu6GcHjg': 'TRT World',
+  'UCNye-wNBqNL5ZzHSJj3l8Bg': 'France 24 English',
+  'UC_gUM8rL-Lrg6O3adPW9K1g': 'Sky News',
+  'UC16niRr50-MSBwiO3YDb3RA': 'DW News',
+  'UCAql2DyGU2un1Ei2nMYsqOA': 'PBS NewsHour',
+  'UCIRYBXDze5krPDzAEOxFGVA': 'i24NEWS English',
+};
+
+const WAR_YT_QUERIES = ['Iran Israel war 2026', 'Iran US military conflict', 'Hormuz strait crisis'];
+
+async function fetchWarVideos() {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  const videos = [];
+  const seenIds = new Set();
+
+  if (apiKey) {
+    const publishedAfter = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+    for (const q of WAR_YT_QUERIES) {
+      try {
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&publishedAfter=${publishedAfter}&videoDuration=medium&videoEmbeddable=true&order=relevance&maxResults=10&key=${apiKey}`;
+        const r = await fetch(url);
+        if (!r.ok) continue;
+        const data = await r.json();
+        for (const item of (data.items || [])) {
+          const vid = item.id?.videoId;
+          if (!vid || seenIds.has(vid)) continue;
+          seenIds.add(vid);
+          videos.push({
+            videoId: vid,
+            title: item.snippet?.title || '',
+            channel: item.snippet?.channelTitle || '',
+            channelId: item.snippet?.channelId || '',
+            thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://img.youtube.com/vi/${vid}/hqdefault.jpg`,
+            publishedAt: item.snippet?.publishedAt || null,
+            description: (item.snippet?.description || '').substring(0, 150),
+            source: 'youtube-api',
+          });
+        }
+      } catch { /* continue */ }
+    }
+  }
+
+  // Supplement with YouTube RSS from known channels (free, no quota)
+  const channelIds = Object.keys(WAR_YT_CHANNELS);
+  const rssResults = await Promise.allSettled(
+    channelIds.slice(0, 8).map(async (chId) => {
+      try {
+        const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${chId}`;
+        const parsed = await rssParser.parseURL(feedUrl);
+        return (parsed.items || []).slice(0, 5).map(item => {
+          const vid = (item.id || '').replace('yt:video:', '') || item.link?.split('v=')[1];
+          return {
+            videoId: vid,
+            title: item.title || '',
+            channel: WAR_YT_CHANNELS[chId] || parsed.title || '',
+            channelId: chId,
+            thumbnailUrl: `https://img.youtube.com/vi/${vid}/hqdefault.jpg`,
+            publishedAt: item.isoDate || item.pubDate || null,
+            description: (item.contentSnippet || '').substring(0, 150),
+            source: 'youtube-rss',
+          };
+        });
+      } catch { return []; }
+    })
+  );
+
+  const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  for (const v of rssVideos) {
+    if (v.videoId && !seenIds.has(v.videoId) && WAR_KEYWORDS.test(v.title + ' ' + v.description)) {
+      seenIds.add(v.videoId);
+      videos.push(v);
+    }
+  }
+
+  videos.sort((a, b) => {
+    const da = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+    const db = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+    return db - da;
+  });
+
+  return {
+    videos: videos.slice(0, 20).map((v, i) => ({
+      id: `yt-${v.videoId}`,
+      videoId: v.videoId,
+      title: v.title,
+      channel: v.channel,
+      channelId: v.channelId,
+      thumbnailUrl: v.thumbnailUrl,
+      publishedAt: v.publishedAt,
+      description: v.description,
+      source: v.source,
+      playable: true,
+    })),
+    fetchedAt: new Date().toISOString(),
+    apiKeyPresent: !!apiKey,
+  };
+}
+
+app.get('/api/tv/war/videos', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:videos');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    const data = await fetchWarVideos();
+    if (r) { await r.set('tv:war:videos', JSON.stringify(data), { ex: 900 }); }
+    res.json(data);
+  } catch (err) {
+    logger.error('WarVideos', 'Failed', { error: err.message });
+    res.json({ videos: [], error: err.message, fetchedAt: new Date().toISOString() });
+  }
+});
+
+// --- AI-ENRICHED UPDATES ---
+
+async function extractOgImage(url) {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 4000);
+    const r = await fetch(url, { signal: controller.signal, headers: { 'User-Agent': 'ThinxTV/1.0' } });
+    clearTimeout(timer);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const match = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+               || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    return match ? match[1] : null;
+  } catch { return null; }
+}
+
+async function fetchWarUpdates() {
+  const headlinesData = await fetchWarHeadlines();
+  const topStories = headlinesData.headlines.slice(0, 8);
+  if (topStories.length === 0) {
+    return { updates: [], fetchedAt: new Date().toISOString(), error: 'no_headlines' };
+  }
+
+  const ogImages = await Promise.allSettled(
+    topStories.map(h => h.link ? extractOgImage(h.link) : Promise.resolve(null))
+  );
+
+  const storiesWithImages = topStories.map((h, i) => ({
+    ...h,
+    ogImage: ogImages[i].status === 'fulfilled' ? ogImages[i].value : null,
+  }));
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  let updates = [];
+
+  if (apiKey) {
+    try {
+      const prompt = `You are a war dashboard content curator. Given these news headlines about the Iran-Israel conflict, create exactly ${Math.min(storiesWithImages.length, 6)} visual story cards for a TV dashboard.
+
+Headlines:
+${storiesWithImages.map((h, i) => `${i + 1}. [${h.source}] ${h.title}`).join('\n')}
+
+For each card, return a JSON array with objects containing:
+- "index": the 1-based headline number this card is based on
+- "headline": a short punchy headline (max 60 chars)
+- "summary": one-line summary (max 80 chars)
+- "template": one of "hero-image", "split-card", "stat-card", "quote-card"
+- "importance": "critical", "high", or "medium"
+- "tags": array of 2-3 short tags
+
+Return ONLY valid JSON array, no markdown, no explanation.`;
+
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 2000 },
+          }),
+        }
+      );
+
+      if (geminiRes.ok) {
+        const geminiData = await geminiRes.json();
+        const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = text.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          updates = parsed.map(card => {
+            const idx = (card.index || 1) - 1;
+            const story = storiesWithImages[idx] || storiesWithImages[0];
+            return {
+              id: `update-${story.feedId || 'unknown'}-${idx}`,
+              headline: (card.headline || story.title).substring(0, 80),
+              summary: (card.summary || story.description).substring(0, 100),
+              template: ['hero-image', 'split-card', 'stat-card', 'quote-card'].includes(card.template) ? card.template : 'hero-image',
+              imageUrl: story.ogImage || story.imageUrl || null,
+              imageCaption: story.source,
+              source: story.source,
+              publishedAt: story.publishedAt,
+              importance: ['critical', 'high', 'medium'].includes(card.importance) ? card.importance : 'medium',
+              tags: Array.isArray(card.tags) ? card.tags.slice(0, 3) : [],
+              link: story.link,
+            };
+          });
+        }
+      }
+    } catch (err) {
+      logger.warn('WarUpdates', 'AI enrichment failed, using raw headlines', { error: err.message });
+    }
+  }
+
+  if (updates.length === 0) {
+    updates = storiesWithImages.slice(0, 6).map((h, i) => ({
+      id: `update-${h.feedId || 'raw'}-${i}`,
+      headline: h.title.substring(0, 80),
+      summary: h.description.substring(0, 100),
+      template: i === 0 ? 'hero-image' : 'split-card',
+      imageUrl: h.ogImage || h.imageUrl || null,
+      imageCaption: h.source,
+      source: h.source,
+      publishedAt: h.publishedAt,
+      importance: i < 2 ? 'critical' : 'high',
+      tags: ['war', 'breaking'],
+      link: h.link,
+    }));
+  }
+
+  return { updates, fetchedAt: new Date().toISOString() };
+}
+
+app.get('/api/tv/war/updates', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:updates');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    const data = await fetchWarUpdates();
+    if (r) { await r.set('tv:war:updates', JSON.stringify(data), { ex: 600 }); }
+    res.json(data);
+  } catch (err) {
+    logger.error('WarUpdates', 'Failed', { error: err.message });
+    res.status(500).json({ updates: [], error: err.message, fetchedAt: new Date().toISOString() });
+  }
+});
+
+// --- BUNDLE (all war data in one call) ---
+
+app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:bundle');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+
+    const [headlinesResult, marketsResult, videosResult, updatesResult] = await Promise.allSettled([
+      fetchWarHeadlines(),
+      fetchWarMarkets(),
+      fetchWarVideos(),
+      fetchWarUpdates(),
+    ]);
+
+    const bundle = {
+      headlines: headlinesResult.status === 'fulfilled' ? headlinesResult.value.headlines : [],
+      headlinesSourceStatus: headlinesResult.status === 'fulfilled' ? headlinesResult.value.sourceStatus : {},
+      markets: marketsResult.status === 'fulfilled' ? marketsResult.value.markets : [],
+      videos: videosResult.status === 'fulfilled' ? videosResult.value.videos : [],
+      updates: updatesResult.status === 'fulfilled' ? updatesResult.value.updates : [],
+      fetchedAt: new Date().toISOString(),
+      errors: {
+        headlines: headlinesResult.status === 'rejected' ? headlinesResult.reason?.message : null,
+        markets: marketsResult.status === 'rejected' ? marketsResult.reason?.message : null,
+        videos: videosResult.status === 'rejected' ? videosResult.reason?.message : null,
+        updates: updatesResult.status === 'rejected' ? updatesResult.reason?.message : null,
+      },
+    };
+
+    if (r) { await r.set('tv:war:bundle', JSON.stringify(bundle), { ex: 60 }); }
+    res.json(bundle);
+  } catch (err) {
+    logger.error('WarBundle', 'Failed', { error: err.message });
+    res.status(500).json({ error: 'Bundle failed', details: err.message });
+  }
 });
 
 // GET /api/example-image?url=... — Proxy for example screenshot images
