@@ -1206,17 +1206,19 @@ async function getCachedBundle() {
 }
 
 app.get('/api/tv/war/stream', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-store',
-    'Access-Control-Allow-Origin': '*',
     'X-Accel-Buffering': 'no',
   });
 
-  res.write('retry: 5000\n\n');
+  // Serverless-friendly: one event per invocation, close immediately.
+  // EventSource reconnects after `retry` ms. Last-Event-ID skips unchanged data.
+  res.write('retry: 30000\n\n');
 
   const lastId = req.headers['last-event-id'] || '';
-  let bundle = await getCachedBundle();
+  const bundle = await getCachedBundle();
 
   if (bundle && bundle.fetchedAt !== lastId) {
     res.write('id: ' + bundle.fetchedAt + '\n');
@@ -1226,24 +1228,6 @@ app.get('/api/tv/war/stream', requireWarToken, async (req, res) => {
     res.write(': no-change\n\n');
   }
 
-  let lastFetchedAt = bundle ? bundle.fetchedAt : '';
-  let alive = true;
-  req.on('close', () => { alive = false; });
-
-  for (let tick = 0; tick < 5 && alive; tick++) {
-    await new Promise(resolve => setTimeout(resolve, 15000));
-    if (!alive) break;
-    res.write(': heartbeat\n\n');
-    try {
-      const fresh = await getCachedBundle();
-      if (fresh && fresh.fetchedAt !== lastFetchedAt) {
-        res.write('id: ' + fresh.fetchedAt + '\n');
-        res.write('event: update\n');
-        res.write('data: ' + JSON.stringify(fresh) + '\n\n');
-        lastFetchedAt = fresh.fetchedAt;
-      }
-    } catch { /* keep alive */ }
-  }
   res.end();
 });
 
