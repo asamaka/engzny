@@ -480,7 +480,7 @@ app.options('/api/tv/*', (req, res) => {
 // ============================================================
 
 function requireWarToken(req, res, next) {
-  const token = (req.headers.authorization || '').replace('Bearer ', '');
+  const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query.token || '';
   const valid = process.env.TV_WAR_TOKEN || process.env.TV_BRIEFING_TOKEN;
   if (!valid || token !== valid) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -1192,6 +1192,59 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
     logger.error('WarBundle', 'Failed', { error: err.message });
     res.status(500).json({ error: 'Bundle failed', details: err.message });
   }
+});
+
+// --- SSE STREAM (push updates to TV) ---
+
+async function getCachedBundle() {
+  const r = await getRedis();
+  if (r) {
+    const cached = await r.get('tv:war:bundle:v2');
+    if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached;
+  }
+  return null;
+}
+
+app.get('/api/tv/war/stream', requireWarToken, async (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-store',
+    'Access-Control-Allow-Origin': '*',
+    'X-Accel-Buffering': 'no',
+  });
+
+  res.write('retry: 5000\n\n');
+
+  const lastId = req.headers['last-event-id'] || '';
+  let bundle = await getCachedBundle();
+
+  if (bundle && bundle.fetchedAt !== lastId) {
+    res.write('id: ' + bundle.fetchedAt + '\n');
+    res.write('event: update\n');
+    res.write('data: ' + JSON.stringify(bundle) + '\n\n');
+  } else {
+    res.write(': no-change\n\n');
+  }
+
+  let lastFetchedAt = bundle ? bundle.fetchedAt : '';
+  let alive = true;
+  req.on('close', () => { alive = false; });
+
+  for (let tick = 0; tick < 5 && alive; tick++) {
+    await new Promise(resolve => setTimeout(resolve, 15000));
+    if (!alive) break;
+    res.write(': heartbeat\n\n');
+    try {
+      const fresh = await getCachedBundle();
+      if (fresh && fresh.fetchedAt !== lastFetchedAt) {
+        res.write('id: ' + fresh.fetchedAt + '\n');
+        res.write('event: update\n');
+        res.write('data: ' + JSON.stringify(fresh) + '\n\n');
+        lastFetchedAt = fresh.fetchedAt;
+      }
+    } catch { /* keep alive */ }
+  }
+  res.end();
 });
 
 // GET /api/example-image?url=... — Proxy for example screenshot images

@@ -2,48 +2,116 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="referrer" content="no-referrer">
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
         #player { width: 100%; height: 100%; }
+        #err { display: none; position: absolute; inset: 0; color: #888; font-family: sans-serif;
+                font-size: 18px; justify-content: center; align-items: center; flex-direction: column; gap: 12px; }
+        #err.show { display: flex; }
+        #err .retry-msg { font-size: 13px; color: #555; }
     </style>
 </head>
 <body>
     <div id="player"></div>
+    <div id="err"><span id="err-text">Video unavailable</span><span class="retry-msg" id="retry-msg"></span></div>
     <script>
-        var tag = document.createElement('script');
-        tag.src = 'https://www.youtube.com/iframe_api';
-        var firstScriptTag = document.getElementsByTagName('script')[0];
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
-
-        var ytPlayer;
         var params = new URLSearchParams(window.location.search);
         var vID = params.get('v');
+        var retries = 0;
+        var MAX_RETRIES = 3;
+        var ytPlayer;
+        var loadTimer;
+
+        var tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        tag.onerror = function() {
+            tag.src = 'https://www.youtube-nocookie.com/iframe_api';
+        };
+        document.head.appendChild(tag);
 
         window.onYouTubeIframeAPIReady = function() {
             if (!vID) return;
+            createPlayer();
+        };
 
+        function createPlayer() {
             var playerVars = {
                 autoplay: 1,
-                rel: parseInt(params.get('rel') || '0'),
-                modestbranding: parseInt(params.get('modestbranding') || '1'),
-                iv_load_policy: parseInt(params.get('iv_load_policy') || '3'),
-                playsinline: 1
+                rel: 0,
+                modestbranding: 1,
+                iv_load_policy: 3,
+                playsinline: 1,
+                origin: window.location.origin
             };
-
             var passthrough = ['controls', 'showinfo', 'fs', 'disablekb', 'start', 'end', 'cc_load_policy'];
             for (var i = 0; i < passthrough.length; i++) {
                 var val = params.get(passthrough[i]);
                 if (val !== null) playerVars[passthrough[i]] = parseInt(val);
             }
-
             ytPlayer = new YT.Player('player', {
                 videoId: vID,
                 width: '100%',
                 height: '100%',
-                playerVars: playerVars
+                playerVars: playerVars,
+                events: {
+                    onReady: onReady,
+                    onStateChange: onStateChange,
+                    onError: onError
+                }
             });
-        };
+        }
+
+        function onReady() {
+            document.getElementById('err').className = '';
+            loadTimer = setTimeout(function() {
+                if (ytPlayer && typeof ytPlayer.getPlayerState === 'function') {
+                    var state = ytPlayer.getPlayerState();
+                    if (state === -1 || state === 0) retryLoad();
+                }
+            }, 12000);
+        }
+
+        function onStateChange(event) {
+            if (event.data === 1) {
+                clearTimeout(loadTimer);
+                document.getElementById('err').className = '';
+                retries = 0;
+            }
+        }
+
+        function onError(event) {
+            clearTimeout(loadTimer);
+            var code = event.data;
+            var msg = 'Error ' + code;
+            if (code === 150 || code === 101) msg = 'Embed restricted (Error ' + code + ')';
+            else if (code === 100) msg = 'Video not found';
+            else if (code === 5) msg = 'HTML5 player error';
+            retryLoad(msg);
+        }
+
+        function retryLoad(msg) {
+            if (retries < MAX_RETRIES) {
+                retries++;
+                var el = document.getElementById('err');
+                el.className = 'show';
+                document.getElementById('err-text').textContent = (msg || 'Loading...') + ' — retrying (' + retries + '/' + MAX_RETRIES + ')';
+                document.getElementById('retry-msg').textContent = 'Attempt ' + (retries + 1);
+                setTimeout(function() {
+                    if (ytPlayer && typeof ytPlayer.loadVideoById === 'function') {
+                        ytPlayer.loadVideoById(vID);
+                    } else {
+                        var container = document.getElementById('player');
+                        if (container.querySelector('iframe')) container.innerHTML = '';
+                        createPlayer();
+                    }
+                }, 2000 * retries);
+            } else {
+                document.getElementById('err').className = 'show';
+                document.getElementById('err-text').textContent = msg || 'Video unavailable';
+                document.getElementById('retry-msg').textContent = 'Max retries reached';
+            }
+        }
 
         window.addEventListener('message', function(event) {
             if (!ytPlayer) return;
