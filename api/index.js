@@ -501,14 +501,17 @@ const WAR_FEEDS = [
   { id: 'france24', name: 'France 24', url: 'https://www.france24.com/en/middle-east/rss', category: 'western' },
   { id: 'guardian', name: 'The Guardian', url: 'https://www.theguardian.com/world/middleeast/rss', category: 'western' },
   { id: 'dw', name: 'DW News', url: 'https://rss.dw.com/xml/rss-en-all', category: 'western' },
-  { id: 'google-war', name: 'Google News', url: 'https://news.google.com/rss/search?q=iran+israel+war&hl=en-US&gl=US&ceid=US:en', category: 'western' },
+  { id: 'google-iran', name: 'Google News', url: 'https://news.google.com/rss/search?q=iran+war+2026&hl=en-US&gl=US&ceid=US:en', category: 'western' },
+  { id: 'aljazeera-me', name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'arab' },
   { id: 'jpost', name: 'Jerusalem Post', url: 'https://www.jpost.com/rss/rssfeedsarabisraeliconflict.aspx', category: 'israeli' },
   { id: 'presstv', name: 'Press TV', url: 'https://www.presstv.ir/rss.xml', category: 'iranian' },
   { id: 'tehrantimes', name: 'Tehran Times', url: 'https://www.tehrantimes.com/rss', category: 'iranian' },
   { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab' },
 ];
 
-const WAR_KEYWORDS = /iran|israel|strike|missile|hormuz|nuclear|sanction|military|war|ceasefire|troops|drone|hezbollah|houthi|yemen|irgc|pentagon|airbase|bombing|retaliat/i;
+const IRAN_FILTER = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei|natanz|bushehr|persian.?gulf|axis.?of.?resistance|shahid|parchin|bandar.?abbas|chabahar/i;
+const WAR_KEYWORDS = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei|natanz|bushehr|persian.?gulf|missile|strike|drone|ceasefire|nuclear|military|war|retaliat|hezbollah|houthi|pentagon/i;
+const WAR_START_DATE = '2026-03-01';
 
 const rssParser = new RssParser({ timeout: 6000, headers: { 'User-Agent': 'ThinxTV/1.0' } });
 
@@ -538,7 +541,7 @@ async function fetchWarHeadlines() {
   });
 
   let allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  allItems = allItems.filter(item => item.title && WAR_KEYWORDS.test(item.title + ' ' + item.description));
+  allItems = allItems.filter(item => item.title && IRAN_FILTER.test(item.title + ' ' + item.description));
 
   // Deduplicate: require >60% of significant words to overlap (not just 4 words)
   const seen = [];
@@ -614,6 +617,150 @@ app.get('/api/tv/war/headlines', requireWarToken, async (req, res) => {
   } catch (err) {
     logger.error('WarHeadlines', 'Failed', { error: err.message });
     res.status(500).json({ error: 'Failed to fetch headlines', details: err.message });
+  }
+});
+
+// --- TIMELINE STORAGE & RETRIEVAL ---
+
+function hashTitle(title) {
+  const norm = title.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+  let h = 0;
+  for (let i = 0; i < norm.length; i++) h = ((h << 5) - h + norm.charCodeAt(i)) | 0;
+  return 'e' + Math.abs(h).toString(36);
+}
+
+async function storeTimelineEvents(headlines) {
+  const r = await getRedis();
+  if (!r || !headlines || headlines.length === 0) return;
+  try {
+    for (const h of headlines.slice(0, 30)) {
+      const hash = hashTitle(h.title);
+      const ts = h.publishedAt ? new Date(h.publishedAt).getTime() : Date.now();
+      if (isNaN(ts)) continue;
+      await r.zadd('tv:war:timeline', { score: ts, member: hash });
+      await r.hsetnx('tv:war:timeline:detail', hash, JSON.stringify({
+        title: h.title, source: h.source, sourceCategory: h.sourceCategory,
+        link: h.link, imageUrl: h.imageUrl,
+        publishedAt: h.publishedAt || new Date().toISOString(),
+      }));
+    }
+  } catch (err) {
+    logger.warn('Timeline', 'Failed to store events', { error: err.message });
+  }
+}
+
+async function storeMarketSnapshot(markets) {
+  const r = await getRedis();
+  if (!r || !markets || markets.length === 0) return;
+  try {
+    const date = new Date().toISOString().split('T')[0];
+    const snapshot = JSON.stringify(markets.slice(0, 10).map(m => ({
+      question: m.question, probability: m.probability, volume: m.volume,
+    })));
+    await r.hset('tv:war:market:snapshots', { [date]: snapshot });
+  } catch (err) {
+    logger.warn('Timeline', 'Failed to store market snapshot', { error: err.message });
+  }
+}
+
+async function fetchWarTimeline() {
+  const r = await getRedis();
+  if (!r) return { days: [], totalEvents: 0 };
+
+  const hashes = await r.zrange('tv:war:timeline', 0, -1, { rev: true });
+  if (!hashes || hashes.length === 0) return { days: [], totalEvents: 0 };
+
+  const allDetail = await r.hgetall('tv:war:timeline:detail');
+  const events = [];
+  for (const hash of hashes) {
+    const raw = allDetail?.[hash];
+    if (!raw) continue;
+    try {
+      const evt = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      events.push(evt);
+    } catch { /* skip */ }
+  }
+
+  const dayMap = {};
+  for (const evt of events) {
+    const date = (evt.publishedAt || '').substring(0, 10) || 'unknown';
+    if (!dayMap[date]) dayMap[date] = [];
+    dayMap[date].push(evt);
+  }
+
+  const days = Object.entries(dayMap)
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, items]) => ({
+      date,
+      label: new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+      items: items.slice(0, 15),
+    }));
+
+  return { days: days.slice(0, 60), totalEvents: events.length };
+}
+
+async function computeWarMeta(headlines, markets) {
+  const startDate = new Date(WAR_START_DATE);
+  const now = new Date();
+  const dayCount = Math.floor((now - startDate) / 86400000);
+
+  const r = await getRedis();
+  let totalEvents = 0;
+  const sourceBreakdown = { western: 0, iranian: 0, israeli: 0, arab: 0 };
+
+  if (r) {
+    try {
+      totalEvents = await r.zcard('tv:war:timeline') || 0;
+      const allDetail = await r.hgetall('tv:war:timeline:detail');
+      if (allDetail) {
+        for (const [, raw] of Object.entries(allDetail)) {
+          try {
+            const evt = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (evt.sourceCategory && sourceBreakdown.hasOwnProperty(evt.sourceCategory)) {
+              sourceBreakdown[evt.sourceCategory]++;
+            }
+          } catch { /* skip */ }
+        }
+      }
+    } catch (err) {
+      logger.warn('WarMeta', 'Failed to compute meta', { error: err.message });
+    }
+  }
+
+  if (totalEvents === 0 && headlines) {
+    totalEvents = headlines.length;
+    for (const h of headlines) {
+      if (h.sourceCategory && sourceBreakdown.hasOwnProperty(h.sourceCategory)) {
+        sourceBreakdown[h.sourceCategory]++;
+      }
+    }
+  }
+
+  return {
+    startDate: WAR_START_DATE,
+    dayCount,
+    totalEventsTracked: totalEvents,
+    sourceBreakdown,
+    activeSources: headlines ? new Set(headlines.map(h => h.source)).size : 0,
+    activeMarkets: markets ? markets.length : 0,
+    latestUpdate: new Date().toISOString(),
+  };
+}
+
+app.get('/api/tv/war/timeline', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:timeline:cache');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    const data = await fetchWarTimeline();
+    if (r) { await r.set('tv:war:timeline:cache', JSON.stringify(data), { ex: 300 }); }
+    res.json(data);
+  } catch (err) {
+    logger.error('WarTimeline', 'Failed', { error: err.message });
+    res.status(500).json({ days: [], totalEvents: 0, error: err.message });
   }
 });
 
@@ -723,7 +870,7 @@ const WAR_YT_CHANNELS = {
   'UCIRYBXDze5krPDzAEOxFGVA': 'i24NEWS English',
 };
 
-const WAR_YT_QUERIES = ['Iran Israel war 2026', 'Iran US military conflict', 'Hormuz strait crisis'];
+const WAR_YT_QUERIES = ['Iran war 2026', 'Iran Israel war latest', 'Strait of Hormuz crisis 2026', 'Iran nuclear strikes', 'IRGC military operation'];
 
 async function fetchWarVideos() {
   const apiKey = process.env.YOUTUBE_API_KEY;
@@ -783,7 +930,7 @@ async function fetchWarVideos() {
 
   const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
   for (const v of rssVideos) {
-    if (v.videoId && !seenIds.has(v.videoId) && WAR_KEYWORDS.test(v.title + ' ' + v.description)) {
+    if (v.videoId && !seenIds.has(v.videoId) && IRAN_FILTER.test(v.title + ' ' + v.description)) {
       seenIds.add(v.videoId);
       videos.push(v);
     }
@@ -867,7 +1014,7 @@ async function fetchWarUpdates() {
 
   if (apiKey) {
     try {
-      const prompt = `You are a war dashboard content curator. Given these news headlines about the Iran-Israel conflict, create exactly ${Math.min(storiesWithImages.length, 6)} visual story cards for a TV dashboard.
+      const prompt = `You are an Iran war dashboard curator. Given these headlines exclusively about the Iran conflict (Iran-Israel war, IRGC, Hormuz, Iranian nuclear program, Iran military operations), create exactly ${Math.min(storiesWithImages.length, 6)} visual story cards for a TV dashboard. Focus ONLY on Iran-related developments.
 
 Headlines:
 ${storiesWithImages.map((h, i) => `${i + 1}. [${h.source}] ${h.title}`).join('\n')}
@@ -978,12 +1125,30 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
       fetchWarUpdates(),
     ]);
 
+    const headlines = headlinesResult.status === 'fulfilled' ? headlinesResult.value.headlines : [];
+    const markets = marketsResult.status === 'fulfilled' ? marketsResult.value.markets : [];
+
+    // Store events in timeline (non-blocking)
+    storeTimelineEvents(headlines).catch(() => {});
+    storeMarketSnapshot(markets).catch(() => {});
+
+    // Fetch timeline and compute meta
+    const [timelineResult, metaResult] = await Promise.allSettled([
+      fetchWarTimeline(),
+      computeWarMeta(headlines, markets),
+    ]);
+
     const bundle = {
-      headlines: headlinesResult.status === 'fulfilled' ? headlinesResult.value.headlines : [],
+      headlines,
       headlinesSourceStatus: headlinesResult.status === 'fulfilled' ? headlinesResult.value.sourceStatus : {},
-      markets: marketsResult.status === 'fulfilled' ? marketsResult.value.markets : [],
+      markets,
       videos: videosResult.status === 'fulfilled' ? videosResult.value.videos : [],
       updates: updatesResult.status === 'fulfilled' ? updatesResult.value.updates : [],
+      timeline: timelineResult.status === 'fulfilled' ? timelineResult.value : { days: [], totalEvents: 0 },
+      warMeta: metaResult.status === 'fulfilled' ? metaResult.value : {
+        startDate: WAR_START_DATE, dayCount: Math.floor((Date.now() - new Date(WAR_START_DATE).getTime()) / 86400000),
+        totalEventsTracked: headlines.length, sourceBreakdown: {}, activeSources: 0, activeMarkets: 0,
+      },
       fetchedAt: new Date().toISOString(),
       errors: {
         headlines: headlinesResult.status === 'rejected' ? headlinesResult.reason?.message : null,
