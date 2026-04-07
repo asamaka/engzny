@@ -900,6 +900,11 @@ const WAR_YT_CHANNELS = {
 
 const WAR_YT_QUERIES = ['Iran war 2026', 'Iran Israel war latest', 'Strait of Hormuz crisis 2026', 'Iran nuclear strikes', 'IRGC military operation'];
 
+function isLiveStream(title) {
+  const t = (title || '').trim();
+  return /^LIVE\s*[:|]/i.test(t) || /\bLIVE\s*$/i.test(t) || /\|\s*LIVE\s*$/i.test(t);
+}
+
 async function fetchWarVideos() {
   const apiKey = process.env.YOUTUBE_API_KEY;
   const videos = [];
@@ -915,11 +920,14 @@ async function fetchWarVideos() {
         const data = await r.json();
         for (const item of (data.items || [])) {
           const vid = item.id?.videoId;
+          const title = item.snippet?.title || '';
           if (!vid || seenIds.has(vid)) continue;
+          if (item.snippet?.liveBroadcastContent === 'live' || item.snippet?.liveBroadcastContent === 'upcoming') continue;
+          if (isLiveStream(title)) continue;
           seenIds.add(vid);
           videos.push({
             videoId: vid,
-            title: item.snippet?.title || '',
+            title,
             channel: item.snippet?.channelTitle || '',
             channelId: item.snippet?.channelId || '',
             thumbnailUrl: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || `https://img.youtube.com/vi/${vid}/hqdefault.jpg`,
@@ -957,7 +965,7 @@ async function fetchWarVideos() {
   );
 
   const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId));
+  const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId) && !isLiveStream(v.title));
   const rssRelevant = await filterIranWarRelevant(rssUnseen, 'videos');
   for (const v of rssRelevant) {
     seenIds.add(v.videoId);
@@ -993,11 +1001,11 @@ app.get('/api/tv/war/videos', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:videos');
+      const cached = await r.get('tv:war:videos:v2');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
     const data = await fetchWarVideos();
-    if (r) { await r.set('tv:war:videos', JSON.stringify(data), { ex: 900 }); }
+    if (r) { await r.set('tv:war:videos:v2', JSON.stringify(data), { ex: 900 }); }
     res.json(data);
   } catch (err) {
     logger.error('WarVideos', 'Failed', { error: err.message });
@@ -1142,7 +1150,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:bundle:v2');
+      const cached = await r.get('tv:war:bundle:v3');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
 
@@ -1186,7 +1194,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
       },
     };
 
-    if (r) { await r.set('tv:war:bundle:v2', JSON.stringify(bundle), { ex: 60 }); }
+    if (r) { await r.set('tv:war:bundle:v3', JSON.stringify(bundle), { ex: 60 }); }
     res.json(bundle);
   } catch (err) {
     logger.error('WarBundle', 'Failed', { error: err.message });
@@ -1199,7 +1207,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
 async function getCachedBundle() {
   const r = await getRedis();
   if (r) {
-    const cached = await r.get('tv:war:bundle:v2');
+    const cached = await r.get('tv:war:bundle:v3');
     if (cached) return typeof cached === 'string' ? JSON.parse(cached) : cached;
   }
   return null;
