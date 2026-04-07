@@ -767,7 +767,8 @@ app.get('/api/tv/war/timeline', requireWarToken, async (req, res) => {
 // --- POLYMARKET MARKETS ---
 
 async function fetchWarMarkets() {
-  const keywords = ['iran', 'israel', 'war', 'hormuz', 'ceasefire', 'nuclear', 'middle east', 'military', 'strike', 'oil', 'troops', 'missile'];
+  const iranRequired = ['iran', 'iranian', 'tehran', 'hormuz', 'irgc', 'persian gulf'];
+  const broadKeywords = ['israel', 'middle east', 'ceasefire', 'nuclear', 'oil price', 'oil shock'];
   let allMarkets = [];
 
   try {
@@ -776,7 +777,9 @@ async function fetchWarMarkets() {
       const events = await eventsRes.json();
       for (const event of events) {
         const text = ((event.title || '') + ' ' + (event.description || '')).toLowerCase();
-        if (keywords.some(k => text.includes(k))) {
+        const hasIran = iranRequired.some(k => text.includes(k));
+        const hasBroad = broadKeywords.some(k => text.includes(k));
+        if (hasIran || (hasBroad && text.includes('iran'))) {
           const markets = event.markets || [];
           for (const m of markets) {
             const prices = m.outcomePrices ? (typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices) : [];
@@ -800,7 +803,7 @@ async function fetchWarMarkets() {
 
   if (allMarkets.length === 0) {
     try {
-      for (const q of ['Iran', 'Israel', 'war', 'Middle East']) {
+      for (const q of ['Iran war', 'Iran Israel', 'Iran nuclear', 'Hormuz', 'Iran ceasefire']) {
         const searchRes = await fetch(`https://gamma-api.polymarket.com/events?limit=20&active=true&closed=false&title=${encodeURIComponent(q)}`);
         if (searchRes.ok) {
           const events = await searchRes.json();
