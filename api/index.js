@@ -843,11 +843,11 @@ app.get('/api/tv/war/markets', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:markets');
+      const cached = await r.get('tv:war:markets:v2');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
     const data = await fetchWarMarkets();
-    if (r) { await r.set('tv:war:markets', JSON.stringify(data), { ex: 120 }); }
+    if (r) { await r.set('tv:war:markets:v2', JSON.stringify(data), { ex: 120 }); }
     res.json(data);
   } catch (err) {
     logger.error('WarMarkets', 'Failed', { error: err.message });
@@ -1117,7 +1117,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:bundle');
+      const cached = await r.get('tv:war:bundle:v2');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
 
@@ -1161,7 +1161,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
       },
     };
 
-    if (r) { await r.set('tv:war:bundle', JSON.stringify(bundle), { ex: 60 }); }
+    if (r) { await r.set('tv:war:bundle:v2', JSON.stringify(bundle), { ex: 60 }); }
     res.json(bundle);
   } catch (err) {
     logger.error('WarBundle', 'Failed', { error: err.message });
