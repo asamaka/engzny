@@ -803,11 +803,13 @@ async function fetchWarMarkets() {
 
   if (allMarkets.length === 0) {
     try {
-      for (const q of ['Iran war', 'Iran Israel', 'Iran nuclear', 'Hormuz', 'Iran ceasefire']) {
+      for (const q of ['Iran', 'Iran war', 'Iran Israel', 'Hormuz']) {
         const searchRes = await fetch(`https://gamma-api.polymarket.com/events?limit=20&active=true&closed=false&title=${encodeURIComponent(q)}`);
         if (searchRes.ok) {
           const events = await searchRes.json();
           for (const event of events) {
+            const evText = ((event.title || '') + ' ' + (event.description || '')).toLowerCase();
+            if (!iranRequired.some(k => evText.includes(k))) continue;
             for (const m of (event.markets || [])) {
               const prices = m.outcomePrices ? (typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices) : [];
               allMarkets.push({
@@ -843,11 +845,11 @@ app.get('/api/tv/war/markets', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:markets:v2');
+      const cached = await r.get('tv:war:markets:v3');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
     const data = await fetchWarMarkets();
-    if (r) { await r.set('tv:war:markets:v2', JSON.stringify(data), { ex: 120 }); }
+    if (r) { await r.set('tv:war:markets:v3', JSON.stringify(data), { ex: 120 }); }
     res.json(data);
   } catch (err) {
     logger.error('WarMarkets', 'Failed', { error: err.message });
