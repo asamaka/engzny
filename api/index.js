@@ -809,20 +809,124 @@ app.get('/api/tv/war/timeline', requireWarToken, async (req, res) => {
 // --- POLYMARKET MARKETS ---
 
 async function fetchWarMarkets() {
-  const iranRequired = ['iran', 'iranian', 'tehran', 'hormuz', 'irgc', 'persian gulf'];
-  let allMarkets = [];
+  // PASS 1: Fetch all event titles from Polymarket (lightweight scan)
+  let allEvents = [];
+  try {
+    const offsets = [];
+    for (let o = 0; o <= 3000; o += 100) offsets.push(o);
+    const batches = [];
+    for (let i = 0; i < offsets.length; i += 10) {
+      const batch = offsets.slice(i, i + 10).map(offset =>
+        fetch(`https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false&offset=${offset}`)
+          .then(r => r.ok ? r.json() : [])
+          .catch(() => [])
+      );
+      const results = await Promise.all(batch);
+      for (const events of results) {
+        for (const e of events) allEvents.push(e);
+      }
+      if (results.some(r => r.length < 100)) break;
+    }
+  } catch (err) {
+    logger.warn('WarMarkets', 'Gamma scan failed', { error: err.message });
+  }
 
-  function extractMarkets(event) {
-    const text = ((event.title || '') + ' ' + (event.description || '')).toLowerCase();
-    if (!iranRequired.some(k => text.includes(k))) return;
+  // Dedupe events by slug
+  const seenSlugs = new Set();
+  allEvents = allEvents.filter(e => {
+    const key = e.slug || e.id;
+    if (seenSlugs.has(key)) return false;
+    seenSlugs.add(key);
+    return true;
+  });
+
+  logger.info('WarMarkets', `Scanned ${allEvents.length} unique events from Polymarket`);
+
+  // PASS 2: Send all event titles to Haiku for relevance filtering
+  let selectedSlugs = new Set();
+  try {
+    const anthropic = getAnthropicClient();
+    const titleList = allEvents.map((e, i) => `${i}. ${e.title || e.slug}`).join('\n');
+    const resp = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 2048,
+      messages: [{
+        role: 'user',
+        content: `You are selecting prediction markets for a TV dashboard tracking the US-Iran war (2026).
+
+Select ALL events that are relevant to:
+- Iran war: military action, strikes, invasion, escalation, de-escalation
+- Iran ceasefire or peace negotiations
+- Iran nuclear program, NPT, enrichment, nuclear deal
+- Iran regime change, IRGC, Iranian government
+- Strait of Hormuz, Persian Gulf security
+- US-Iran relations, sanctions, diplomacy
+- Regional actors directly involved: Israel-Iran, Hezbollah-Iran, Gulf states in Iran context
+- War-related economic impacts (oil, energy) IF directly tied to Iran conflict
+
+Do NOT select: Ukraine-Russia (unless Iran-linked), US domestic politics, crypto, sports, entertainment, elections unrelated to Iran, other regional conflicts not involving Iran.
+
+Return ONLY a JSON array of index numbers to keep. Example: [0,2,5,11]
+
+Events:
+${titleList}`
+      }],
+    });
+    const text = resp.content[0].text.trim();
+    const match = text.match(/\[[\d,\s]+\]/);
+    if (match) {
+      const indices = JSON.parse(match[0]);
+      for (const i of indices) {
+        if (i >= 0 && i < allEvents.length) {
+          selectedSlugs.add(allEvents[i].slug || allEvents[i].id);
+        }
+      }
+      logger.info('WarMarkets', `Haiku selected ${selectedSlugs.size} events from ${allEvents.length}`);
+    }
+  } catch (err) {
+    logger.warn('WarMarkets', 'Haiku selection failed, falling back to keyword filter', { error: err.message });
+    const fallbackKeywords = ['iran', 'iranian', 'tehran', 'hormuz', 'irgc', 'ceasefire', 'nuclear deal', 'hezbollah'];
+    for (const e of allEvents) {
+      const text = ((e.title || '') + ' ' + (e.slug || '')).toLowerCase();
+      if (fallbackKeywords.some(k => text.includes(k))) selectedSlugs.add(e.slug || e.id);
+    }
+  }
+
+  // PASS 3: Extract open markets from selected events
+  const now = new Date();
+  let markets = [];
+  for (const event of allEvents) {
+    const key = event.slug || event.id;
+    if (!selectedSlugs.has(key)) continue;
     for (const m of (event.markets || [])) {
+      if (m.closed) continue;
       const prices = m.outcomePrices ? (typeof m.outcomePrices === 'string' ? JSON.parse(m.outcomePrices) : m.outcomePrices) : [];
       const yesPrice = parseFloat(prices[0]) || 0;
-      allMarkets.push({
-        id: m.id || m.conditionId || `poly-${allMarkets.length}`,
-        question: m.question || event.title,
+      if (yesPrice <= 0.02 || yesPrice >= 0.93) continue;
+
+      const vol = parseFloat(m.volume || '0');
+      const volM = vol / 1e6;
+
+      // Skip micro-volume markets (< $50k) — usually spam/joke markets
+      if (vol < 50000) continue;
+
+      // Skip markets whose end date has already passed
+      const endDate = m.endDate || m.expirationDate || event.endDate || null;
+      if (endDate) {
+        const ed = new Date(endDate);
+        if (ed < now) continue;
+      }
+
+      // Check question text for past-date references (e.g. "by March 29" when it's April)
+      const question = m.question || event.title || '';
+      if (isMarketDateExpired(question, now)) continue;
+
+      markets.push({
+        id: m.id || m.conditionId || `poly-${markets.length}`,
+        question,
         probability: Math.round(yesPrice * 1000) / 1000,
-        volume: m.volume ? `$${(parseFloat(m.volume) / 1e6).toFixed(1)}M` : null,
+        volume: `$${volM.toFixed(1)}M`,
+        volumeNum: volM,
         imageUrl: event.image || m.image || null,
         updatedAt: m.updatedAt || event.updatedAt || null,
         eventSlug: event.slug || null,
@@ -830,37 +934,37 @@ async function fetchWarMarkets() {
     }
   }
 
-  // Paginate through all active events (Iran markets are spread across offsets 0-900+)
-  try {
-    const offsets = [0, 100, 200, 300, 400, 500, 600, 700, 800, 900];
-    const fetches = offsets.map(offset =>
-      fetch(`https://gamma-api.polymarket.com/events?limit=100&active=true&closed=false&offset=${offset}`)
-        .then(r => r.ok ? r.json() : [])
-        .catch(() => [])
-    );
-    const pages = await Promise.all(fetches);
-    for (const events of pages) {
-      for (const event of events) extractMarkets(event);
-    }
-  } catch (err) {
-    logger.warn('WarMarkets', 'Gamma paginated fetch failed', { error: err.message });
-  }
-
-  const seen = new Set();
-  allMarkets = allMarkets.filter(m => {
-    if (seen.has(m.id)) return false;
-    seen.add(m.id);
+  // Dedupe markets
+  const seenIds = new Set();
+  markets = markets.filter(m => {
+    if (seenIds.has(m.id)) return false;
+    seenIds.add(m.id);
     return true;
   });
 
-  // Sort by volume (highest first)
-  allMarkets.sort((a, b) => {
-    const va = parseFloat((a.volume || '').replace(/[$M,]/g, '')) || 0;
-    const vb = parseFloat((b.volume || '').replace(/[$M,]/g, '')) || 0;
-    return vb - va;
-  });
+  // Sort by volume
+  markets.sort((a, b) => (b.volumeNum || 0) - (a.volumeNum || 0));
 
-  return { markets: allMarkets, fetchedAt: new Date().toISOString() };
+  // Clean up volumeNum from output
+  markets.forEach(m => delete m.volumeNum);
+
+  return { markets, fetchedAt: new Date().toISOString() };
+}
+
+function isMarketDateExpired(question, now) {
+  const months = { january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+    july: 6, august: 7, september: 8, october: 9, november: 10, december: 11 };
+  // Match patterns like "by April 7", "on March 29, 2026", "by March 31"
+  const re = /(?:by|on|before)\s+(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{1,2})(?:[,\s]+(\d{4}))?/gi;
+  let match;
+  while ((match = re.exec(question)) !== null) {
+    const month = months[match[1].toLowerCase()];
+    const day = parseInt(match[2]);
+    const year = match[3] ? parseInt(match[3]) : now.getFullYear();
+    const deadline = new Date(year, month, day, 23, 59, 59);
+    if (deadline < now) return true;
+  }
+  return false;
 }
 
 app.get('/api/tv/war/markets', requireWarToken, async (req, res) => {
@@ -868,11 +972,11 @@ app.get('/api/tv/war/markets', requireWarToken, async (req, res) => {
   try {
     const r = await getRedis();
     if (r) {
-      const cached = await r.get('tv:war:markets:v4');
+      const cached = await r.get('tv:war:markets:v8');
       if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
     }
     const data = await fetchWarMarkets();
-    if (r) { await r.set('tv:war:markets:v4', JSON.stringify(data), { ex: 300 }); }
+    if (r) { await r.set('tv:war:markets:v8', JSON.stringify(data), { ex: 300 }); }
     res.json(data);
   } catch (err) {
     logger.error('WarMarkets', 'Failed', { error: err.message });
@@ -945,14 +1049,14 @@ async function fetchWarVideos() {
     }
   }
 
-  // Supplement with YouTube RSS from known channels (free, no quota)
+  // Supplement with YouTube RSS from ALL known channels (free, no quota)
   const channelIds = Object.keys(WAR_YT_CHANNELS);
   const rssResults = await Promise.allSettled(
-    channelIds.slice(0, 8).map(async (chId) => {
+    channelIds.map(async (chId) => {
       try {
         const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${chId}`;
         const parsed = await rssParser.parseURL(feedUrl);
-        return (parsed.items || []).slice(0, 5).map(item => {
+        return (parsed.items || []).slice(0, 15).map(item => {
           const vid = (item.id || '').replace('yt:video:', '') || item.link?.split('v=')[1];
           return {
             videoId: vid,
@@ -971,7 +1075,9 @@ async function fetchWarVideos() {
 
   const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
   const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId) && !isLiveOrCompilation(v.title));
+  logger.info('WarVideos', `RSS returned ${rssVideos.length} total, ${rssUnseen.length} unseen after dedup/live filter`);
   const rssRelevant = await filterIranWarRelevant(rssUnseen, 'videos');
+  logger.info('WarVideos', `Haiku kept ${rssRelevant.length} of ${rssUnseen.length} RSS videos`);
   for (const v of rssRelevant) {
     seenIds.add(v.videoId);
     videos.push(v);
@@ -1001,17 +1107,67 @@ async function fetchWarVideos() {
   };
 }
 
+const VIDEO_ACCUM_KEY = 'tv:war:videos:accum:v2';
+const VIDEO_FETCH_LOCK = 'tv:war:videos:fetchlock:v2';
+const MAX_ACCUMULATED_VIDEOS = 20;
+
+async function getAccumulatedVideos() {
+  const r = await getRedis();
+
+  let accumulated = [];
+  if (r) {
+    const stored = await r.get(VIDEO_ACCUM_KEY);
+    if (stored) accumulated = (typeof stored === 'string' ? JSON.parse(stored) : stored);
+  }
+
+  let shouldFetch = true;
+  if (r) {
+    const lock = await r.get(VIDEO_FETCH_LOCK);
+    if (lock) shouldFetch = false;
+  }
+
+  if (shouldFetch) {
+    const freshData = await fetchWarVideos();
+    const freshVideos = freshData.videos || [];
+
+    const existingIds = new Set(accumulated.map(v => v.videoId));
+    let newCount = 0;
+    for (const v of freshVideos) {
+      if (!existingIds.has(v.videoId)) {
+        accumulated.push(v);
+        existingIds.add(v.videoId);
+        newCount++;
+      }
+    }
+
+    accumulated.sort((a, b) => {
+      const da = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const db = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return db - da;
+    });
+
+    if (accumulated.length > MAX_ACCUMULATED_VIDEOS) {
+      accumulated = accumulated.slice(0, MAX_ACCUMULATED_VIDEOS);
+    }
+
+    if (r) {
+      await r.set(VIDEO_ACCUM_KEY, JSON.stringify(accumulated), { ex: 86400 });
+      await r.set(VIDEO_FETCH_LOCK, '1', { ex: 300 });
+    }
+    logger.info('WarVideos', `Fetched ${freshVideos.length} fresh, added ${newCount} new, total ${accumulated.length}`);
+  }
+
+  return {
+    videos: accumulated,
+    fetchedAt: new Date().toISOString(),
+    apiKeyPresent: !!process.env.YOUTUBE_API_KEY,
+  };
+}
+
 app.get('/api/tv/war/videos', requireWarToken, async (req, res) => {
   setCorsHeaders(res);
   try {
-    const r = await getRedis();
-    if (r) {
-      const cached = await r.get('tv:war:videos:v2');
-      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
-    }
-    const data = await fetchWarVideos();
-    if (r) { await r.set('tv:war:videos:v2', JSON.stringify(data), { ex: 900 }); }
-    res.json(data);
+    res.json(await getAccumulatedVideos());
   } catch (err) {
     logger.error('WarVideos', 'Failed', { error: err.message });
     res.json({ videos: [], error: err.message, fetchedAt: new Date().toISOString() });
@@ -1181,7 +1337,7 @@ app.get('/api/tv/war/bundle', requireWarToken, async (req, res) => {
     const [headlinesResult, marketsResult, videosResult, updatesResult] = await Promise.allSettled([
       fetchWarHeadlines(),
       fetchWarMarkets(),
-      fetchWarVideos(),
+      getAccumulatedVideos(),
       fetchWarUpdates(),
     ]);
 
@@ -1271,6 +1427,32 @@ app.get('/api/tv/war/stream', requireWarToken, async (req, res) => {
   }
 
   res.end();
+});
+
+app.get('/api/tv/war/analyze', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    const cached = r ? await r.get('tv:war:analysis') : null;
+    if (!cached) return res.status(404).json({ error: 'No analysis available yet' });
+    const data = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to retrieve analysis' });
+  }
+});
+
+app.post('/api/tv/war/analyze', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    const body = req.body;
+    if (!body || !body.analysis) return res.status(400).json({ error: 'Missing analysis field' });
+    if (r) await r.set('tv:war:analysis', JSON.stringify(body), { ex: 600 });
+    res.json({ ok: true, storedAt: new Date().toISOString() });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to store analysis' });
+  }
 });
 
 // GET /api/example-image?url=... — Proxy for example screenshot images
