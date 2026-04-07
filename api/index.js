@@ -1218,7 +1218,17 @@ app.get('/api/tv/war/stream', requireWarToken, async (req, res) => {
   res.write('retry: 30000\n\n');
 
   const lastId = req.headers['last-event-id'] || '';
-  const bundle = await getCachedBundle();
+  let bundle = await getCachedBundle();
+
+  if (!bundle) {
+    // Cache empty — trigger a lightweight fetch via the bundle endpoint's own cache-or-fetch logic
+    try {
+      const response = await fetch('https://www.thinx.fun/api/tv/war/bundle', {
+        headers: { 'Authorization': 'Bearer ' + (process.env.TV_WAR_TOKEN || process.env.TV_BRIEFING_TOKEN) }
+      });
+      if (response.ok) bundle = await response.json();
+    } catch { /* will fall through to no-change */ }
+  }
 
   if (bundle && bundle.fetchedAt !== lastId) {
     res.write('id: ' + bundle.fetchedAt + '\n');
