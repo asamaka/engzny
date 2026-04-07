@@ -509,11 +509,52 @@ const WAR_FEEDS = [
   { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab' },
 ];
 
-const IRAN_FILTER = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei|natanz|bushehr|persian.?gulf|axis.?of.?resistance|shahid|parchin|bandar.?abbas|chabahar/i;
-const WAR_KEYWORDS = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei|natanz|bushehr|persian.?gulf|missile|strike|drone|ceasefire|nuclear|military|war|retaliat|hezbollah|houthi|pentagon/i;
 const WAR_START_DATE = '2026-03-01';
+const IRAN_FALLBACK = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei/i;
 
 const rssParser = new RssParser({ timeout: 6000, headers: { 'User-Agent': 'ThinxTV/1.0' } });
+
+async function filterIranWarRelevant(items, type) {
+  if (items.length === 0) return [];
+  try {
+    const anthropic = getAnthropicClient();
+    const BATCH = 120;
+    const allRelevant = [];
+
+    for (let offset = 0; offset < items.length; offset += BATCH) {
+      const chunk = items.slice(offset, offset + BATCH);
+      const numbered = chunk.map((item, i) => {
+        const desc = item.description ? ' — ' + item.description.substring(0, 60) : '';
+        return (i + 1) + '. ' + (item.title || '') + desc;
+      }).join('\n');
+
+      const res = await anthropic.messages.create({
+        model: 'claude-3-5-haiku-20241022',
+        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: 'Filter ' + type + ' for an IRAN WAR dashboard. Return ONLY the line numbers of items relevant to: the Iran war (Iran-Israel/US-Iran conflict), IRGC operations, Strait of Hormuz, Iranian nuclear program, strikes on/by Iran, Iranian military & proxies (Hezbollah/Houthis acting for Iran), sanctions on Iran, Iran ceasefire talks, Iranian regime/leadership, or direct consequences of the Iran conflict (oil shock, regional fallout, diplomatic moves about Iran).\n\nReturn comma-separated numbers only. If none relevant, return NONE.\n\n' + numbered,
+        }],
+      });
+
+      const text = (res.content[0].text || '').trim();
+      if (text !== 'NONE') {
+        const nums = text.match(/\d+/g);
+        if (nums) {
+          for (const n of nums) {
+            const idx = parseInt(n) - 1;
+            if (idx >= 0 && idx < chunk.length) allRelevant.push(items[offset + idx]);
+          }
+        }
+      }
+    }
+    logger.info('IranFilter', type + ' AI filter', { input: items.length, output: allRelevant.length });
+    return allRelevant;
+  } catch (err) {
+    logger.warn('IranFilter', 'AI filter failed, using regex fallback', { error: err.message });
+    return items.filter(item => IRAN_FALLBACK.test((item.title || '') + ' ' + (item.description || '')));
+  }
+}
 
 async function fetchWarHeadlines() {
   const results = await Promise.allSettled(
@@ -541,7 +582,8 @@ async function fetchWarHeadlines() {
   });
 
   let allItems = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  allItems = allItems.filter(item => item.title && IRAN_FILTER.test(item.title + ' ' + item.description));
+  allItems = allItems.filter(item => item.title);
+  allItems = await filterIranWarRelevant(allItems, 'headlines');
 
   // Deduplicate: require >60% of significant words to overlap (not just 4 words)
   const seen = [];
@@ -915,11 +957,11 @@ async function fetchWarVideos() {
   );
 
   const rssVideos = rssResults.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  for (const v of rssVideos) {
-    if (v.videoId && !seenIds.has(v.videoId) && IRAN_FILTER.test(v.title + ' ' + v.description)) {
-      seenIds.add(v.videoId);
-      videos.push(v);
-    }
+  const rssUnseen = rssVideos.filter(v => v.videoId && !seenIds.has(v.videoId));
+  const rssRelevant = await filterIranWarRelevant(rssUnseen, 'videos');
+  for (const v of rssRelevant) {
+    seenIds.add(v.videoId);
+    videos.push(v);
   }
 
   videos.sort((a, b) => {
