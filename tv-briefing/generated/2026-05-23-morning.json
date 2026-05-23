@@ -1,0 +1,598 @@
+{
+  "agentRunAt": "2026-05-23T10:23:27+03:00",
+  "generatedAt": "2026-05-23T10:23:27+03:00",
+  "timezone": "Africa/Cairo",
+  "location": {
+    "city": "New Cairo",
+    "country": "Egypt"
+  },
+  "liveFeeds": {
+    "weather": {
+      "url": "https://api.open-meteo.com/v1/forecast?latitude=30.04&longitude=31.24&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Africa%2FCairo&forecast_days=1",
+      "refreshSeconds": 1800,
+      "parser": "openmeteo"
+    },
+    "crypto": {
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true",
+      "refreshSeconds": 600,
+      "parser": "coingecko",
+      "display": {
+        "label": "Bitcoin",
+        "prefix": "$",
+        "changeKey": "usd_24h_change"
+      }
+    },
+    "sports": {
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard?dates=20260524",
+      "refreshSeconds": 120,
+      "parser": "espn",
+      "display": {
+        "label": "Liverpool",
+        "teamFilter": "Liverpool"
+      }
+    },
+    "breakingNews": {
+      "url": "https://saurav.tech/NewsAPI/top-headlines/category/general/us.json",
+      "refreshSeconds": 900,
+      "parser": "saurav-news"
+    },
+    "briefing": {
+      "url": "https://www.thinx.fun/api/tv/briefing",
+      "refreshSeconds": 300,
+      "parser": "self"
+    }
+  },
+  "header": {
+    "weather": {
+      "temperatureC": 27,
+      "feelsLikeC": 27,
+      "condition": "Mainly clear",
+      "highC": 32,
+      "lowC": 20
+    },
+    "metrics": [
+      {
+        "id": "hijri-dhul-hijjah-6",
+        "label": "Hijri",
+        "title": "Dhu al-Hijjah",
+        "value": "Day 6",
+        "changeText": "Eid al-Adha in 4 days",
+        "trend": "up"
+      },
+      {
+        "id": "egypt-electricity-hike-major-users",
+        "label": "Egypt",
+        "title": "Electricity",
+        "value": "+31%",
+        "changeText": "major users hit",
+        "trend": "up"
+      },
+      {
+        "id": "openai-ipo-september",
+        "label": "AI",
+        "title": "OpenAI",
+        "value": "Sept?",
+        "changeText": "confidential filing next",
+        "trend": "up"
+      },
+      {
+        "id": "egypt-squad-27",
+        "label": "Sports",
+        "title": "Egypt squad",
+        "value": "27",
+        "changeText": "one cut after Russia",
+        "trend": "up"
+      }
+    ]
+  },
+  "hero": {
+    "greeting": "Good Morning, Aser!",
+    "context": "Dhu al-Hijjah 6 opens with Iran drawing two red lines at once -- uranium stays home and Hormuz control stays in play -- while the AI money race gets louder by the hour. OpenAI is lining up a filing, Anthropic is nearing another mega-round, Meta is cutting thousands to fund AI, and SpaceX's S-1 reads like infrastructure doctrine. Egypt's board is more practical today: higher electricity tariffs are now more visible, and Cairo is pitching itself as a grain hub as Eid al-Adha approaches.",
+    "photoOfDay": {
+      "imageUrl": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1600&q=80",
+      "title": "Cold water through the mountains",
+      "caption": "A clear river cuts through deep green rock and pine -- a calm, faraway reset before the board gets loud.",
+      "internalReason": "Picked a high-contrast landscape with no topic overlap: wonder, distance, and a visual palate cleanser for a news-heavy morning."
+    }
+  },
+  "videoRecommendations": [
+    {
+      "id": "story-iran-uranium-red-line-may23",
+      "storyTitle": "Iran drew a new red line by refusing to send its 60% uranium abroad",
+      "storyContext": "The latest Iran-war hinge: Tehran hardened the single clause Trump says any deal must include.",
+      "tag": "Breaking",
+      "label": "Iran",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "Km21MbU3JQs",
+      "videoTitle": "Mojtaba Khamenei 'Rejects' Key US Demand | WION Fineprint",
+      "videoChannel": "WION",
+      "videoPublishedAt": "2026-05-21T18:10:04Z",
+      "videoDurationText": "7:53",
+      "videoDurationSeconds": 473,
+      "thumbnailUrl": "https://i.ytimg.com/vi/Km21MbU3JQs/hqdefault.jpg",
+      "storySource": "Reuters / WION",
+      "storyPublishedAt": "2026-05-21T17:16:00Z",
+      "searchQuery": "Iran enriched uranium stay inside country Reuters May 2026",
+      "searchIterations": 3,
+      "internalReason": "Specific and current clip on the exact uranium-export dispute, with a recognizable channel and enough runtime to explain why it could blow up the talks.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-openai-ipo-race-may23",
+      "storyTitle": "OpenAI is preparing a confidential IPO filing that could start a September listing race",
+      "storyContext": "This turns frontier AI from product competition into a capital-markets sprint against Anthropic and SpaceX.",
+      "tag": "Follow",
+      "label": "OpenAI",
+      "ongoingStory": true,
+      "ongoingStoryId": "openai-ipo-2026",
+      "videoId": "12DCo78QSm8",
+      "videoTitle": "OpenAI plans to go public as soon as September: Source",
+      "videoChannel": "CNBC Television",
+      "videoPublishedAt": "2026-05-21T18:03:11Z",
+      "videoDurationText": "2:35",
+      "videoDurationSeconds": 155,
+      "thumbnailUrl": "https://i.ytimg.com/vi/12DCo78QSm8/hqdefault.jpg",
+      "storySource": "CNBC / Bloomberg",
+      "storyPublishedAt": "2026-05-21T17:50:00Z",
+      "searchQuery": "OpenAI IPO filing May 2026",
+      "searchIterations": 2,
+      "internalReason": "Exact story match and a fresh CNBC clip focused on the filing timeline and IPO race.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-meta-ai-layoffs-may23",
+      "storyTitle": "Meta began cutting 8,000 jobs while moving 7,000 workers into AI teams",
+      "storyContext": "This is the clearest white-collar AI displacement story in the market right now.",
+      "tag": "Career",
+      "label": "Meta",
+      "ongoingStory": true,
+      "ongoingStoryId": "meta-ai-layoffs-2026",
+      "videoId": "-aqUCN5NdZk",
+      "videoTitle": "Meta Cuts 8,000 Jobs As Zuckerberg Doubles Down On Artificial Intelligence Push | Latest News | N18G",
+      "videoChannel": "CNN-News18",
+      "videoPublishedAt": "2026-05-21T00:00:00Z",
+      "videoDurationText": "3:17",
+      "videoDurationSeconds": 197,
+      "thumbnailUrl": "https://i.ytimg.com/vi/-aqUCN5NdZk/hqdefault.jpg",
+      "storySource": "CNBC / Bloomberg",
+      "storyPublishedAt": "2026-05-20T23:41:00Z",
+      "searchQuery": "Meta layoffs AI May 2026 8000 jobs",
+      "searchIterations": 4,
+      "internalReason": "Fresh, story-specific clip on the job cuts plus AI reassignments, which is the highest-signal career story in this cycle.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-garden-grove-chemical-may23",
+      "storyTitle": "A leaking Garden Grove tank forced mass evacuations with officials warning it could spill or explode",
+      "storyContext": "This is the morning's pure wow-factor emergency story: a volatile chemical tank, live worst-case briefings, and whole neighborhoods pushed out.",
+      "tag": "Alert",
+      "label": "US",
+      "ongoingStory": true,
+      "ongoingStoryId": "garden-grove-chemical-2026",
+      "videoId": "aljWCZ42gGQ",
+      "videoTitle": "Tank spews toxic chemicals in Garden Grove",
+      "videoChannel": "ABC7",
+      "videoPublishedAt": "2026-05-22T01:26:30Z",
+      "videoDurationText": "0:52",
+      "videoDurationSeconds": 52,
+      "thumbnailUrl": "https://i.ytimg.com/vi/aljWCZ42gGQ/hqdefault.jpg",
+      "storySource": "ABC7 / OCFA",
+      "storyPublishedAt": "2026-05-22T01:26:30Z",
+      "searchQuery": "Garden Grove toxic tank May 2026 evacuation",
+      "searchIterations": 3,
+      "internalReason": "Dramatic exact-match footage from the scene; short, but it shows the event directly and cleanly.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-hormuz-shipping-rules-may23",
+      "storyTitle": "Iran's new Hormuz transit rules are now shaping who moves oil and on what terms",
+      "storyContext": "The diplomacy story did not really simplify the choke point: Tehran is still using Hormuz as leverage.",
+      "tag": "Breaking",
+      "label": "Hormuz",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "QJ_A-drAV1A",
+      "videoTitle": "The new Iranian rules reshaping global oil shipping",
+      "videoChannel": "news.com.au",
+      "videoPublishedAt": "2026-05-20T23:31:22Z",
+      "videoDurationText": "2:46",
+      "videoDurationSeconds": 166,
+      "thumbnailUrl": "https://i.ytimg.com/vi/QJ_A-drAV1A/hqdefault.jpg",
+      "storySource": "Reuters / CNBC",
+      "storyPublishedAt": "2026-05-22T14:00:00Z",
+      "searchQuery": "Iran Hormuz tolls Reuters May 2026",
+      "searchIterations": 3,
+      "internalReason": "It is the clearest explainer clip on the new Hormuz-control mechanism and why shipping is still constrained even as talks inch forward.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-spacex-ai-ipo-may23",
+      "storyTitle": "SpaceX's S-1 turned into an AI-infrastructure story as much as a space IPO",
+      "storyContext": "For this user, the point is not retail stock excitement -- it is that AI capex, chips, and compute are now inside the biggest listing on the board.",
+      "tag": "Tech",
+      "label": "SpaceX",
+      "ongoingStory": true,
+      "ongoingStoryId": "spacex-ai-ipo-2026",
+      "videoId": "RXnV4_R-aTA",
+      "videoTitle": "SpaceX reveals IPO filing: Here's what to know",
+      "videoChannel": "CNBC Television",
+      "videoPublishedAt": "2026-05-21T12:22:06Z",
+      "videoDurationText": "6:11",
+      "videoDurationSeconds": 371,
+      "thumbnailUrl": "https://i.ytimg.com/vi/RXnV4_R-aTA/hqdefault.jpg",
+      "storySource": "CNBC / TechCrunch",
+      "storyPublishedAt": "2026-05-21T12:22:06Z",
+      "searchQuery": "SpaceX IPO filing AI 2026",
+      "searchIterations": 3,
+      "internalReason": "Fresh CNBC coverage of the actual filing, with the AI capex angle clearly spelled out in the report.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-egypt-electricity-hikes-may23",
+      "storyTitle": "Egypt's new electricity tariff sheet shows deeper hikes for major users than the first messaging suggested",
+      "storyContext": "This is the practical Egypt card today: the war-cost shock is now visible in bills for commercial users, utilities and higher brackets.",
+      "tag": "Local",
+      "label": "Egypt",
+      "ongoingStory": true,
+      "ongoingStoryId": "egypt-energy-crisis",
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "Recent tariff sheets and local reporting show hikes reaching roughly 15% to 31% across several service and high-usage categories, with metro, water, irrigation and commercial users among those facing bigger increases. Cairo says lower household brackets stay protected, but the inflation pass-through risk is real.",
+      "storySource": "Mada Masr / Ahram Online",
+      "storyPublishedAt": "2026-05-21T09:00:00Z",
+      "searchQuery": "Egypt electricity tariffs May 2026 Ahram Mada Masr",
+      "searchIterations": 4,
+      "internalReason": "High personal-impact Egypt story. Video search stayed generic, so the text card is cleaner than forcing a weak clip.",
+      "previousPosition": null,
+      "playable": false
+    },
+    {
+      "id": "story-anthropic-funding-round-may23",
+      "storyTitle": "Anthropic is close to a new $30B-plus round that could value it above $900B",
+      "storyContext": "This keeps the AI wall balanced: OpenAI may reach public markets first, but Anthropic is still pulling in private capital at extraordinary scale.",
+      "tag": "AI",
+      "label": "Anthropic",
+      "ongoingStory": true,
+      "ongoingStoryId": "anthropic-funding-2026",
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "Bloomberg says Anthropic could close a new financing round as soon as next week, with Sequoia, Dragoneer, Altimeter and Greenoaks expected to co-lead. If it lands above a $900B valuation, it vaults back into the top tier of the AI power race just as OpenAI's IPO clock starts.",
+      "storySource": "Bloomberg / CNBC",
+      "storyPublishedAt": "2026-05-22T19:42:00Z",
+      "searchQuery": "Anthropic 30 billion round May 2026",
+      "searchIterations": 2,
+      "internalReason": "Important Anthropic capital-markets update, but the available video coverage was either generic IPO chatter or stale.",
+      "previousPosition": null,
+      "playable": false
+    },
+    {
+      "id": "story-openai-erdos-breakthrough-may23",
+      "storyTitle": "An OpenAI model just broke a famous Erdos conjecture in discrete geometry",
+      "storyContext": "This is the pure AI breakthrough slot: not product marketing, but a genuine research milestone people will talk about.",
+      "tag": "AI",
+      "label": "OpenAI",
+      "ongoingStory": false,
+      "ongoingStoryId": null,
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "OpenAI says a general-purpose reasoning model found an infinite family of counterexamples to the long-standing unit-distance conjecture, with the proof checked by external mathematicians and accompanied by a human-written explanation. It is one of the clearest \"AI did real science\" stories of the month.",
+      "storySource": "OpenAI / arXiv",
+      "storyPublishedAt": "2026-05-20T19:20:13Z",
+      "searchQuery": "OpenAI Erdos breakthrough May 2026",
+      "searchIterations": 2,
+      "internalReason": "Huge fit for the user's OpenAI and AI-breakthrough preference, but the official video is brief and more announcement-like than a full TV segment, so text is better.",
+      "previousPosition": null,
+      "playable": false
+    },
+    {
+      "id": "story-egypt-grain-hub-may23",
+      "storyTitle": "Egypt is pitching itself as a regional grain hub with Russian exporters and new storage infrastructure",
+      "storyContext": "Under the noise, this is a serious Egypt food-security story with long-tail impact on bread, supply chains and leverage.",
+      "tag": "Local",
+      "label": "Egypt",
+      "ongoingStory": true,
+      "ongoingStoryId": "egypt-food-security-2026",
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "Supply Minister Sherif Farouk said Egypt wants a major grain trading, storage and processing hub, with new elevators, transport links and port-side facilities tied to Russian wheat exporters. The point is resilience: bigger reserves, clearer tracking and more bargaining power on a strategic commodity.",
+      "storySource": "Reuters / Ahram Online",
+      "storyPublishedAt": "2026-05-22T09:27:00Z",
+      "searchQuery": "Egypt grain hub Russia May 2026 Reuters",
+      "searchIterations": 3,
+      "internalReason": "Direct Egypt food-security relevance. Video search was thin and generic, so this stays a clean text card.",
+      "previousPosition": null,
+      "playable": false
+    }
+  ],
+  "bannerItems": [
+    {
+      "id": "banner-hijri-day-6",
+      "tag": "Local",
+      "text": "Dhu al-Hijjah 6 in Cairo; Eid al-Adha begins in four days.",
+      "priority": 99,
+      "kind": "alert",
+      "timestamp": "2026-05-23T10:23:27+03:00"
+    },
+    {
+      "id": "banner-uranium-red-line",
+      "tag": "Breaking",
+      "text": "Iran says its near-weapons-grade uranium will stay inside the country, hardening the biggest peace-talk sticking point.",
+      "priority": 97,
+      "kind": "breaking",
+      "timestamp": "2026-05-21T17:16:00Z"
+    },
+    {
+      "id": "banner-openai-ipo-race",
+      "tag": "Follow",
+      "text": "OpenAI is preparing a confidential IPO filing that could kick off a September listing race.",
+      "priority": 94,
+      "kind": "breaking",
+      "timestamp": "2026-05-21T17:50:00Z"
+    },
+    {
+      "id": "banner-meta-ai-layoffs",
+      "tag": "Career",
+      "text": "Meta is cutting about 8,000 jobs while moving 7,000 workers into new AI teams.",
+      "priority": 90,
+      "kind": "context",
+      "timestamp": "2026-05-20T23:41:00Z"
+    },
+    {
+      "id": "banner-garden-grove",
+      "tag": "Alert",
+      "text": "Garden Grove officials warned a leaking chemical tank could spill or explode after mass evacuations.",
+      "priority": 89,
+      "kind": "alert",
+      "timestamp": "2026-05-22T01:26:30Z"
+    },
+    {
+      "id": "banner-hormuz-rules",
+      "tag": "Breaking",
+      "text": "Iran's new Hormuz vetting and fee system is now shaping who moves oil through the choke point.",
+      "priority": 87,
+      "kind": "breaking",
+      "timestamp": "2026-05-22T14:00:00Z"
+    },
+    {
+      "id": "banner-spacex-ipo",
+      "tag": "Tech",
+      "text": "SpaceX's filing puts AI infrastructure, not just rockets, at the center of the biggest IPO story on the board.",
+      "priority": 82,
+      "kind": "context",
+      "timestamp": "2026-05-21T12:22:06Z"
+    },
+    {
+      "id": "banner-egypt-electricity",
+      "tag": "Local",
+      "text": "Egypt's published tariff sheet shows bigger electricity hikes for major users than the early framing suggested.",
+      "priority": 80,
+      "kind": "alert",
+      "timestamp": "2026-05-21T09:00:00Z"
+    },
+    {
+      "id": "banner-anthropic-round",
+      "tag": "Follow",
+      "text": "Anthropic is close to a $30B-plus round that could push its valuation above $900B.",
+      "priority": 77,
+      "kind": "context",
+      "timestamp": "2026-05-22T19:42:00Z"
+    },
+    {
+      "id": "banner-egypt-grain-hub",
+      "tag": "Local",
+      "text": "Egypt is pitching a grain hub strategy with Russian exporters, storage, and processing built into the plan.",
+      "priority": 74,
+      "kind": "context",
+      "timestamp": "2026-05-22T09:27:00Z"
+    }
+  ],
+  "storyTracker": {
+    "iran-war-2026": {
+      "firstSeen": "2026-03-18",
+      "updateCount": 90,
+      "status": "active"
+    },
+    "trump-xi-beijing-2026": {
+      "firstSeen": "2026-05-13",
+      "updateCount": 3,
+      "status": "active"
+    },
+    "nvidia-china-h200-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "egypt-energy-crisis": {
+      "firstSeen": "2026-03-20",
+      "updateCount": 69,
+      "status": "active"
+    },
+    "cuba-blackout-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "openai-daybreak-2026": {
+      "firstSeen": "2026-05-13",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "anthropic-mythos-2026": {
+      "firstSeen": "2026-05-13",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "samsung-wide-fold-2026": {
+      "firstSeen": "2026-05-10",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "salah-liverpool-run-in-2026": {
+      "firstSeen": "2026-05-01",
+      "updateCount": 9,
+      "status": "active"
+    },
+    "zamalek-confed-final-2026": {
+      "firstSeen": "2026-05-12",
+      "updateCount": 4,
+      "status": "active"
+    },
+    "openai-apple-legal-fight-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "samsung-union-strike-2026": {
+      "firstSeen": "2026-05-15",
+      "updateCount": 4,
+      "status": "active"
+    },
+    "anthropic-funding-2026": {
+      "firstSeen": "2026-05-15",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "meta-ai-layoffs-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 4,
+      "status": "active"
+    },
+    "ebola-bundibugyo-2026": {
+      "firstSeen": "2026-05-17",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "kilauea-episode-47-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "openai-codex-mobile-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "egypt-fitch-war-buffer-2026": {
+      "firstSeen": "2026-05-15",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "anthropic-gates-public-goods-2026": {
+      "firstSeen": "2026-05-14",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "cisco-ai-restructuring-2026": {
+      "firstSeen": "2026-05-13",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "barakah-uae-drone-2026": {
+      "firstSeen": "2026-05-17",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "egypt-imf-review-2026": {
+      "firstSeen": "2026-05-18",
+      "updateCount": 3,
+      "status": "active"
+    },
+    "nvidia-vera-2026": {
+      "firstSeen": "2026-05-18",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "xi-putin-beijing-2026": {
+      "firstSeen": "2026-05-20",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "openai-compute-capacity-2026": {
+      "firstSeen": "2026-05-19",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "anthropic-talent-war-2026": {
+      "firstSeen": "2026-05-22",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "anthropic-compute-profit-2026": {
+      "firstSeen": "2026-05-21",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "yc-openai-tokens-2026": {
+      "firstSeen": "2026-05-21",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "intuit-ai-layoffs-2026": {
+      "firstSeen": "2026-05-21",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "openai-ipo-2026": {
+      "firstSeen": "2026-05-22",
+      "updateCount": 2,
+      "status": "active"
+    },
+    "ai-workforce-disruption-2026": {
+      "firstSeen": "2026-05-22",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "egypt-world-cup-2026": {
+      "firstSeen": "2026-05-22",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "garden-grove-chemical-2026": {
+      "firstSeen": "2026-05-23",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "spacex-ai-ipo-2026": {
+      "firstSeen": "2026-05-23",
+      "updateCount": 1,
+      "status": "active"
+    },
+    "egypt-food-security-2026": {
+      "firstSeen": "2026-05-23",
+      "updateCount": 1,
+      "status": "active"
+    }
+  },
+  "watchLog": [
+    "65C0XcmruTI",
+    "QtUD9AxBan8",
+    "aDT9bBt9HxM"
+  ]
+}
