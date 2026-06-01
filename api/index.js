@@ -1455,6 +1455,69 @@ app.post('/api/tv/war/analyze', requireWarToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// CINEMATIC INTEL — pre-built bundle (built by scripts/build-intel.js cron)
+// The TV pulls this read-only; no on-demand generation happens here.
+// ============================================================
+app.get('/api/tv/intel', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:intel:v1');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    // Fallback: last bundle written to disk by the builder (works without Redis)
+    const file = path.join(__dirname, '..', 'intel-bundle.json');
+    if (fs.existsSync(file)) {
+      return res.json(JSON.parse(fs.readFileSync(file, 'utf8')));
+    }
+    res.status(404).json({ error: 'No intel bundle available yet' });
+  } catch (err) {
+    logger.error('Intel', 'Failed to serve bundle', { error: err.message });
+    res.status(500).json({ error: 'Failed to read intel bundle' });
+  }
+});
+
+// POST /api/tv/intel — push a pre-built bundle into Redis (used by the builder).
+app.post('/api/tv/intel', express.json({ limit: '4mb' }), requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const body = req.body;
+    if (!body || !Array.isArray(body.stories)) return res.status(400).json({ error: 'Invalid bundle (missing stories[])' });
+    const r = await getRedis();
+    if (r) await r.set('tv:war:intel:v1', JSON.stringify(body));
+    res.json({ ok: true, stories: body.stories.length, storedAt: new Date().toISOString(), redis: !!r });
+  } catch (err) {
+    logger.error('Intel', 'Failed to store pushed bundle', { error: err.message });
+    res.status(500).json({ error: 'Failed to store bundle' });
+  }
+});
+
+// GET /api/img?u=<encoded image url> — caching proxy so the TV pulls story
+// images through thinx.fun (CDN-cached) instead of flaky upstream news CDNs.
+app.get('/api/img', async (req, res) => {
+  const u = req.query.u;
+  if (!u || typeof u !== 'string' || !/^https?:\/\//i.test(u)) {
+    return res.status(400).json({ error: 'Missing or invalid u parameter' });
+  }
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const upstream = await fetch(u, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ThinxTV/1.0)' } });
+    clearTimeout(t);
+    const ctype = upstream.headers.get('content-type') || '';
+    if (!upstream.ok || !ctype.startsWith('image/')) return res.status(404).end();
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    res.set('Content-Type', ctype);
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=86400, s-maxage=86400, immutable');
+    res.send(buf);
+  } catch (err) {
+    res.status(502).end();
+  }
+});
+
 // GET /api/example-image?url=... — Proxy for example screenshot images
 // Only allows fetching from upload.wikimedia.org to prevent open-relay abuse
 app.get('/api/example-image', async (req, res) => {

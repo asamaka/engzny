@@ -1,0 +1,52 @@
+name: Cinematic Intel Builder
+
+# Pre-builds the Iran Watch cinematic intel bundle every ~10 minutes and writes
+# it to Redis (tv:war:intel:v1). The TV reads the finished bundle read-only via
+# GET /api/tv/intel and never triggers any generation itself.
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes
+  workflow_dispatch:
+
+concurrency:
+  group: intel-builder
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build intel bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build intel bundle
+        env:
+          # Repo uses CLAUDE_API_KEY for the Anthropic key (see tests.yml)
+          ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          # Optional overrides (sensible defaults are baked into the code):
+          INTEL_SONNET: ${{ vars.INTEL_SONNET }}
+          INTEL_OPUS: ${{ vars.INTEL_OPUS }}
+          INTEL_HAIKU: ${{ vars.INTEL_HAIKU }}
+          INTEL_WAR_START: ${{ vars.INTEL_WAR_START }}
+          INTEL_SPIKE_THRESHOLD: ${{ vars.INTEL_SPIKE_THRESHOLD }}
+        run: node scripts/build-intel.js
+
+      - name: Summary
+        if: always()
+        run: echo "Intel build finished at $(date -u)" >> "$GITHUB_STEP_SUMMARY"

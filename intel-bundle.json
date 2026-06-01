@@ -1,0 +1,1114 @@
+{
+  "status": {
+    "dayLabel": "DAY",
+    "dayCounter": 93,
+    "label": "ACTIVE STRIKES & TALKS HALT",
+    "severity": "critical"
+  },
+  "weather": {
+    "tempC": 31,
+    "code": 3,
+    "icon": "☁️",
+    "label": "Overcast",
+    "updatedAt": "2026-06-01T17:02:58.419Z"
+  },
+  "breaking": {
+    "text": "Middle East crisis live: Iran says no more peace talks with US until Israel stops its operations",
+    "source": "The Guardian",
+    "at": "2026-06-01T17:04:16.297Z",
+    "ttlMins": 90
+  },
+  "signals": [
+    {
+      "id": "1986507",
+      "question": "Will Jared Kushner attend the next US x Iran diplomatic meeting?",
+      "prob": "31%",
+      "probColor": "amber",
+      "delta": "-20 pts",
+      "deltaColor": "red",
+      "meta": "$0.1M vol",
+      "spike": true,
+      "spark": [
+        7,
+        9,
+        11,
+        13,
+        15,
+        17
+      ],
+      "byDate": "by Jun 30, 2026",
+      "history": [
+        0.31
+      ],
+      "storyId": "iran-suspends-talks",
+      "relatedHeadlines": [
+        {
+          "title": "Middle East crisis live: Iran says no more peace talks with US until Israel stops its operations",
+          "outlet": "The Guardian",
+          "meta": "8m ago"
+        },
+        {
+          "title": "Iran War Live Updates: U.S. and Iran Trade Attacks; Unconfirmed Report Says Iran Will Stop Participating in Peace Talks - The New York Times",
+          "outlet": "Google News",
+          "meta": "26m ago"
+        },
+        {
+          "title": "Iran suspends all peace talks in protest at Israeli offensive in Lebanon",
+          "outlet": "The Guardian",
+          "meta": "81m ago"
+        },
+        {
+          "title": "War breaking news. Iran: 'Stop talks until Israel stops in Lebanon and Gaza' - Il Sole 24 ORE",
+          "outlet": "Google News",
+          "meta": "58m ago"
+        }
+      ],
+      "relatedMarketIds": [
+        "2354024",
+        "1986508",
+        "2354023"
+      ]
+    },
+    {
+      "id": "2354024",
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 15, 2026?",
+      "prob": "26%",
+      "probColor": "amber",
+      "delta": "-17 pts",
+      "deltaColor": "red",
+      "meta": "$0.3M vol",
+      "spike": true,
+      "spark": [
+        7,
+        9,
+        11,
+        13,
+        15,
+        17
+      ],
+      "byDate": "by Jun 15, 2026",
+      "history": [
+        0.255
+      ],
+      "storyId": "hormuz-blockade",
+      "relatedHeadlines": [
+        {
+          "title": "‘Sit back and relax’: Trump insists Iran deal close despite strikes – The Latest",
+          "outlet": "The Guardian",
+          "meta": "28m ago"
+        },
+        {
+          "title": "Iran says IRGC Navy to control all Strait of Hormuz traffic ‘with full authority’",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        },
+        {
+          "title": "IRGC Navy approves transit of 15 ships via Hormuz Strait in past 24 hours",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        },
+        {
+          "title": "Iran to allow more Japanese ships to pass Strait of Hormuz: Pezeshkian",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        }
+      ],
+      "relatedMarketIds": [
+        "1986507",
+        "1986508",
+        "2354023"
+      ]
+    },
+    {
+      "id": "1986508",
+      "question": "Will Steve Witkoff attend the next US x Iran diplomatic meeting?",
+      "prob": "37%",
+      "probColor": "amber",
+      "delta": "-17 pts",
+      "deltaColor": "red",
+      "meta": "$0.1M vol",
+      "spike": true,
+      "spark": [
+        7,
+        9,
+        11,
+        13,
+        15,
+        17
+      ],
+      "byDate": "by Jun 30, 2026",
+      "history": [
+        0.365
+      ],
+      "storyId": "iran-suspends-talks",
+      "relatedHeadlines": [
+        {
+          "title": "Middle East crisis live: Iran says no more peace talks with US until Israel stops its operations",
+          "outlet": "The Guardian",
+          "meta": "8m ago"
+        },
+        {
+          "title": "Iran War Live Updates: U.S. and Iran Trade Attacks; Unconfirmed Report Says Iran Will Stop Participating in Peace Talks - The New York Times",
+          "outlet": "Google News",
+          "meta": "26m ago"
+        },
+        {
+          "title": "Iran suspends all peace talks in protest at Israeli offensive in Lebanon",
+          "outlet": "The Guardian",
+          "meta": "81m ago"
+        },
+        {
+          "title": "War breaking news. Iran: 'Stop talks until Israel stops in Lebanon and Gaza' - Il Sole 24 ORE",
+          "outlet": "Google News",
+          "meta": "58m ago"
+        }
+      ],
+      "relatedMarketIds": [
+        "1986507",
+        "2354024",
+        "2354023"
+      ]
+    },
+    {
+      "id": "2354023",
+      "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 7, 2026?",
+      "prob": "10%",
+      "probColor": "red",
+      "delta": "-15 pts",
+      "deltaColor": "red",
+      "meta": "$0.5M vol",
+      "spike": true,
+      "spark": [
+        7,
+        9,
+        11,
+        13,
+        15,
+        17
+      ],
+      "byDate": "by Jun 7, 2026",
+      "history": [
+        0.095
+      ],
+      "storyId": "hormuz-blockade",
+      "relatedHeadlines": [
+        {
+          "title": "‘Sit back and relax’: Trump insists Iran deal close despite strikes – The Latest",
+          "outlet": "The Guardian",
+          "meta": "28m ago"
+        },
+        {
+          "title": "Iran says IRGC Navy to control all Strait of Hormuz traffic ‘with full authority’",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        },
+        {
+          "title": "IRGC Navy approves transit of 15 ships via Hormuz Strait in past 24 hours",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        },
+        {
+          "title": "Iran to allow more Japanese ships to pass Strait of Hormuz: Pezeshkian",
+          "outlet": "Press TV",
+          "meta": "60m ago"
+        }
+      ],
+      "relatedMarketIds": [
+        "1986507",
+        "2354024",
+        "1986508"
+      ]
+    }
+  ],
+  "stories": [
+    {
+      "id": "iran-suspends-talks",
+      "headline": "Iran halts US peace talks until Israel stops Lebanon ops.",
+      "brief": "Tehran suspended negotiations with Washington in protest of ongoing Israeli strikes on Beirut suburbs, threatening ceasefire collapse.",
+      "image": "https://i.guim.co.uk/img/media/49f72ec22ebb085ccc66dfa23556bb62b0b52eda/453_0_4594_3675/master/4594.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=d0243e8cdba712dc8c736462ee5dd87e",
+      "hasMarket": true,
+      "marketIds": [
+        1986507,
+        1986508
+      ],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "marketImpact",
+            "statCallouts",
+            "timeline",
+            "videos"
+          ],
+          "showTimeline": true,
+          "emphasis": "text",
+          "keyQuote": null,
+          "statCallouts": [
+            {
+              "value": "-20 pts",
+              "label": "Kushner attendance market"
+            },
+            {
+              "value": "-17 pts",
+              "label": "Witkoff attendance market"
+            },
+            {
+              "value": "1000s",
+              "label": "Fleeing southern Beirut"
+            }
+          ]
+        },
+        "aiSummary": "Iran announced it will not participate in further peace talks with the US until Israel ceases operations in Lebanon and Gaza. The Guardian reports the suspension comes as thousands flee Netanyahu-ordered bombing of southern Beirut. The New York Times notes this is still unconfirmed, while Iranian officials cited Israeli attacks on Lebanon as violating the Iran-US ceasefire. Markets tracking Kushner and Witkoff attendance at next diplomatic meeting dropped 20 and 17 points respectively.",
+        "sources": [
+          {
+            "idx": 0,
+            "title": "Middle East crisis live: Iran says no more peace talks with US until Israel stops its operations",
+            "outlet": "The Guardian",
+            "meta": "8m ago",
+            "category": "western",
+            "link": "https://www.theguardian.com/world/live/2026/jun/01/iran-war-live-news-updates-kuwait-missile-drone-attack-us-strikes-iran-radar-sites",
+            "image": "https://i.guim.co.uk/img/media/280380211e22edac733ac82128ca2bcadd7be8e4/657_0_4128_3302/master/4128.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctbGl2ZS5wbmc&enable=upscale&s=6e061d32b4e6bd05401bf5e6bc58eaa6"
+          },
+          {
+            "idx": 3,
+            "title": "Iran War Live Updates: U.S. and Iran Trade Attacks; Unconfirmed Report Says Iran Will Stop Participating in Peace Talks - The New York Times",
+            "outlet": "Google News",
+            "meta": "26m ago",
+            "category": "western",
+            "link": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPS0doYXZBSjJCdjlYOVhxM25obDN5MXBRWmRyRFNPdEZycjZnb0EyR3FqZWNKQVN5VGg0NGwwclhKaXhtTU91Y254Tkd4UENuZjJQSmphaHI2dXBqTzRwN3FTdk5EVllmY2hQQzYzSUtTOWMzY3h1Q29Ed0xfT3B5elBJSWM?oc=5",
+            "image": null
+          },
+          {
+            "idx": 46,
+            "title": "Iran suspends all peace talks in protest at Israeli offensive in Lebanon",
+            "outlet": "The Guardian",
+            "meta": "81m ago",
+            "category": "western",
+            "link": "https://www.theguardian.com/world/2026/jun/01/iran-strikes-us-military-base-kuwait-iranian-air-defences",
+            "image": "https://i.guim.co.uk/img/media/49f72ec22ebb085ccc66dfa23556bb62b0b52eda/453_0_4594_3675/master/4594.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=d0243e8cdba712dc8c736462ee5dd87e"
+          },
+          {
+            "idx": 6,
+            "title": "War breaking news. Iran: 'Stop talks until Israel stops in Lebanon and Gaza' - Il Sole 24 ORE",
+            "outlet": "Google News",
+            "meta": "58m ago",
+            "category": "western",
+            "link": "https://news.google.com/rss/articles/CBMimgFBVV95cUxQQ1MtTWNWZnVYeF8xbG9ZcXRkZ3pYUWhvelRXZExqQ0lOdUpmQWNiRTkzVmp1MW94SE9ucFZsQkFPX3ZSRjFRQkRPY2RLOTF0UnlTT1pOM1lod3djTU5JeWM5bXVaWHZiU05YT2hNUVctM0hNYUhfallLbGJDN3QwM280UkhUWFViRENDNFprLTljYURBWTFNY3hB?oc=5",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "n-2hsA1k_Z8",
+            "title": "Iranian sources tell MS NOW: 'No dialogue will take place' until fighting in Lebanon ends",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/n-2hsA1k_Z8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:35:05.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "e_hZkjgWd4w",
+            "title": "Iran suspends talks with US",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/e_hZkjgWd4w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:59:42.000Z"
+          },
+          {
+            "videoId": "LslR0ghDq-w",
+            "title": "LIVE: Beirut skyline as Israel orders strikes on the city's southern suburbs",
+            "channel": "Al Jazeera English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/LslR0ghDq-w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:57:44.000Z"
+          },
+          {
+            "videoId": "cAbo8Iorzvw",
+            "title": "War on Iran: IRGC attacks Kuwait airbase as Israel seizes UNESCO site",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/cAbo8Iorzvw/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:10:46.000Z"
+          },
+          {
+            "videoId": "fbBMSehK2-s",
+            "title": "U.S. launches new strikes on Iran amid peace talks",
+            "channel": "NBC News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fbBMSehK2-s/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:35:59.000Z"
+          }
+        ],
+        "timeline": [
+          {
+            "time": "Early May",
+            "cap": "US-Iran peace talks commence",
+            "now": false
+          },
+          {
+            "time": "Sun 12:00",
+            "cap": "Israel intensifies Beirut strikes",
+            "now": false
+          },
+          {
+            "time": "Sun 15:45",
+            "cap": "Iran suspends all negotiations",
+            "now": false
+          },
+          {
+            "time": "NOW",
+            "cap": "Ceasefire framework collapsing",
+            "now": true
+          }
+        ],
+        "marketImpact": {
+          "id": "1986507",
+          "question": "Will Jared Kushner attend the next US x Iran diplomatic meeting?",
+          "prob": "31%",
+          "delta": "-20 pts",
+          "deltaColor": "red",
+          "byDate": "by Jun 30, 2026"
+        }
+      }
+    },
+    {
+      "id": "us-iran-exchange",
+      "headline": "US bombs Iran sites; Tehran retaliates against Kuwait base.",
+      "brief": "Washington struck Iranian military targets, then intercepted missiles Iran fired at US troops in Kuwait. Five Americans reportedly injured.",
+      "image": null,
+      "hasMarket": false,
+      "marketIds": [],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "statCallouts",
+            "keyQuote",
+            "videos",
+            "sources"
+          ],
+          "showTimeline": false,
+          "emphasis": "image",
+          "keyQuote": {
+            "text": "The US and Iran trading attacks in an escalating cycle.",
+            "attribution": "The New York Times"
+          },
+          "statCallouts": [
+            {
+              "value": "5",
+              "label": "Americans injured"
+            },
+            {
+              "value": "2",
+              "label": "Countries struck"
+            }
+          ]
+        },
+        "aiSummary": "The Washington Post reports the US bombed Iranian military sites and subsequently downed missiles Tehran launched at American troops stationed in Kuwait. Press TV claims five Americans were injured in the Iranian strike on the Kuwait base, and that the IRGC hit a US air base behind an earlier attack on a telecom tower in southern Iran. The New York Times describes this as the US and Iran trading attacks in an escalating cycle.",
+        "sources": [
+          {
+            "idx": 1,
+            "title": "US bombs Iranian military sites, then downs missiles Tehran fired at troops in Kuwait - The Washington Post",
+            "outlet": "Google News",
+            "meta": "20m ago",
+            "category": "western",
+            "link": "https://news.google.com/rss/articles/CBMixwFBVV95cUxQZ28waU5mb0FjWGg3cDJHendiMXFCNElGRWtPeUd5cGYxNnJaMGJFOGRPRzMzWTg3WEZHZVZHaXl1M2hLUzZYT2tzTll2OTZXLWx4XzhIRVQzdVktSzdHR1VwU0VXeWxEcjBSVGVPS0twRUtXMWF4Tk12OTFtUHNlY2k5Zl92LWJTSzNONlJ4WHJtRzFTcFBmY3FISG83amdvQ0FVN0ZKc3k3aDFjUmNCcWRKTHJQMk00aC03X3Y0WWZJaHc3U1I0?oc=5",
+            "image": null
+          },
+          {
+            "idx": 3,
+            "title": "Iran War Live Updates: U.S. and Iran Trade Attacks; Unconfirmed Report Says Iran Will Stop Participating in Peace Talks - The New York Times",
+            "outlet": "Google News",
+            "meta": "26m ago",
+            "category": "western",
+            "link": "https://news.google.com/rss/articles/CBMihAFBVV95cUxPS0doYXZBSjJCdjlYOVhxM25obDN5MXBRWmRyRFNPdEZycjZnb0EyR3FqZWNKQVN5VGg0NGwwclhKaXhtTU91Y254Tkd4UENuZjJQSmphaHI2dXBqTzRwN3FTdk5EVllmY2hQQzYzSUtTOWMzY3h1Q29Ed0xfT3B5elBJSWM?oc=5",
+            "image": null
+          },
+          {
+            "idx": 35,
+            "title": "Five Americans injured in Iranian missile strike on Kuwait base: Report",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769514/Iran-missile-attack-Kuwait-base-injures-American-personnel-damage-US-military-drones",
+            "image": null
+          },
+          {
+            "idx": 16,
+            "title": "IRGC hits US air base behind attack on telecom tower in southern Iran",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/06/01/769620/Iran-US-IRGC-Sirik",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "6dV7eoQnC5U",
+            "title": "US bombs Iranian military sites and Kuwait is hit by drone and missile fire",
+            "channel": "Al Jazeera English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/6dV7eoQnC5U/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:40:12.000Z"
+          },
+          {
+            "videoId": "IQBrX9WNpUI",
+            "title": "Iran claims to strike US base; Trump changes deal proposal",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/IQBrX9WNpUI/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:38:11.000Z"
+          },
+          {
+            "videoId": "cAbo8Iorzvw",
+            "title": "War on Iran: IRGC attacks Kuwait airbase as Israel seizes UNESCO site",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/cAbo8Iorzvw/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:10:46.000Z"
+          },
+          {
+            "videoId": "ufV5iXtAFhk",
+            "title": "Iran attacks damage 20 US military sites since start of war, satellite images show. #BBCNews",
+            "channel": "DW News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/ufV5iXtAFhk/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:00:01.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "u-bb8Ww6qW0",
+            "title": "IRAN IMPASSE: U.S. and Iran exchange fire as Trump pushes changes to deal",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/u-bb8Ww6qW0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:46:18.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": null
+      }
+    },
+    {
+      "id": "lebanon-escalation",
+      "headline": "Netanyahu orders strikes on Beirut as Hezbollah clash grows.",
+      "brief": "Israeli PM directed bombing of southern Beirut suburbs, prompting mass evacuations and Hezbollah vows to retain weapons until occupation ends.",
+      "image": "https://ichef.bbci.co.uk/news/1024/branded_news/bde6/live/974794b0-5d9f-11f1-8b8c-6d33e1d5abb6.jpg",
+      "hasMarket": false,
+      "marketIds": [],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "keyQuote",
+            "statCallouts",
+            "videos",
+            "sources"
+          ],
+          "showTimeline": false,
+          "emphasis": "image",
+          "keyQuote": {
+            "text": "Hezbollah vows to keep weapons until Israeli occupation ends.",
+            "attribution": "Press TV, citing Hezbollah leadership"
+          },
+          "statCallouts": [
+            {
+              "value": "2",
+              "label": "Israeli drones downed"
+            },
+            {
+              "value": "1000s",
+              "label": "Fleeing southern Beirut"
+            }
+          ]
+        },
+        "aiSummary": "BBC reports Israel's Prime Minister ordered strikes on Beirut suburbs as the Hezbollah conflict escalates. The Guardian says thousands are fleeing Netanyahu's bombing campaign in southern Beirut. Press TV reports Hezbollah vows to keep weapons until Israeli occupation ends, and that Hezbollah forces pounded Israeli military sites while downing two Hermes 450 drones. Iranian officials warned northern Israeli settlers to evacuate if Beirut suburbs come under attack.",
+        "sources": [
+          {
+            "idx": 2,
+            "title": "Israel PM orders strikes on Beirut suburbs as Hezbollah conflict escalates",
+            "outlet": "BBC",
+            "meta": "21m ago",
+            "category": "western",
+            "link": "https://www.bbc.com/news/articles/c4g419e2xlvo?at_medium=RSS&at_campaign=rss",
+            "image": "https://ichef.bbci.co.uk/news/1024/branded_news/bde6/live/974794b0-5d9f-11f1-8b8c-6d33e1d5abb6.jpg"
+          },
+          {
+            "idx": 4,
+            "title": "Thousands flee as Netanyahu orders Israeli bombing of southern Beirut",
+            "outlet": "The Guardian",
+            "meta": "27m ago",
+            "category": "western",
+            "link": "https://www.theguardian.com/world/2026/jun/01/european-leaders-condemn-israel-incursion-into-lebanon",
+            "image": "https://i.guim.co.uk/img/media/f47c4bbbd6850371a09c0773a337dcc3bfa297bd/285_0_3150_2520/master/3150.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=1ed1855392de34cba9b3e415b1d33573"
+          },
+          {
+            "idx": 29,
+            "title": "Hezbollah vows to keep weapons until Israeli occupation ends",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2025/08/15/753153/Hezbollah-vows-to-keep-weapons-until-Israeli-occupation-ends",
+            "image": null
+          },
+          {
+            "idx": 18,
+            "title": "Hezbollah pounds Israeli military sites, downs two Hermes 450 drones",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/06/01/769644/Hezbollah-launches-rocket-attacks-on-Israeli-military-sites,-downs-two-Hermes-450-drones",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "LslR0ghDq-w",
+            "title": "LIVE: Beirut skyline as Israel orders strikes on the city's southern suburbs",
+            "channel": "Al Jazeera English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/LslR0ghDq-w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:57:44.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "fR8O0zSVzD8",
+            "title": "Iran and US carry out fresh strikes while Israel-Hezbollah conflict escalates | BBC News",
+            "channel": "DW News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fR8O0zSVzD8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T11:17:37.000Z"
+          },
+          {
+            "videoId": "n-2hsA1k_Z8",
+            "title": "Iranian sources tell MS NOW: 'No dialogue will take place' until fighting in Lebanon ends",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/n-2hsA1k_Z8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:35:05.000Z"
+          },
+          {
+            "videoId": "6dV7eoQnC5U",
+            "title": "US bombs Iranian military sites and Kuwait is hit by drone and missile fire",
+            "channel": "Al Jazeera English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/6dV7eoQnC5U/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:40:12.000Z"
+          },
+          {
+            "videoId": "ufV5iXtAFhk",
+            "title": "Iran attacks damage 20 US military sites since start of war, satellite images show. #BBCNews",
+            "channel": "DW News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/ufV5iXtAFhk/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:00:01.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": null
+      }
+    },
+    {
+      "id": "hormuz-blockade",
+      "headline": "Strait of Hormuz blockade shows no signs of lifting soon.",
+      "brief": "Despite Trump's optimism on a deal, prediction markets see blockade extending past mid-June as Iran tightens control of all strait traffic.",
+      "image": "https://i.guim.co.uk/img/media/cd1a7ea2924745e14dcfced3c80bb5527aed90e0/484_0_4844_3875/master/4844.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=0a4187b9bf804f802f14a125b359e9e3",
+      "hasMarket": true,
+      "marketIds": [
+        2354024,
+        2354023
+      ],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "marketImpact",
+            "statCallouts",
+            "keyQuote",
+            "videos"
+          ],
+          "showTimeline": false,
+          "emphasis": "text",
+          "keyQuote": {
+            "text": "The IRGC Navy will control all Strait of Hormuz traffic 'with full authority.'",
+            "attribution": "Iran via Press TV"
+          },
+          "statCallouts": [
+            {
+              "value": "-15 pts",
+              "label": "June 7 blockade-lift market"
+            },
+            {
+              "value": "-17 pts",
+              "label": "June 15 blockade-lift market"
+            },
+            {
+              "value": "15",
+              "label": "Ships approved in 24h"
+            }
+          ]
+        },
+        "aiSummary": "Trump insists an Iran deal is close despite ongoing strikes, but markets betting on blockade lifting by June 7 and June 15 dropped 15 and 17 points. Press TV reports Iran says the IRGC Navy will control all Strait of Hormuz traffic 'with full authority', though it approved transit of 15 ships in the past 24 hours and will allow more Japanese vessels to pass. The naval standoff continues amid broader US-Iran hostilities.",
+        "sources": [
+          {
+            "idx": 5,
+            "title": "‘Sit back and relax’: Trump insists Iran deal close despite strikes – The Latest",
+            "outlet": "The Guardian",
+            "meta": "28m ago",
+            "category": "western",
+            "link": "https://www.theguardian.com/world/audio/2026/jun/01/sit-back-and-relax-trump-insists-iran-deal-close-despite-strikes-the-latest",
+            "image": "https://i.guim.co.uk/img/media/cd1a7ea2924745e14dcfced3c80bb5527aed90e0/484_0_4844_3875/master/4844.jpg?width=1200&height=630&quality=85&auto=format&fit=crop&precrop=40:21,offset-x50,offset-y0&overlay-align=bottom%2Cleft&overlay-width=100p&overlay-base64=L2ltZy9zdGF0aWMvb3ZlcmxheXMvdGctZGVmYXVsdC5wbmc&enable=upscale&s=0a4187b9bf804f802f14a125b359e9e3"
+          },
+          {
+            "idx": 33,
+            "title": "Iran says IRGC Navy to control all Strait of Hormuz traffic ‘with full authority’",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769547/Iran-Armed-Forces-Hormuz-Strait",
+            "image": null
+          },
+          {
+            "idx": 17,
+            "title": "IRGC Navy approves transit of 15 ships via Hormuz Strait in past 24 hours",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/06/01/769654/IRGC-Navy-coordinates-passage-15-ships-Strait-of-Hormuz-",
+            "image": null
+          },
+          {
+            "idx": 15,
+            "title": "Iran to allow more Japanese ships to pass Strait of Hormuz: Pezeshkian",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/06/01/769659/Iran-Pezeshkian-phone-call-Japan-PM-shipping-Hormuz",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "u-bb8Ww6qW0",
+            "title": "IRAN IMPASSE: U.S. and Iran exchange fire as Trump pushes changes to deal",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/u-bb8Ww6qW0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:46:18.000Z"
+          },
+          {
+            "videoId": "IQBrX9WNpUI",
+            "title": "Iran claims to strike US base; Trump changes deal proposal",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/IQBrX9WNpUI/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:38:11.000Z"
+          },
+          {
+            "videoId": "fbBMSehK2-s",
+            "title": "U.S. launches new strikes on Iran amid peace talks",
+            "channel": "NBC News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fbBMSehK2-s/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:35:59.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "e_hZkjgWd4w",
+            "title": "Iran suspends talks with US",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/e_hZkjgWd4w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:59:42.000Z"
+          },
+          {
+            "videoId": "jF8qi_4zBi0",
+            "title": "Iran unearths its missile arsenal after US strikes",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/jF8qi_4zBi0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:19:11.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": {
+          "id": "2354024",
+          "question": "Will Donald Trump announce that the United States blockade of the Strait of Hormuz has been lifted by June 15, 2026?",
+          "prob": "26%",
+          "delta": "-17 pts",
+          "deltaColor": "red",
+          "byDate": "by Jun 15, 2026"
+        }
+      }
+    },
+    {
+      "id": "iran-infrastructure",
+      "headline": "Iran restores gas output after Israeli energy strikes.",
+      "brief": "Tehran brought three South Pars platforms back online and energy services are recovering following US-Israeli attacks on critical infrastructure.",
+      "image": null,
+      "hasMarket": false,
+      "marketIds": [],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "statCallouts",
+            "keyQuote",
+            "videos",
+            "sources"
+          ],
+          "showTimeline": false,
+          "emphasis": "image",
+          "keyQuote": {
+            "text": "Iran's 106-year-old Pasteur institute maintains vital services despite US-Israeli terror attacks.",
+            "attribution": "Iranian energy sources"
+          },
+          "statCallouts": [
+            {
+              "value": "3",
+              "label": "South Pars platforms restored"
+            },
+            {
+              "value": "106 yrs",
+              "label": "Pasteur Institute operating"
+            },
+            {
+              "value": "Record",
+              "label": "Stock market trading volume"
+            }
+          ]
+        },
+        "aiSummary": "Press TV reports Iran restored gas output at three South Pars platforms after Israeli strikes targeted energy infrastructure. The country's energy giant is restoring operations after what Iranian sources call US-Israeli terror attacks. Iran's 106-year-old Pasteur institute maintains vital services despite the attacks, while the Iranian stock market reported historic trading volumes as shares surged during the conflict.",
+        "sources": [
+          {
+            "idx": 37,
+            "title": "Iran restores gas output at three South Pars platforms after Israeli strikes",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/31/769587/Iran-restores-gas-producton-South-Pars-filed-output-suspended-Israeli-attacks-",
+            "image": null
+          },
+          {
+            "idx": 25,
+            "title": "Iran’s energy giant restores rhythm after US-Israeli terror",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769526/Iran%E2%80%99s-energy-giant-restores-rhythm-after-US-Israeli-terror-",
+            "image": null
+          },
+          {
+            "idx": 43,
+            "title": "Iran's 106-year-old Pasteur institute keeps vital services running despite attack",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/27/769370/Iran-s-106-year-old-Pasteur-institute-keeps-vital-services-running-despite-attack",
+            "image": null
+          },
+          {
+            "idx": 24,
+            "title": "Iranian stock market reports historic trade as shares surge",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769535/Iran-stock-market-historic-trade-day-report",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "fR8O0zSVzD8",
+            "title": "Iran and US carry out fresh strikes while Israel-Hezbollah conflict escalates | BBC News",
+            "channel": "DW News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fR8O0zSVzD8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T11:17:37.000Z"
+          },
+          {
+            "videoId": "jF8qi_4zBi0",
+            "title": "Iran unearths its missile arsenal after US strikes",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/jF8qi_4zBi0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:19:11.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "n-2hsA1k_Z8",
+            "title": "Iranian sources tell MS NOW: 'No dialogue will take place' until fighting in Lebanon ends",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/n-2hsA1k_Z8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:35:05.000Z"
+          },
+          {
+            "videoId": "cAbo8Iorzvw",
+            "title": "War on Iran: IRGC attacks Kuwait airbase as Israel seizes UNESCO site",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/cAbo8Iorzvw/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:10:46.000Z"
+          },
+          {
+            "videoId": "u-bb8Ww6qW0",
+            "title": "IRAN IMPASSE: U.S. and Iran exchange fire as Trump pushes changes to deal",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/u-bb8Ww6qW0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:46:18.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": null
+      }
+    },
+    {
+      "id": "regional-realignment",
+      "headline": "UAE faces Iranian backlash over alleged war participation.",
+      "brief": "Reports claim UAE joined US-Israeli operations from the start; Dubai shut down Iran's Red Crescent hospital and froze assets amid tensions.",
+      "image": null,
+      "hasMarket": false,
+      "marketIds": [],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "keyQuote",
+            "statCallouts",
+            "videos",
+            "sources"
+          ],
+          "showTimeline": false,
+          "emphasis": "image",
+          "keyQuote": {
+            "text": "Dubai authorities shut down Iran's Red Crescent hospital and froze its assets in coordinated pressure.",
+            "attribution": "Iranian sources via Press TV"
+          },
+          "statCallouts": [
+            {
+              "value": "1",
+              "label": "Iranian hospital shut down"
+            },
+            {
+              "value": "▲",
+              "label": "Iran-Pakistan land corridor rising"
+            },
+            {
+              "value": "▼",
+              "label": "UAE port traffic declining"
+            }
+          ]
+        },
+        "aiSummary": "Press TV reports the UAE joined US-Israeli aggression against Iran from the outset of hostilities, according to Iranian sources. Dubai authorities shut down Iran's Red Crescent hospital and froze its assets in what appears to be coordinated pressure. Meanwhile, UAE ports are reportedly losing ground as the Iran-Pakistan land corridor reshapes regional transit routes, reflecting broader geopolitical realignment in the Gulf.",
+        "sources": [
+          {
+            "idx": 36,
+            "title": "UAE joined US-Israeli aggression against Iran from outset: Report",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769503/Iran-UAE-launched-strikes-onset-US-Israeli-aggression-Wall-Street-Journal-report",
+            "image": null
+          },
+          {
+            "idx": 34,
+            "title": "UAE shuts down Iran’s Red Crescent hospital in Dubai, freezes assets",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/31/769585/UAE-shut-down-Iran%E2%80%99s-Red-Crescent-hospital-in-Dubai,-froze-assets",
+            "image": null
+          },
+          {
+            "idx": 26,
+            "title": "UAE ports lose ground as Iran-Pakistan land corridor reshapes regional transit: Report",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/30/769512/UAE-ports-lose-ground-Iran-Pakistan-land-corridor-reshapes-regional-transit--Report",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "n-2hsA1k_Z8",
+            "title": "Iranian sources tell MS NOW: 'No dialogue will take place' until fighting in Lebanon ends",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/n-2hsA1k_Z8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:35:05.000Z"
+          },
+          {
+            "videoId": "u-bb8Ww6qW0",
+            "title": "IRAN IMPASSE: U.S. and Iran exchange fire as Trump pushes changes to deal",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/u-bb8Ww6qW0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:46:18.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          },
+          {
+            "videoId": "e_hZkjgWd4w",
+            "title": "Iran suspends talks with US",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/e_hZkjgWd4w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:59:42.000Z"
+          },
+          {
+            "videoId": "jF8qi_4zBi0",
+            "title": "Iran unearths its missile arsenal after US strikes",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/jF8qi_4zBi0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:19:11.000Z"
+          },
+          {
+            "videoId": "IQBrX9WNpUI",
+            "title": "Iran claims to strike US base; Trump changes deal proposal",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/IQBrX9WNpUI/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:38:11.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": null
+      }
+    },
+    {
+      "id": "domestic-iran",
+      "headline": "Poll shows two-thirds of Iranians proud amid conflict.",
+      "brief": "Survey finds 59% believe Iran won the war as leadership emphasizes unity between people, officials, and Armed Forces during crisis.",
+      "image": null,
+      "hasMarket": false,
+      "marketIds": [],
+      "drilldown": {
+        "layout": {
+          "modules": [
+            "summary",
+            "statCallouts",
+            "keyQuote",
+            "videos",
+            "sources"
+          ],
+          "showTimeline": false,
+          "emphasis": "text",
+          "keyQuote": {
+            "text": "Unity between the people, officials, and Armed Forces must never be undermined during this period.",
+            "attribution": "Iran's Supreme Leader"
+          },
+          "statCallouts": [
+            {
+              "value": "66%",
+              "label": "Iranians proud of global standing"
+            },
+            {
+              "value": "59%",
+              "label": "Say Iran won the war"
+            }
+          ]
+        },
+        "aiSummary": "Press TV reports a poll showing two-thirds of Iranians are proud of the nation's global standing, with 59% saying Iran won the war. Iran's Supreme Leader stressed that unity between the people, officials, and Armed Forces must never be undermined during this period. The IRGC congratulated Iranian athletes on victories amid the US-Israeli war, reflecting government efforts to maintain domestic morale.",
+        "sources": [
+          {
+            "idx": 23,
+            "title": "Poll: Two-thirds of Iranians proud of nation’s global standing; 59% say Iran won the war",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/31/769578/Survey--nearly-67--of-Iranians-proud-of-country%E2%80%99s-global-standing-despite-anti-Iran-campaigns",
+            "image": null
+          },
+          {
+            "idx": 28,
+            "title": "Leader: Unity between people, officials, Armed Forces must never be undermined",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2025/08/24/753693/Iran-Leader-national-unity-armed-forces-war-division-",
+            "image": null
+          },
+          {
+            "idx": 44,
+            "title": "IRGC congratulates Iranian athletes on victories amid US-Israeli war",
+            "outlet": "Press TV",
+            "meta": "60m ago",
+            "category": "iranian",
+            "link": "https://presstv.ir/Detail/2026/05/31/769610/Iran-IRGC-athletes-war",
+            "image": null
+          }
+        ],
+        "videos": [
+          {
+            "videoId": "e_hZkjgWd4w",
+            "title": "Iran suspends talks with US",
+            "channel": "CNN",
+            "thumbnailUrl": "https://i.ytimg.com/vi/e_hZkjgWd4w/hqdefault.jpg",
+            "publishedAt": "2026-06-01T15:59:42.000Z"
+          },
+          {
+            "videoId": "cAbo8Iorzvw",
+            "title": "War on Iran: IRGC attacks Kuwait airbase as Israel seizes UNESCO site",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/cAbo8Iorzvw/hqdefault.jpg",
+            "publishedAt": "2026-06-01T13:10:46.000Z"
+          },
+          {
+            "videoId": "u-bb8Ww6qW0",
+            "title": "IRAN IMPASSE: U.S. and Iran exchange fire as Trump pushes changes to deal",
+            "channel": "TRT World",
+            "thumbnailUrl": "https://i.ytimg.com/vi/u-bb8Ww6qW0/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:46:18.000Z"
+          },
+          {
+            "videoId": "fbBMSehK2-s",
+            "title": "U.S. launches new strikes on Iran amid peace talks",
+            "channel": "NBC News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fbBMSehK2-s/hqdefault.jpg",
+            "publishedAt": "2026-06-01T12:35:59.000Z"
+          },
+          {
+            "videoId": "fR8O0zSVzD8",
+            "title": "Iran and US carry out fresh strikes while Israel-Hezbollah conflict escalates | BBC News",
+            "channel": "DW News",
+            "thumbnailUrl": "https://i.ytimg.com/vi/fR8O0zSVzD8/hqdefault.jpg",
+            "publishedAt": "2026-06-01T11:17:37.000Z"
+          },
+          {
+            "videoId": "tG3i11Q0Bow",
+            "title": "Iran warns retaliatory strikes on northern Israel if Beirut’s southern suburbs are hit",
+            "channel": "France 24 English",
+            "thumbnailUrl": "https://i.ytimg.com/vi/tG3i11Q0Bow/hqdefault.jpg",
+            "publishedAt": "2026-06-01T16:34:28.000Z"
+          }
+        ],
+        "timeline": [],
+        "marketImpact": null
+      }
+    }
+  ],
+  "uiDecisions": {
+    "accent": "#f0584e"
+  },
+  "generatedAt": "2026-06-01T17:04:16.297Z",
+  "model": {
+    "curator": "claude-sonnet-4-5-20250929",
+    "designer": "claude-opus-4-6"
+  },
+  "_meta": {
+    "headlines": 50,
+    "markets": 33,
+    "spikes": 4
+  }
+}
