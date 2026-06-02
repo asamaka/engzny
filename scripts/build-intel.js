@@ -243,6 +243,7 @@ async function main() {
       return {
         idx: i, title: h.title, outlet: h.source,
         meta: h.ageMinutes != null ? `${h.ageMinutes}m ago` : (h.publishedAt || ''),
+        publishedAt: h.publishedAt || null,  // absolute time so the TV shows a live, trustworthy age
         category: h.sourceCategory, link: h.link, image: (imgMap[h.link] && W.isLikelyPhoto(imgMap[h.link])) ? imgMap[h.link] : null,
       };
     });
@@ -279,6 +280,43 @@ async function main() {
         } : null,
       },
     });
+  }
+
+  // Freshness guard: drop stories whose newest source is older than HARD_STALE_DAYS
+  // (e.g. a re-published 2024 helicopter-crash article). Prefer stories under
+  // STALE_DAYS but keep at least MIN_STORIES (freshest first) so the wall is never empty.
+  {
+    const DAY = 86400000;
+    const STALE_DAYS = Number(process.env.INTEL_STALE_DAYS || 14);
+    const HARD_STALE_DAYS = Number(process.env.INTEL_HARD_STALE_DAYS || 120);
+    const MIN_STORIES = Number(process.env.INTEL_MIN_STORIES || 3);
+    const nowMs = Date.now();
+    const ageDays = (st) => {
+      let newest = null;
+      for (const s of (st.drilldown?.sources || [])) {
+        const t = s.publishedAt ? Date.parse(s.publishedAt) : NaN;
+        if (!isNaN(t) && (newest === null || t > newest)) newest = t;
+      }
+      for (const v of (st.drilldown?.videos || [])) {
+        const t = v.publishedAt ? Date.parse(v.publishedAt) : NaN;
+        if (!isNaN(t) && (newest === null || t > newest)) newest = t;
+      }
+      return newest === null ? null : (nowMs - newest) / DAY;
+    };
+    const tagged = stories.map((st, i) => ({ st, i, ad: ageDays(st) }));
+    let keep = tagged.filter(t => t.ad === null || t.ad <= HARD_STALE_DAYS);
+    const fresh = keep.filter(t => t.ad === null || t.ad <= STALE_DAYS);
+    let chosen;
+    if (fresh.length >= MIN_STORIES) chosen = fresh;
+    else if (keep.length >= MIN_STORIES) chosen = keep;
+    else chosen = tagged.slice().sort((a, b) => (a.ad ?? 1e9) - (b.ad ?? 1e9)).slice(0, MIN_STORIES);
+    const dropped = tagged.filter(t => !chosen.includes(t));
+    if (dropped.length) {
+      console.log('[intel] dropped stale stories:', dropped.map(t => `${t.st.id}(${t.ad == null ? '?' : t.ad.toFixed(0) + 'd'})`).join(', '));
+    }
+    chosen.sort((a, b) => a.i - b.i);
+    stories.length = 0;
+    stories.push(...chosen.map(t => t.st));
   }
 
   // Enrich each signal with market-drilldown data: related headlines + related markets + storyId
