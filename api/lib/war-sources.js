@@ -86,6 +86,7 @@ async function filterIranWarRelevant(items, type) {
       const r = await a.messages.create({
         model: HAIKU_MODEL,
         max_tokens: 600,
+        temperature: 0,   // deterministic selection: same input -> same picks (stable run-to-run)
         messages: [{ role: 'user', content: 'Filter ' + type + ' for an IRAN WAR dashboard. Return ONLY the line numbers relevant to: the Iran war (Iran-Israel/US-Iran conflict), IRGC, Strait of Hormuz, Iranian nuclear program, strikes on/by Iran, Iran proxies (Hezbollah/Houthis), sanctions on Iran, Iran ceasefire talks, Iranian regime, or direct consequences (oil shock, regional fallout, diplomacy about Iran). Comma-separated numbers only. If none, return NONE.\n\n' + numbered }],
       });
       const text = (r.content[0].text || '').trim();
@@ -281,7 +282,7 @@ async function fetchWarMarkets() {
     try {
       const titleList = allEvents.map((e, i) => `${i}. ${e.title || e.slug}`).join('\n');
       const r = await a.messages.create({
-        model: HAIKU_MODEL, max_tokens: 3000,
+        model: HAIKU_MODEL, max_tokens: 3000, temperature: 0,   // deterministic market selection
         messages: [{ role: 'user', content: `Select prediction markets for a US-Iran war (2026) TV dashboard. Include ANYTHING tied to: Iran war/strikes/escalation/de-escalation, Iran ceasefire/peace talks, Iran nuclear program/deal, Iran regime/IRGC, Strait of Hormuz/Persian Gulf, US-Iran relations/sanctions, Israel-Iran, Hezbollah, Lebanon front, oil/energy IF tied to the Iran conflict. Exclude: Ukraine-Russia (unless Iran-linked), US domestic politics, crypto, sports, entertainment, non-Iran conflicts. Return ONLY a JSON array of index numbers. Events:\n${titleList}` }],
       });
       const m = (r.content[0].text || '').match(/\[[\d,\s]+\]/);
@@ -316,13 +317,20 @@ async function fetchWarMarkets() {
       if (isMarketDateExpired(question, now)) continue;
       const d1h = numOrNull(m.oneHourPriceChange);
       const d24h = numOrNull(m.oneDayPriceChange);
+      const d1w = numOrNull(m.oneWeekPriceChange);
+      let yesToken = null;
+      try {
+        const toks = m.clobTokenIds ? (typeof m.clobTokenIds === 'string' ? JSON.parse(m.clobTokenIds) : m.clobTokenIds) : [];
+        yesToken = Array.isArray(toks) ? (toks[0] || null) : null;
+      } catch {}
       markets.push({
         id: m.id || m.conditionId || `poly-${markets.length}`,
         conditionId: m.conditionId || null,
+        yesToken,                       // CLOB token id for the YES outcome -> real price history on demand
         question,
         probability: Math.round(yes * 1000) / 1000,
         volume: `$${(vol / 1e6).toFixed(1)}M`, volumeNum: vol / 1e6,
-        delta1h: d1h, delta24h: d24h,
+        delta1h: d1h, delta24h: d24h, delta1w: d1w,
         imageUrl: event.image || m.image || null,
         eventSlug: event.slug || null,
         endDate,
@@ -338,66 +346,113 @@ async function fetchWarMarkets() {
 
 function numOrNull(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
 
-/**
- * Append current prices to rolling history in Redis and return per-market
- * spark (0..22) + a measured recent delta. Cold-start safe.
- */
-async function withPriceHistory(markets) {
-  const r = getRedis();
-  let hist = {};
-  if (r) { try { hist = (await r.hgetall('tv:war:intel:pxhist')) || {}; } catch {} }
-  const nowT = Date.now();
-  const updated = {};
-  for (const m of markets) {
-    let series = [];
-    try { const raw = hist[m.id]; series = raw ? (typeof raw === 'string' ? JSON.parse(raw) : raw) : []; } catch {}
-    series.push({ t: nowT, p: m.probability });
-    series = series.filter(pt => nowT - pt.t < 36 * 3600000).slice(-12); // keep 36h, max 12 pts
-    updated[m.id] = JSON.stringify(series);
-    // measured delta vs ~50+ min ago
-    const older = series.find(pt => nowT - pt.t > 50 * 60000);
-    m.histDelta = older ? (m.probability - older.p) : null;
-    // full history (probabilities 0..1) for charting on the TV
-    m.history = series.map(s => Math.round(s.p * 1000) / 1000);
-    // spark from history (>=3 pts) else synthetic from gamma delta
-    const pts = series.map(s => s.p);
-    if (pts.length >= 3) {
-      const lo = Math.min(...pts), hi = Math.max(...pts), range = (hi - lo) || 1;
-      m.spark = pts.slice(-7).map(p => Math.round(22 - ((p - lo) / range) * 22));
-    } else {
-      const dir = (m.delta24h || m.histDelta || 0) >= 0 ? -1 : 1;
-      m.spark = [11, 11, 11, 11, 11, 11].map((v, i) => Math.max(2, Math.min(20, v + dir * (i - 2) * 2)));
-    }
-  }
-  if (r && Object.keys(updated).length) { try { await r.hset('tv:war:intel:pxhist', updated); } catch {} }
-  return markets;
+// ---------------------------------------------------------------- real price history
+// We no longer track prices ourselves. For the FEW markets we actually display we
+// pull authoritative history straight from the Polymarket CLOB on demand. This is
+// stateless (no Redis series to manage) and scales because we only ever fetch
+// history for the handful of markets that reach the screen.
+
+/** Fetch real price history for a CLOB YES-token. Returns [{t,p}] (t=sec, p=0..1) or null. */
+async function fetchMarketHistory(yesToken, { interval = '1w', fidelity = 60 } = {}) {
+  if (!yesToken) return null;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(`https://clob.polymarket.com/prices-history?market=${yesToken}&interval=${interval}&fidelity=${fidelity}`, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const h = (j.history || []).filter(p => p && typeof p.p === 'number' && typeof p.t === 'number');
+    return h.length ? h : null;
+  } catch { return null; }
 }
 
-/** Pick the spiking markets (recent move >= threshold), top N by |move|. */
-function pickSpikes(markets, { threshold = 0.03, max = 4 } = {}) {
-  const scored = markets.map(m => {
-    const move = [m.delta24h, m.delta1h, m.histDelta].map(x => Math.abs(x || 0)).reduce((a, b) => Math.max(a, b), 0);
-    const signed = m.histDelta != null ? m.histDelta : (m.delta24h != null ? m.delta24h : (m.delta1h || 0));
-    return { m, move, signed };
-  }).filter(x => x.move >= threshold);
-  scored.sort((a, b) => b.move - a.move);
-  return scored.slice(0, max).map(({ m, move, signed }) => {
-    const pct = Math.round(m.probability * 100);
-    const deltaPts = Math.round(signed * 100);
-    const up = signed >= 0;
-    return {
-      id: m.id, conditionId: m.conditionId, question: m.question,
-      prob: pct + '%',
-      probColor: pct <= 15 ? 'red' : (pct >= 60 ? 'green' : 'amber'),
-      delta: (up ? '+' : '') + deltaPts + ' pts',
-      deltaColor: up ? 'green' : 'red',
-      meta: m.volume + ' vol',
-      byDate: m.byDate || null,
-      history: m.history || [],
-      spike: true, moveAbs: move, spark: m.spark,
-      eventSlug: m.eventSlug, imageUrl: m.imageUrl,
-    };
-  });
+/** Downsample a probability series (0..1) into a 7-point sparkline (0..22, smaller=higher). */
+function sparkFromHistory(pts) {
+  const tail = pts.slice(-48);
+  if (tail.length < 2) return [11, 11, 11, 11, 11, 11, 11];
+  const lo = Math.min(...tail), hi = Math.max(...tail), range = (hi - lo) || 1;
+  const n = 7, out = [];
+  for (let i = 0; i < n; i++) {
+    const idx = Math.round((i * (tail.length - 1)) / (n - 1));
+    out.push(Math.round(22 - ((tail[idx] - lo) / range) * 22));
+  }
+  return out;
+}
+
+/** Measured delta vs ~hoursAgo using real history. */
+function measuredDelta(hist, hoursAgo) {
+  if (!hist || !hist.length) return null;
+  const last = hist[hist.length - 1];
+  const target = last.t - hoursAgo * 3600;
+  let ref = hist[0];
+  for (const pt of hist) { if (pt.t <= target) ref = pt; else break; }
+  return last.p - ref.p;
+}
+
+/**
+ * Cheap, stateless candidate prefilter: top-N markets by any available Gamma
+ * movement, with liquidity (volume) as the tiebreaker. We then pull REAL history
+ * for just these candidates to measure the true move. Gamma's change fields are
+ * spotty, so volume keeps the candidate net wide enough to not miss a real mover.
+ */
+function pickSpikeCandidates(markets, { max = 10 } = {}) {
+  return markets
+    .map(m => {
+      const gMove = [m.delta24h, m.delta1h, (m.delta1w != null ? m.delta1w * 0.3 : 0)]
+        .map(x => Math.abs(x || 0)).reduce((a, b) => Math.max(a, b), 0);
+      return { m, score: gMove * 100 + Math.min(5, m.volumeNum || 0) };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, max)
+    .map(x => x.m);
+}
+
+/**
+ * Pull real CLOB history for the candidate markets, measure the true recent move,
+ * and return the top `max` genuine movers (>= threshold) formatted for the bundle.
+ * Falls back to Gamma deltas + a synthetic spark if a market has no history.
+ */
+async function enrichSpikesWithHistory(candidates, { threshold = 0.03, max = 4, interval = '1w', fidelity = 60 } = {}) {
+  const enriched = await Promise.all(candidates.map(async (m) => {
+    const hist = await fetchMarketHistory(m.yesToken, { interval, fidelity });
+    let history = [], spark = null, d24 = null, d1 = null;
+    if (hist && hist.length >= 3) {
+      history = hist.map(p => Math.round(p.p * 1000) / 1000);
+      spark = sparkFromHistory(hist.map(p => p.p));
+      d24 = measuredDelta(hist, 24);
+      d1 = measuredDelta(hist, 1);
+    }
+    const signed = d24 != null ? d24 : (m.delta24h != null ? m.delta24h : (m.delta1h || 0));
+    const moveAbs = [d24, d1, m.delta24h, m.delta1h].map(x => Math.abs(x || 0)).reduce((a, b) => Math.max(a, b), 0);
+    if (!spark) {
+      const dir = signed >= 0 ? -1 : 1;
+      spark = [11, 11, 11, 11, 11, 11].map((v, i) => Math.max(2, Math.min(20, v + dir * (i - 2) * 2)));
+    }
+    return { m, history, spark, signed, moveAbs };
+  }));
+  return enriched
+    .filter(x => x.moveAbs >= threshold)
+    .sort((a, b) => b.moveAbs - a.moveAbs)
+    .slice(0, max)
+    .map(({ m, history, spark, signed, moveAbs }) => {
+      const pct = Math.round(m.probability * 100);
+      const deltaPts = Math.round(signed * 100);
+      const up = signed >= 0;
+      return {
+        id: m.id, conditionId: m.conditionId, question: m.question,
+        yesToken: m.yesToken || null,   // lets us re-price this exact market later without a full markets fetch
+        prob: pct + '%',
+        probColor: pct <= 15 ? 'red' : (pct >= 60 ? 'green' : 'amber'),
+        delta: (up ? '+' : '') + deltaPts + ' pts',
+        deltaColor: up ? 'green' : 'red',
+        meta: m.volume + ' vol',
+        byDate: m.byDate || null,
+        history,
+        spike: true, moveAbs, spark,
+        eventSlug: m.eventSlug, imageUrl: m.imageUrl,
+      };
+    });
 }
 
 // ---------------------------------------------------------------- YouTube videos (keyless RSS)
@@ -488,6 +543,7 @@ module.exports = {
   WAR_FEEDS, WAR_START_DATE, IRAN_FALLBACK, rssParser,
   filterIranWarRelevant, fetchWarHeadlines,
   isGoodImage, isLikelyPhoto, extractOgImage, wikiImage, resolveStoryImage,
-  isMarketDateExpired, parseByDate, fetchWarMarkets, withPriceHistory, pickSpikes,
+  isMarketDateExpired, parseByDate, fetchWarMarkets,
+  fetchMarketHistory, sparkFromHistory, measuredDelta, pickSpikeCandidates, enrichSpikesWithHistory,
   fetchWarVideos, WAR_YT_CHANNELS, fetchWeather,
 };
