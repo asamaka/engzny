@@ -19,12 +19,29 @@ const W = require('../api/lib/war-sources');
 
 const SONNET = process.env.INTEL_SONNET || 'claude-sonnet-4-5-20250929';
 const OPUS = process.env.INTEL_OPUS || 'claude-opus-4-6';
+const HAIKU = process.env.INTEL_HAIKU || 'claude-haiku-4-5-20251001';
 const REDIS_KEY = 'tv:war:intel:v1';
 const LAYOUT_PREFIX = 'tv:war:intel:layout:';
+const SEG_KEY = 'tv:war:segments:v1';            // persistent segment memory (the "iceberg")
+const SEG_FILE = process.env.INTEL_SEG_OUT || path.join(__dirname, '..', 'intel-segments.json');
 const OUT_FILE = process.env.INTEL_OUT || path.join(__dirname, '..', 'intel-bundle.json');
 const MODULE_LIBRARY = ['summary', 'marketImpact', 'videos', 'sources', 'timeline', 'keyQuote', 'statCallouts'];
+const DORMANT_MS = Number(process.env.INTEL_DORMANT_MS || 3 * 3600 * 1000);   // off-screen this long => resurfacing
+const DEAD_DAYS = Number(process.env.INTEL_SEG_DEAD_DAYS || 7);               // no update this long => archived
+const REGISTRY_CAP = Number(process.env.INTEL_SEG_CAP || 80);                 // keep newest N segments
 
 function log(...a) { console.error('[build-intel]', ...a); }
+
+// Human-friendly relative age for prompts/logs ("3h ago", "2d ago").
+function relAge(iso) {
+  if (!iso) return 'unknown';
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms)) return 'unknown';
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `${Math.max(0, m)}m ago`;
+  const h = Math.round(m / 60); if (h < 48) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
 
 function extractJson(text) {
   let t = (text || '').trim();
@@ -109,7 +126,7 @@ Rules: group by DISTINCT real events. Over-generate clusters (it is fine to prop
 // sources, which videos appear, which prediction markets show on the home rail,
 // ordering, what counts as breaking, and the overall status. Sonnet's digest +
 // proposals are advisory raw material only.
-async function decideEditorial(headlines, spikes, videos, proposals) {
+async function decideEditorial(headlines, spikes, videos, proposals, existingDigest) {
   const hList = headlines.map((h, i) =>
     `${i}. [${h.source}/${h.sourceCategory}] ${h.title}${h.ageMinutes != null ? ` (${h.ageMinutes}m ago)` : ''}`
   ).join('\n');
@@ -126,6 +143,9 @@ NOW: ${new Date().toISOString()}
 
 CONTEXT DIGEST (advisory, from the desk):
 ${proposals.contextDigest || '(none)'}
+
+EXISTING SEGMENTS (persistent memory — stories ALREADY tracked across previous runs; REUSE an id when a cluster continues one of these, even if the wording changed):
+${existingDigest || '(none yet — this is a fresh start)'}
 
 CANDIDATE CLUSTERS (advisory, from the desk):
 ${JSON.stringify(proposals.clusters || [], null, 0)}
@@ -144,9 +164,10 @@ Return ONLY JSON (no prose, no fences):
   "status": { "label": "<UPPERCASE short status, <=28 chars>", "severity": "calm|warning|critical" },
   "breakingIdx": <headline index of the single genuine BREAKING item right now, or null>,
   "homeMarketIds": [<ordered subset of the spiking market ids to DISPLAY on the home rail; pick the most decision-relevant, [] if none worth showing>],
-  "segments": [   // 5-7 DISTINCT stories, MOST IMPORTANT FIRST; YOU decide the final set + order
+  "segments": [   // 5-7 DISTINCT stories to DISPLAY now, MOST IMPORTANT FIRST; YOU decide the final set + order
     {
-      "id": "<short-stable-slug>",
+      "id": "<REUSE an existing id if this continues a tracked story; otherwise a NEW short-stable-slug>",
+      "isMajorUpdate": <true ONLY if there is a genuinely NEW development since this story was last covered; false if it is the same information reworded or merely re-sourced>,
       "headline": "<<=64 chars, editorial, ends with a period>",
       "brief": "<1-2 sentences, <=180 chars>",
       "sourceIdxs": [<1-4 headline indices, most relevant FIRST — you choose the top sources>],
@@ -160,7 +181,9 @@ Return ONLY JSON (no prose, no fences):
 }
 
 Rules (you have final say):
-- Choose the segment set, titles, ordering, and the TOP sources per story. Prefer fresher, higher-signal headlines; swap in a newer development over an older one when they compete.
+- CONTINUITY IS CRITICAL: If a cluster is the SAME underlying story as one in EXISTING SEGMENTS, you MUST reuse that segment's id (do not invent a new slug, do not re-title it into a "new" story). Set isMajorUpdate=true only when a real new development has occurred; otherwise false. Create a NEW id ONLY for a genuinely new, distinct, title-worthy development not already tracked.
+- Do NOT resurface an old story as if it were breaking. A reworded version of yesterday's news is the SAME segment (reuse id, isMajorUpdate=false), not a new one.
+- Choose the segment set, titles, ordering, and the TOP sources per story. Prefer stories with a real new development (isMajorUpdate=true) or strong fresh sourcing; swap in a newer development over an older one when they compete.
 - videoIdxs: pick the clips that genuinely match the story (freshest, on-topic). [] if none fit — never force an unrelated clip.
 - homeMarketIds: decide which prediction markets earn a spot on the home rail (most relevant to the lead stories).
 - breakingIdx: ONLY a headline younger than ~90 minutes describing a major new development; else null.
@@ -387,9 +410,117 @@ async function refreshSignals(prevBundle) {
   }));
 }
 
+// ---- persistent segment memory (the "iceberg" the cron reasons over) --------
+// Each cron run reconciles the freshly-curated segments against a durable registry
+// so we (a) never resurface the same story as a brand-new "first reported" item,
+// (b) keep a true first-report time + running update history per segment, and
+// (c) reuse a stable curated image instead of re-picking (and flip-flopping) it.
+async function loadRegistry(redis) {
+  if (redis) { try { const c = await redis.get(SEG_KEY); if (c) return typeof c === 'string' ? JSON.parse(c) : c; } catch {} }
+  try { if (fs.existsSync(SEG_FILE)) return JSON.parse(fs.readFileSync(SEG_FILE, 'utf8')); } catch {}
+  return { version: 1, segments: {} };
+}
+async function saveRegistry(redis, reg) {
+  reg.updatedAt = new Date().toISOString();
+  if (redis) { try { await redis.set(SEG_KEY, JSON.stringify(reg)); } catch (e) { log('registry redis write failed', e.message); } }
+  try { fs.writeFileSync(SEG_FILE, JSON.stringify(reg, null, 2)); } catch {}
+}
+function segSourceMeta(sources) {
+  const links = new Set(), outlets = new Set(), cats = new Set();
+  let newest = 0, oldest = Infinity;
+  for (const s of (sources || [])) {
+    if (s.link) links.add(s.link);
+    if (s.outlet) outlets.add(s.outlet);
+    if (s.category) cats.add(s.category);
+    const t = s.publishedAt ? Date.parse(s.publishedAt) : NaN;
+    if (!isNaN(t)) { if (t > newest) newest = t; if (t < oldest) oldest = t; }
+  }
+  return {
+    links: [...links], outlets: [...outlets], cats: [...cats],
+    newestAt: newest ? new Date(newest).toISOString() : null,
+    oldestAt: oldest !== Infinity ? new Date(oldest).toISOString() : null,
+  };
+}
+// Reconcile one curated segment into the registry; returns the durable record.
+function mergeSegment(reg, seg, sources, now) {
+  const nowISO = new Date(now).toISOString();
+  const sm = segSourceMeta(sources);
+  const isMajor = !!seg.isMajorUpdate;
+  let rec = reg.segments[seg.id];
+  let resurfaced = false;
+  if (!rec) {
+    rec = {
+      id: seg.id, createdAt: nowISO, firstReportedAt: nowISO,
+      firstSeenSourceAt: sm.oldestAt || nowISO,
+      updateCount: 0, sourceLinks: [], outlets: [], categories: [], shownCount: 0,
+    };
+    reg.segments[seg.id] = rec;
+  } else {
+    const lastShown = rec.lastShownAt ? Date.parse(rec.lastShownAt) : 0;
+    resurfaced = isMajor && (!lastShown || (now - lastShown) > DORMANT_MS);
+    if (sm.oldestAt && (!rec.firstSeenSourceAt || Date.parse(sm.oldestAt) < Date.parse(rec.firstSeenSourceAt)))
+      rec.firstSeenSourceAt = sm.oldestAt; // keep the TRUE earliest first-report time
+  }
+  rec.sourceLinks = [...new Set([...(rec.sourceLinks || []), ...sm.links])];
+  rec.outlets = [...new Set([...(rec.outlets || []), ...sm.outlets])];
+  rec.categories = [...new Set([...(rec.categories || []), ...sm.cats])];
+  const grew = sm.links.some(l => !(rec._lastLinks || []).includes(l)); // genuinely new sourcing this run
+  rec._lastLinks = sm.links;
+  rec.title = seg.headline; rec.brief = seg.brief; rec.aiSummary = seg.aiSummary || seg.brief;
+  rec.timeline = Array.isArray(seg.timeline) ? seg.timeline : (rec.timeline || []);
+  rec.marketIds = (seg.marketIds || []).map(String);
+  rec.newestSourceAt = sm.newestAt || rec.newestSourceAt || nowISO;
+  if (grew || isMajor) rec.latestUpdateAt = nowISO;
+  if (isMajor) { rec.latestMajorUpdateAt = nowISO; rec.updateCount = (rec.updateCount || 0) + 1; }
+  if (!rec.latestUpdateAt) rec.latestUpdateAt = nowISO;
+  if (!rec.latestMajorUpdateAt) rec.latestMajorUpdateAt = rec.firstReportedAt;
+  rec.sourceCount = rec.sourceLinks.length;
+  rec.outletCount = rec.outlets.length;
+  rec.coveragePct = Math.round((rec.categories.length / 4) * 100); // share of the 4 source blocs
+  rec.resurfaced = resurfaced;
+  return rec;
+}
+// Status transitions + size cap after a run.
+function finalizeRegistry(reg, displayedIds, now) {
+  const shown = new Set(displayedIds);
+  const nowISO = new Date(now).toISOString();
+  for (const rec of Object.values(reg.segments)) {
+    if (shown.has(rec.id)) {
+      rec.status = 'active'; rec.lastShownAt = nowISO; rec.shownCount = (rec.shownCount || 0) + 1;
+    } else {
+      const age = now - Date.parse(rec.latestUpdateAt || rec.firstReportedAt || nowISO);
+      rec.status = age > DEAD_DAYS * 86400000 ? 'dead' : 'dormant';
+      rec.resurfaced = false;
+    }
+  }
+  const all = Object.values(reg.segments).sort((a, b) => Date.parse(b.latestUpdateAt || 0) - Date.parse(a.latestUpdateAt || 0));
+  if (all.length > REGISTRY_CAP) for (const rec of all.slice(REGISTRY_CAP)) delete reg.segments[rec.id];
+}
+// Haiku: a short, concrete visual query for the keyless image search fallback.
+async function imageQueryFor(seg) {
+  try {
+    const txt = await W.anthropicText({
+      model: HAIKU, max_tokens: 24,
+      prompt: `Give a 2-4 word concrete, photographable visual subject (a place, landmark, vehicle, building, or scene) that best illustrates this news story for a TV thumbnail. Output ONLY the search phrase. No quotes, no punctuation, no personal names.\nHeadline: ${seg.headline}\nSummary: ${seg.aiSummary || seg.brief || ''}`,
+    });
+    return (txt || '').trim().replace(/^["']|["']$/g, '').split('\n')[0].slice(0, 60) || null;
+  } catch { return null; }
+}
+// Resolve the segment's curated image: stable reuse unless missing or a major update;
+// prefer a real photo from the story's own sources, else a keyless web image search.
+async function resolveSegmentImage(seg, rec, ogImg, isMajor) {
+  if (rec.image && !isMajor) return rec.image;       // stable: don't flip-flop the photo every run
+  if (ogImg) return ogImg;                           // freshest story-specific press photo
+  const q = (rec.imageQuery && !isMajor) ? rec.imageQuery : await imageQueryFor(seg);
+  rec.imageQuery = q;
+  const found = await W.searchPhoto(q);
+  return found || rec.image || null;
+}
+
 // ---- main -------------------------------------------------------------------
 async function main() {
   const redis = W.getRedis();
+  const NOW = Date.now();
   log('redis', redis ? 'connected' : 'NOT configured (file-only output)');
 
   const [hRes, mRes, weather, videosAll] = await Promise.all([
@@ -425,10 +556,22 @@ async function main() {
   }
   log(novelty.changed ? `curating — ${novelty.reasons.join('; ')}` : `reuse cap reached (${Math.round(prevAge / 60000)}m) — refreshing editorial`);
 
+  // Persistent segment memory: the editor reasons against everything we've tracked
+  // so it continues existing stories (reusing their id) instead of resurfacing them
+  // as brand-new "first reported" items.
+  const registry = await loadRegistry(redis);
+  const existingDigest = Object.values(registry.segments || {})
+    .filter(s => s.status !== 'dead')
+    .sort((a, b) => Date.parse(b.latestUpdateAt || 0) - Date.parse(a.latestUpdateAt || 0))
+    .slice(0, 24)
+    .map(s => `- id=${s.id} "${s.title}" (first reported ${relAge(s.firstSeenSourceAt)}, last update ${relAge(s.latestUpdateAt)}, ${s.sourceCount || 0} sources, ${s.status || 'active'})`)
+    .join('\n');
+
   // Two-stage curation: Sonnet drafts proposals + context (cheap), Opus decides
-  // ALL content (segments, titles, sources, videos, home markets, swaps).
+  // ALL content (segments, titles, sources, videos, home markets, swaps) — now also
+  // classifying each into an existing segment id or a brand-new one.
   const proposals = await proposeContext(headlines, spikes, videosAll);
-  const curated = await decideEditorial(headlines, spikes, videosAll, proposals);
+  const curated = await decideEditorial(headlines, spikes, videosAll, proposals, existingDigest);
   const segments = (curated.segments || []).slice(0, 7);
 
   // Resolve og:image for every referenced source link (parallel)
@@ -466,12 +609,19 @@ async function main() {
         category: h.sourceCategory, link: h.link, image: (imgMap[h.link] && W.isLikelyPhoto(imgMap[h.link])) ? imgMap[h.link] : null,
       };
     });
-    // hero image: Sonnet-picked photo, else first photo candidate, else null (gradient)
+    // og candidate (Sonnet-picked photo, else first candidate) = freshest story-specific photo
     const cands = candsBySeg[si] || [];
-    let heroImg = null;
+    let ogImg = null;
     const pi = picked[si] != null ? picked[si] : picked[String(si)];
-    if (pi != null && cands[pi]) heroImg = cands[pi].url;
-    if (!heroImg && cands.length) heroImg = cands[0].url;
+    if (pi != null && cands[pi]) ogImg = cands[pi].url;
+    if (!ogImg && cands.length) ogImg = cands[0].url;
+
+    // Reconcile this segment into persistent memory, then resolve a STABLE curated
+    // image (reused run-to-run unless missing or a real new development).
+    if (!seg.id) seg.id = (seg.headline || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || crypto.randomBytes(4).toString('hex');
+    const rec = mergeSegment(registry, seg, sources, NOW);
+    rec.image = await resolveSegmentImage(seg, rec, ogImg, !!seg.isMajorUpdate);
+    rec.imageResolvedAt = new Date(NOW).toISOString();
 
     // videos: Opus-chosen clips (videoIdxs into videosAll). Fall back to keyword
     // matching only when Opus didn't choose — and never force an unrelated clip.
@@ -489,10 +639,27 @@ async function main() {
     const linkedSpikes = (seg.marketIds || []).map(id => spikeById[id]).filter(Boolean);
     const layout = await designLayout(seg, redis, { hasMarket: linkedSpikes.length > 0, hasVideos: vids.length > 0 });
     stories.push({
-      id: seg.id || crypto.randomBytes(4).toString('hex'),
+      id: seg.id,
       headline: seg.headline, brief: seg.brief,
-      image: heroImg, hasMarket: linkedSpikes.length > 0,
+      image: rec.image || null, hasMarket: linkedSpikes.length > 0,
       marketIds: (seg.marketIds || []).filter(id => spikeById[id]),
+      // metadata contract — the persistent "iceberg" stats the API/TV can reason over
+      meta: {
+        firstReportedAt: rec.firstSeenSourceAt || rec.firstReportedAt,
+        latestUpdateAt: rec.latestUpdateAt,
+        latestMajorUpdateAt: rec.latestMajorUpdateAt,
+        updateCount: rec.updateCount || 0,
+        sourceCount: rec.sourceCount || 0,
+        outletCount: rec.outletCount || 0,
+        coveragePct: rec.coveragePct || 0,
+        resurfaced: !!rec.resurfaced,
+        status: 'active',
+      },
+      // the TV shows "updated" only when a dormant story is brought back by a real
+      // development; otherwise the true "first reported" time (which may be days old).
+      freshness: rec.resurfaced
+        ? { label: 'updated', at: rec.latestMajorUpdateAt }
+        : { label: 'first reported', at: rec.firstSeenSourceAt || rec.firstReportedAt },
       drilldown: {
         layout,
         aiSummary: seg.aiSummary || seg.brief,
@@ -542,6 +709,11 @@ async function main() {
     stories.length = 0;
     stories.push(...chosen.map(t => t.st));
   }
+
+  // Reconcile registry status against what actually reached the screen, then persist
+  // the segment memory (the iceberg) so the next run continues these stories.
+  finalizeRegistry(registry, stories.map(s => s.id), NOW);
+  await saveRegistry(redis, registry);
 
   // Home rail: Opus decides which prediction markets (and order) appear. Fall back to all spikes.
   const homeIds = (curated.homeMarketIds || []).map(String);

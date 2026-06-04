@@ -202,6 +202,50 @@ async function wikiImage(keyword) {
   } catch { return null; }
 }
 
+// ---- keyless web image search (illustrative photo for a segment) ----------
+// When a segment has no usable og:image (common for wire/state-media stories), we
+// resolve an illustrative photo from a free, keyless source using a short, concrete
+// visual query (an LLM picks the query upstream). Wikimedia Commons first (real
+// editorial/landmark photos, stable hotlinking), then Openverse (CC-licensed).
+async function commonsPhoto(query, { minWidth = 600 } = {}) {
+  if (!query) return null;
+  try {
+    const u = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrnamespace=6&gsrlimit=10&prop=imageinfo&iiprop=url|size|mime&iiurlwidth=1000&format=json&origin=*`;
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'ThinxTV/1.0 (intel image)' } });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const pages = j.query && j.query.pages ? Object.values(j.query.pages) : [];
+    // Keep search order; prefer real photos (jpeg) of reasonable size, skip svg/diagrams/icons.
+    const cand = pages
+      .map(p => (p.imageinfo && p.imageinfo[0]) || null)
+      .filter(Boolean)
+      .filter(ii => /jpe?g/i.test(ii.mime || '') && (ii.thumbwidth || ii.width || 0) >= minWidth)
+      .filter(ii => !LOGO_HINT.test(ii.thumburl || ii.url || ''))
+      .map(ii => ii.thumburl || ii.url)[0];
+    return cand || null;
+  } catch { return null; }
+}
+async function openversePhoto(query) {
+  if (!query) return null;
+  try {
+    const u = `https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=4&mature=false`;
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(u, { signal: ctrl.signal, headers: { 'User-Agent': 'ThinxTV/1.0 (intel image)' } });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const j = await r.json();
+    const res = (j.results || []).find(x => x && (x.url || x.thumbnail));
+    return res ? (res.url || res.thumbnail) : null;
+  } catch { return null; }
+}
+/** Resolve an illustrative photo URL for a concrete visual query (keyless). */
+async function searchPhoto(query) {
+  if (!query) return null;
+  return (await commonsPhoto(query)) || (await openversePhoto(query));
+}
+
 const IMG_KEYWORDS = ['Beaufort Castle', 'Strait of Hormuz', 'Beirut', 'Tehran', 'Lebanon', 'Iran', 'Israel', 'Bandar Abbas'];
 
 /** Resolve a story image: og:image of candidate urls -> wikipedia entity -> null. */
@@ -543,6 +587,7 @@ module.exports = {
   WAR_FEEDS, WAR_START_DATE, IRAN_FALLBACK, rssParser,
   filterIranWarRelevant, fetchWarHeadlines,
   isGoodImage, isLikelyPhoto, extractOgImage, wikiImage, resolveStoryImage,
+  commonsPhoto, openversePhoto, searchPhoto,
   isMarketDateExpired, parseByDate, fetchWarMarkets,
   fetchMarketHistory, sparkFromHistory, measuredDelta, pickSpikeCandidates, enrichSpikesWithHistory,
   fetchWarVideos, WAR_YT_CHANNELS, fetchWeather,

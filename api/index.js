@@ -1479,6 +1479,54 @@ app.get('/api/tv/intel', requireWarToken, async (req, res) => {
   }
 });
 
+// GET /api/tv/segments — the persistent "iceberg" of tracked segments (metadata +
+// curated image), filterable by the metadata contract. The home bundle (/intel) is
+// only the tip; this exposes the full queue so a client can build its own view.
+//   ?status=active|dormant|dead   (default: not dead)
+//   ?minSources=N  ?minCoverage=PCT  ?sinceMajorUpdateMin=N  (only updated within N min)
+//   ?order=update|firstReported|sources|coverage   ?limit=N (default 50)
+app.get('/api/tv/segments', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    let reg = null;
+    if (r) { const c = await r.get('tv:war:segments:v1'); if (c) reg = typeof c === 'string' ? JSON.parse(c) : c; }
+    if (!reg) {
+      const file = path.join(__dirname, '..', 'intel-segments.json');
+      if (fs.existsSync(file)) reg = JSON.parse(fs.readFileSync(file, 'utf8'));
+    }
+    let segs = Object.values((reg && reg.segments) || {});
+    const q = req.query;
+    if (q.status) segs = segs.filter(s => (s.status || 'active') === q.status);
+    else segs = segs.filter(s => (s.status || 'active') !== 'dead');
+    if (q.minSources) segs = segs.filter(s => (s.sourceCount || 0) >= Number(q.minSources));
+    if (q.minCoverage) segs = segs.filter(s => (s.coveragePct || 0) >= Number(q.minCoverage));
+    if (q.sinceMajorUpdateMin) {
+      const cut = Date.now() - Number(q.sinceMajorUpdateMin) * 60000;
+      segs = segs.filter(s => Date.parse(s.latestMajorUpdateAt || 0) >= cut);
+    }
+    const orderKey = {
+      update: s => Date.parse(s.latestUpdateAt || 0),
+      firstReported: s => -Date.parse(s.firstSeenSourceAt || s.firstReportedAt || 0),
+      sources: s => (s.sourceCount || 0),
+      coverage: s => (s.coveragePct || 0),
+    }[q.order] || (s => Date.parse(s.latestUpdateAt || 0));
+    segs.sort((a, b) => orderKey(b) - orderKey(a));
+    const limit = Math.max(1, Math.min(200, Number(q.limit) || 50));
+    const view = segs.slice(0, limit).map(s => ({
+      id: s.id, title: s.title, brief: s.brief, image: s.image || null, status: s.status || 'active',
+      firstReportedAt: s.firstSeenSourceAt || s.firstReportedAt, latestUpdateAt: s.latestUpdateAt,
+      latestMajorUpdateAt: s.latestMajorUpdateAt, updateCount: s.updateCount || 0,
+      sourceCount: s.sourceCount || 0, outletCount: s.outletCount || 0, coveragePct: s.coveragePct || 0,
+      lastShownAt: s.lastShownAt || null, shownCount: s.shownCount || 0, marketIds: s.marketIds || [],
+    }));
+    res.json({ count: view.length, total: Object.keys((reg && reg.segments) || {}).length, segments: view, updatedAt: reg && reg.updatedAt });
+  } catch (err) {
+    logger.error('Intel', 'Failed to serve segments', { error: err.message });
+    res.status(500).json({ error: 'Failed to read segment registry' });
+  }
+});
+
 // POST /api/tv/intel — push a pre-built bundle into Redis (used by the builder).
 app.post('/api/tv/intel', express.json({ limit: '4mb' }), requireWarToken, async (req, res) => {
   setCorsHeaders(res);
