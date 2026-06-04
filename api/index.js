@@ -1479,6 +1479,36 @@ app.get('/api/tv/intel', requireWarToken, async (req, res) => {
   }
 });
 
+// GET /api/tv/intel/public — token-free, read-only mirror of the intel bundle for
+// the mobile web view (/m). It serves the SAME bundle the TV reads but requires no
+// token: the data is published news content, and this route can only read — it
+// cannot write. The token-protected GET/POST /api/tv/intel above are unchanged, so
+// the write-capable TV_WAR_TOKEN is never exposed to the public page.
+app.get('/api/tv/intel/public', async (req, res) => {
+  setCorsHeaders(res);
+  res.set('Cache-Control', 'public, max-age=30, s-maxage=30');
+  try {
+    const r = await getRedis();
+    if (r) {
+      const cached = await r.get('tv:war:intel:v1');
+      if (cached) return res.json(typeof cached === 'string' ? JSON.parse(cached) : cached);
+    }
+    const file = path.join(__dirname, '..', 'intel-bundle.json');
+    if (fs.existsSync(file)) {
+      return res.json(JSON.parse(fs.readFileSync(file, 'utf8')));
+    }
+    res.status(404).json({ error: 'No intel bundle available yet' });
+  } catch (err) {
+    logger.error('Intel', 'Failed to serve public bundle', { error: err.message });
+    res.status(500).json({ error: 'Failed to read intel bundle' });
+  }
+});
+
+// GET /m — the mobile web briefing (phone-friendly mirror of the TV intel view).
+app.get('/m', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'm.html'));
+});
+
 // GET /api/tv/segments — the persistent "iceberg" of tracked segments (metadata +
 // curated image), filterable by the metadata contract. The home bundle (/intel) is
 // only the tip; this exposes the full queue so a client can build its own view.
