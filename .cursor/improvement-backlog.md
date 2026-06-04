@@ -11,6 +11,7 @@ Maintained by the Continuous Improvement Agent. Read at start of every run, upda
 
 ### P1 — Degraded
 
+- [ ] Prediction-market screenshots need market-aware extraction/layout — user example (2026-06-04): "Will the US strike 9 countries in 2026?" rendered without recognizing the market context deeply enough. Extract and feature resolution metadata, current odds/change, deadline, related headlines, and "countries so far / implicated countries" evidence instead of a generic summary. Design should answer the obvious market question with structured cards.
 - [ ] Sonar deep research often times out before pipeline cap — most breaking_news pipelines miss research enrichment. Consider post-complete SSE card_updates so research arrives late rather than never.
 
 ### P2 — Meaningful Polish
