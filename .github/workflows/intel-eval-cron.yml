@@ -52,6 +52,15 @@ jobs:
           INTEL_HAIKU: ${{ vars.INTEL_HAIKU }}
         run: node scripts/eval-intel.js ${{ github.event.inputs.reflect == 'false' && '--no-reflect' || '' }}
 
+      - name: Upload full report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intel-eval-report
+          path: intel-eval.json
+          if-no-files-found: warn
+          retention-days: 30
+
       - name: Summary
         if: always()
         run: echo "Intel accuracy eval finished at $(date -u)" >> "$GITHUB_STEP_SUMMARY"

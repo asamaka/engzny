@@ -493,6 +493,17 @@ function setCorsHeaders(res) {
   res.set('Cache-Control', 'public, max-age=30');
 }
 
+// Auth for the eval/accuracy endpoints: accept the write-capable war token OR the
+// admin debug token. The debug token is the project's standard mechanism for
+// trigger/admin actions (briefing + improvement triggers use it), so this lets the
+// accuracy loop be driven on demand without exposing the TV's war token.
+function requireEvalAuth(req, res, next) {
+  const token = (req.headers.authorization || '').replace('Bearer ', '') || req.query.token || req.headers['x-debug-token'] || '';
+  const war = process.env.TV_WAR_TOKEN || process.env.TV_BRIEFING_TOKEN;
+  if ((war && token === war) || token === DEBUG_TOKEN) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+}
+
 // --- WAR RSS FEED REGISTRY ---
 const WAR_FEEDS = [
   { id: 'bbc-mideast', name: 'BBC', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', category: 'western' },
@@ -1581,7 +1592,7 @@ app.post('/api/tv/intel', express.json({ limit: '4mb' }), requireWarToken, async
 // ============================================================
 
 // GET /api/tv/intel/eval — the latest stored accuracy report + score history.
-app.get('/api/tv/intel/eval', requireWarToken, async (req, res) => {
+app.get('/api/tv/intel/eval', requireEvalAuth, async (req, res) => {
   setCorsHeaders(res);
   try {
     const intelEval = require('./lib/intel-eval');
@@ -1601,7 +1612,7 @@ app.get('/api/tv/intel/eval', requireWarToken, async (req, res) => {
 // Establishes ground truth via a live web search, so it costs tokens + ~20-40s.
 // A tighter web-search budget keeps it inside the serverless window; the cron
 // script uses a wider budget. Pass {"reflect":false} to skip the Opus reflection.
-app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireWarToken, async (req, res) => {
+app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireEvalAuth, async (req, res) => {
   setCorsHeaders(res);
   try {
     const intelEval = require('./lib/intel-eval');
@@ -1617,6 +1628,39 @@ app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireWarToken
   } catch (err) {
     logger.error('IntelEval', 'Evaluation failed', { error: err.message });
     res.status(500).json({ error: 'Evaluation failed', detail: err.message });
+  }
+});
+
+// POST /api/tv/intel/eval/trigger — dispatch the intel-eval-cron.yml workflow via
+// the runtime's GITHUB_DISPATCH_TOKEN (actions:write only). This runs the heavy
+// full eval in CI (no serverless timeout, persists report + uploads the JSON
+// artifact) without needing the caller to hold a GitHub token. Body: {reflect:bool}.
+app.post('/api/tv/intel/eval/trigger', express.json({ limit: '16kb' }), requireEvalAuth, async (req, res) => {
+  setCorsHeaders(res);
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  if (!token) return res.status(503).json({ error: 'GITHUB_DISPATCH_TOKEN not configured' });
+  const owner = process.env.IMPROVEMENT_REPO_OWNER || 'asamaka';
+  const repo = process.env.IMPROVEMENT_REPO_NAME || 'engzny';
+  const reflect = (req.body && req.body.reflect === false) ? 'false' : 'true';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/intel-eval-cron.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { reflect } }),
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      return res.status(502).json({ error: `GitHub dispatch ${r.status}`, detail: body.slice(0, 300) });
+    }
+    res.json({ ok: true, dispatched: 'intel-eval-cron.yml', ref: 'main', reflect, at: new Date().toISOString() });
+  } catch (err) {
+    logger.error('IntelEval', 'Dispatch failed', { error: err.message });
+    res.status(500).json({ error: 'Dispatch failed', detail: err.message });
   }
 });
 

@@ -337,20 +337,23 @@ A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.j
 
 A deterministic backbone (pure, unit-tested) scores **coverage/recall** (importance-weighted, vs Opus's top-10), **freshness** (median displayed age + label honesty), **staleness** (`INTEL_EVAL_STALE_H`, default 24h), and **market alignment**, rolled into a **composite 0–100**.
 
-Reports persist to `tv:war:eval:v1` (latest) + `tv:war:eval:log` (history trend line). Run it:
+Reports persist to `tv:war:eval:v1` (latest) + `tv:war:eval:log` (history trend line); each CI run also uploads the full report as the `intel-eval-report` artifact (`intel-eval.json`). The eval endpoints accept the **war token OR the debug token** (`thinx-debug-2026`) so the loop is self-serve. Run it:
 
 ```bash
-# On demand against the current live bundle (costs tokens + ~20-40s):
-curl -X POST 'https://www.thinx.fun/api/tv/intel/eval?token=<TV_WAR_TOKEN>' -H 'Content-Type: application/json' -d '{}'
+# Dispatch the full CI eval (no serverless timeout; persists + uploads artifact):
+curl -X POST 'https://www.thinx.fun/api/tv/intel/eval/trigger?token=thinx-debug-2026' -H 'Content-Type: application/json' -d '{}'
+
+# OR run inline against the live bundle now (costs tokens + ~30-60s):
+curl -X POST 'https://www.thinx.fun/api/tv/intel/eval?token=thinx-debug-2026' -H 'Content-Type: application/json' -d '{}'
 
 # Read the latest report + score history:
-curl 'https://www.thinx.fun/api/tv/intel/eval?token=<TV_WAR_TOKEN>&history=30'
+curl 'https://www.thinx.fun/api/tv/intel/eval?token=thinx-debug-2026&history=30'
 
 # Locally / in CI (writes intel-eval.json + Redis):
 node scripts/eval-intel.js            # add --no-reflect to skip the Opus pass
 ```
 
-Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the build) and `workflow_dispatch`.
+Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the build), `workflow_dispatch`, and the `/eval/trigger` endpoint above (dispatches that workflow via `GITHUB_DISPATCH_TOKEN`).
 
 ### Intel config knobs
 
