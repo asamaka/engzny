@@ -122,6 +122,34 @@ describe('intel-eval pure scoring', () => {
     });
   });
 
+  describe('reconcileWorldviews', () => {
+    it('marks cross-confirmed stories high-confidence and single-provider ones low', () => {
+      const gemini = { provider: 'gemini', situation: 'g', marketQuestions: ['Hormuz lifted by June 15?'],
+        topHeadlines: [{ title: 'Hezbollah rejects ceasefire deal', summary: 'short', importance: 5, front: 'levant' },
+                       { title: 'Iran-US talks deadlock over frozen assets', summary: 'x', importance: 4 }] };
+      const opus = { provider: 'opus', situation: 'o', marketQuestions: ['Iran ceasefire by July?'],
+        topHeadlines: [{ title: 'Hezbollah rejects the Washington ceasefire truce', summary: 'a much longer summary', importance: 4, front: 'levant' },
+                       { title: 'Global oil crisis: IEA largest disruption ever', summary: 'y', importance: 4 }] };
+      const r = E.reconcileWorldviews([gemini, opus]);
+      expect(r.providersUsed).toEqual(['gemini', 'opus']);
+      const lebanon = r.topHeadlines.find(h => /hezbollah/i.test(h.title));
+      expect(lebanon.confidence).toBe('high');
+      expect(lebanon.providers.sort()).toEqual(['gemini', 'opus']);
+      expect(lebanon.summary).toBe('a much longer summary'); // keeps the richer summary
+      expect(r.topHeadlines[0]).toBe(lebanon); // cross-confirmed sorts first
+      const oil = r.topHeadlines.find(h => /oil/i.test(h.title));
+      expect(oil.confidence).toBe('low');
+      expect(r.marketQuestions).toHaveLength(2); // unioned
+    });
+
+    it('single provider yields medium confidence (no cross-check available)', () => {
+      const only = { provider: 'gemini', situation: 'g', marketQuestions: [],
+        topHeadlines: [{ title: 'Some real story', importance: 3 }] };
+      const r = E.reconcileWorldviews([only]);
+      expect(r.topHeadlines[0].confidence).toBe('medium');
+    });
+  });
+
   describe('summarize', () => {
     it('extracts a compact trend-line entry', () => {
       const report = {

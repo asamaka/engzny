@@ -38,8 +38,8 @@ async function main() {
   log(`grade ${report.reflection && report.reflection.grade} | median displayed age ${report.freshness.medianDisplayedAgeH}h | stale fraction ${report.staleness.staleFraction}`);
 
   const reality = report.reality || {};
-  log(`--- OPUS WORLDVIEW (web search): top ${(reality.topHeadlines || []).length} headlines ---`);
-  for (const h of (reality.topHeadlines || [])) log(`  ${h.rank}. (${h.importance}/5) [${h.front}] ${h.title}`);
+  log(`--- WORLDVIEW (${(reality.providersUsed || []).join(' + ') || 'n/a'}): top ${(reality.topHeadlines || []).length} headlines ---`);
+  for (const h of (reality.topHeadlines || [])) log(`  ${h.rank}. (${h.importance}/5, ${h.confidence}, via:${(h.providers || []).join('+')}) [${h.front}] ${h.title}`);
 
   log('--- GAP ANALYSIS (reality vs the feed) ---');
   for (const g of (report.gapAnalysis || [])) {

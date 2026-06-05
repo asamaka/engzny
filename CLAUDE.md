@@ -328,14 +328,16 @@ A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.j
 - The editor **re-titles** a reused segment to lead with the newest development (continuity of *id*, freshness of *headline*).
 - The displayed **freshness label is honest**: a long-running story with a recent source shows "updated <recent>" (`INTEL_FRESH_LABEL_MIN`, default 360 min) instead of "first reported 2 days ago".
 
-### Accuracy harness — snapshot vs. reality (two-phase, architecture-aware)
-`api/lib/intel-eval.js` runs a single Opus pass **with web search** that:
-1. **Builds its own worldview** — Opus web-searches every front and produces its independent **top-10 headlines** (content summary + importance + first-report + sources + a photo suggestion each) — the view a standard search "usually surfaces well".
+### Accuracy harness — snapshot vs. reality (cross-checked, architecture-aware)
+`api/lib/intel-eval.js`:
+1. **Builds a reconciled worldview** — independent **top-10 headlines** from two providers in parallel (`INTEL_EVAL_GT_PROVIDER`, default `both`): **Gemini Flash + Google Search grounding** (the "standard search that surfaces major stories well", cheap/fast) and **Opus + web search**. They're reconciled: a story surfaced by **both** is `confidence:high`; by only one is `confidence:low` (a possible miss OR a single-source rumor — the judge weighs it gently and never asserts shaky claims). Each headline carries content summary + importance + first-report + sources + a photo suggestion.
 2. **Reads the live feed** exactly as `/m` shows it (set `INTEL_EVAL_FEED_URL` to read the public endpoint; else Redis/file).
 3. **Gap analysis across the full spectrum** — for each real story: `missing` → `covered_reword` (title should change to encapsulate/split, with a suggested title) → `covered_shallow` (thin content/photo) → `over_broad`/`merged` → `covered_well`; plus reverse "feed-only" stories (stale/over-covered/off-scope). It is told **not to jump to conclusions** (single-sourced claims like a death are marked uncertain).
 4. **Root-cause + structural fixes** — each gap is attributed to a **pipeline stage** (ingestion → relevance filter → dedup → novelty gate → memory → curation → images/markets) via an `ARCHITECTURE_BRIEF` handed to the judge, and recommendations must be **structural** (a front in `news-topics.js`, a source/tier, a gate knob, a code change, or a **prompt generalization that removes a restriction**) rather than special-case keywords.
 
-A deterministic backbone (pure, unit-tested) scores **coverage/recall** (importance-weighted, vs Opus's top-10), **freshness** (median displayed age + label honesty), **staleness** (`INTEL_EVAL_STALE_H`, default 24h), and **market alignment**, rolled into a **composite 0–100**.
+3. **Gap analysis** — Opus judges (no web search; it reasons over the reconciled reality + feed) classifying each story `missing` → `covered_reword` → `covered_shallow` → `over_broad`/`merged` → `covered_well`, plus reverse feed-only issues, each attributed to a **pipeline stage** via the `ARCHITECTURE_BRIEF`, with **structural** recommendations (front in `news-topics.js`, source/tier, gate knob, code change, or a prompt generalization) over special-casing.
+
+A deterministic backbone (pure, unit-tested) scores **coverage/recall** (importance-weighted, vs the reconciled top-10), **freshness** (median displayed age + label honesty), **staleness** (`INTEL_EVAL_STALE_H`, default 24h), and **market alignment**, rolled into a **composite 0–100**.
 
 Reports persist to `tv:war:eval:v1` (latest) + `tv:war:eval:log` (history trend line); each CI run also uploads the full report as the `intel-eval-report` artifact (`intel-eval.json`). The eval endpoints accept the **war token OR the debug token** (`thinx-debug-2026`) so the loop is self-serve. Run it:
 
@@ -366,7 +368,9 @@ Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the
 | `INTEL_EVAL_STALE_H` | `24` | Hours after which a story counts as stale in the eval |
 | `INTEL_EVAL_FEED_URL` | (unset) | If set, the eval reads the feed from this URL (e.g. the `/m` public endpoint) instead of Redis/file |
 | `INTEL_EVAL_MATCH` | `0.34` | Token-overlap threshold to call a real event "covered" |
-| `INTEL_EVAL_GT_MODEL` / `INTEL_EVAL_JUDGE_MODEL` | Sonnet / Opus | Ground-truth (web search) and reflection judge models |
+| `INTEL_EVAL_GT_PROVIDER` | `both` | Worldview source: `both` (Gemini + Opus, cross-checked), `gemini`, or `opus` |
+| `INTEL_EVAL_GEMINI` | `gemini-2.5-flash` | Gemini model for the grounded worldview (needs `GEMINI_API_KEY`) |
+| `INTEL_EVAL_GT_MODEL` / `INTEL_EVAL_JUDGE_MODEL` | Sonnet / Opus | Cheap-path worldview model / the gap-analysis judge model |
 
 ## Continuous Improvement
 

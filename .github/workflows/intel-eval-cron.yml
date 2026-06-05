@@ -45,11 +45,15 @@ jobs:
         env:
           # Repo uses CLAUDE_API_KEY for the Anthropic key (see intel-cron.yml)
           ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+          # Gemini Flash + Google Search grounding builds one of the cross-checked
+          # worldviews. If this secret is absent the eval degrades to Opus-only.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
           INTEL_SONNET: ${{ vars.INTEL_SONNET }}
           INTEL_OPUS: ${{ vars.INTEL_OPUS }}
           INTEL_HAIKU: ${{ vars.INTEL_HAIKU }}
+          INTEL_EVAL_GT_PROVIDER: ${{ vars.INTEL_EVAL_GT_PROVIDER }}
         run: node scripts/eval-intel.js ${{ github.event.inputs.reflect == 'false' && '--no-reflect' || '' }}
 
       - name: Upload full report artifact
