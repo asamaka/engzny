@@ -9,6 +9,7 @@
  * image resolver, and Open-Meteo weather. No dependency on api/index.js.
  */
 const RssParser = require('rss-parser');
+const NT = require('./news-topics');   // structured scope/relevance config (no hard-coded keyword strings)
 
 // ---------------------------------------------------------------- clients
 let _redis = null;
@@ -54,24 +55,50 @@ async function anthropicText({ model, max_tokens, system, prompt }) {
 const log = (...a) => console.log('[war-sources]', ...a);
 
 // ---------------------------------------------------------------- RSS feeds
+// Source registry. `category` is the editorial bloc (drives the per-bloc reserve
+// so no single side dominates); `tier` is speed/role: 1 = fast wire/aggregator
+// (breaking, lowest latency), 2 = major outlet, 3 = regional/state media. The
+// `fronts` hint is advisory metadata (which topics a source is strong on) used
+// by the eval harness when it recommends where to add coverage.
+//
+// Google News *search* feeds are deliberately included as tier-1 wires: they are
+// extremely reliable to fetch and surface breaking items (e.g. a fresh Lebanon
+// strike) minutes faster than a publisher's section RSS, and the `when:Nd`
+// window keeps them fresh. Dead/slow feeds never break a run (Promise.allSettled).
 const WAR_FEEDS = [
-  { id: 'bbc-mideast', name: 'BBC', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', category: 'western' },
-  { id: 'cnn-mideast', name: 'CNN', url: 'http://rss.cnn.com/rss/edition_meast.rss', category: 'western' },
-  { id: 'fox-world', name: 'Fox News', url: 'https://moxie.foxnews.com/google-publisher/world.xml', category: 'western' },
-  { id: 'france24', name: 'France 24', url: 'https://www.france24.com/en/middle-east/rss', category: 'western' },
-  { id: 'guardian', name: 'The Guardian', url: 'https://www.theguardian.com/world/middleeast/rss', category: 'western' },
-  { id: 'dw', name: 'DW News', url: 'https://rss.dw.com/xml/rss-en-all', category: 'western' },
-  { id: 'google-iran', name: 'Google News', url: 'https://news.google.com/rss/search?q=iran+war+2026&hl=en-US&gl=US&ceid=US:en', category: 'western' },
-  { id: 'aljazeera-me', name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'arab' },
-  { id: 'jpost', name: 'Jerusalem Post', url: 'https://www.jpost.com/rss/rssfeedsarabisraeliconflict.aspx', category: 'israeli' },
-  { id: 'presstv', name: 'Press TV', url: 'https://www.presstv.ir/rss.xml', category: 'iranian' },
-  { id: 'tehrantimes', name: 'Tehran Times', url: 'https://www.tehrantimes.com/rss', category: 'iranian' },
-  { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab' },
+  // --- tier 1: fast wires / targeted aggregators (lowest latency, per-front) ---
+  { id: 'gnews-breaking', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Iran+OR+Israel+OR+Hezbollah+OR+Lebanon)+strike+when:1d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['iran-core', 'levant', 'israel-gaza'] },
+  { id: 'gnews-levant', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Lebanon+OR+Hezbollah+OR+Beirut)+when:2d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['levant'] },
+  { id: 'gnews-iran', name: 'Google News', url: 'https://news.google.com/rss/search?q=iran+war+2026&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['iran-core', 'nuclear-diplomacy'] },
+  { id: 'gnews-reuters', name: 'Reuters via GN', url: 'https://news.google.com/rss/search?q=site:reuters.com+(Iran+OR+Lebanon+OR+Israel)+when:2d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['iran-core', 'levant'] },
+  // --- tier 2: major international outlets ---
+  { id: 'bbc-mideast', name: 'BBC', url: 'https://feeds.bbci.co.uk/news/world/middle_east/rss.xml', category: 'western', tier: 2, fronts: ['iran-core', 'levant', 'israel-gaza'] },
+  { id: 'cnn-mideast', name: 'CNN', url: 'http://rss.cnn.com/rss/edition_meast.rss', category: 'western', tier: 2, fronts: ['iran-core', 'israel-gaza'] },
+  { id: 'fox-world', name: 'Fox News', url: 'https://moxie.foxnews.com/google-publisher/world.xml', category: 'western', tier: 2, fronts: ['iran-core'] },
+  { id: 'france24', name: 'France 24', url: 'https://www.france24.com/en/middle-east/rss', category: 'western', tier: 2, fronts: ['levant', 'iran-core'] },
+  { id: 'guardian', name: 'The Guardian', url: 'https://www.theguardian.com/world/middleeast/rss', category: 'western', tier: 2, fronts: ['iran-core', 'israel-gaza'] },
+  { id: 'dw', name: 'DW News', url: 'https://rss.dw.com/xml/rss-en-all', category: 'western', tier: 2, fronts: ['iran-core'] },
+  // --- regional / state media (each bloc, for the editorial reserve) ---
+  { id: 'aljazeera-me', name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'arab', tier: 2, fronts: ['levant', 'israel-gaza', 'iran-core'] },
+  { id: 'alarabiya', name: 'Al Arabiya', url: 'https://english.alarabiya.net/.mrss/en.xml', category: 'arab', tier: 2, fronts: ['gulf-hormuz', 'levant'] },
+  { id: 'naharnet', name: 'Naharnet', url: 'https://www.naharnet.com/rss/news', category: 'arab', tier: 3, fronts: ['levant'] },
+  { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab', tier: 3, fronts: ['energy-fallout'] },
+  { id: 'jpost', name: 'Jerusalem Post', url: 'https://www.jpost.com/rss/rssfeedsarabisraeliconflict.aspx', category: 'israeli', tier: 2, fronts: ['levant', 'israel-gaza'] },
+  { id: 'toi', name: 'Times of Israel', url: 'https://www.timesofisrael.com/feed/', category: 'israeli', tier: 2, fronts: ['levant', 'israel-gaza', 'iran-core'] },
+  { id: 'presstv', name: 'Press TV', url: 'https://www.presstv.ir/rss.xml', category: 'iranian', tier: 3, fronts: ['iran-core'] },
+  { id: 'tehrantimes', name: 'Tehran Times', url: 'https://www.tehrantimes.com/rss', category: 'iranian', tier: 3, fronts: ['iran-core', 'nuclear-diplomacy'] },
 ];
+
+// Editorial blocs that earn a reserved slice of the headline set (so the wall is
+// never one-sided). Wires are first so the freshest breaking items survive the cut.
+const SOURCE_BLOCS = ['wire', 'western', 'israeli', 'arab', 'iranian'];
 
 const WAR_START_DATE = process.env.INTEL_WAR_START || '2026-03-01';
 const HAIKU_MODEL = process.env.INTEL_HAIKU || 'claude-haiku-4-5-20251001';
-const IRAN_FALLBACK = /iran|iranian|tehran|irgc|hormuz|isfahan|khamenei|hezbollah|lebanon|beirut|israel|nuclear|ceasefire/i;
+// Regex fallback when the relevance LLM is unavailable — generated from the
+// active scope so it always matches the same fronts the prompt describes
+// (exported name kept for backward-compat with existing callers/tests).
+const IRAN_FALLBACK = NT.fallbackRegex();
 const rssParser = new RssParser({ timeout: 7000, headers: { 'User-Agent': 'ThinxTV/1.0' } });
 
 async function filterIranWarRelevant(items, type) {
@@ -87,7 +114,7 @@ async function filterIranWarRelevant(items, type) {
         model: HAIKU_MODEL,
         max_tokens: 600,
         temperature: 0,   // deterministic selection: same input -> same picks (stable run-to-run)
-        messages: [{ role: 'user', content: 'Filter ' + type + ' for an IRAN WAR dashboard. Return ONLY the line numbers relevant to: the Iran war (Iran-Israel/US-Iran conflict), IRGC, Strait of Hormuz, Iranian nuclear program, strikes on/by Iran, Iran proxies (Hezbollah/Houthis), sanctions on Iran, Iran ceasefire talks, Iranian regime, or direct consequences (oil shock, regional fallout, diplomacy about Iran). Comma-separated numbers only. If none, return NONE.\n\n' + numbered }],
+        messages: [{ role: 'user', content: NT.relevancePrompt(type) + '\n\n' + numbered }],
       });
       const text = (r.content[0].text || '').trim();
       if (text !== 'NONE') {
@@ -145,7 +172,7 @@ async function fetchWarHeadlines() {
   deduped.forEach(i => { i._ts = i.publishedAt ? new Date(i.publishedAt).getTime() : (now - 3600000); });
   deduped.sort((a, b) => b._ts - a._ts);
 
-  const buckets = { western: [], iranian: [], israeli: [], arab: [] };
+  const buckets = Object.fromEntries(SOURCE_BLOCS.map(b => [b, []]));
   for (const i of deduped) { if (buckets[i.sourceCategory]) buckets[i.sourceCategory].push(i); }
   const reserved = [];
   for (const items of Object.values(buckets)) reserved.push(...items.slice(0, 5));
@@ -291,9 +318,10 @@ function parseByDate(question, endDate) {
   return null;
 }
 
-const MARKET_KEYWORDS = ['iran', 'iranian', 'tehran', 'hormuz', 'irgc', 'khamenei', 'ceasefire', 'nuclear deal',
-  'nuclear weapon', 'hezbollah', 'lebanon', 'beirut', 'israel', 'gaza', 'houthi', 'strait', 'oil price', 'crude',
-  'middle east', 'netanyahu', 'trump iran', 'regime'];
+// Keyword fallback for market selection — generated from the active scope's
+// fronts (plus a couple of market-phrasing variants) so it tracks the same
+// topics as the relevance prompt instead of drifting as a separate hand list.
+const MARKET_KEYWORDS = [...new Set([...NT.allKeywords(), 'nuclear deal', 'nuclear weapon', 'regime', 'middle east'])];
 
 /**
  * Broad Iran-related open markets from Polymarket Gamma, with settled filtering
@@ -327,7 +355,7 @@ async function fetchWarMarkets() {
       const titleList = allEvents.map((e, i) => `${i}. ${e.title || e.slug}`).join('\n');
       const r = await a.messages.create({
         model: HAIKU_MODEL, max_tokens: 3000, temperature: 0,   // deterministic market selection
-        messages: [{ role: 'user', content: `Select prediction markets for a US-Iran war (2026) TV dashboard. Include ANYTHING tied to: Iran war/strikes/escalation/de-escalation, Iran ceasefire/peace talks, Iran nuclear program/deal, Iran regime/IRGC, Strait of Hormuz/Persian Gulf, US-Iran relations/sanctions, Israel-Iran, Hezbollah, Lebanon front, oil/energy IF tied to the Iran conflict. Exclude: Ukraine-Russia (unless Iran-linked), US domestic politics, crypto, sports, entertainment, non-Iran conflicts. Return ONLY a JSON array of index numbers. Events:\n${titleList}` }],
+        messages: [{ role: 'user', content: `${NT.marketSelectionPrompt()}\n\nEvents:\n${titleList}` }],
       });
       const m = (r.content[0].text || '').match(/\[[\d,\s]+\]/);
       if (m) for (const i of JSON.parse(m[0])) if (i >= 0 && i < allEvents.length) selected.add(allEvents[i].slug || allEvents[i].id);

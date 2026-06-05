@@ -1572,6 +1572,54 @@ app.post('/api/tv/intel', express.json({ limit: '4mb' }), requireWarToken, async
   }
 });
 
+// ============================================================
+// INTEL ACCURACY — snapshot-vs-reality evaluation (api/lib/intel-eval.js)
+// Grades the live bundle against an independently web-searched picture of
+// reality: coverage/misses, freshness, staleness, market alignment, plus an
+// Opus reflection with recommendations. Run on demand here, or on a schedule
+// via scripts/eval-intel.js (.github/workflows/intel-eval-cron.yml).
+// ============================================================
+
+// GET /api/tv/intel/eval — the latest stored accuracy report + score history.
+app.get('/api/tv/intel/eval', requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const intelEval = require('./lib/intel-eval');
+    const [latest, history] = await Promise.all([
+      intelEval.loadLatest(),
+      intelEval.loadHistory(Math.max(1, Math.min(60, Number(req.query.history) || 30))),
+    ]);
+    if (!latest) return res.status(404).json({ error: 'No evaluation yet — run POST /api/tv/intel/eval' });
+    res.json({ latest, history });
+  } catch (err) {
+    logger.error('IntelEval', 'Failed to read evaluation', { error: err.message });
+    res.status(500).json({ error: 'Failed to read evaluation' });
+  }
+});
+
+// POST /api/tv/intel/eval — run an evaluation NOW against the current live bundle.
+// Establishes ground truth via a live web search, so it costs tokens + ~20-40s.
+// A tighter web-search budget keeps it inside the serverless window; the cron
+// script uses a wider budget. Pass {"reflect":false} to skip the Opus reflection.
+app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireWarToken, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const intelEval = require('./lib/intel-eval');
+    const bundle = await intelEval.loadBundle();
+    if (!bundle || !Array.isArray(bundle.stories) || !bundle.stories.length) {
+      return res.status(404).json({ error: 'No intel bundle to evaluate' });
+    }
+    const reflectEnabled = (req.body && req.body.reflect) !== false;
+    const report = await intelEval.scoreSnapshot({ bundle, reflectEnabled, gtOpts: { maxUses: 4 } });
+    const summary = await intelEval.saveReport(report);
+    logger.info('IntelEval', 'Evaluation complete', { composite: report.scores.composite, missed: (report.coverage.missed || []).length });
+    res.json({ ok: true, summary, report });
+  } catch (err) {
+    logger.error('IntelEval', 'Evaluation failed', { error: err.message });
+    res.status(500).json({ error: 'Evaluation failed', detail: err.message });
+  }
+});
+
 // GET /api/img?u=<encoded image url> — caching proxy so the TV pulls story
 // images through thinx.fun (CDN-cached) instead of flaky upstream news CDNs.
 app.get('/api/img', async (req, res) => {

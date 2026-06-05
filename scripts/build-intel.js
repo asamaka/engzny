@@ -181,9 +181,10 @@ Return ONLY JSON (no prose, no fences):
 }
 
 Rules (you have final say):
-- CONTINUITY IS CRITICAL: If a cluster is the SAME underlying story as one in EXISTING SEGMENTS, you MUST reuse that segment's id (do not invent a new slug, do not re-title it into a "new" story). Set isMajorUpdate=true only when a real new development has occurred; otherwise false. Create a NEW id ONLY for a genuinely new, distinct, title-worthy development not already tracked.
-- Do NOT resurface an old story as if it were breaking. A reworded version of yesterday's news is the SAME segment (reuse id, isMajorUpdate=false), not a new one.
-- Choose the segment set, titles, ordering, and the TOP sources per story. Prefer stories with a real new development (isMajorUpdate=true) or strong fresh sourcing; swap in a newer development over an older one when they compete.
+- CONTINUITY OF IDENTITY, FRESHNESS OF HEADLINE: If a cluster is the SAME underlying story as one in EXISTING SEGMENTS, you MUST reuse that segment's id (do not invent a new slug for it). BUT the headline must always describe the LATEST development — when isMajorUpdate=true, REWRITE the headline + brief to lead with what is newest (never keep a stale headline frozen across days just because the id is reused). Create a NEW id ONLY for a genuinely new, distinct development not already tracked.
+- isMajorUpdate=true when a real new development has occurred since this story was last covered (a new strike, a new casualty count, a new diplomatic move); false only when it is the same information merely re-sourced or reworded with nothing new.
+- Do NOT manufacture breaking-ness: breakingIdx is for a genuinely fresh major item, not a reword. But DO keep the wall alive — a running story with a real new development today should lead with today's angle, not yesterday's headline.
+- Choose the segment set, titles, ordering, and the TOP sources per story. Prefer stories with a real new development (isMajorUpdate=true) or strong fresh sourcing. RETIRE a story that has had no genuinely new development in over a day to make room for a fresher distinct one when slots are contested — do not let the same 7 headlines sit unchanged for days.
 - videoIdxs: pick the clips that genuinely match the story (freshest, on-topic). [] if none fit — never force an unrelated clip.
 - homeMarketIds: decide which prediction markets earn a spot on the home rail (most relevant to the lead stories).
 - breakingIdx: ONLY a headline younger than ~90 minutes describing a major new development; else null.
@@ -359,15 +360,24 @@ function detectNovelty(prev, headlines, spikes) {
   if (!prev || !(prev.stories || []).length) return { changed: true, reasons: ['no prior bundle'] };
   const S = extractShownState(prev);
   const FRESH_WINDOW = Number(process.env.INTEL_FRESH_WINDOW_MIN || 180) * 60000;
+  // A very-fresh headline is treated as a genuine development even if it shares
+  // tokens with a story we're already showing. This is the key freshness fix:
+  // a NEW Lebanon strike ("Israel strikes Beirut again") overlaps heavily with
+  // the running Lebanon segment, so the 75% token-dedup used to swallow it and
+  // the feed sat still. Below the breaking window we bypass that dedup so the
+  // development forces a rebuild (which lets the editor re-lead/re-title it).
+  const BREAKING_MIN = Number(process.env.INTEL_BREAKING_MIN || 45);
   const reasons = [];
-  // New headline: not an existing source link, not a near-duplicate of a shown
-  // title, AND genuinely recent (newer than anything shown, or within the fresh
-  // window) so selection jitter resurfacing an OLD item doesn't trigger a rebuild.
+  // New headline: a fresh source we aren't already linking. We skip the
+  // near-duplicate dedup for breaking-fresh items; for older items we still
+  // require it not be a reword of something shown (so selection jitter
+  // resurfacing an OLD item doesn't trigger a needless rebuild).
   const newH = headlines.filter(h => {
     if (h.link && S.links.has(h.link)) return false;
-    if (coveredBy(titleTokens(h.title), S.titles)) return false;
+    const breaking = h.ageMinutes != null && h.ageMinutes <= BREAKING_MIN;
+    if (!breaking && coveredBy(titleTokens(h.title), S.titles)) return false;
     const t = tsMs(h);
-    return (S.newest && t > S.newest) || (h.ageMinutes != null && h.ageMinutes * 60000 <= FRESH_WINDOW);
+    return breaking || (S.newest && t > S.newest) || (h.ageMinutes != null && h.ageMinutes * 60000 <= FRESH_WINDOW);
   });
   if (newH.length) reasons.push(`${newH.length} new headline(s) e.g. "${(newH[0].title || '').slice(0, 64)}"`);
   // Spiking-market membership change or direction flip.
@@ -646,6 +656,7 @@ async function main() {
       // metadata contract — the persistent "iceberg" stats the API/TV can reason over
       meta: {
         firstReportedAt: rec.firstSeenSourceAt || rec.firstReportedAt,
+        newestSourceAt: rec.newestSourceAt || null,   // newest underlying source (true freshness signal)
         latestUpdateAt: rec.latestUpdateAt,
         latestMajorUpdateAt: rec.latestMajorUpdateAt,
         updateCount: rec.updateCount || 0,
@@ -655,11 +666,21 @@ async function main() {
         resurfaced: !!rec.resurfaced,
         status: 'active',
       },
-      // the TV shows "updated" only when a dormant story is brought back by a real
-      // development; otherwise the true "first reported" time (which may be days old).
-      freshness: rec.resurfaced
-        ? { label: 'updated', at: rec.latestMajorUpdateAt }
-        : { label: 'first reported', at: rec.firstSeenSourceAt || rec.firstReportedAt },
+      // Honest freshness: a long-running story (Lebanon front, Hormuz) keeps the
+      // SAME segment for days for continuity, but if its newest source is recent
+      // it is NOT stale — show "updated <recent>" so a 4h-old development doesn't
+      // read as "first reported 2 days ago". Only genuinely quiet stories show
+      // their original first-reported time. firstReportedAt is always carried so
+      // the client can still show "tracking since …".
+      freshness: (() => {
+        const newest = rec.newestSourceAt ? Date.parse(rec.newestSourceAt) : 0;
+        const FRESH_LABEL_MS = Number(process.env.INTEL_FRESH_LABEL_MIN || 360) * 60000; // 6h
+        const firstAt = rec.firstSeenSourceAt || rec.firstReportedAt;
+        if (rec.resurfaced || (newest && (NOW - newest) <= FRESH_LABEL_MS)) {
+          return { label: 'updated', at: rec.newestSourceAt || rec.latestMajorUpdateAt, firstReportedAt: firstAt };
+        }
+        return { label: 'first reported', at: firstAt, firstReportedAt: firstAt };
+      })(),
       drilldown: {
         layout,
         aiSummary: seg.aiSummary || seg.brief,

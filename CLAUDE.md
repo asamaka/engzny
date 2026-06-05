@@ -99,6 +99,9 @@ api/
     screenshot-capture.js     # Screenshot capture & thumbnail generation
     vercel-logs.js            # Vercel runtime logs API client
     improvement-trigger.js    # Continuous improvement agent trigger (Cursor API)
+    war-sources.js            # Intel feed data fetchers (RSS, Polymarket, videos, images)
+    news-topics.js            # Structured scope/fronts → relevance prompts + regex (no hard-coded keywords)
+    intel-eval.js             # Snapshot-vs-reality accuracy harness (coverage/freshness/staleness/markets)
 
 public/
   hub-v2.html                 # Main page (served at /)
@@ -312,6 +315,51 @@ curl 'https://www.thinx.fun/api/tv/briefing/status?token=thinx-debug-2026'
 ```bash
 curl 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'
 ```
+
+## Cinematic Intel Feed ("Iran Watch") + Accuracy Eval
+
+A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.js`, which fetches RSS headlines + Polymarket spikes + videos, curates them (Sonnet proposer → Opus editor), and writes a finished bundle to Redis (`tv:war:intel:v1`). The TV reads it read-only via `GET /api/tv/intel`; the phone mirror is `/m` (`GET /api/tv/intel/public`, no token). A persistent "iceberg" of tracked stories lives in `tv:war:segments:v1` (`GET /api/tv/segments`).
+
+### Scope is data, not code
+`api/lib/news-topics.js` defines the active **scope** (default `mideast-conflict`) as a set of **fronts** (Iran core, Lebanon/Hezbollah, Israel/Gaza, Gulf/Hormuz, nuclear/diplomacy, energy). The relevance filter prompt, the regex fallback, and the market-selection prompt are all **generated** from this config — there is no hard-coded "IRAN WAR" keyword list anymore. Override the active scope with `INTEL_SCOPE` (no code change). Sources in `api/lib/war-sources.js` are tiered (tier 1 = fast wires/Google-News queries, tier 2 = major outlets, tier 3 = regional/state) and tagged with the fronts they cover.
+
+### Freshness fixes (why the wall no longer "freezes")
+- A **breaking-fresh** headline (`INTEL_BREAKING_MIN`, default 45 min) bypasses the novelty gate's 75% token-dedup, so a new strike on a running story forces a rebuild instead of being swallowed as a near-duplicate.
+- The editor **re-titles** a reused segment to lead with the newest development (continuity of *id*, freshness of *headline*).
+- The displayed **freshness label is honest**: a long-running story with a recent source shows "updated <recent>" (`INTEL_FRESH_LABEL_MIN`, default 360 min) instead of "first reported 2 days ago".
+
+### Accuracy harness — snapshot vs. reality
+`api/lib/intel-eval.js` grades the live bundle against an independently web-searched picture of reality at the snapshot's timestamp:
+- **Coverage/recall** (importance-weighted) + an explicit **miss-list** (what reality had that we didn't).
+- **Freshness** (median displayed age + label honesty), **staleness** (fraction of the wall older than `INTEL_EVAL_STALE_H`, default 24h), **market alignment** (are the right prediction markets on the rail).
+- A **composite 0–100 score** + an **Opus reflection** (grade, narrative, structured recommendations: source/knob/prompt to change).
+
+Reports persist to `tv:war:eval:v1` (latest) + `tv:war:eval:log` (history trend line). Run it:
+
+```bash
+# On demand against the current live bundle (costs tokens + ~20-40s):
+curl -X POST 'https://www.thinx.fun/api/tv/intel/eval?token=<TV_WAR_TOKEN>' -H 'Content-Type: application/json' -d '{}'
+
+# Read the latest report + score history:
+curl 'https://www.thinx.fun/api/tv/intel/eval?token=<TV_WAR_TOKEN>&history=30'
+
+# Locally / in CI (writes intel-eval.json + Redis):
+node scripts/eval-intel.js            # add --no-reflect to skip the Opus pass
+```
+
+Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the build) and `workflow_dispatch`.
+
+### Intel config knobs
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INTEL_SCOPE` | `mideast-conflict` | Active scope id in `news-topics.js` |
+| `INTEL_BREAKING_MIN` | `45` | Headline age (min) that bypasses dedup and forces a rebuild |
+| `INTEL_FRESH_LABEL_MIN` | `360` | Newest-source age (min) under which a story shows "updated" not "first reported" |
+| `INTEL_MAX_REUSE_MS` | `1500000` | Hard cap (25 min) before the editorial is refreshed regardless |
+| `INTEL_EVAL_STALE_H` | `24` | Hours after which a story counts as stale in the eval |
+| `INTEL_EVAL_MATCH` | `0.34` | Token-overlap threshold to call a real event "covered" |
+| `INTEL_EVAL_GT_MODEL` / `INTEL_EVAL_JUDGE_MODEL` | Sonnet / Opus | Ground-truth (web search) and reflection judge models |
 
 ## Continuous Improvement
 
