@@ -108,6 +108,20 @@ describe('intel-eval pure scoring', () => {
     });
   });
 
+  describe('feedDigest', () => {
+    it('renders stories + market rail for the judge, flagging missing images', () => {
+      const bundle = {
+        stories: [story({ id: 's1', headline: 'Israel strikes Lebanon', brief: 'b', newestSourceAt: hAgo(4) })],
+        signals: [{ question: 'Hormuz blockade lifted by June 15?', prob: '43%', delta: '-3 pts' }],
+      };
+      const d = E.feedDigest(bundle);
+      expect(d.stories).toContain('id=s1');
+      expect(d.stories).toContain('Israel strikes Lebanon');
+      expect(d.stories).toContain('image: NONE'); // story has no image field
+      expect(d.sigs).toContain('Hormuz blockade lifted');
+    });
+  });
+
   describe('summarize', () => {
     it('extracts a compact trend-line entry', () => {
       const report = {

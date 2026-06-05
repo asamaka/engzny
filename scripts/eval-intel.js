@@ -30,22 +30,31 @@ async function main() {
   }
   log(`evaluating bundle generated ${bundle.generatedAt} (${bundle.stories.length} stories, ${(bundle.signals || []).length} signals)`);
 
-  const report = await E.scoreSnapshot({ bundle, reflectEnabled });
+  const report = await E.scoreSnapshot({ bundle, reflectEnabled, gtOpts: { maxUses: 8 } });
   const summary = await E.saveReport(report, redis);
 
   log('=== ACCURACY ===');
   log(`composite ${report.scores.composite}/100  (coverage ${report.scores.coverage}, freshness ${report.scores.freshness}, staleness ${report.scores.staleness}, markets ${report.scores.marketAlignment})`);
   log(`grade ${report.reflection && report.reflection.grade} | median displayed age ${report.freshness.medianDisplayedAgeH}h | stale fraction ${report.staleness.staleFraction}`);
-  const missed = report.coverage.missed || [];
-  if (missed.length) {
-    log(`MISSED ${missed.length} real development(s):`);
-    for (const m of missed.slice(0, 6)) log(`  - (${m.importance}/5) ${m.title}`);
-  } else {
-    log('no misses — feed covers the real top developments');
+
+  const reality = report.reality || {};
+  log(`--- OPUS WORLDVIEW (web search): top ${(reality.topHeadlines || []).length} headlines ---`);
+  for (const h of (reality.topHeadlines || [])) log(`  ${h.rank}. (${h.importance}/5) [${h.front}] ${h.title}`);
+
+  log('--- GAP ANALYSIS (reality vs the feed) ---');
+  for (const g of (report.gapAnalysis || [])) {
+    if (g.status === 'covered_well') continue;
+    const extra = g.suggestedTitle ? ` → suggest: "${g.suggestedTitle}"` : '';
+    log(`  [${g.status}/${g.likelyStage}/${g.confidence || '?'}] ${g.title}${extra}`);
+    if (g.discrepancy) log(`      ${g.discrepancy}`);
   }
-  if (report.reflection && report.reflection.narrative) log('reflection:', report.reflection.narrative);
+  for (const fo of (report.feedOnlyStories || [])) log(`  [feed-only/${fo.issue}] ${fo.headline} — ${fo.note}`);
+
+  if (report.reflection && report.reflection.narrative) log('narrative:', report.reflection.narrative);
+  log('--- RECOMMENDATIONS (structural) ---');
   for (const r of (report.reflection && report.reflection.recommendations) || []) {
-    log(`  rec [${r.priority}/${r.type}] ${r.target}: ${r.detail}`);
+    log(`  [${r.priority}/${r.type}] ${r.target}: ${r.detail}`);
+    if (r.generalizes) log(`      generalizes: ${r.generalizes}`);
   }
   log('stored:', JSON.stringify(summary));
 }

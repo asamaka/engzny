@@ -328,11 +328,14 @@ A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.j
 - The editor **re-titles** a reused segment to lead with the newest development (continuity of *id*, freshness of *headline*).
 - The displayed **freshness label is honest**: a long-running story with a recent source shows "updated <recent>" (`INTEL_FRESH_LABEL_MIN`, default 360 min) instead of "first reported 2 days ago".
 
-### Accuracy harness — snapshot vs. reality
-`api/lib/intel-eval.js` grades the live bundle against an independently web-searched picture of reality at the snapshot's timestamp:
-- **Coverage/recall** (importance-weighted) + an explicit **miss-list** (what reality had that we didn't).
-- **Freshness** (median displayed age + label honesty), **staleness** (fraction of the wall older than `INTEL_EVAL_STALE_H`, default 24h), **market alignment** (are the right prediction markets on the rail).
-- A **composite 0–100 score** + an **Opus reflection** (grade, narrative, structured recommendations: source/knob/prompt to change).
+### Accuracy harness — snapshot vs. reality (two-phase, architecture-aware)
+`api/lib/intel-eval.js` runs a single Opus pass **with web search** that:
+1. **Builds its own worldview** — Opus web-searches every front and produces its independent **top-10 headlines** (content summary + importance + first-report + sources + a photo suggestion each) — the view a standard search "usually surfaces well".
+2. **Reads the live feed** exactly as `/m` shows it (set `INTEL_EVAL_FEED_URL` to read the public endpoint; else Redis/file).
+3. **Gap analysis across the full spectrum** — for each real story: `missing` → `covered_reword` (title should change to encapsulate/split, with a suggested title) → `covered_shallow` (thin content/photo) → `over_broad`/`merged` → `covered_well`; plus reverse "feed-only" stories (stale/over-covered/off-scope). It is told **not to jump to conclusions** (single-sourced claims like a death are marked uncertain).
+4. **Root-cause + structural fixes** — each gap is attributed to a **pipeline stage** (ingestion → relevance filter → dedup → novelty gate → memory → curation → images/markets) via an `ARCHITECTURE_BRIEF` handed to the judge, and recommendations must be **structural** (a front in `news-topics.js`, a source/tier, a gate knob, a code change, or a **prompt generalization that removes a restriction**) rather than special-case keywords.
+
+A deterministic backbone (pure, unit-tested) scores **coverage/recall** (importance-weighted, vs Opus's top-10), **freshness** (median displayed age + label honesty), **staleness** (`INTEL_EVAL_STALE_H`, default 24h), and **market alignment**, rolled into a **composite 0–100**.
 
 Reports persist to `tv:war:eval:v1` (latest) + `tv:war:eval:log` (history trend line). Run it:
 
@@ -358,6 +361,7 @@ Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the
 | `INTEL_FRESH_LABEL_MIN` | `360` | Newest-source age (min) under which a story shows "updated" not "first reported" |
 | `INTEL_MAX_REUSE_MS` | `1500000` | Hard cap (25 min) before the editorial is refreshed regardless |
 | `INTEL_EVAL_STALE_H` | `24` | Hours after which a story counts as stale in the eval |
+| `INTEL_EVAL_FEED_URL` | (unset) | If set, the eval reads the feed from this URL (e.g. the `/m` public endpoint) instead of Redis/file |
 | `INTEL_EVAL_MATCH` | `0.34` | Token-overlap threshold to call a real event "covered" |
 | `INTEL_EVAL_GT_MODEL` / `INTEL_EVAL_JUDGE_MODEL` | Sonnet / Opus | Ground-truth (web search) and reflection judge models |
 

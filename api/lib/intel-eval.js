@@ -36,6 +36,23 @@ const EVAL_FILE = process.env.INTEL_EVAL_OUT || path.join(__dirname, '..', '..',
 const WEIGHTS = { coverage: 0.40, freshness: 0.25, staleness: 0.15, marketAlignment: 0.20 };
 const MATCH_THRESHOLD = Number(process.env.INTEL_EVAL_MATCH || 0.34);  // token overlap to call an event "covered"
 
+// A concise, accurate model of the generation pipeline, handed to the judge so it
+// can localize WHERE a gap originates (which stage failed) and recommend a
+// STRUCTURAL fix — a code change, a knob, or a prompt GENERALIZATION — instead of
+// a special-case keyword band-aid. Keep this in sync with build-intel.js /
+// war-sources.js / news-topics.js when the architecture changes.
+const ARCHITECTURE_BRIEF = `The feed is produced hourly by scripts/build-intel.js through these stages — a gap can originate in ANY of them, so attribute it precisely:
+1. INGESTION (api/lib/war-sources.js, WAR_FEEDS): ~18 RSS / Google-News-query sources, tiered (tier1 = fast wire/aggregator queries, tier2 = major outlets, tier3 = regional/state) and tagged with the fronts they cover. Best-effort; a dead feed is skipped. A real story absent here was never ingested → fix is a SOURCE (add/retune a feed) or a Google-News query.
+2. RELEVANCE FILTER (war-sources.filterIranWarRelevant): Haiku marks each headline in-scope or not, using a prompt + regex GENERATED from api/lib/news-topics.js fronts (no hard-coded keywords). A real story dropped here → the scope/front config or the filter prompt is too narrow → fix is a PROMPT GENERALIZATION or a new/widened front in news-topics.js.
+3. DEDUP: headlines with >60% word overlap collapse to one. Over-aggressive dedup can merge distinct events.
+4. NOVELTY GATE (build-intel.detectNovelty): structural, no LLM. A rebuild happens only if a genuinely-new in-scope headline appears (not already shown, not a 75% token-duplicate of a shown title UNLESS it is breaking-fresh <= INTEL_BREAKING_MIN) OR a market spikes/flips; otherwise the previous editorial is REUSED and only markets re-price. If the wall is stale-but-fresh-news-exists, suspect this gate (knobs: INTEL_BREAKING_MIN, INTEL_FRESH_WINDOW_MIN, INTEL_MAX_REUSE_MS).
+5. MEMORY / "iceberg" (tv:war:segments:v1): persistent segments keep a stable id across runs for continuity; status active/dormant/dead. Continuity can freeze a headline if the editor doesn't re-title.
+6. CURATION: Sonnet proposes 8-14 candidate clusters → Opus editor picks the final 5-7 segments, their id (reuse vs new), HEADLINE wording, top sources, linked markets/videos, summary, and ordering (build-intel.decideEditorial prompt). Title-wording and "which 7 made the wall" gaps live here → fix is the editor PROMPT.
+7. IMAGES: og:image per source → Sonnet picks the best real photo (avoids flags/logos) → keyless Wikimedia/Openverse fallback. Stable reuse unless a major update.
+8. STALENESS DROP + FRESHNESS LABEL: stories whose newest source is too old are dropped; the displayed label is "updated <recent>" when a source is recent, else "first reported".
+9. MARKETS (war-sources.fetchWarMarkets): Polymarket scanned → Haiku selects in-scope (prompt from news-topics) → real CLOB history measures spikes → Opus picks the home rail.
+Prefer fixes that improve the STRUCTURE (a front in news-topics, a source tier, a gate knob, a prompt generalization that removes a restriction) over one-off special-casing.`;
+
 // ----------------------------------------------------------------- pure text utils
 const STOP = new Set(('the a an of to in on for and or with by from at is are be as was were has have had its their ' +
   'his her our your you we it that this these those over under into out up down new latest live breaking watch report ' +
@@ -170,79 +187,136 @@ function extractJson(text) {
 }
 function joinText(resp) { return ((resp && resp.content) || []).filter(b => b.type === 'text').map(b => b.text).join('\n'); }
 
-// Establish "reality at the timestamp" with a live web search: the real top
-// developments + the market-relevant questions + a one-line situation. Returns a
-// structured object or throws if the model/tool is unavailable.
-async function fetchGroundTruth({ atISO, scope = NT.activeScope(), topK = 8, maxUses = 6, anthropic = W.getAnthropic() } = {}) {
-  if (!anthropic) throw new Error('ANTHROPIC_API_KEY not set (ground truth needs web search)');
+// Render the live feed (the same bundle /m shows) as text the judge can read:
+// each story's headline + brief + summary + freshness + sources + image/market
+// presence, plus the market rail. This is the pipeline's attempt at a worldview.
+function feedDigest(bundle) {
+  const stories = ((bundle && bundle.stories) || []).map((s, i) => {
+    const f = s.freshness || {};
+    const srcs = ((s.drilldown && s.drilldown.sources) || []).map(x => x.outlet).filter(Boolean).slice(0, 4).join(', ');
+    return `#${i} id=${s.id} | "${s.headline}"\n   brief: ${s.brief || ''}\n   summary: ${(s.drilldown && s.drilldown.aiSummary) || ''}\n   freshness: ${f.label || '?'} ${f.at || ''} | sources: ${srcs || 'none'} | image: ${s.image ? 'yes' : 'NONE'} | linkedMarkets: ${(s.marketIds || []).length}`;
+  }).join('\n');
+  const sigs = ((bundle && bundle.signals) || []).map(s => `- "${s.question}" ${s.prob} (${s.delta})`).join('\n') || '(none)';
+  return { stories: stories || '(none)', sigs };
+}
+
+// Reality-only web search (used when the heavy reflection is skipped) — still
+// needed so the deterministic metrics have a top-list to score against.
+async function fetchReality({ atISO, scope = NT.activeScope(), topK = 10, maxUses = 6, anthropic = W.getAnthropic() } = {}) {
+  if (!anthropic) throw new Error('ANTHROPIC_API_KEY not set (reality needs web search)');
   const brief = NT.scopeBrief(scope);
   const prompt =
-    `You are a news desk fact-checker establishing GROUND TRUTH. It is ${atISO}. Use web search to determine ` +
-    `the real situation RIGHT NOW for ${brief.label}: ${brief.description}\n\nFronts to cover: ${brief.fronts.join('; ')}.\n\n` +
-    `Search broadly (each front), then return the ${topK} MOST IMPORTANT real developments as of this timestamp — ` +
-    `the things a serious viewer must not miss. Do NOT include events you cannot find a real source for, and do NOT ` +
-    `include developments that clearly post-date ${atISO}.\n\n` +
-    `Return ONLY JSON (no prose, no fences):\n{\n` +
-    `  "asOf": "${atISO}",\n` +
-    `  "situation": "<2-3 sentence neutral summary of the real state of play>",\n` +
-    `  "events": [ { "title": "<concrete headline of the real development>", "front": "<which front>", ` +
-    `"importance": <1-5, 5=must-lead>, "firstReportedAt": "<approx ISO time it broke, best estimate>", ` +
-    `"sources": ["<outlet>", ...] } ],\n` +
-    `  "marketQuestions": [ "<prediction-market-style question that genuinely matters now>", ... ]\n}`;
+    `It is ${atISO}. Using web search, establish the REAL state of play for ${brief.label}: ${brief.description}\n` +
+    `Search EACH front: ${brief.fronts.join('; ')}.\n\n` +
+    `Return your independent TOP ${topK} headlines a serious viewer must not miss as of now. Only include items you ` +
+    `can source; do not include developments that clearly post-date ${atISO}.\n\n` +
+    `Return ONLY JSON: {"situation":"<2-3 sentences>","topHeadlines":[{"rank":1,"title":"...","summary":"<2-3 sentence content>",` +
+    `"front":"...","importance":<1-5>,"firstReportedAt":"<approx ISO>","sources":["<outlet>"],"photoSuggestion":"<concrete photo subject>"}],` +
+    `"marketQuestions":["<question that genuinely matters now>"]}`;
   const resp = await anthropic.messages.create({
-    model: GT_MODEL,
-    max_tokens: 4000,
+    model: GT_MODEL, max_tokens: 5000,
     tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }],
     messages: [{ role: 'user', content: prompt }],
   });
-  const gt = extractJson(joinText(resp));
-  gt.events = Array.isArray(gt.events) ? gt.events.slice(0, topK + 4) : [];
-  gt.marketQuestions = Array.isArray(gt.marketQuestions) ? gt.marketQuestions.slice(0, 10) : [];
-  gt._model = GT_MODEL;
-  return gt;
+  const r = extractJson(joinText(resp));
+  r.topHeadlines = Array.isArray(r.topHeadlines) ? r.topHeadlines.slice(0, topK + 4) : [];
+  r.marketQuestions = Array.isArray(r.marketQuestions) ? r.marketQuestions.slice(0, 10) : [];
+  r._model = GT_MODEL;
+  return r;
 }
 
-// ----------------------------------------------------------------- LLM: reflection
-// Opus judge: turn the snapshot + ground truth + computed metrics into a written
-// reflection — what we missed and WHY, plus concrete, structured recommendations
-// (source to add / knob to change / prompt to adjust) so the loop can close.
-async function reflect({ bundle, groundTruth, metrics, anthropic = W.getAnthropic() } = {}) {
-  if (!anthropic) return null;
-  const stories = (bundle && bundle.stories || []).map((s, i) => `${i}. ${s.headline} [freshness: ${s.freshness && s.freshness.label} ${s.freshness && s.freshness.at}]`).join('\n');
-  const missed = (metrics.coverage.missed || []).map(m => `- (${m.importance}/5) ${m.title}${m.fronts && m.fronts.length ? ` [${m.fronts.join(',')}]` : ''}`).join('\n') || '(none)';
+// The full evaluation: a SINGLE architecture-aware Opus pass with web search.
+// Opus (1) builds its OWN top-10 worldview from a standard web search — the view
+// that "usually surfaces major stories well" — including content + a photo idea
+// per headline; (2) reads the live feed (what /m shows), the pipeline's attempt
+// at the same worldview via RSS + memory + filters + Haiku→Opus layers; (3) does
+// a careful gap analysis across the FULL spectrum (story missing entirely → title
+// wording should change to encapsulate/narrow → shallow content/photo gap →
+// over-broad/merged) WITHOUT jumping to conclusions; and (4) attributes each gap
+// to a pipeline STAGE and recommends STRUCTURAL fixes (code / knob / prompt
+// generalization that removes a restriction) over special-casing.
+async function evaluateFull({ bundle, atISO, scope = NT.activeScope(), maxUses = 6, anthropic = W.getAnthropic() } = {}) {
+  if (!anthropic) throw new Error('ANTHROPIC_API_KEY not set (evaluation needs web search)');
+  const brief = NT.scopeBrief(scope);
+  const feed = feedDigest(bundle);
   const prompt =
-    `You are auditing a live news dashboard against reality. Be concrete and critical.\n\n` +
-    `SITUATION (ground truth): ${groundTruth.situation || '(none)'}\n\n` +
-    `WHAT THE DASHBOARD IS SHOWING (story headlines):\n${stories || '(none)'}\n\n` +
-    `REAL DEVELOPMENTS WE MISSED (importance-weighted):\n${missed}\n\n` +
-    `COMPUTED SCORES (0-100): composite ${metrics.composite}, coverage ${metrics.coverage.score}, ` +
-    `freshness ${metrics.freshness.score} (median displayed age ${metrics.freshness.medianDisplayedAgeH}h, ` +
-    `label honesty ${metrics.freshness.labelHonesty}), staleness ${metrics.staleness.score} ` +
-    `(stale fraction ${metrics.staleness.staleFraction}), market alignment ${metrics.marketAlignment.score}.\n\n` +
-    `Return ONLY JSON:\n{\n` +
-    `  "grade": "A|B|C|D|F",\n` +
-    `  "narrative": "<3-5 sentences: how well does the feed reflect reality right now, and the single biggest gap>",\n` +
-    `  "recommendations": [ { "type": "source|knob|prompt|other", "target": "<file/env/source to change>", ` +
-    `"detail": "<specific change>", "priority": "P0|P1|P2", "rationale": "<why, tied to a miss above>" } ]\n}`;
-  try {
-    const resp = await anthropic.messages.create({ model: JUDGE_MODEL, max_tokens: 1800, messages: [{ role: 'user', content: prompt }] });
-    const out = extractJson(joinText(resp));
-    out._model = JUDGE_MODEL;
-    return out;
-  } catch (e) {
-    return { grade: null, narrative: 'reflection failed: ' + e.message, recommendations: [] };
-  }
+`You are the senior editor-auditor of a cinematic news dashboard ("${brief.label}"). Work in PHASES and do not jump to conclusions.
+
+NOW: ${atISO}
+SCOPE: ${brief.description}
+FRONTS: ${brief.fronts.join('; ')}
+
+PHASE 1 — YOUR INDEPENDENT WORLDVIEW. Use web search across EVERY front to build the TOP 10 headlines a serious viewer must not miss right now. For each: the real title, 2-3 sentences of actual content, the front, importance 1-5, an approximate first-report time, the outlets carrying it, and a concrete PHOTO suggestion (a photographable subject that would illustrate it). Only include items you can source; exclude anything clearly post-dating NOW. Be rigorous: if a claim is uncertain or single-sourced (e.g. someone's death, a casualty count), mark it uncertain rather than asserting it.
+
+PHASE 2 — READ THE PIPELINE'S FEED. This is what the dashboard is actually showing on the phone (/m), produced through RSS ingestion → relevance filter → dedup → novelty gate → persistent memory → Sonnet/Opus curation → images/markets. Study it:
+STORIES:
+${feed.stories}
+MARKET RAIL:
+${feed.sigs}
+
+PHASE 3 — GAP ANALYSIS. The goal is for the pipeline's worldview to match a standard web search's worldview, reached through a DIFFERENT path. Compare your Phase-1 list to the feed and, for EACH of your top-10, classify the discrepancy across the full spectrum:
+- "missing": the real story is absent from the feed entirely.
+- "covered_reword": present but the TITLE should change to better encapsulate it (give the suggested title) — or the inverse, a feed title is too broad/narrow and should be split/merged.
+- "covered_shallow": present but the summary/sources/photo are thin or the wrong emphasis.
+- "over_broad" / "merged": the feed lumps distinct real stories together (or vice-versa).
+- "covered_well": faithfully represented.
+Also flag feed stories that DON'T map to any real top-10 (stale, over-covered, off-scope, wrong wording, or factually shaky).
+
+PHASE 4 — ROOT CAUSE + STRUCTURAL FIXES. For each gap, attribute the LIKELY pipeline STAGE using this architecture:
+${ARCHITECTURE_BRIEF}
+Then recommend fixes that improve the STRUCTURE/architecture so the pipeline generalizes — a code change, a gate knob, a new/widened front in news-topics.js, a source/tier, or a PROMPT GENERALIZATION that removes a restriction — NOT a one-off keyword/special-case. Each recommendation must name the stage/file it targets and how it generalizes rather than patches.
+
+Return ONLY JSON (no prose, no fences):
+{
+  "reality": { "situation": "<2-3 sentences>", "topHeadlines": [ {"rank":1,"title":"...","summary":"...","front":"...","importance":1-5,"firstReportedAt":"<approx ISO>","sources":["..."],"photoSuggestion":"..."} ], "marketQuestions": ["..."] },
+  "gapAnalysis": [ {"realityRank":N,"title":"...","status":"missing|covered_reword|covered_shallow|over_broad|merged|covered_well","feedStoryId":"<id or null>","discrepancy":"<what's off, concretely>","suggestedTitle":"<better title or null>","likelyStage":"ingestion|relevance_filter|dedup|novelty_gate|memory|editor_selection|editor_wording|images|market_selection|freshness_label|unknown","confidence":"high|medium|low"} ],
+  "feedOnlyStories": [ {"feedStoryId":"<id>","headline":"...","issue":"stale|over_covered|off_scope|wording|factual","note":"..."} ],
+  "narrative": "<4-6 sentences: how close is the pipeline's worldview to a standard web search's, where does it diverge, and is the divergence ingestion, filtering, gating, memory, or curation — measured, no overclaiming>",
+  "grade": "A|B|C|D|F",
+  "recommendations": [ {"priority":"P0|P1|P2","type":"code|prompt|knob|source|architecture","target":"<file/env/source>","detail":"<the change>","generalizes":"<how it widens/structures rather than special-cases>","rationale":"<tied to a specific gap + stage>"} ]
+}`;
+  const resp = await anthropic.messages.create({
+    model: JUDGE_MODEL, max_tokens: 8000,
+    tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }],
+    messages: [{ role: 'user', content: prompt }],
+  });
+  const out = extractJson(joinText(resp));
+  const reality = out.reality || {};
+  reality.topHeadlines = Array.isArray(reality.topHeadlines) ? reality.topHeadlines : [];
+  reality.marketQuestions = Array.isArray(reality.marketQuestions) ? reality.marketQuestions : [];
+  return {
+    reality,
+    gapAnalysis: Array.isArray(out.gapAnalysis) ? out.gapAnalysis : [],
+    feedOnlyStories: Array.isArray(out.feedOnlyStories) ? out.feedOnlyStories : [],
+    narrative: out.narrative || '',
+    grade: out.grade || null,
+    recommendations: Array.isArray(out.recommendations) ? out.recommendations : [],
+    _model: JUDGE_MODEL,
+  };
 }
 
 // ----------------------------------------------------------------- orchestration
-// Full evaluation: ground truth (web search) -> deterministic metrics -> reflection.
-// `bundle` is the snapshot to grade. Returns the structured report (not persisted).
+// Full evaluation: Opus web-search worldview + feed read + gap analysis, then the
+// deterministic metrics (scored against Opus's top-10). `bundle` is the snapshot
+// to grade (what /m shows). Returns the structured report (not persisted).
 async function scoreSnapshot({ bundle, now = Date.now(), scope = NT.activeScope(), reflectEnabled = true, gtOpts = {} } = {}) {
   if (!bundle || !Array.isArray(bundle.stories)) throw new Error('scoreSnapshot needs a bundle with stories[]');
   const atISO = new Date(now).toISOString();
-  const groundTruth = await fetchGroundTruth({ atISO, scope, ...gtOpts });
-  const metrics = computeMetrics(bundle, groundTruth, now);
-  const reflection = reflectEnabled ? await reflect({ bundle, groundTruth, metrics }) : null;
+
+  let reality, analysis;
+  if (reflectEnabled) {
+    const full = await evaluateFull({ bundle, atISO, scope, ...gtOpts });
+    reality = full.reality;
+    analysis = { gapAnalysis: full.gapAnalysis, feedOnlyStories: full.feedOnlyStories, narrative: full.narrative, grade: full.grade, recommendations: full.recommendations };
+  } else {
+    reality = await fetchReality({ atISO, scope, ...gtOpts });
+    analysis = null;
+  }
+
+  // Deterministic backbone scored against Opus's independent top-10.
+  const gtForMetrics = { events: reality.topHeadlines || [], marketQuestions: reality.marketQuestions || [] };
+  const metrics = computeMetrics(bundle, gtForMetrics, now);
+
   return {
     evaluatedAt: atISO,
     snapshotGeneratedAt: bundle.generatedAt || null,
@@ -259,14 +333,24 @@ async function scoreSnapshot({ bundle, now = Date.now(), scope = NT.activeScope(
     freshness: metrics.freshness,
     staleness: metrics.staleness,
     marketAlignment: metrics.marketAlignment,
-    reflection,
-    groundTruth,
-    models: { groundTruth: GT_MODEL, judge: JUDGE_MODEL },
+    reality,
+    gapAnalysis: analysis ? analysis.gapAnalysis : [],
+    feedOnlyStories: analysis ? analysis.feedOnlyStories : [],
+    // `reflection` kept as the narrative/grade/recommendations envelope (stable shape for consumers).
+    reflection: analysis ? { grade: analysis.grade, narrative: analysis.narrative, recommendations: analysis.recommendations } : null,
+    models: { worldview: reflectEnabled ? JUDGE_MODEL : GT_MODEL, judge: JUDGE_MODEL },
   };
 }
 
 // ----------------------------------------------------------------- persistence
+// Load the snapshot to grade. Prefers the live feed exactly as /m serves it when
+// INTEL_EVAL_FEED_URL is set (e.g. https://www.thinx.fun/api/tv/intel/public),
+// so the eval reads what the user actually sees; falls back to Redis then file.
 async function loadBundle(redis = W.getRedis()) {
+  const url = process.env.INTEL_EVAL_FEED_URL;
+  if (url) {
+    try { const r = await fetch(url); if (r.ok) { const b = await r.json(); if (b && Array.isArray(b.stories)) return b; } } catch {}
+  }
   if (redis) { try { const c = await redis.get('tv:war:intel:v1'); if (c) return typeof c === 'string' ? JSON.parse(c) : c; } catch {} }
   const file = path.join(__dirname, '..', '..', 'intel-bundle.json');
   try { if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
@@ -274,14 +358,20 @@ async function loadBundle(redis = W.getRedis()) {
 }
 // Compact history entry (the full report is large; the log keeps the trend line).
 function summarize(report) {
+  const gaps = (report.gapAnalysis || []).filter(g => g.status && g.status !== 'covered_well');
+  const missing = gaps.filter(g => g.status === 'missing');
+  const topGap = missing[0] || gaps[0] || (report.coverage.missed || [])[0] || null;
   return {
     evaluatedAt: report.evaluatedAt,
     snapshotGeneratedAt: report.snapshotGeneratedAt,
     composite: report.scores.composite,
     scores: report.scores,
     grade: report.reflection && report.reflection.grade,
+    gapCount: gaps.length,
+    missingCount: missing.length,
     missedCount: (report.coverage.missed || []).length,
-    topMiss: (report.coverage.missed || [])[0] ? report.coverage.missed[0].title : null,
+    topMiss: topGap ? topGap.title : null,
+    recCount: (report.reflection && report.reflection.recommendations || []).length,
   };
 }
 async function saveReport(report, redis = W.getRedis()) {
@@ -317,7 +407,7 @@ module.exports = {
   scoreCoverage, scoreFreshness, scoreStaleness, scoreMarketAlignment, compositeScore, computeMetrics,
   WEIGHTS, MATCH_THRESHOLD,
   // llm + orchestration
-  fetchGroundTruth, reflect, scoreSnapshot,
+  feedDigest, fetchReality, evaluateFull, scoreSnapshot, ARCHITECTURE_BRIEF,
   // persistence
   loadBundle, saveReport, loadLatest, loadHistory, summarize,
   EVAL_KEY, EVAL_LOG,
