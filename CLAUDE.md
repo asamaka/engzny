@@ -320,6 +320,20 @@ curl 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'
 
 A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.js`, which fetches RSS headlines + Polymarket spikes + videos, curates them (Sonnet proposer → Opus editor), and writes a finished bundle to Redis (`tv:war:intel:v1`). The TV reads it read-only via `GET /api/tv/intel`; the phone mirror is `/m` (`GET /api/tv/intel/public`, no token). A persistent "iceberg" of tracked stories lives in `tv:war:segments:v1` (`GET /api/tv/segments`).
 
+### Triggering the intel builder manually (for agents)
+The builder normally runs on its hourly schedule. To force a run now — **the order an agent should try paths, with what works:**
+
+1. **Direct dispatch with a PAT (the reliable path).** `api.github.com` is reachable from the agent sandbox, so a fine-grained PAT (repo `asamaka/engzny`, **Actions: Read and write**) can dispatch it:
+   ```bash
+   GH_DISPATCH_PAT=github_pat_xxx ./scripts/trigger-intel-build.sh force   # 'force' bypasses the reuse gate
+   ```
+   The token comes from `GH_DISPATCH_PAT` (or `GITHUB_TOKEN`) in the env — never commit it. Create one at github.com/settings/tokens?type=beta.
+2. **GitHub UI:** Actions → "Cinematic Intel Builder" → Run workflow (optionally set `force=true`).
+3. ❌ **The GitHub MCP integration cannot do this** — it lacks `actions: write` and returns `403 "Resource not accessible by integration"`. Don't burn time retrying it.
+4. ⚠️ **Vercel endpoint** `POST /api/tv/intel/build/trigger?token=<debug|war>` body `{"force":true}` works *only if* `GITHUB_DISPATCH_TOKEN` (Vercel env, shared with the eval/improvement path) is valid — it has been seen expired (`401 Bad credentials`).
+
+Verify a run landed by polling `GET /api/tv/intel/public` for a newer `generatedAt`; new-pipeline builds carry `meta.corroboration` on each story.
+
 ### Scope is data, not code
 `api/lib/news-topics.js` defines the active **scope** (default `mideast-conflict`) as a set of **fronts** (Iran core, Lebanon/Hezbollah, Israel/Gaza, Gulf/Hormuz, nuclear/diplomacy, energy). The relevance filter prompt, the regex fallback, and the market-selection prompt are all **generated** from this config — there is no hard-coded "IRAN WAR" keyword list anymore. Override the active scope with `INTEL_SCOPE` (no code change). Sources in `api/lib/war-sources.js` are tiered (tier 1 = fast wires/Google-News queries, tier 2 = major outlets, tier 3 = regional/state) and tagged with the fronts they cover.
 
