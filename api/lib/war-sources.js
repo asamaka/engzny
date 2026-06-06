@@ -582,16 +582,62 @@ async function enrichSpikesWithHistory(candidates, { threshold = 0.03, max = 4, 
 }
 
 // ---------------------------------------------------------------- YouTube videos (keyless RSS)
+// Vetted broadcaster/wire channels. IMPORTANT: these ids were previously stale —
+// several pointed at the WRONG channel (the "France 24" id was actually Al
+// Jazeera, "DW News" was BBC) and two 404'd, so every clip's source LABEL was a
+// lie. The ids below are verified against the live feed; more importantly the
+// label is now taken from the feed's own title at fetch time (see fetchWarVideos),
+// so a wrong id can never again mislabel a clip's source.
 const WAR_YT_CHANNELS = {
-  'UCknLrEdhRCp1aegoMqRhGGw': 'Reuters',
-  'UC52X5wxOL_s5yw0dQk7NtgA': 'Al Jazeera English',
+  'UChqUTb7kYRX8-EiaN3XFrSQ': 'Reuters',
+  'UC52X5wxOL_s5yw0dQk7NtgA': 'Associated Press',
   'UCupvZG-5ko_eiXAupbDfxWw': 'CNN',
-  'UCXIJgqnII2ZOINSValKDNAQ': 'BBC News',
-  'UCaXkIU1QidjPwiAYu6GcHjg': 'TRT World',
-  'UCNye-wNBqNL5ZzHSJj3l8Bg': 'France 24 English',
-  'UC16niRr50-MSBwiO3YDb3RA': 'DW News',
+  'UC16niRr50-MSBwiO3YDb3RA': 'BBC News',
+  'UC7fWeaHhqgM4Ry-RMpM2YYw': 'TRT World',
+  'UCQfwfsi5VrQ8yKZ-UWmAEFg': 'France 24 English',
+  'UCNye-wNBqNL5ZzHSJj3l8Bg': 'Al Jazeera English',
   'UCeY0bbntWzzVIaj2z3QigXg': 'NBC News',
+  'UCHpw8xwDNhU9gdohEcJu4aA': 'The Guardian',
+  'UCaXkIU1QidjPwiAYu6GcHjg': 'MS NOW',
 };
+
+// Source-reputation tiers for ranking clips. The targeted search opens the pool
+// to the whole web — alongside wires/broadcasters it returns a long tail of
+// sensational aggregators ("Times Now", "WION", "CRUX", "Oneindia"), foreign-
+// language desks, and individuals ("Srijan Kalam"). We don't hard-exclude them
+// (they sometimes carry the only on-topic clip) — we DOWN-RANK them: a clip that
+// covers the story equally well from Reuters beats one from a random uploader.
+// tier 1 = global wires + flagship broadcasters; 2 = solid secondary outlets;
+// 3 = everything else (unknown/aggregator/individual). Matched on channel name
+// so it works for both the RSS pool and search results.
+// CNN matches the network but NOT "CNN-News18" (India's sensational affiliate).
+const CHANNEL_TIER1 = /\b(reuters|associated press|ap archive|\bap\b|afp|agence france|al jazeera|bbc|cnn\b(?!-?news18)|france ?24|dw news|deutsche welle|sky news|al arabiya|nbc news|cbs|abc news|pbs|bloomberg|cnbc|fox news|the guardian|guardian news|ms now|msnbc|npr|the economist|financial times|wall street journal|new york times|washington post|c-span)\b/i;
+const CHANNEL_TIER2 = /\b(trt world|sbs|the hill|usa today|dd india|roya|i24|times of israel|jerusalem post|haaretz|euronews|politico|axios|channel 4|\bitv\b|cbc news|global news|south china morning post|scmp|middle east eye|al monitor|the national|nbc|cbs news|abc)\b/i;
+function channelTier(name) {
+  const s = String(name || '').toLowerCase();
+  if (!s) return 3;
+  if (CHANNEL_TIER1.test(s)) return 1;
+  if (CHANNEL_TIER2.test(s)) return 2;
+  return 3;
+}
+// Parse a YouTube "12:34" / "1:02:33" length into seconds (null if unknown).
+function parseDurationText(t) {
+  const m = String(t || '').trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  return (Number(m[1] || 0) * 3600) + (Number(m[2]) * 60) + Number(m[3]);
+}
+// Fitness of a clip's duration for a cinematic TV card (0 worst … 3 best). A
+// sub-minute Short is a vertical teaser; a 30-min+ item is a full bulletin or a
+// livestream replay — both play badly on the wall. null (broadcaster RSS, no
+// duration) is treated as neutral-good since those are already vetted outlets.
+function durationFit(sec) {
+  if (sec == null) return 2;
+  if (sec < 45) return 0;
+  if (sec < 90) return 2;
+  if (sec <= 1200) return 3;   // ~1.5–20 min sweet spot
+  if (sec <= 1800) return 2;   // 20–30 min, acceptable
+  return 1;                    // 30 min+ bulletin / livestream replay
+}
 
 function ytId(item) {
   if (item.id && item.id.indexOf('yt:video:') === 0) return item.id.slice('yt:video:'.length);
@@ -605,8 +651,11 @@ async function fetchWarVideos() {
   const results = await Promise.allSettled(Object.entries(WAR_YT_CHANNELS).map(async ([cid, name]) => {
     try {
       const parsed = await rssParser.parseURL(`https://www.youtube.com/feeds/videos.xml?channel_id=${cid}`);
+      // Label from the feed's OWN title (the real channel name) — never the static
+      // map — so the source tag always matches the actual publisher.
+      const channel = (parsed.title || name || '').trim();
       return (parsed.items || []).map(it => ({
-        videoId: ytId(it), title: (it.title || '').trim(), channel: name,
+        videoId: ytId(it), title: (it.title || '').trim(), channel,
         publishedAt: it.isoDate || it.pubDate || null,
         _ts: it.isoDate ? new Date(it.isoDate).getTime() : 0,
       })).filter(v => v.videoId && v._ts > cutoff);
@@ -623,6 +672,7 @@ async function fetchWarVideos() {
   vids.sort((a, b) => b._ts - a._ts);
   return vids.slice(0, 30).map(v => ({
     videoId: v.videoId, title: v.title, channel: v.channel, publishedAt: v.publishedAt,
+    tier: channelTier(v.channel), durationSec: null,
     thumbnailUrl: `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
   }));
 }
@@ -681,6 +731,8 @@ async function searchVideos(query, opts = {}) {
   if (!query) return [];
   const max = Number(opts.max || 6);
   const maxAgeDays = Number(opts.maxAgeDays || process.env.INTEL_VIDEO_SEARCH_AGE_DAYS || 45);
+  const minSec = Number(process.env.INTEL_VIDEO_MIN_SEC || 45);
+  const maxSec = Number(process.env.INTEL_VIDEO_MAX_SEC || 1500);
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), Number(process.env.INTEL_VIDEO_SEARCH_TIMEOUT_MS || 8000));
@@ -703,6 +755,14 @@ async function searchVideos(query, opts = {}) {
         || (v.title && v.title.simpleText) || '';
       if (!title) continue;
       if ((title.match(/#/g) || []).length >= 3) continue;   // hashtag-spam shorts — never good TV clips
+      // Reject what plays badly on a cinematic wall: live/upcoming streams and
+      // Shorts (both lack a normal lengthText), plus clips outside the duration
+      // window. A regular clip always carries "m:ss"; live/short/upcoming don't.
+      const isLive = /\b(LIVE|UPCOMING)\b/.test(JSON.stringify(v.badges || v.thumbnailOverlays || ''));
+      const isShort = !!(v.navigationEndpoint && JSON.stringify(v.navigationEndpoint).includes('/shorts/'));
+      const durationSec = parseDurationText(v.lengthText && v.lengthText.simpleText);
+      if (isLive || isShort || durationSec == null) continue;
+      if (durationSec < minSec || durationSec > maxSec) continue;
       const channel = (v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].text)
         || (v.longBylineText && v.longBylineText.runs && v.longBylineText.runs[0] && v.longBylineText.runs[0].text) || '';
       const ts = parseRelativeAge(v.publishedTimeText && v.publishedTimeText.simpleText);
@@ -711,6 +771,7 @@ async function searchVideos(query, opts = {}) {
       out.push({
         videoId, title: title.trim(), channel: channel.trim(),
         publishedAt: ts ? new Date(ts).toISOString() : null,
+        durationSec, tier: channelTier(channel),
         thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
         searched: true,
       });
@@ -765,5 +826,5 @@ module.exports = {
   commonsPhoto, openversePhoto, searchPhoto,
   isMarketDateExpired, parseByDate, fetchWarMarkets,
   fetchMarketHistory, sparkFromHistory, measuredDelta, pickSpikeCandidates, enrichSpikesWithHistory,
-  fetchWarVideos, searchVideos, WAR_YT_CHANNELS, fetchWeather,
+  fetchWarVideos, searchVideos, channelTier, durationFit, parseDurationText, WAR_YT_CHANNELS, fetchWeather,
 };

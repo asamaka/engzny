@@ -846,26 +846,32 @@ async function main() {
     const toCard = v => ({
       videoId: v.videoId, title: v.title, channel: v.channel,
       thumbnailUrl: v.thumbnailUrl || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
-      publishedAt: v.publishedAt || null,
+      publishedAt: v.publishedAt || null, durationSec: v.durationSec != null ? v.durationSec : null,
     });
     const searched = process.env.INTEL_VIDEO_SEARCH_OFF === '1'
-      ? [] : await W.searchVideos(videoQueryFor(seg), { max: 8 }).catch(() => []);
+      ? [] : await W.searchVideos(videoQueryFor(seg), { max: 10 }).catch(() => []);
     const opusPicked = (seg.videoIdxs || []).map(i => videosAll[i]).filter(Boolean);
     const pool = []; const seenV = new Set();
     for (const v of [...opusPicked, ...searched, ...videosAll]) {
       if (!v || !v.videoId || seenV.has(v.videoId)) continue;
       seenV.add(v.videoId); pool.push(v);
     }
-    const scored = pool.map(v => ({ v, s: videoCoversSegment(v, seg) }));
+    const scored = pool.map(v => ({
+      v, s: videoCoversSegment(v, seg),
+      tier: v.tier != null ? v.tier : W.channelTier(v.channel),
+      fit: W.durationFit(v.durationSec),
+    }));
     let picks = scored.filter(x => x.s >= VIDEO_MIN_MATCH);
     // Safety net so a segment isn't left blank: search hits are on-topic by
     // construction (we searched THIS headline), so accept those sharing >=1
     // distinctive token. We still refuse a pool clip that covers nothing.
     if (!picks.length) picks = scored.filter(x => x.s >= 1 && x.v.searched);
-    // Rank: strongest coverage first; at a tie prefer the VETTED broadcaster pool
-    // clip over an arbitrary search-channel one, then the fresher clip.
-    picks.sort((a, b) => b.s - a.s
-      || (a.v.searched === b.v.searched ? 0 : a.v.searched ? 1 : -1)
+    // Among clips that adequately COVER the story, finetune by QUALITY: prefer the
+    // more reputable source (wire/broadcaster over a sensational aggregator), then
+    // stronger coverage, then a better-fitting duration, then the fresher clip.
+    picks.sort((a, b) => a.tier - b.tier
+      || b.s - a.s
+      || b.fit - a.fit
       || (Date.parse(b.v.publishedAt || 0) - Date.parse(a.v.publishedAt || 0)));
     const vids = picks.slice(0, 6).map(x => toCard(x.v));
 
