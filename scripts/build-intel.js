@@ -43,6 +43,60 @@ const FIRST_REPORT_BACKDATE_MS = Number(process.env.INTEL_FIRST_REPORT_BACKDATE_
 
 function log(...a) { console.error('[build-intel]', ...a); }
 
+// ---- pipeline trace (powers the /m/debug viewer) ---------------------------
+// Each cron run records a structured, human-readable trace of the whole flow —
+// the fetched inputs (RSS / Polymarket / videos), the novelty gate, and every
+// model call's PROMPT IN + parsed RESPONSE OUT (Sonnet propose, Opus decide,
+// the per-segment newsroom rewrite, layout, Haiku image query) — persisted to
+// Redis so the debug page can replay any run step by step. Best-effort and
+// non-fatal: tracing never breaks a build.
+let TRACE = null;
+const TRACE_FIELD_CAP = Number(process.env.INTEL_TRACE_FIELD_CAP || 40000);
+function traceInit(meta = {}) {
+  TRACE = { runId: `${Date.now()}-${crypto.randomBytes(2).toString('hex')}`, startedAt: new Date().toISOString(), _t0: Date.now(), _seq: 0, meta, steps: [] };
+  return TRACE;
+}
+// Clip very long strings so one giant prompt can't bloat the stored trace.
+function traceClip(detail) {
+  if (detail == null) return undefined;
+  return JSON.parse(JSON.stringify(detail, (k, v) =>
+    (typeof v === 'string' && v.length > TRACE_FIELD_CAP) ? v.slice(0, TRACE_FIELD_CAP) + `\n…[+${v.length - TRACE_FIELD_CAP} chars truncated]` : v));
+}
+function traceStep(phase, title, opts = {}) {
+  if (!TRACE) return;
+  try {
+    TRACE.steps.push({
+      seq: TRACE._seq++, phase, title, atMs: Date.now() - TRACE._t0,
+      summary: opts.summary || '', model: opts.model || null,
+      usage: opts.usage || null, ms: opts.ms != null ? opts.ms : null,
+      detail: traceClip(opts.detail),
+    });
+  } catch (e) { log('traceStep failed (non-fatal)', phase, e.message); }
+}
+async function persistTrace(redis, extra = {}) {
+  if (!TRACE) return;
+  Object.assign(TRACE, extra);
+  TRACE.finishedAt = new Date().toISOString();
+  TRACE.durationMs = Date.now() - TRACE._t0;
+  const out = { ...TRACE }; delete out._t0; delete out._seq;
+  const summary = {
+    runId: out.runId, startedAt: out.startedAt, finishedAt: out.finishedAt, durationMs: out.durationMs,
+    ok: !out.error, error: out.error ? out.error.message : null,
+    reused: !!out.reused, forced: !!(out.meta && out.meta.forced),
+    headlines: out.inputs ? out.inputs.headlines : 0,
+    stories: out.result ? out.result.stories : 0,
+    status: out.result ? out.result.status : null,
+    steps: out.steps.length, scope: out.meta && out.meta.scope,
+  };
+  if (!redis) { log('trace: no redis, skipping persist'); return; }
+  try {
+    await redis.set(`tv:war:intel:run:${out.runId}`, JSON.stringify(out), { ex: Number(process.env.INTEL_TRACE_TTL || 604800) });
+    await redis.lpush('tv:war:intel:runs', JSON.stringify(summary));
+    await redis.ltrim('tv:war:intel:runs', 0, Number(process.env.INTEL_TRACE_KEEP || 50) - 1);
+    log('trace persisted', out.runId, `${out.steps.length} steps`);
+  } catch (e) { log('trace persist failed', e.message); }
+}
+
 // Human-friendly relative age for prompts/logs ("3h ago", "2d ago").
 function relAge(iso) {
   if (!iso) return 'unknown';
@@ -151,11 +205,18 @@ Return ONLY JSON (no prose, no fences):
 }`;
 
   try {
+    const _t = Date.now();
     const { json, usage, searches } = await callJsonWithSearch(NEWSROOM, 2000, prompt);
     log(`newsroom "${seg.id}": ${fetched}/${withBodies.length} bodies, ${searches} searches, corro=${json.corroboration || '?'} (tokens ${usage?.input_tokens}/${usage?.output_tokens})`);
+    traceStep('newsroom', `Newsroom rewrite — ${seg.id}`, {
+      model: NEWSROOM, usage, ms: Date.now() - _t,
+      summary: `${fetched}/${withBodies.length} article bodies · ${searches} web searches · corroboration ${json.corroboration || '?'}`,
+      detail: { sources: withBodies.map(s => ({ outlet: s.outlet, category: s.category, link: s.link, bodyFetched: !!s.body, bodyChars: s.body ? s.body.length : 0 })), prompt, response: json },
+    });
     return json;
   } catch (e) {
     log(`newsroom "${seg.id}" failed (${e.message}) — keeping triage draft`);
+    traceStep('newsroom', `Newsroom rewrite — ${seg.id} (failed)`, { summary: e.message, detail: { prompt, error: e.message } });
     return null;
   }
 }
@@ -210,8 +271,14 @@ Return ONLY JSON (no prose, no fences):
 
 Rules: group by DISTINCT real events. Over-generate clusters (it is fine to propose overlapping or speculative ones). Do not invent events. Keep titles factual.`;
 
+  const _t = Date.now();
   const { json, usage } = await callJson(SONNET, 4000, prompt);
   log(`sonnet propose: ${(json.clusters || []).length} clusters (tokens ${usage?.input_tokens}/${usage?.output_tokens})`);
+  traceStep('sonnet', 'Sonnet — propose clusters', {
+    model: SONNET, usage, ms: Date.now() - _t,
+    summary: `${(json.clusters || []).length} candidate clusters drafted`,
+    detail: { prompt, response: json },
+  });
   return json;
 }
 
@@ -286,8 +353,14 @@ Rules (you have final say):
 - severity: critical if active strikes/invasion/blockade; warning if fragile/strained; calm if stable.
 - Do not invent events. Distinct stories only. Ground every summary ONLY in the referenced headlines.`;
 
+  const _t = Date.now();
   const { json, usage } = await callJson(OPUS, 6000, prompt);
   log(`opus decide: ${(json.segments || []).length} segments, ${(json.homeMarketIds || []).length} home markets (tokens ${usage?.input_tokens}/${usage?.output_tokens})`);
+  traceStep('opus', 'Opus — editorial decisions', {
+    model: OPUS, usage, ms: Date.now() - _t,
+    summary: `${(json.segments || []).length} segments · ${(json.homeMarketIds || []).length} home markets · status "${json.status?.label || '?'}" · breakingIdx ${json.breakingIdx == null ? 'none' : json.breakingIdx}`,
+    detail: { prompt, response: json },
+  });
   return json;
 }
 
@@ -305,7 +378,14 @@ async function designLayout(segment, redis, opts) {
     .update((segment.id || segment.headline || '') + '|v' + hasVideos + 'm' + hasMarket + 't' + hasTimeline)
     .digest('hex').slice(0, 16);
   if (redis) {
-    try { const c = await redis.get(LAYOUT_PREFIX + hash); if (c) { return typeof c === 'string' ? JSON.parse(c) : c; } } catch {}
+    try {
+      const c = await redis.get(LAYOUT_PREFIX + hash);
+      if (c) {
+        const cached = typeof c === 'string' ? JSON.parse(c) : c;
+        traceStep('layout', `Layout — ${segment.id} (cache hit)`, { summary: `modules: ${(cached.modules || []).join(', ')}`, detail: { cacheKey: hash, response: cached } });
+        return cached;
+      }
+    } catch {}
   }
   // Static instruction block — identical across every per-segment call in a run,
   // so we send it as a cached system block (prompt caching) and bill it once.
@@ -339,13 +419,20 @@ linked spiking market: ${hasMarket}
 playable video clips available: ${hasVideos}`;
 
   let layout;
+  const _t = Date.now();
+  let _usage = null;
   try {
-    const { json } = await callJson(SONNET, 1200, prompt, { system });
-    layout = json;
+    const { json, usage } = await callJson(SONNET, 1200, prompt, { system });
+    layout = json; _usage = usage;
   } catch (e) {
     log('sonnet layout failed, using default', e.message);
     layout = { modules: ['summary', hasVideos ? 'videos' : 'sources'], showTimeline: false, emphasis: 'image', keyQuote: null, statCallouts: null };
   }
+  traceStep('layout', `Layout — ${segment.id}`, {
+    model: SONNET, usage: _usage, ms: Date.now() - _t,
+    summary: `modules: ${(layout.modules || []).join(', ')}`,
+    detail: { caps: { hasTimeline, hasMarket, hasVideos }, prompt, response: layout },
+  });
   layout.modules = (Array.isArray(layout.modules) ? layout.modules : ['summary', 'sources'])
     .filter(m => MODULE_LIBRARY.includes(m));
   if (!layout.modules.includes('summary')) layout.modules.unshift('summary');
@@ -376,7 +463,13 @@ ${lines.join('\n')}
 
 Return ONLY JSON mapping story index to chosen candidate index, e.g. {"0":2,"1":0}. If a story has no good photo, omit it.`;
   try {
-    const { json } = await callJson(SONNET, 800, prompt);
+    const _t = Date.now();
+    const { json, usage } = await callJson(SONNET, 800, prompt);
+    traceStep('image', 'Sonnet — pick best photo per story', {
+      model: SONNET, usage, ms: Date.now() - _t,
+      summary: `chose photos for ${Object.keys(json || {}).length} stor${Object.keys(json || {}).length === 1 ? 'y' : 'ies'}`,
+      detail: { prompt, response: json },
+    });
     return json || {};
   } catch (e) { log('image pick failed', e.message); return {}; }
 }
@@ -689,12 +782,13 @@ function finalizeRegistry(reg, displayedIds, now) {
 }
 // Haiku: a short, concrete visual query for the keyless image search fallback.
 async function imageQueryFor(seg) {
+  const prompt = `Give a 2-4 word concrete, photographable visual subject (a place, landmark, vehicle, building, or scene) that best illustrates this news story for a TV thumbnail. Output ONLY the search phrase. No quotes, no punctuation, no personal names.\nHeadline: ${seg.headline}\nSummary: ${seg.aiSummary || seg.brief || ''}`;
   try {
-    const txt = await W.anthropicText({
-      model: HAIKU, max_tokens: 24,
-      prompt: `Give a 2-4 word concrete, photographable visual subject (a place, landmark, vehicle, building, or scene) that best illustrates this news story for a TV thumbnail. Output ONLY the search phrase. No quotes, no punctuation, no personal names.\nHeadline: ${seg.headline}\nSummary: ${seg.aiSummary || seg.brief || ''}`,
-    });
-    return (txt || '').trim().replace(/^["']|["']$/g, '').split('\n')[0].slice(0, 60) || null;
+    const _t = Date.now();
+    const txt = await W.anthropicText({ model: HAIKU, max_tokens: 24, prompt });
+    const q = (txt || '').trim().replace(/^["']|["']$/g, '').split('\n')[0].slice(0, 60) || null;
+    traceStep('haiku', `Haiku — image query for ${seg.id}`, { model: HAIKU, ms: Date.now() - _t, summary: q ? `"${q}"` : '(none)', detail: { prompt, response: txt } });
+    return q;
   } catch { return null; }
 }
 // Resolve the segment's curated image: stable reuse unless missing or a major update;
@@ -712,6 +806,7 @@ async function resolveSegmentImage(seg, rec, ogImg, isMajor) {
 async function main() {
   const redis = W.getRedis();
   const NOW = Date.now();
+  traceInit({ scope: NT.activeScope().id, forced: process.env.INTEL_FORCE === '1', models: { sonnet: SONNET, opus: OPUS, haiku: HAIKU, newsroom: NEWSROOM } });
   log('redis', redis ? 'connected' : 'NOT configured (file-only output)');
 
   const [hRes, mRes, weather, videosAll] = await Promise.all([
@@ -728,7 +823,23 @@ async function main() {
   const spikes = await W.enrichSpikesWithHistory(candidates, { threshold: Number(process.env.INTEL_SPIKE_THRESHOLD || 0.03), max: 4 });
   log(`headlines=${headlines.length} markets=${markets.length} candidates=${candidates.length} spikes=${spikes.length} videos=${videosAll.length} weather=${weather ? weather.tempC + 'C' : 'n/a'}`);
 
-  if (!headlines.length) { log('no headlines; aborting (keeping previous bundle)'); process.exit(1); }
+  TRACE.inputs = { headlines: headlines.length, markets: markets.length, spikes: spikes.length, videos: videosAll.length };
+  traceStep('inputs', 'Fetched live sources', {
+    summary: `${headlines.length} headlines · ${markets.length} markets · ${spikes.length} spikes · ${videosAll.length} videos · weather ${weather ? weather.tempC + '°C' : 'n/a'}`,
+    detail: {
+      headlines: headlines.map(h => ({ source: h.source, bloc: h.sourceCategory, ageMin: h.ageMinutes, title: h.title, link: h.link })),
+      spikes: spikes.map(s => ({ id: s.id, question: s.question, prob: s.prob, delta: s.delta, deltaColor: s.deltaColor })),
+      videos: videosAll.map(v => ({ tier: v.tier, channel: v.channel, title: v.title, publishedAt: v.publishedAt })),
+      weather,
+    },
+  });
+
+  if (!headlines.length) {
+    log('no headlines; aborting (keeping previous bundle)');
+    traceStep('error', 'Aborted: no headlines fetched', { summary: 'all RSS feeds returned empty — kept previous bundle' });
+    await persistTrace(redis, { error: { message: 'no headlines fetched' } });
+    process.exit(1);
+  }
 
   // Change-detection gate: only pay for a new curation when a genuinely new,
   // Iran-relevant item would change something shown on a page. Otherwise reuse
@@ -737,12 +848,18 @@ async function main() {
   const prev = await loadPrevBundle(redis);
   const novelty = detectNovelty(prev, headlines, spikes);
   const prevAge = prev?.generatedAt ? (Date.now() - Date.parse(prev.generatedAt)) : Infinity;
-  if (process.env.INTEL_FORCE !== '1' && prev && !novelty.changed && prevAge < MAX_REUSE_MS) {
+  const willReuse = process.env.INTEL_FORCE !== '1' && prev && !novelty.changed && prevAge < MAX_REUSE_MS;
+  traceStep('gate', `Novelty gate — ${willReuse ? 'REUSE (no LLM)' : 'CURATE'}`, {
+    summary: novelty.changed ? novelty.reasons.join('; ') : (willReuse ? `nothing new; last build ${Math.round(prevAge / 60000)}m ago` : `reuse cap reached (${Math.round(prevAge / 60000)}m)`),
+    detail: { changed: novelty.changed, reasons: novelty.reasons, forced: process.env.INTEL_FORCE === '1', prevAgeMin: Number.isFinite(prevAge) ? Math.round(prevAge / 60000) : null, maxReuseMin: Math.round(MAX_REUSE_MS / 60000) },
+  });
+  if (willReuse) {
     log(`no new Iran info changes any page (last build ${Math.round(prevAge / 60000)}m ago) — reuse + re-price, NO LLM`);
     prev.signals = await refreshSignals(prev);
     prev.generatedAt = new Date().toISOString();
     prev._meta = { ...prev._meta, reused: true, reusedAt: prev.generatedAt };
     await persist(prev, redis);
+    await persistTrace(redis, { reused: true, result: { stories: (prev.stories || []).length, status: prev.status?.label || null, headlines: headlines.length } });
     return;
   }
   log(novelty.changed ? `curating — ${novelty.reasons.join('; ')}` : `reuse cap reached (${Math.round(prevAge / 60000)}m) — refreshing editorial`);
@@ -820,7 +937,12 @@ async function main() {
     // Timeline discipline: a timeline only survives if it is a genuine multi-step
     // chronology with CONCRETE timestamps — otherwise it is dropped here (so the
     // registry, layout, and drilldown all agree there is no timeline).
+    const _tlBefore = Array.isArray(seg.timeline) ? seg.timeline : [];
     seg.timeline = sanitizeTimeline(seg.timeline);
+    traceStep('timeline', `Timeline gate — ${seg.id}`, {
+      summary: `${_tlBefore.length} → ${seg.timeline.length} ${seg.timeline.length ? 'kept (exact timestamps)' : 'dropped (vague/undatable)'}`,
+      detail: { before: _tlBefore, after: seg.timeline },
+    });
 
     // og candidate (Sonnet-picked photo, else first candidate) = freshest story-specific photo
     const cands = candsBySeg[si] || [];
@@ -874,6 +996,18 @@ async function main() {
       || b.fit - a.fit
       || (Date.parse(b.v.publishedAt || 0) - Date.parse(a.v.publishedAt || 0)));
     const vids = picks.slice(0, 6).map(x => toCard(x.v));
+    const _chosenIds = new Set(vids.map(v => v.videoId));
+    traceStep('video', `Video selection — ${seg.id}`, {
+      summary: `${vids.length} chosen from ${pool.length} candidates (search returned ${searched.length})`,
+      detail: {
+        query: videoQueryFor(seg),
+        chosen: vids.map(v => ({ tier: W.channelTier(v.channel), channel: v.channel, durationSec: v.durationSec, title: v.title, videoId: v.videoId })),
+        candidates: scored
+          .sort((a, b) => b.s - a.s || a.tier - b.tier)
+          .slice(0, 20)
+          .map(x => ({ chosen: _chosenIds.has(x.v.videoId), covers: x.s, tier: x.tier, durFit: x.fit, durationSec: x.v.durationSec ?? null, src: x.v.searched ? 'search' : 'pool', channel: x.v.channel, title: x.v.title })),
+      },
+    });
 
     const linkedSpikes = (seg.marketIds || []).map(id => spikeById[id]).filter(Boolean);
     const layout = await designLayout(seg, redis, { hasMarket: linkedSpikes.length > 0, hasVideos: vids.length > 0 });
@@ -1013,10 +1147,33 @@ async function main() {
   };
 
   await persist(bundle, redis);
+
+  traceStep('output', 'Assembled & published bundle', {
+    summary: `${stories.length} stories · ${bundle.signals.length} market signals · status "${bundle.status.label}" (${sev})${breaking ? ' · BREAKING' : ''}`,
+    detail: {
+      status: bundle.status, breaking,
+      stories: stories.map(st => ({
+        id: st.id, headline: st.headline,
+        videos: (st.drilldown.videos || []).map(v => `[${v.channel}] ${v.title}`),
+        timelineLen: (st.drilldown.timeline || []).length,
+        modules: st.drilldown.layout?.modules || [],
+        corroboration: st.meta?.corroboration || null,
+      })),
+      signals: bundle.signals.map(s => ({ question: s.question, prob: s.prob, delta: s.delta })),
+    },
+  });
+  await persistTrace(redis, { result: { stories: stories.length, status: bundle.status.label, headlines: headlines.length } });
 }
 
 if (require.main === module) {
-  main().catch(e => { console.error('[build-intel] FATAL', e); process.exit(1); });
+  main().catch(async e => {
+    console.error('[build-intel] FATAL', e);
+    try {
+      traceStep('error', 'Run failed', { summary: e.message, detail: { stack: e.stack } });
+      await persistTrace(W.getRedis(), { error: { message: e.message, stack: e.stack } });
+    } catch {}
+    process.exit(1);
+  });
 }
 
 module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens };

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Intel Pipeline · Debug</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121724; --panel2:#1a2030; --bd:#232c40;
+    --bd2:#324158; --tx:#e6ebf5; --tx2:#9aa6bd; --tx3:#6b768c; --accent:#6c9fff;
+    --inputs:#3b82f6; --gate:#94a3b8; --sonnet:#14b8a6; --opus:#a855f7; --newsroom:#f59e0b;
+    --haiku:#22d3ee; --layout:#818cf8; --timeline:#4ade80; --video:#fb7185; --image:#c084fc;
+    --output:#10b981; --error:#ef4444;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:980px;margin:0 auto;padding:16px 14px 80px}
+  header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--bg) 70%,transparent);padding:10px 0 8px;display:flex;align-items:center;gap:10px}
+  header h1{font-size:15px;margin:0;font-weight:700;letter-spacing:.3px}
+  header .sub{color:var(--tx3);font-size:12px}
+  .btn{background:var(--panel2);border:1px solid var(--bd);color:var(--tx2);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer}
+  .btn:hover{border-color:var(--bd2);color:var(--tx)}
+  .spacer{flex:1}
+
+  /* run list */
+  .run{display:block;background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin:10px 0;cursor:pointer;transition:border-color .15s,transform .05s}
+  .run:hover{border-color:var(--accent)}
+  .run:active{transform:scale(.997)}
+  .run .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .run .when{font-weight:600}
+  .run .rel{color:var(--tx3);font-size:12px}
+  .run .meta{margin-top:6px;color:var(--tx2);font-size:12.5px;display:flex;gap:14px;flex-wrap:wrap}
+  .run .meta b{color:var(--tx);font-weight:600}
+  .badge{font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:999px;text-transform:uppercase}
+  .b-ok{background:rgba(16,185,129,.16);color:#34d399}
+  .b-err{background:rgba(239,68,68,.16);color:#f87171}
+  .b-reuse{background:rgba(148,163,184,.16);color:#cbd5e1}
+  .b-force{background:rgba(108,159,255,.16);color:#93b4ff}
+
+  /* detail */
+  .runhead{background:var(--panel);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin:10px 0}
+  .runhead .kv{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--tx2);font-size:12.5px;margin-top:6px}
+  .runhead .kv b{color:var(--tx)}
+  .step{border:1px solid var(--bd);border-left-width:3px;border-radius:10px;margin:8px 0;background:var(--panel);overflow:hidden}
+  .step>.sh{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer}
+  .step>.sh:hover{background:var(--panel2)}
+  .chip{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:2px 7px;border-radius:6px;flex-shrink:0;min-width:74px;text-align:center}
+  .st-title{font-weight:600;flex-shrink:0}
+  .st-sum{color:var(--tx2);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+  .st-time{color:var(--tx3);font-size:11px;flex-shrink:0;font-variant-numeric:tabular-nums}
+  .st-body{padding:4px 12px 12px;border-top:1px solid var(--bd);display:none}
+  .step.open>.st-body{display:block}
+  .modelmeta{display:flex;gap:14px;flex-wrap:wrap;color:var(--tx3);font-size:11.5px;margin:8px 0}
+  .modelmeta b{color:var(--tx2)}
+
+  /* collapsible detail keys */
+  .field{margin:8px 0;border:1px solid var(--bd);border-radius:8px;background:var(--panel2)}
+  .field>.fh{display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12.5px}
+  .field>.fh:hover{color:var(--tx)}
+  .field>.fh .k{font-weight:700;color:var(--tx)}
+  .field>.fh .sz{color:var(--tx3);font-size:11px}
+  .field>.fb{display:none;padding:0 10px 10px}
+  .field.open>.fb{display:block}
+  .caret{transition:transform .12s;color:var(--tx3);font-size:10px}
+  .field.open .caret,.step.open .caret{transform:rotate(90deg)}
+  pre{white-space:pre-wrap;word-break:break-word;background:#0a0d13;border:1px solid var(--bd);border-radius:7px;padding:10px;margin:0;font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#cfd8ea;max-height:520px;overflow:auto}
+  table{border-collapse:collapse;width:100%;font-size:11.5px;display:block;overflow:auto;max-height:520px}
+  th,td{border:1px solid var(--bd);padding:4px 7px;text-align:left;vertical-align:top;white-space:pre-wrap;word-break:break-word}
+  th{position:sticky;top:0;background:var(--panel2);color:var(--tx2);font-weight:700}
+  td{color:var(--tx2)}
+  td.yes{color:#34d399;font-weight:700}
+  .mut{color:var(--tx3)}
+  .center{text-align:center;color:var(--tx3);padding:40px 0}
+  .gate{max-width:360px;margin:60px auto;text-align:center}
+  .gate input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--panel);color:var(--tx);font-size:14px;margin:10px 0}
+  .err{color:#f87171}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Intel Pipeline</h1>
+    <span class="sub" id="subtitle">cron runs</span>
+    <span class="spacer"></span>
+    <button class="btn" id="refreshBtn" style="display:none">↻ Refresh</button>
+    <button class="btn" id="backBtn" style="display:none">← Runs</button>
+  </header>
+  <div id="view"></div>
+</div>
+<script>
+const V = document.getElementById('view');
+const sub = document.getElementById('subtitle');
+const backBtn = document.getElementById('backBtn');
+const refreshBtn = document.getElementById('refreshBtn');
+const PHASES = ['inputs','gate','sonnet','opus','newsroom','haiku','layout','timeline','video','image','output','error'];
+
+// ---- token ----
+function getToken(){
+  const u = new URL(location.href);
+  const t = u.searchParams.get('token');
+  if (t){ localStorage.setItem('thinx_dbg_tk', t); u.searchParams.delete('token'); history.replaceState({}, '', u.pathname + u.search + u.hash); }
+  return localStorage.getItem('thinx_dbg_tk') || '';
+}
+async function api(pathStr){
+  const tk = getToken();
+  const r = await fetch('/api/tv/intel' + pathStr + (pathStr.includes('?')?'&':'?') + 'token=' + encodeURIComponent(tk));
+  if (r.status === 401 || r.status === 403){ const e = new Error('unauthorized'); e.auth = true; throw e; }
+  if (!r.ok){ throw new Error('HTTP ' + r.status); }
+  return r.json();
+}
+function tokenGate(msg){
+  refreshBtn.style.display = backBtn.style.display = 'none';
+  V.innerHTML = '<div class="gate"><div>'+(msg||'Enter the debug token to view pipeline runs.')+'</div>'+
+    '<input id="tkin" type="password" placeholder="debug token" autocomplete="off">'+
+    '<button class="btn" id="tkgo" style="width:100%">View runs</button></div>';
+  document.getElementById('tkgo').onclick = ()=>{ const v=document.getElementById('tkin').value.trim(); if(v){ localStorage.setItem('thinx_dbg_tk', v); route(); } };
+  document.getElementById('tkin').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('tkgo').click(); });
+}
+
+// ---- helpers ----
+function esc(s){ return String(s).replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmtMs(ms){ if(ms==null) return ''; if(ms<1000) return ms+'ms'; return (ms/1000).toFixed(ms<10000?2:1)+'s'; }
+function rel(iso){
+  const d = Date.now() - Date.parse(iso); if(!isFinite(d)) return '';
+  const m = Math.round(d/60000); if(m<1) return 'just now'; if(m<60) return m+'m ago';
+  const h = Math.round(m/60); if(h<48) return h+'h ago'; return Math.round(h/24)+'d ago';
+}
+function fmtTime(iso){ try{ return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}); }catch{ return iso; } }
+function sizeHint(v){
+  if (typeof v === 'string') return (v.length>800? (v.length/1000).toFixed(1)+'k chars' : v.length+' chars');
+  if (Array.isArray(v)) return v.length+' item'+(v.length===1?'':'s');
+  if (v && typeof v==='object') return Object.keys(v).length+' fields';
+  return '';
+}
+
+// ---- list view ----
+async function showList(){
+  sub.textContent = 'cron runs';
+  backBtn.style.display = 'none'; refreshBtn.style.display = '';
+  refreshBtn.onclick = showList;
+  V.innerHTML = '<div class="center">Loading runs…</div>';
+  let data;
+  try { data = await api('/runs'); }
+  catch(e){ if(e.auth) return tokenGate(); return V.innerHTML = '<div class="center err">'+esc(e.message)+'</div>'; }
+  const runs = data.runs || [];
+  if (!runs.length){ V.innerHTML = '<div class="center">No runs recorded yet.<br><span class="mut">The hourly intel cron writes a trace each run.</span></div>'; return; }
+  V.innerHTML = runs.map(r=>{
+    const badges = [
+      r.ok ? '<span class="badge b-ok">ok</span>' : '<span class="badge b-err">error</span>',
+      r.reused ? '<span class="badge b-reuse">reused</span>' : '',
+      r.forced ? '<span class="badge b-force">forced</span>' : '',
+    ].join('');
+    return '<div class="run" data-id="'+esc(r.runId)+'">'+
+      '<div class="top">'+badges+'<span class="when">'+esc(fmtTime(r.startedAt))+'</span><span class="rel">'+esc(rel(r.startedAt))+'</span></div>'+
+      '<div class="meta">'+
+        '<span><b>'+(r.stories||0)+'</b> stories</span>'+
+        '<span><b>'+(r.headlines||0)+'</b> headlines</span>'+
+        '<span><b>'+(r.steps||0)+'</b> steps</span>'+
+        '<span><b>'+fmtMs(r.durationMs)+'</b></span>'+
+        (r.status?'<span class="mut">'+esc(r.status)+'</span>':'')+
+        (r.error?'<span class="err">'+esc(r.error)+'</span>':'')+
+      '</div></div>';
+  }).join('');
+  V.querySelectorAll('.run').forEach(el=> el.onclick = ()=>{ location.hash = '#/run/'+el.dataset.id; });
+}
+
+// ---- detail view ----
+function renderValue(v){
+  if (v == null) return '<span class="mut">null</span>';
+  if (typeof v === 'string') return '<pre>'+esc(v)+'</pre>';
+  if (Array.isArray(v) && v.length && v.every(x=>x && typeof x==='object' && !Array.isArray(x))){
+    const cols = []; v.forEach(o=>Object.keys(o).forEach(k=>{ if(!cols.includes(k)) cols.push(k); }));
+    const cap = cols.slice(0,12);
+    const cell = x => (x==null)?'' : (typeof x==='object'? JSON.stringify(x) : String(x));
+    return '<table><thead><tr>'+cap.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+
+      v.map(o=>'<tr>'+cap.map(c=>{ const val=cell(o[c]); const cls=(o[c]===true?' class="yes"':''); return '<td'+cls+'>'+esc(val)+'</td>'; }).join('')+'</tr>').join('')+
+      '</tbody></table>';
+  }
+  return '<pre>'+esc(JSON.stringify(v, null, 2))+'</pre>';
+}
+function field(key, val, openByDefault){
+  return '<div class="field'+(openByDefault?' open':'')+'">'+
+    '<div class="fh"><span class="caret">▶</span><span class="k">'+esc(key)+'</span><span class="sz">'+esc(sizeHint(val))+'</span></div>'+
+    '<div class="fb">'+renderValue(val)+'</div></div>';
+}
+function stepBody(s){
+  let html = '';
+  if (s.model || s.usage || s.ms!=null){
+    const u = s.usage||{};
+    html += '<div class="modelmeta">'+
+      (s.model?'<span>model <b>'+esc(s.model)+'</b></span>':'')+
+      (u.input_tokens!=null?'<span>in <b>'+u.input_tokens+'</b> tok</span>':'')+
+      (u.output_tokens!=null?'<span>out <b>'+u.output_tokens+'</b> tok</span>':'')+
+      (s.ms!=null?'<span>took <b>'+fmtMs(s.ms)+'</b></span>':'')+'</div>';
+  }
+  const d = s.detail||{};
+  const keys = Object.keys(d);
+  // Show prompt/response first; keep everything collapsed (compact first).
+  const order = ['prompt','response','sources','before','after','candidates','chosen','headlines','videos','spikes','stories','signals','reasons','stack'];
+  keys.sort((a,b)=>{ const ia=order.indexOf(a), ib=order.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib); });
+  for (const k of keys) html += field(k, d[k], false);
+  if (!keys.length && !html) html = '<div class="mut" style="padding:6px 0">No further detail.</div>';
+  return html;
+}
+async function showRun(id){
+  sub.textContent = 'run trace';
+  backBtn.style.display = ''; refreshBtn.style.display = 'none';
+  backBtn.onclick = ()=>{ location.hash = '#/'; };
+  V.innerHTML = '<div class="center">Loading run…</div>';
+  let t;
+  try { t = await api('/runs/'+encodeURIComponent(id)); }
+  catch(e){ if(e.auth) return tokenGate(); return V.innerHTML = '<div class="center err">'+esc(e.message)+'</div>'; }
+  const m = t.meta||{};
+  const models = m.models||{};
+  let head = '<div class="runhead">'+
+    '<div class="top" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+      (t.error?'<span class="badge b-err">error</span>':'<span class="badge b-ok">ok</span>')+
+      (t.reused?'<span class="badge b-reuse">reused</span>':'')+
+      (m.forced?'<span class="badge b-force">forced</span>':'')+
+      '<span class="when" style="font-weight:600">'+esc(fmtTime(t.startedAt))+'</span><span class="rel" style="color:var(--tx3)">'+esc(rel(t.startedAt))+'</span></div>'+
+    '<div class="kv">'+
+      '<span>duration <b>'+fmtMs(t.durationMs)+'</b></span>'+
+      '<span>steps <b>'+(t.steps||[]).length+'</b></span>'+
+      (m.scope?'<span>scope <b>'+esc(m.scope)+'</b></span>':'')+
+      (t.result&&t.result.status?'<span>status <b>'+esc(t.result.status)+'</b></span>':'')+
+      (models.opus?'<span>opus <b>'+esc(models.opus)+'</b></span>':'')+
+      (models.sonnet?'<span>sonnet <b>'+esc(models.sonnet)+'</b></span>':'')+
+      (models.newsroom?'<span>newsroom <b>'+esc(models.newsroom)+'</b></span>':'')+
+    '</div>'+
+    (t.error?'<div class="err" style="margin-top:8px">'+esc(t.error.message||t.error)+'</div>':'')+
+    '</div>';
+
+  const steps = (t.steps||[]).map(s=>{
+    const color = 'var(--'+(PHASES.includes(s.phase)?s.phase:'gate')+')';
+    return '<div class="step" style="border-left-color:'+color+'">'+
+      '<div class="sh">'+
+        '<span class="caret">▶</span>'+
+        '<span class="chip" style="background:'+color+'22;color:'+color+'">'+esc(s.phase)+'</span>'+
+        '<span class="st-title">'+esc(s.title)+'</span>'+
+        '<span class="st-sum">'+esc(s.summary||'')+'</span>'+
+        '<span class="st-time">+'+fmtMs(s.atMs)+'</span>'+
+      '</div>'+
+      '<div class="st-body">'+stepBody(s)+'</div>'+
+    '</div>';
+  }).join('');
+  V.innerHTML = head + steps;
+
+  // interactions: toggle steps and fields
+  V.querySelectorAll('.step > .sh').forEach(sh=> sh.onclick = ()=> sh.parentElement.classList.toggle('open'));
+  V.querySelectorAll('.field > .fh').forEach(fh=> fh.onclick = e=>{ e.stopPropagation(); fh.parentElement.classList.toggle('open'); });
+}
+
+// ---- router ----
+function route(){
+  const h = location.hash || '#/';
+  const mRun = h.match(/^#\/run\/(.+)$/);
+  if (mRun) showRun(decodeURIComponent(mRun[1]));
+  else showList();
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

@@ -1520,6 +1520,44 @@ app.get('/m', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm.html'));
 });
 
+// GET /m/debug — pipeline run viewer (lists each intel cron run; drill into the
+// whole flow with each model's prompt in / response out). The page shell is
+// public; its data API below is token-gated (war OR debug token).
+app.get('/m/debug', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'm-debug.html'));
+});
+
+// GET /api/tv/intel/runs — newest-first list of cron-run summaries (build-intel
+// writes a structured trace per run to Redis; see persistTrace there).
+app.get('/api/tv/intel/runs', requireEvalAuth, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (!r) return res.json({ runs: [], persistence: 'memory-only' });
+    const raw = await r.lrange('tv:war:intel:runs', 0, Number(req.query.limit || 50) - 1);
+    const runs = (raw || []).map(x => { try { return typeof x === 'string' ? JSON.parse(x) : x; } catch { return null; } }).filter(Boolean);
+    res.json({ runs, persistence: 'redis' });
+  } catch (err) {
+    logger.error('Intel', 'Failed to list runs', { error: err.message });
+    res.status(500).json({ error: 'Failed to list runs' });
+  }
+});
+
+// GET /api/tv/intel/runs/:runId — the full step-by-step trace for one run.
+app.get('/api/tv/intel/runs/:runId', requireEvalAuth, async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const r = await getRedis();
+    if (!r) return res.status(404).json({ error: 'No run store configured' });
+    const raw = await r.get(`tv:war:intel:run:${req.params.runId}`);
+    if (!raw) return res.status(404).json({ error: 'Run not found (expired or unknown id)' });
+    res.json(typeof raw === 'string' ? JSON.parse(raw) : raw);
+  } catch (err) {
+    logger.error('Intel', 'Failed to read run', { error: err.message });
+    res.status(500).json({ error: 'Failed to read run' });
+  }
+});
+
 // GET /api/tv/segments — the persistent "iceberg" of tracked segments (metadata +
 // curated image), filterable by the metadata contract. The home bundle (/intel) is
 // only the tip; this exposes the full queue so a client can build its own view.

@@ -320,6 +320,9 @@ curl 'https://www.thinx.fun/api/tv/briefing/context?token=thinx-debug-2026'
 
 A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.js`, which fetches RSS headlines + Polymarket spikes + videos, curates them (Sonnet proposer → Opus editor), and writes a finished bundle to Redis (`tv:war:intel:v1`). The TV reads it read-only via `GET /api/tv/intel`; the phone mirror is `/m` (`GET /api/tv/intel/public`, no token). A persistent "iceberg" of tracked stories lives in `tv:war:segments:v1` (`GET /api/tv/segments`).
 
+### Pipeline run viewer (`/m/debug`)
+Every `build-intel` run records a structured, human-readable **trace** of the whole flow and persists it to Redis (`tv:war:intel:run:<id>` full trace, `tv:war:intel:runs` newest-first summary list, 7-day TTL, capped at `INTEL_TRACE_KEEP`=50). The page at **`/m/debug`** lists each cron run (latest first) and drills into the sequence step by step — inputs (RSS / Polymarket spikes / videos), the novelty gate, and every model call's **prompt IN + parsed response OUT** (Sonnet propose → Opus decide → per-segment newsroom rewrite, layout, Haiku image query), plus the per-segment timeline gate and video-selection candidates. Compact summaries expand on click. Data API: `GET /api/tv/intel/runs` and `GET /api/tv/intel/runs/:id` (auth: war token **or** debug token `thinx-debug-2026`; the page accepts `?token=` and remembers it). Tracing is best-effort and never breaks a build.
+
 ### Triggering the intel builder manually (for agents)
 The builder normally runs on its hourly schedule. To force a run now — **the order an agent should try paths, with what works:**
 
