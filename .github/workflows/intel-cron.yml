@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '0 * * * *'   # every hour (top of the hour)
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force a full rebuild (bypass the novelty/reuse gate)'
+        required: false
+        default: 'false'
 
 concurrency:
   group: intel-builder
@@ -39,6 +44,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          # Manual "rebuild now": bypass the novelty/reuse gate so the run always
+          # re-curates (and exercises the full-text + web-search newsroom pass).
+          INTEL_FORCE: ${{ github.event.inputs.force == 'true' && '1' || '' }}
           # Optional overrides (sensible defaults are baked into the code):
           INTEL_SONNET: ${{ vars.INTEL_SONNET }}
           INTEL_OPUS: ${{ vars.INTEL_OPUS }}

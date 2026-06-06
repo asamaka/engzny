@@ -1668,6 +1668,39 @@ app.post('/api/tv/intel/eval/trigger', express.json({ limit: '16kb' }), requireE
   }
 });
 
+// POST /api/tv/intel/build/trigger — dispatch the intel-cron.yml builder via the
+// runtime's GITHUB_DISPATCH_TOKEN (actions:write only), so the feed can be rebuilt
+// on demand without holding a GitHub token. Body: {force:bool} bypasses the
+// novelty/reuse gate (always re-curates + runs the full-text newsroom pass).
+app.post('/api/tv/intel/build/trigger', express.json({ limit: '16kb' }), requireEvalAuth, async (req, res) => {
+  setCorsHeaders(res);
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  if (!token) return res.status(503).json({ error: 'GITHUB_DISPATCH_TOKEN not configured' });
+  const owner = process.env.IMPROVEMENT_REPO_OWNER || 'asamaka';
+  const repo = process.env.IMPROVEMENT_REPO_NAME || 'engzny';
+  const force = (req.body && req.body.force) ? 'true' : 'false';
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/intel-cron.yml/dispatches`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ref: 'main', inputs: { force } }),
+    });
+    if (!r.ok) {
+      const body = await r.text();
+      return res.status(502).json({ error: `GitHub dispatch ${r.status}`, detail: body.slice(0, 300) });
+    }
+    res.json({ ok: true, dispatched: 'intel-cron.yml', ref: 'main', force, at: new Date().toISOString() });
+  } catch (err) {
+    logger.error('IntelBuild', 'Dispatch failed', { error: err.message });
+    res.status(500).json({ error: 'Dispatch failed', detail: err.message });
+  }
+});
+
 // GET /api/img?u=<encoded image url> — caching proxy so the TV pulls story
 // images through thinx.fun (CDN-cached) instead of flaky upstream news CDNs.
 app.get('/api/img', async (req, res) => {
