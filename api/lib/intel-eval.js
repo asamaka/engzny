@@ -251,10 +251,15 @@ async function fetchRealityWebSearch({ atISO, scope = NT.activeScope(), model = 
 
 // Worldview via Gemini Flash + Google Search grounding — the "standard search that
 // surfaces major stories well". Cheap/fast; citations backfill any missing sources.
-async function fetchRealityGemini({ atISO, scope = NT.activeScope(), topK = 10, maxTokens = 6000, gemini = getGemini() } = {}) {
+async function fetchRealityGemini({ atISO, scope = NT.activeScope(), topK = 10, maxTokens = 8192, gemini = getGemini() } = {}) {
   if (!gemini) throw new Error('GEMINI_API_KEY not set (gemini worldview)');
-  const out = await gemini.generateTextWithGrounding({ prompt: realityPrompt(NT.scopeBrief(scope), atISO, topK), maxTokens });
-  const r = extractJson(out.text || '');
+  const prompt = realityPrompt(NT.scopeBrief(scope), atISO, topK) + '\n\nOutput ONLY the minified JSON object — no markdown, no commentary, no trailing notes.';
+  // thinkingBudget:0 stops 2.5-Flash from spending the output budget on "thinking"
+  // (which was returning empty/truncated text); the larger budget fits 10 items.
+  const out = await gemini.generateTextWithGrounding({ prompt, maxTokens, thinkingBudget: 0 });
+  let r;
+  try { r = extractJson(out.text || ''); }
+  catch (e) { throw new Error(`gemini worldview unparseable (textLen=${(out.text || '').length}, finish=${out.stopReason}): ${e.message}`); }
   const cites = out.citations || [];
   const topHeadlines = (Array.isArray(r.topHeadlines) ? r.topHeadlines.slice(0, topK + 4) : []).map(h => ({
     ...h, sources: (Array.isArray(h.sources) && h.sources.length) ? h.sources : cites.slice(0, 3),
@@ -367,9 +372,14 @@ Return ONLY JSON (no prose, no fences):
 async function buildReality({ atISO, scope, provider = GT_PROVIDER, gtOpts = {} }) {
   const wantGemini = (provider === 'both' || provider === 'gemini') && !!getGemini();
   const wantOpus = provider === 'both' || provider === 'opus' || !wantGemini; // ensure at least one source
+  // The second worldview is an INDEPENDENT web search for cross-checking, not a
+  // judgment — so it uses the faster GT_MODEL (Sonnet) by default, which keeps the
+  // parallel `both` pass inside Vercel's 120s budget and reserves Opus for judging.
+  const searchModel = process.env.INTEL_EVAL_GT_MODEL || GT_MODEL;
+  const searchLabel = /opus/i.test(searchModel) ? 'opus' : 'sonnet';
   const tasks = [];
   if (wantGemini) tasks.push(fetchRealityGemini({ atISO, scope, ...gtOpts }).then(r => ({ ok: true, r })).catch(e => ({ ok: false, provider: 'gemini', e })));
-  if (wantOpus) tasks.push(fetchRealityWebSearch({ atISO, scope, model: JUDGE_MODEL, provider: 'opus', ...gtOpts }).then(r => ({ ok: true, r })).catch(e => ({ ok: false, provider: 'opus', e })));
+  if (wantOpus) tasks.push(fetchRealityWebSearch({ atISO, scope, model: searchModel, provider: searchLabel, ...gtOpts }).then(r => ({ ok: true, r })).catch(e => ({ ok: false, provider: searchLabel, e })));
   const settled = await Promise.all(tasks);
   const lists = settled.filter(s => s.ok).map(s => s.r);
   if (!lists.length) throw new Error('all worldview providers failed: ' + settled.map(s => `${s.provider}:${s.e && s.e.message}`).join('; '));

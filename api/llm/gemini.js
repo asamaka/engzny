@@ -144,15 +144,20 @@ class GeminiAdapter extends LLMAdapter {
 
   /**
    * Text-only query with Google Search grounding.
+   * `thinkingBudget` (2.5 models): pass 0 to disable "thinking" so the output
+   * budget isn't consumed before the answer is emitted (important when the caller
+   * needs reliable structured output rather than empty/truncated text).
    */
-  async generateTextWithGrounding({ prompt, systemPrompt, maxTokens }) {
+  async generateTextWithGrounding({ prompt, systemPrompt, maxTokens, thinkingBudget }) {
+    const generationConfig = {
+      temperature: 0.2,
+      maxOutputTokens: maxTokens || this.maxTokens,
+    };
+    if (thinkingBudget != null) generationConfig.thinkingConfig = { thinkingBudget };
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       tools: [{ google_search: {} }],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: maxTokens || this.maxTokens,
-      },
+      generationConfig,
     };
 
     if (systemPrompt) {
