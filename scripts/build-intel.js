@@ -20,6 +20,9 @@ const W = require('../api/lib/war-sources');
 const SONNET = process.env.INTEL_SONNET || 'claude-sonnet-4-5-20250929';
 const OPUS = process.env.INTEL_OPUS || 'claude-opus-4-6';
 const HAIKU = process.env.INTEL_HAIKU || 'claude-haiku-4-5-20251001';
+const NEWSROOM = process.env.INTEL_NEWSROOM || SONNET;                          // model for the full-text rewrite pass
+const ARTICLE_CHARS = Number(process.env.INTEL_ARTICLE_CHARS || 3000);          // per-source body length fed to the rewrite
+const WEBSEARCH_MAX = Number(process.env.INTEL_WEBSEARCH_MAX || 3);             // web_search uses per story (0 disables search)
 const REDIS_KEY = 'tv:war:intel:v1';
 const LAYOUT_PREFIX = 'tv:war:intel:layout:';
 const SEG_KEY = 'tv:war:segments:v1';            // persistent segment memory (the "iceberg")
@@ -71,6 +74,75 @@ async function callJson(model, maxTokens, prompt, opts = {}) {
   const r = await a.messages.create(params);
   const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
   return { json: extractJson(text), usage: r.usage };
+}
+
+// Like callJson, but with Anthropic server-side web_search enabled so the model
+// can corroborate claims live. web_search is a server tool — the API runs the
+// searches and returns the finished answer in one call (no client tool loop).
+async function callJsonWithSearch(model, maxTokens, prompt, maxUses = WEBSEARCH_MAX) {
+  const a = W.getAnthropic();
+  if (!a) throw new Error('ANTHROPIC_API_KEY not set');
+  const params = { model, max_tokens: maxTokens, messages: [{ role: 'user', content: prompt }] };
+  if (maxUses > 0) params.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: maxUses }];
+  const r = await a.messages.create(params);
+  const text = (r.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+  const searches = (r.content || []).filter(b => b.type === 'server_tool_use').length;
+  return { json: extractJson(text), usage: r.usage, searches };
+}
+
+// ---- Stage C — Newsroom rewrite: read the FULL articles + corroborate ------
+// The triage stages (Sonnet/Opus) work from headline strings, which is enough to
+// GROUP and SELECT stories but not enough to write an accurate headline/summary —
+// that's how a single state-media headline gets laundered into neutral "fact".
+// For each selected story we fetch its sources' full bodies and run one rewrite
+// pass WITH live web search, under strict attribution rules. Falls back to the
+// triage draft on any failure (missing key, blocked sources, etc.).
+async function newsroomRewrite(seg, sources, redis) {
+  const withBodies = await Promise.all((sources || []).map(async s => ({
+    ...s, body: await W.extractArticleText(s.link, { maxChars: ARTICLE_CHARS, redis }),
+  })));
+  const fetched = withBodies.filter(s => s.body).length;
+  const blocks = withBodies.map((s, i) =>
+    `[SOURCE ${i + 1}] ${s.outlet || '?'} (${s.category || 'n/a'} bloc)${s.publishedAt ? ', published ' + s.publishedAt : ''}\n`
+    + `headline: ${s.title}\nurl: ${s.link}\n`
+    + `full text: ${s.body || '(could not fetch — corroborate via web search)'}`
+  ).join('\n\n');
+
+  const prompt = `You are the senior newsroom editor for IRAN WATCH. Rewrite ONE story so its headline, brief, and summary are grounded in the FULL article text below and CORROBORATED with a live web search — not laundered from a single source's spin.
+
+NOW: ${new Date().toISOString()}
+
+CURRENT DRAFT (written from headline strings only — improve it):
+headline: ${seg.headline}
+brief: ${seg.brief || ''}
+
+SOURCE ARTICLES (${fetched}/${withBodies.length} full bodies fetched):
+${blocks}
+
+RULES — attribution is the whole point:
+1. Web-search the central facts (who said/did what, casualty figures, dates) against INDEPENDENT outlets before writing.
+2. A fact confirmed by 2+ independent outlets (different blocs) may be stated plainly. A claim found in only ONE source — especially state media (Press TV, Tehran Times) or any single partisan outlet — MUST be attributed in the prose ("Press TV reports…", "the IDF says…", "according to Iranian state media…"). NEVER restate one partisan source's framing ("humiliated enemy", "decisive victory") as neutral fact.
+3. If web search contradicts a source, prefer the corroborated version and flag the dispute. Do not fabricate; mark anything uncorroborated as unconfirmed.
+4. Lead the headline with the genuinely NEWEST, most significant development. Do NOT dress up a routine or anniversary statement as breaking news.
+5. Keep it tight and TV-ready. Ground everything in the bodies above + your web-search findings.
+
+Return ONLY JSON (no prose, no fences):
+{
+  "headline": "<=64 chars, editorial, ends with a period, leads with the newest development",
+  "brief": "<1-2 sentences, <=180 chars, attribution-aware>",
+  "aiSummary": "<3-5 sentences from the full text + corroboration; single-source claims attributed>",
+  "timeline": [ {"time":"<e.g. 'Thu 14:00' or 'NOW'>","cap":"<<=40 chars>","now":<bool>} ],
+  "corroboration": "high|mixed|single-source"
+}`;
+
+  try {
+    const { json, usage, searches } = await callJsonWithSearch(NEWSROOM, 2000, prompt);
+    log(`newsroom "${seg.id}": ${fetched}/${withBodies.length} bodies, ${searches} searches, corro=${json.corroboration || '?'} (tokens ${usage?.input_tokens}/${usage?.output_tokens})`);
+    return json;
+  } catch (e) {
+    log(`newsroom "${seg.id}" failed (${e.message}) — keeping triage draft`);
+    return null;
+  }
 }
 
 function dayCounter() {
@@ -637,6 +709,21 @@ async function main() {
         category: h.sourceCategory, link: h.link, image: (imgMap[h.link] && W.isLikelyPhoto(imgMap[h.link])) ? imgMap[h.link] : null,
       };
     });
+
+    // Newsroom rewrite: read the full source bodies + corroborate via web search,
+    // then replace the headline-only triage draft (and store the richer text in the
+    // registry below). Skipped with INTEL_NEWSROOM_OFF=1.
+    if (process.env.INTEL_NEWSROOM_OFF !== '1' && sources.length) {
+      const rw = await newsroomRewrite(seg, sources, redis);
+      if (rw) {
+        if (rw.headline) seg.headline = String(rw.headline).slice(0, 80);
+        if (rw.brief) seg.brief = rw.brief;
+        if (rw.aiSummary) seg.aiSummary = rw.aiSummary;
+        if (Array.isArray(rw.timeline) && rw.timeline.length) seg.timeline = rw.timeline;
+        if (rw.corroboration) seg.corroboration = rw.corroboration;
+      }
+    }
+
     // og candidate (Sonnet-picked photo, else first candidate) = freshest story-specific photo
     const cands = candsBySeg[si] || [];
     let ogImg = null;
@@ -682,6 +769,7 @@ async function main() {
         outletCount: rec.outletCount || 0,
         coveragePct: rec.coveragePct || 0,
         resurfaced: !!rec.resurfaced,
+        corroboration: seg.corroboration || null,   // high | mixed | single-source (newsroom web-search verdict)
         status: 'active',
       },
       // Honest freshness: a long-running story (Lebanon front, Hormuz) keeps the

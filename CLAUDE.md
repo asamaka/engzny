@@ -327,6 +327,15 @@ A scheduled GitHub Action (`intel-cron.yml`, hourly) runs `scripts/build-intel.j
 - A **breaking-fresh** headline (`INTEL_BREAKING_MIN`, default 45 min) bypasses the novelty gate's 75% token-dedup, so a new strike on a running story forces a rebuild instead of being swallowed as a near-duplicate.
 - The editor **re-titles** a reused segment to lead with the newest development (continuity of *id*, freshness of *headline*).
 - The displayed **freshness label is honest**: a long-running story with a recent source shows "updated <recent>" (`INTEL_FRESH_LABEL_MIN`, default 360 min) instead of "first reported 2 days ago".
+- **First-reported can't be back-dated by a stale grouped-in article.** `firstSeenSourceAt` is clamped to a grace window before the segment was first tracked (`INTEL_FIRST_REPORT_BACKDATE_DAYS`, default 3); this both heals records already poisoned by a months-old explainer and refuses new ones (the bug where a fresh Hebron story read "first reported 3mo ago").
+
+### Full-text grounding + corroboration (don't launder a single source's spin)
+The triage stages (Sonnet propose → Opus decide) work from **headline strings**, which is enough to GROUP and SELECT stories but *not* to write an accurate headline/summary — feeding the LLM only a 200-char RSS snippet is how a single state-media headline ("'humiliated' enemy…") got laundered into neutral "fact". So for each **selected** story, `build-intel.newsroomRewrite`:
+1. Fetches the chosen sources' **full article bodies** (`war-sources.extractArticleText`: regex `<p>`-extraction, Redis-cached, graceful null on a blocked/slow publisher → falls back to the RSS snippet).
+2. Runs **one rewrite pass with live `web_search`** that regenerates the headline / brief / `aiSummary` / timeline under strict **attribution rules**: a fact confirmed by 2+ independent blocs may be stated plainly; a claim in only one source (esp. state media) **must be attributed in the prose**, never asserted as neutral fact; lead with the newest development; don't dress up a routine/anniversary statement as breaking.
+3. Emits `meta.corroboration` (`high | mixed | single-source`).
+
+Fetches/searches scale with **what's actually shown** (the rewrite runs only on the curation path — the reuse gate skips it entirely), not the whole headline pool. Tune with `INTEL_ARTICLE_CHARS`, `INTEL_WEBSEARCH_MAX` (0 = bodies-only), `INTEL_NEWSROOM` (model); disable with `INTEL_NEWSROOM_OFF=1`.
 
 ### Accuracy harness — snapshot vs. reality (cross-checked, architecture-aware)
 `api/lib/intel-eval.js`:
@@ -365,6 +374,12 @@ Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the
 | `INTEL_BREAKING_MIN` | `45` | Headline age (min) that bypasses dedup and forces a rebuild |
 | `INTEL_FRESH_LABEL_MIN` | `360` | Newest-source age (min) under which a story shows "updated" not "first reported" |
 | `INTEL_MAX_REUSE_MS` | `1500000` | Hard cap (25 min) before the editorial is refreshed regardless |
+| `INTEL_NEWSROOM` | (Sonnet) | Model for the full-text + web-search rewrite pass |
+| `INTEL_NEWSROOM_OFF` | (unset) | Set to `1` to skip the newsroom rewrite (triage drafts only — no body fetch / web search) |
+| `INTEL_ARTICLE_CHARS` | `3000` | Per-source article-body length fed to the rewrite |
+| `INTEL_ARTICLE_TTL` | `259200` | Seconds to cache a fetched article body in Redis (3 days) |
+| `INTEL_ARTICLE_TIMEOUT_MS` | `8000` | Per-article fetch timeout |
+| `INTEL_WEBSEARCH_MAX` | `3` | `web_search` uses per story in the rewrite (`0` disables search, bodies-only) |
 | `INTEL_EVAL_STALE_H` | `24` | Hours after which a story counts as stale in the eval |
 | `INTEL_EVAL_FEED_URL` | (unset) | If set, the eval reads the feed from this URL (e.g. the `/m` public endpoint) instead of Redis/file |
 | `INTEL_EVAL_MATCH` | `0.34` | Token-overlap threshold to call a real event "covered" |

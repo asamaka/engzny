@@ -8,6 +8,7 @@
  * Polymarket market fetch (broad list + spike detection), og:image/Wikipedia
  * image resolver, and Open-Meteo weather. No dependency on api/index.js.
  */
+const crypto = require('crypto');
 const RssParser = require('rss-parser');
 const NT = require('./news-topics');   // structured scope/relevance config (no hard-coded keyword strings)
 
@@ -215,6 +216,59 @@ async function extractOgImage(url) {
     let img = m ? m[1] : null;
     if (img && img.startsWith('//')) img = 'https:' + img;
     return isGoodImage(img) ? img : null;
+  } catch { return null; }
+}
+
+// ---- full article-body extraction (so the curation LLM reads the STORY, not
+// just a 200-char RSS snippet). Cached in Redis (articles are immutable), with a
+// short timeout and a graceful null on any failure so a slow/blocked publisher
+// (e.g. Press TV) never breaks a run — callers fall back to the RSS description.
+function decodeEntities(s) {
+  return (s || '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;|&apos;|&rsquo;|&lsquo;/g, "'")
+    .replace(/&ldquo;|&rdquo;/g, '"').replace(/&nbsp;/g, ' ').replace(/&hellip;/g, '…')
+    .replace(/&mdash;/g, '—').replace(/&ndash;/g, '–')
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(+n); } catch { return ' '; } })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return ' '; } });
+}
+function htmlToText(html) {
+  const h = (html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ');
+  // Article bodies almost always live in <p> blocks; collecting those drops nav,
+  // captions, share widgets, and cookie banners without a DOM parser.
+  const paras = [];
+  const re = /<p\b[^>]*>([\s\S]*?)<\/p>/gi; let m;
+  while ((m = re.exec(h))) {
+    const t = decodeEntities(m[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+    if (t.length >= 40) paras.push(t);   // skip short nav/caption fragments
+  }
+  let text = paras.join('\n');
+  if (text.length < 200) text = decodeEntities(h.replace(/<[^>]+>/g, ' '));  // fallback: strip all tags
+  return text.replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+}
+async function extractArticleText(url, opts = {}) {
+  const maxChars = Number(opts.maxChars || process.env.INTEL_ARTICLE_CHARS || 3000);
+  if (!url || /news\.google\.com|google\.com\/rss/.test(url)) return null;  // redirect shells have no body
+  const redis = opts.redis || getRedis();
+  const key = 'tv:war:article:' + crypto.createHash('sha1').update(url).digest('hex').slice(0, 24);
+  if (redis) {
+    try { const c = await redis.get(key); if (c) { const o = typeof c === 'string' ? JSON.parse(c) : c; if (o && o.text) return o.text.slice(0, maxChars); } } catch {}
+  }
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), Number(process.env.INTEL_ARTICLE_TIMEOUT_MS || 8000));
+    const r = await fetch(url, { signal: ctrl.signal, redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ThinxTV/1.0)' } });
+    clearTimeout(t);
+    if (!r.ok) return null;
+    if (/news\.google\.com|consent\.google\.com/.test(r.url || '')) return null;  // landed on a consent/redirect shell
+    const text = htmlToText(await r.text()).slice(0, maxChars);
+    if (text.length < 200) return null;  // too thin to be a real body — let the caller fall back
+    if (redis) { try { await redis.set(key, JSON.stringify({ text, at: Date.now() }), { ex: Number(process.env.INTEL_ARTICLE_TTL || 3 * 86400) }); } catch {} }
+    return text;
   } catch { return null; }
 }
 
@@ -614,7 +668,7 @@ module.exports = {
   getRedis, getAnthropic, anthropicText, log,
   WAR_FEEDS, WAR_START_DATE, IRAN_FALLBACK, rssParser,
   filterIranWarRelevant, fetchWarHeadlines,
-  isGoodImage, isLikelyPhoto, extractOgImage, wikiImage, resolveStoryImage,
+  isGoodImage, isLikelyPhoto, extractOgImage, extractArticleText, htmlToText, wikiImage, resolveStoryImage,
   commonsPhoto, openversePhoto, searchPhoto,
   isMarketDateExpired, parseByDate, fetchWarMarkets,
   fetchMarketHistory, sparkFromHistory, measuredDelta, pickSpikeCandidates, enrichSpikesWithHistory,
