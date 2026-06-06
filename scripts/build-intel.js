@@ -97,6 +97,18 @@ async function callJsonWithSearch(model, maxTokens, prompt, maxUses = WEBSEARCH_
 // For each selected story we fetch its sources' full bodies and run one rewrite
 // pass WITH live web search, under strict attribution rules. Falls back to the
 // triage draft on any failure (missing key, blocked sources, etc.).
+// web_search makes the model emit inline citation tags (<cite index="3-5">…</cite>)
+// and bracketed footnote markers; those are display artifacts, not prose, and the
+// TV/phone render these fields as escaped text — strip them to clean prose.
+function stripCites(s) {
+  if (typeof s !== 'string') return s;
+  return s
+    .replace(/<\/?cite[^>]*>/gi, '')
+    .replace(/\s*\[(?:\d+[-,\d\s]*)\]/g, '')   // [3-5], [1, 2]
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 async function newsroomRewrite(seg, sources, redis) {
   const withBodies = await Promise.all((sources || []).map(async s => ({
     ...s, body: await W.extractArticleText(s.link, { maxChars: ARTICLE_CHARS, redis }),
@@ -125,6 +137,7 @@ RULES — attribution is the whole point:
 3. If web search contradicts a source, prefer the corroborated version and flag the dispute. Do not fabricate; mark anything uncorroborated as unconfirmed.
 4. Lead the headline with the genuinely NEWEST, most significant development. Do NOT dress up a routine or anniversary statement as breaking news.
 5. Keep it tight and TV-ready. Ground everything in the bodies above + your web-search findings.
+6. Output CLEAN PROSE only — do NOT put <cite> tags, citation markers, or bracketed footnotes ([1], [3-5]) inside any field; attribute in words instead ("Reuters reports…").
 
 Return ONLY JSON (no prose, no fences):
 {
@@ -716,10 +729,12 @@ async function main() {
     if (process.env.INTEL_NEWSROOM_OFF !== '1' && sources.length) {
       const rw = await newsroomRewrite(seg, sources, redis);
       if (rw) {
-        if (rw.headline) seg.headline = String(rw.headline).slice(0, 80);
-        if (rw.brief) seg.brief = rw.brief;
-        if (rw.aiSummary) seg.aiSummary = rw.aiSummary;
-        if (Array.isArray(rw.timeline) && rw.timeline.length) seg.timeline = rw.timeline;
+        if (rw.headline) seg.headline = stripCites(String(rw.headline)).slice(0, 80);
+        if (rw.brief) seg.brief = stripCites(rw.brief);
+        if (rw.aiSummary) seg.aiSummary = stripCites(rw.aiSummary);
+        if (Array.isArray(rw.timeline) && rw.timeline.length) {
+          seg.timeline = rw.timeline.map(t => ({ ...t, cap: stripCites(t.cap) }));
+        }
         if (rw.corroboration) seg.corroboration = rw.corroboration;
       }
     }
@@ -891,4 +906,8 @@ async function main() {
   await persist(bundle, redis);
 }
 
-main().catch(e => { console.error('[build-intel] FATAL', e); process.exit(1); });
+if (require.main === module) {
+  main().catch(e => { console.error('[build-intel] FATAL', e); process.exit(1); });
+}
+
+module.exports = { stripCites };
