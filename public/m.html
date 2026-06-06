@@ -310,9 +310,14 @@
     return arr.map(function(y,i){return (i*(w/(n-1))).toFixed(1)+','+(h-(y*(h/22))).toFixed(1);}).join(' ');}
 
   // ---------- clock + chrome ----------
+  // Relative "updated Xm ago" \u2014 timezone-proof (the raw ISO HH:MM read as UTC,
+  // not the viewer's local time). Re-ticked by clock() so it ages in place.
+  function updatedLbl(){ var g=genTime();
+    $('updLbl').textContent=(g!=null)?('updated '+timeAgo(Math.max(0,Date.now()-g))):''; }
   function clock(){ var d=new Date(),h=d.getHours(),m=d.getMinutes(),ap=h<12?'AM':'PM';h=h%12||12;
     var day=d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
-    $('clock').textContent=day+' \u00b7 '+h+':'+(m<10?'0':'')+m+' '+ap; }
+    $('clock').textContent=day+' \u00b7 '+h+':'+(m<10?'0':'')+m+' '+ap;
+    updatedLbl(); }
   function applyBreaking(intel){ var b=intel&&intel.breaking,show=false,txt='';
     if(b&&b.text){var at=Date.parse(b.at||'')||0,age=at?(Date.now()-at):Infinity;
       if(b.critical===true || (at && age>=0 && age<20*60000)){show=true;txt=(b.text||'').replace(/^\s*breaking\s*[:\-]?\s*/i,'');}}
@@ -322,7 +327,7 @@
     $('statusLbl').textContent=(intel.status&&intel.status.label)||'';
     var w=intel.weather;
     $('wx').innerHTML=(w&&w.tempC!=null)?((w.icon||'')+' '+w.tempC+'\u00b0 \u00b7 '):'';
-    $('updLbl').textContent=intel.generatedAt?('updated '+intel.generatedAt.substr(11,5)):'';
+    updatedLbl();
     $('storySrc').textContent=stories().length?(stories().length+' stories'):'';
     applyBreaking(intel);
   }

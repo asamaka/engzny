@@ -29,6 +29,13 @@ const MODULE_LIBRARY = ['summary', 'marketImpact', 'videos', 'sources', 'timelin
 const DORMANT_MS = Number(process.env.INTEL_DORMANT_MS || 3 * 3600 * 1000);   // off-screen this long => resurfacing
 const DEAD_DAYS = Number(process.env.INTEL_SEG_DEAD_DAYS || 7);               // no update this long => archived
 const REGISTRY_CAP = Number(process.env.INTEL_SEG_CAP || 80);                 // keep newest N segments
+// "first reported" must reflect when the STORY broke, not a stale background
+// article the editor happened to group in. A source dated more than this far
+// before we first started tracking the segment is treated as a mis-grouped
+// explainer/archive piece and is NOT allowed to back-date "first reported"
+// (that's how a fresh Hebron story showed "3mo ago"). Generous enough to honor
+// a story that genuinely broke a few days before we caught it.
+const FIRST_REPORT_BACKDATE_MS = Number(process.env.INTEL_FIRST_REPORT_BACKDATE_DAYS || 3) * 86400000;
 
 function log(...a) { console.error('[build-intel]', ...a); }
 
@@ -459,17 +466,28 @@ function mergeSegment(reg, seg, sources, now) {
   let rec = reg.segments[seg.id];
   let resurfaced = false;
   if (!rec) {
+    // Don't let a stale grouped-in article back-date "first reported" before we
+    // ever started tracking this story (minus a small grace for a real recent break).
+    const floor = now - FIRST_REPORT_BACKDATE_MS;
+    const oldest = sm.oldestAt ? Date.parse(sm.oldestAt) : now;
     rec = {
       id: seg.id, createdAt: nowISO, firstReportedAt: nowISO,
-      firstSeenSourceAt: sm.oldestAt || nowISO,
+      firstSeenSourceAt: new Date(Math.min(now, Math.max(floor, oldest))).toISOString(),
       updateCount: 0, sourceLinks: [], outlets: [], categories: [], shownCount: 0,
     };
     reg.segments[seg.id] = rec;
   } else {
     const lastShown = rec.lastShownAt ? Date.parse(rec.lastShownAt) : 0;
     resurfaced = isMajor && (!lastShown || (now - lastShown) > DORMANT_MS);
-    if (sm.oldestAt && (!rec.firstSeenSourceAt || Date.parse(sm.oldestAt) < Date.parse(rec.firstSeenSourceAt)))
-      rec.firstSeenSourceAt = sm.oldestAt; // keep the TRUE earliest first-report time
+    // The earliest a source may push "first reported" is a grace window before we
+    // first tracked the segment (createdAt). Heals records already poisoned by a
+    // months-old article, and refuses new ones, while keeping the true earliest
+    // time for legitimately long-running stories.
+    const floor = (rec.createdAt ? Date.parse(rec.createdAt) : now) - FIRST_REPORT_BACKDATE_MS;
+    const candidate = sm.oldestAt ? Math.max(floor, Date.parse(sm.oldestAt)) : null;
+    const current = rec.firstSeenSourceAt ? Date.parse(rec.firstSeenSourceAt) : Infinity;
+    const next = Math.max(floor, Math.min(current, candidate != null ? candidate : current));
+    rec.firstSeenSourceAt = new Date(next).toISOString(); // true earliest, clamped to the floor
   }
   rec.sourceLinks = [...new Set([...(rec.sourceLinks || []), ...sm.links])];
   rec.outlets = [...new Set([...(rec.outlets || []), ...sm.outlets])];
