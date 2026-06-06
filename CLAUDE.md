@@ -351,6 +351,14 @@ The triage stages (Sonnet propose → Opus decide) work from **headline strings*
 
 Fetches/searches scale with **what's actually shown** (the rewrite runs only on the curation path — the reuse gate skips it entirely), not the whole headline pool. Tune with `INTEL_ARTICLE_CHARS`, `INTEL_WEBSEARCH_MAX` (0 = bodies-only), `INTEL_NEWSROOM` (model); disable with `INTEL_NEWSROOM_OFF=1`.
 
+### Videos must COVER the story, not just be "relevant by nature"
+Everything on this wall is regionally relevant, so a plain keyword-overlap match (the old gate accepted any shared word) attached generic Iran/Israel/war footage to unrelated segments (a Lebanon humanitarian clip landed on the Iran-inflation story; the IAEA-blackout story carried only drone/radar clips). Two structural changes (`scripts/build-intel.js`, `war-sources.searchVideos`):
+1. **Targeted sourcing.** Beyond the 8 vetted broadcaster YouTube channels (`fetchWarVideos`), the builder runs a **keyless YouTube search for each segment's own headline** (`searchVideos` parses the results page's `ytInitialData`, drops hashtag-spam shorts, graceful `[]` on any failure). That's how a segment gets a clip that covers its *exact* story (Reuters "Iran fired seven ballistic missiles toward Kuwait, Bahrain"; CNN "Lebanon president's message to Iran") instead of generic regional footage.
+2. **A "covers-the-story" gate (deterministic, unit-tested).** A clip must share enough **distinctive** tokens with the segment — tokens that are NOT part of the scope's own "everything here is about this" vocabulary (the umbrella actor + universal actors/regions + editorial/attribution/war-action verbs, all **derived from `news-topics.js`**, so front-specific subjects like *iaea, hormuz, hezbollah, aoun* still identify a specific story). Bar is `INTEL_VIDEO_MIN_MATCH` (default 2). If nothing clears it, the on-topic **search hits** (about this headline by construction) fill in at ≥1 distinctive token; a pool clip covering *nothing* is never forced on. At a tie, the vetted broadcaster clip outranks an arbitrary search-channel one.
+
+### Timelines: only a genuine, EXACTLY-timestamped sequence
+Not every story is a sequence of events, and a timeline is meaningless without real times — yet the newsroom rewrite used to fabricate one for every story with vague buckets ("Fri evening", "Sat AM"). `sanitizeTimeline` (deterministic, unit-tested) now runs on the final `seg.timeline`: it keeps only entries stamped with a **concrete** time (a clock time `Fri 22:00`, or a specific date `Jun 4` / `Jun 13 2025`), drops vague/undatable buckets and restated steps, and if fewer than **2 concretely-timed historical points** survive it drops the timeline entirely (`[]`). The newsroom + editor prompts are aligned to this rule (exact times or `[]`; "most stories do NOT need a timeline"). On a real snapshot this kept the clock-stamped strike chronology and the dated IAEA chronology while dropping four vague ones.
+
 ### Accuracy harness — snapshot vs. reality (cross-checked, architecture-aware)
 `api/lib/intel-eval.js`:
 1. **Builds a reconciled worldview** — independent **top-10 headlines** from two providers in parallel (`INTEL_EVAL_GT_PROVIDER`, default `both`): **Gemini Flash + Google Search grounding** (the "standard search that surfaces major stories well", cheap/fast) and **Opus + web search**. They're reconciled: a story surfaced by **both** is `confidence:high`; by only one is `confidence:low` (a possible miss OR a single-source rumor — the judge weighs it gently and never asserts shaky claims). Each headline carries content summary + importance + first-report + sources + a photo suggestion.
@@ -394,6 +402,10 @@ Scheduled via `.github/workflows/intel-eval-cron.yml` (every 3h, offset from the
 | `INTEL_ARTICLE_TTL` | `259200` | Seconds to cache a fetched article body in Redis (3 days) |
 | `INTEL_ARTICLE_TIMEOUT_MS` | `8000` | Per-article fetch timeout |
 | `INTEL_WEBSEARCH_MAX` | `3` | `web_search` uses per story in the rewrite (`0` disables search, bodies-only) |
+| `INTEL_VIDEO_MIN_MATCH` | `2` | Min distinctive (non-scope-generic) tokens a clip must share to "cover" a segment |
+| `INTEL_VIDEO_SEARCH_OFF` | (unset) | Set to `1` to skip the per-segment targeted YouTube search (broadcaster pool only) |
+| `INTEL_VIDEO_SEARCH_AGE_DAYS` | `45` | Drop targeted-search clips older than this |
+| `INTEL_VIDEO_SEARCH_TIMEOUT_MS` | `8000` | Per-segment video-search fetch timeout |
 | `INTEL_EVAL_STALE_H` | `24` | Hours after which a story counts as stale in the eval |
 | `INTEL_EVAL_FEED_URL` | (unset) | If set, the eval reads the feed from this URL (e.g. the `/m` public endpoint) instead of Redis/file |
 | `INTEL_EVAL_MATCH` | `0.34` | Token-overlap threshold to call a real event "covered" |

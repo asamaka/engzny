@@ -627,6 +627,99 @@ async function fetchWarVideos() {
   }));
 }
 
+// ---------------------------------------------------------------- targeted video search (keyless)
+// The broadcaster-channel pull above only surfaces whatever those 8 channels
+// happened to upload recently, so a SPECIFIC story (the Aoun–Araghchi spat, the
+// IAEA board session) rarely has a clip that actually covers it — only generic
+// regional footage. To give every segment a clip that covers its EXACT story we
+// search YouTube directly for the segment's headline (no API key: we read the
+// public results page and parse its embedded ytInitialData JSON). Graceful: any
+// failure (network, consent wall, markup change) returns [] and the caller falls
+// back to the broadcaster pool.
+function extractYtInitialData(html) {
+  const i = html.indexOf('ytInitialData');
+  if (i < 0) return null;
+  const eq = html.indexOf('=', i);
+  if (eq < 0) return null;
+  let j = eq + 1;
+  while (j < html.length && html[j] !== '{') j++;
+  if (j >= html.length) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let k = j; k < html.length; k++) {
+    const c = html[k];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+    } else if (c === '"') inStr = true;
+    else if (c === '{') depth++;
+    else if (c === '}' && --depth === 0) {
+      try { return JSON.parse(html.slice(j, k + 1)); } catch { return null; }
+    }
+  }
+  return null;
+}
+// Recursively collect every value stored under `key` anywhere in the tree.
+function collectByKey(node, key, out = []) {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node)) { for (const v of node) collectByKey(v, key, out); return out; }
+  for (const [k, v] of Object.entries(node)) {
+    if (k === key) out.push(v);
+    if (v && typeof v === 'object') collectByKey(v, key, out);
+  }
+  return out;
+}
+// "3 days ago" / "2 hours ago" / "Streamed 1 week ago" -> approximate epoch ms.
+function parseRelativeAge(text) {
+  const m = String(text || '').match(/(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i);
+  if (!m) return null;
+  const mult = { second: 1e3, minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 }[m[2].toLowerCase()];
+  return mult ? Date.now() - Number(m[1]) * mult : null;
+}
+/** Keyless YouTube search for clips that cover a SPECIFIC story (a segment headline). */
+async function searchVideos(query, opts = {}) {
+  if (!query) return [];
+  const max = Number(opts.max || 6);
+  const maxAgeDays = Number(opts.maxAgeDays || process.env.INTEL_VIDEO_SEARCH_AGE_DAYS || 45);
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), Number(process.env.INTEL_VIDEO_SEARCH_TIMEOUT_MS || 8000));
+    const r = await fetch(`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`, {
+      signal: ctrl.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    clearTimeout(t);
+    if (!r.ok) return [];
+    const data = extractYtInitialData(await r.text());
+    if (!data) return [];
+    const seen = new Set(); const out = [];
+    for (const v of collectByKey(data, 'videoRenderer')) {
+      const videoId = v && v.videoId;
+      if (!videoId || seen.has(videoId)) continue;
+      const title = (v.title && v.title.runs && v.title.runs[0] && v.title.runs[0].text)
+        || (v.title && v.title.simpleText) || '';
+      if (!title) continue;
+      if ((title.match(/#/g) || []).length >= 3) continue;   // hashtag-spam shorts — never good TV clips
+      const channel = (v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].text)
+        || (v.longBylineText && v.longBylineText.runs && v.longBylineText.runs[0] && v.longBylineText.runs[0].text) || '';
+      const ts = parseRelativeAge(v.publishedTimeText && v.publishedTimeText.simpleText);
+      if (ts != null && (Date.now() - ts) / 86400000 > maxAgeDays) continue;
+      seen.add(videoId);
+      out.push({
+        videoId, title: title.trim(), channel: channel.trim(),
+        publishedAt: ts ? new Date(ts).toISOString() : null,
+        thumbnailUrl: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        searched: true,
+      });
+      if (out.length >= max) break;
+    }
+    return out;
+  } catch { return []; }
+}
+
 // ---------------------------------------------------------------- image candidate quality
 const LOGO_HINT = /(logo|favicon|sprite|placeholder|default|icon|avatar|wikipedia\.org\/.*Flag_of|\/Flag_|flag-|-flag|share[-_]?default|_default_|og-default)/i;
 const PHOTO_HOST = /(bbci\.co\.uk|guim\.co\.uk|media\.cnn|aljazeera|ytimg|reuters|france24|dw\.com|jpost|s\.yimg|hdnux|thgim|akamai|cloudfront|wp\.com|gettyimages|ahram)/i;
@@ -672,5 +765,5 @@ module.exports = {
   commonsPhoto, openversePhoto, searchPhoto,
   isMarketDateExpired, parseByDate, fetchWarMarkets,
   fetchMarketHistory, sparkFromHistory, measuredDelta, pickSpikeCandidates, enrichSpikesWithHistory,
-  fetchWarVideos, WAR_YT_CHANNELS, fetchWeather,
+  fetchWarVideos, searchVideos, WAR_YT_CHANNELS, fetchWeather,
 };

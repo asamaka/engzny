@@ -16,6 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
 const W = require('../api/lib/war-sources');
+const NT = require('../api/lib/news-topics');   // active scope → "relevant by nature" vocabulary
 
 const SONNET = process.env.INTEL_SONNET || 'claude-sonnet-4-5-20250929';
 const OPUS = process.env.INTEL_OPUS || 'claude-opus-4-6';
@@ -138,13 +139,14 @@ RULES — attribution is the whole point:
 4. Lead the headline with the genuinely NEWEST, most significant development. Do NOT dress up a routine or anniversary statement as breaking news.
 5. Keep it tight and TV-ready. Ground everything in the bodies above + your web-search findings.
 6. Output CLEAN PROSE only — do NOT put <cite> tags, citation markers, or bracketed footnotes ([1], [3-5]) inside any field; attribute in words instead ("Reuters reports…").
+7. timeline: ONLY if this story is a real multi-step chronology AND you know the EXACT time of each step — stamp each point with a clock time ("Thu 14:00") or a specific date ("Jun 4"), each a distinct event. If you'd have to approximate ("Thu evening", "recently") or you don't have datable steps, return an empty array []. Do not pad a single event into fake steps. Not every story needs a timeline.
 
 Return ONLY JSON (no prose, no fences):
 {
   "headline": "<=64 chars, editorial, ends with a period, leads with the newest development",
   "brief": "<1-2 sentences, <=180 chars, attribution-aware>",
   "aiSummary": "<3-5 sentences from the full text + corroboration; single-source claims attributed>",
-  "timeline": [ {"time":"<e.g. 'Thu 14:00' or 'NOW'>","cap":"<<=40 chars>","now":<bool>} ],
+  "timeline": [ {"time":"<EXACT: a clock time 'Thu 14:00' or a specific date 'Jun 4'>","cap":"<<=40 chars, a distinct event>","now":<bool>} ],
   "corroboration": "high|mixed|single-source"
 }`;
 
@@ -277,10 +279,10 @@ Rules (you have final say):
 - isMajorUpdate=true when a real new development has occurred since this story was last covered (a new strike, a new casualty count, a new diplomatic move); false only when it is the same information merely re-sourced or reworded with nothing new.
 - Do NOT manufacture breaking-ness: breakingIdx is for a genuinely fresh major item, not a reword. But DO keep the wall alive — a running story with a real new development today should lead with today's angle, not yesterday's headline.
 - Choose the segment set, titles, ordering, and the TOP sources per story. Prefer stories with a real new development (isMajorUpdate=true) or strong fresh sourcing. RETIRE a story that has had no genuinely new development in over a day to make room for a fresher distinct one when slots are contested — do not let the same 7 headlines sit unchanged for days.
-- videoIdxs: pick the clips that genuinely match the story (freshest, on-topic). [] if none fit — never force an unrelated clip.
+- videoIdxs: pick ONLY clips whose title COVERS this specific story (the same event/people/place) or directly supports its content — NOT clips that are merely about the same region or war (everything here is regionally relevant, so that bar is too low). [] if none truly cover it — never force an on-region-but-off-story clip (the builder also searches for matching clips, so [] is fine).
 - homeMarketIds: decide which prediction markets earn a spot on the home rail (most relevant to the lead stories).
 - breakingIdx: ONLY a headline younger than ~90 minutes describing a major new development; else null.
-- timeline: 3-5 points ONLY for a genuine multi-step chronology; else []. Last point now=true when ongoing.
+- timeline: include ONLY when the story is a genuine multi-step chronology AND you know WHEN each step happened. Give 3-5 points, each stamped with a CONCRETE time (a clock time like "Fri 22:00" or a specific date like "Jun 4"), each a DISTINCT event (never restate the headline as a step). If you'd have to write vague buckets ("Fri evening", "recently") or you don't have datable steps, return []. Most stories do NOT need a timeline. Last point now=true when ongoing.
 - severity: critical if active strikes/invasion/blockade; warning if fragile/strained; calm if stable.
 - Do not invent events. Distinct stories only. Ground every summary ONLY in the referenced headlines.`;
 
@@ -379,12 +381,88 @@ Return ONLY JSON mapping story index to chosen candidate index, e.g. {"0":2,"1":
   } catch (e) { log('image pick failed', e.message); return {}; }
 }
 
-function scoreVideoForSegment(v, seg) {
-  const text = (seg.headline + ' ' + seg.aiSummary).toLowerCase();
-  const words = new Set(text.replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 3));
-  const vt = (v.title || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/);
-  let hits = 0; for (const w of vt) if (words.has(w)) hits++;
+// ---- video relevance: COVERS the story, not just "relevant by nature" -------
+// Everything on this wall is regionally relevant, so plain keyword overlap (the
+// old gate accepted ANY shared word >3 chars) attached generic Iran/Israel/war
+// footage to unrelated segments — a Lebanon humanitarian clip landed on an Iran
+// inflation story. The fix: a clip must share DISTINCTIVE tokens — ones that are
+// NOT part of the scope's own "everything here is about this" vocabulary. The
+// generic set is DERIVED from the active scope's core front + editorial fillers
+// (no hard-coded keyword list), so front-specific subjects (iaea, hormuz, kuwait,
+// hezbollah, aoun) still count as distinctive and identify a specific story.
+const VIDEO_MIN_MATCH = Number(process.env.INTEL_VIDEO_MIN_MATCH || 2);
+const GENERIC_VIDEO_TOKENS = (() => {
+  const scope = NT.activeScope();
+  const core = (scope.topics && scope.topics[0] && scope.topics[0].keywords) || []; // the umbrella actor (iran…)
+  // Pervasive vocabulary that is "relevant by nature" on a conflict wall: the
+  // other universal actors/regions, editorial fillers, attribution verbs, and the
+  // generic war-action verbs that recur in nearly every headline. Sharing only
+  // these does NOT mean a clip covers a SPECIFIC story.
+  const universal =
+    'israel israeli america american war conflict crisis region regional gulf mideast middle east '
+    + 'news live breaking update latest report watch video shorts amid after over says said tell told '
+    + 'warn claim vow urge accuse reject deny strike struck attack fire hit launch shell raid '
+    + 'tension escalate';
+  return new Set([...core.flatMap(k => k.split(/\s+/)), ...universal.split(/\s+/)].map(normToken));
+})();
+// Light normalization so lebanese~lebanon, iranian~iran, strikes~strike unify.
+function normToken(w) {
+  const NORM = { lebanese: 'lebanon', iranian: 'iran', irans: 'iran', israeli: 'israel', americans: 'america', american: 'america' };
+  w = String(w || '').toLowerCase();
+  if (NORM[w]) return NORM[w];
+  return w.replace(/(ed|ing|s)$/, '');
+}
+function distinctiveTokens(text) {
+  const out = new Set();
+  for (const raw of String(text || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)) {
+    if (raw.length < 4) continue;
+    const w = normToken(raw);
+    if (!w || w.length < 3 || GENERIC_VIDEO_TOKENS.has(w)) continue;
+    out.add(w);
+  }
+  return out;
+}
+// How strongly a clip's TITLE covers a segment's specific story (count of shared
+// distinctive tokens). 0 = on-region-but-off-story (must not be forced on).
+function videoCoversSegment(v, seg) {
+  const segTok = distinctiveTokens((seg.headline || '') + ' ' + (seg.aiSummary || seg.brief || ''));
+  let hits = 0;
+  for (const w of distinctiveTokens(v.title)) if (segTok.has(w)) hits++;
   return hits;
+}
+function videoQueryFor(seg) {
+  return String(seg.headline || '').replace(/[.;|].*$/, '').replace(/["']/g, '').trim().slice(0, 90);
+}
+
+// ---- timeline: only a genuine, EXACTLY-timestamped multi-step chronology -----
+// Not every story is a sequence of events, and a timeline is meaningless without
+// real times. We keep entries stamped with a CONCRETE time (a clock time, or a
+// specific calendar date) and drop vague buckets ("Fri evening", "Sat AM",
+// "recently"). If fewer than 2 concretely-timed historical steps survive, the
+// story has no datable sequence and gets NO timeline (returns []).
+const TL_MONTHS = 'jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec';
+const TL_DATE_RE = new RegExp(`(?:${TL_MONTHS})[a-z]*\\.?\\s*\\d{1,2}|\\d{1,2}\\s*(?:${TL_MONTHS})|\\d{4}-\\d{2}-\\d{2}`, 'i');
+function isConcreteTime(t) {
+  const s = String(t || '').trim();
+  if (!s) return false;
+  if (/\d{1,2}:\d{2}/.test(s)) return true;   // a clock time, e.g. "Fri 22:00"
+  return TL_DATE_RE.test(s);                   // a specific date, e.g. "Jun 4", "Jun 13 2025"
+}
+function sanitizeTimeline(tl) {
+  if (!Array.isArray(tl)) return [];
+  const cleaned = []; const seen = new Set();
+  for (const e of tl) {
+    if (!e || !e.cap) continue;
+    const cap = String(e.cap).trim();
+    const key = cap.toLowerCase().slice(0, 40);
+    if (seen.has(key)) continue;   // drop a step that just restates an earlier one
+    const now = e.now === true || /^\s*now\s*$/i.test(String(e.time || ''));
+    if (!now && !isConcreteTime(e.time)) continue;   // drop vague/undated steps
+    seen.add(key);
+    cleaned.push({ time: now ? 'NOW' : String(e.time).trim(), cap, now });
+  }
+  if (cleaned.filter(e => !e.now).length < 2) return [];   // no real datable sequence
+  return cleaned.slice(0, 5);
 }
 
 // ---- persistence ------------------------------------------------------------
@@ -739,6 +817,11 @@ async function main() {
       }
     }
 
+    // Timeline discipline: a timeline only survives if it is a genuine multi-step
+    // chronology with CONCRETE timestamps — otherwise it is dropped here (so the
+    // registry, layout, and drilldown all agree there is no timeline).
+    seg.timeline = sanitizeTimeline(seg.timeline);
+
     // og candidate (Sonnet-picked photo, else first candidate) = freshest story-specific photo
     const cands = candsBySeg[si] || [];
     let ogImg = null;
@@ -753,18 +836,38 @@ async function main() {
     rec.image = await resolveSegmentImage(seg, rec, ogImg, !!seg.isMajorUpdate);
     rec.imageResolvedAt = new Date(NOW).toISOString();
 
-    // videos: Opus-chosen clips (videoIdxs into videosAll). Fall back to keyword
-    // matching only when Opus didn't choose — and never force an unrelated clip.
-    const toCard = v => ({ videoId: v.videoId, title: v.title, channel: v.channel, thumbnailUrl: v.thumbnailUrl, publishedAt: v.publishedAt });
-    const chosenVids = (seg.videoIdxs || []).map(i => videosAll[i]).filter(Boolean);
-    const vids = chosenVids.length
-      ? chosenVids.slice(0, 6).map(toCard)
-      : videosAll
-          .map(v => ({ v, s: scoreVideoForSegment(v, seg) }))
-          .filter(x => x.s > 0)
-          .sort((a, b) => b.s - a.s)
-          .slice(0, 6)
-          .map(x => toCard(x.v));
+    // videos: every segment should carry clips that COVER its specific story —
+    // not clips that are merely about the same region/war. Widen the candidate
+    // pool with a targeted keyless search for THIS headline, merge the editor's
+    // picks + the broadcaster pool, then keep only clips that share enough
+    // DISTINCTIVE tokens to actually cover the story (never forcing an off-story
+    // clip). If nothing clears the bar, fall back to the on-topic SEARCH hits
+    // (which are about this headline by construction) before giving up.
+    const toCard = v => ({
+      videoId: v.videoId, title: v.title, channel: v.channel,
+      thumbnailUrl: v.thumbnailUrl || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
+      publishedAt: v.publishedAt || null,
+    });
+    const searched = process.env.INTEL_VIDEO_SEARCH_OFF === '1'
+      ? [] : await W.searchVideos(videoQueryFor(seg), { max: 8 }).catch(() => []);
+    const opusPicked = (seg.videoIdxs || []).map(i => videosAll[i]).filter(Boolean);
+    const pool = []; const seenV = new Set();
+    for (const v of [...opusPicked, ...searched, ...videosAll]) {
+      if (!v || !v.videoId || seenV.has(v.videoId)) continue;
+      seenV.add(v.videoId); pool.push(v);
+    }
+    const scored = pool.map(v => ({ v, s: videoCoversSegment(v, seg) }));
+    let picks = scored.filter(x => x.s >= VIDEO_MIN_MATCH);
+    // Safety net so a segment isn't left blank: search hits are on-topic by
+    // construction (we searched THIS headline), so accept those sharing >=1
+    // distinctive token. We still refuse a pool clip that covers nothing.
+    if (!picks.length) picks = scored.filter(x => x.s >= 1 && x.v.searched);
+    // Rank: strongest coverage first; at a tie prefer the VETTED broadcaster pool
+    // clip over an arbitrary search-channel one, then the fresher clip.
+    picks.sort((a, b) => b.s - a.s
+      || (a.v.searched === b.v.searched ? 0 : a.v.searched ? 1 : -1)
+      || (Date.parse(b.v.publishedAt || 0) - Date.parse(a.v.publishedAt || 0)));
+    const vids = picks.slice(0, 6).map(x => toCard(x.v));
 
     const linkedSpikes = (seg.marketIds || []).map(id => spikeById[id]).filter(Boolean);
     const layout = await designLayout(seg, redis, { hasMarket: linkedSpikes.length > 0, hasVideos: vids.length > 0 });
@@ -910,4 +1013,4 @@ if (require.main === module) {
   main().catch(e => { console.error('[build-intel] FATAL', e); process.exit(1); });
 }
 
-module.exports = { stripCites };
+module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens };
