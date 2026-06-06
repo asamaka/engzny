@@ -1608,10 +1608,11 @@ app.get('/api/tv/intel/eval', requireEvalAuth, async (req, res) => {
   }
 });
 
-// POST /api/tv/intel/eval — run an evaluation NOW against the current live bundle.
-// Establishes ground truth via a live web search, so it costs tokens + ~20-40s.
-// A tighter web-search budget keeps it inside the serverless window; the cron
-// script uses a wider budget. Pass {"reflect":false} to skip the Opus reflection.
+// POST /api/tv/intel/eval — run an evaluation NOW against the current live bundle,
+// inline on Vercel. The runtime has BOTH keys (GEMINI_API_KEY + ANTHROPIC_API_KEY),
+// so the full cross-checked worldview (Gemini grounding + Opus web search) runs
+// here with no GitHub secret needed; maxDuration is 120s (vercel.json), enough for
+// the `both` pass. Body: {"provider":"both|gemini|opus","reflect":bool,"maxUses":N}.
 app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireEvalAuth, async (req, res) => {
   setCorsHeaders(res);
   try {
@@ -1620,10 +1621,13 @@ app.post('/api/tv/intel/eval', express.json({ limit: '256kb' }), requireEvalAuth
     if (!bundle || !Array.isArray(bundle.stories) || !bundle.stories.length) {
       return res.status(404).json({ error: 'No intel bundle to evaluate' });
     }
-    const reflectEnabled = (req.body && req.body.reflect) !== false;
-    const report = await intelEval.scoreSnapshot({ bundle, reflectEnabled, gtOpts: { maxUses: 4 } });
+    const body = req.body || {};
+    const reflectEnabled = body.reflect !== false;
+    const provider = body.provider || undefined; // undefined -> module default (both)
+    const maxUses = Math.max(1, Math.min(8, Number(body.maxUses) || 5));
+    const report = await intelEval.scoreSnapshot({ bundle, reflectEnabled, provider, gtOpts: { maxUses } });
     const summary = await intelEval.saveReport(report);
-    logger.info('IntelEval', 'Evaluation complete', { composite: report.scores.composite, missed: (report.coverage.missed || []).length });
+    logger.info('IntelEval', 'Evaluation complete', { composite: report.scores.composite, providers: (report.models && report.models.worldview) || null });
     res.json({ ok: true, summary, report });
   } catch (err) {
     logger.error('IntelEval', 'Evaluation failed', { error: err.message });
