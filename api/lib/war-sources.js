@@ -164,9 +164,15 @@ async function filterIranWarRelevant(items, type) {
 }
 
 async function fetchWarHeadlines() {
+  const FEED_TIMEOUT_MS = Number(process.env.INTEL_FEED_TIMEOUT_MS || 9000);
   const results = await Promise.allSettled(WAR_FEEDS.map(async (feed) => {
     try {
-      const parsed = await rssParser.parseURL(feed.url);
+      // Hard timeout per feed so one slow/hanging host can never stall the run
+      // (belt-and-suspenders over rss-parser's own timeout). Failures -> [] below.
+      const parsed = await Promise.race([
+        rssParser.parseURL(feed.url),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('feed timeout')), FEED_TIMEOUT_MS)),
+      ]);
       return (parsed.items || []).map(item => ({
         feedId: feed.id, source: feed.name, sourceCategory: feed.category,
         title: (item.title || '').trim(), link: item.link || '',
