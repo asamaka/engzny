@@ -81,8 +81,8 @@ const WAR_FEEDS = [
   { id: 'dw', name: 'DW News', url: 'https://rss.dw.com/xml/rss-en-all', category: 'western', tier: 2, fronts: ['iran-core'] },
   // --- regional / state media (each bloc, for the editorial reserve) ---
   { id: 'aljazeera-me', name: 'Al Jazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'arab', tier: 2, fronts: ['levant', 'israel-gaza', 'iran-core'] },
-  { id: 'alarabiya', name: 'Al Arabiya', url: 'https://english.alarabiya.net/.mrss/en.xml', category: 'arab', tier: 2, fronts: ['gulf-hormuz', 'levant'] },
-  { id: 'naharnet', name: 'Naharnet', url: 'https://www.naharnet.com/rss/news', category: 'arab', tier: 3, fronts: ['levant'] },
+  { id: 'alarabiya', name: 'Al Arabiya', url: 'https://news.google.com/rss/search?q=site:alarabiya.net+(Iran+OR+Gulf+OR+Lebanon+OR+Hormuz)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 2, fronts: ['gulf-hormuz', 'levant'] },
+  { id: 'naharnet', name: 'Naharnet', url: 'https://news.google.com/rss/search?q=site:naharnet.com+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 3, fronts: ['levant'] },
   { id: 'egypt-indep', name: 'Egypt Independent', url: 'https://www.egyptindependent.com/feed/', category: 'arab', tier: 3, fronts: ['energy-fallout'] },
   { id: 'jpost', name: 'Jerusalem Post', url: 'https://www.jpost.com/rss/rssfeedsarabisraeliconflict.aspx', category: 'israeli', tier: 2, fronts: ['levant', 'israel-gaza'] },
   { id: 'toi', name: 'Times of Israel', url: 'https://www.timesofisrael.com/feed/', category: 'israeli', tier: 2, fronts: ['levant', 'israel-gaza', 'iran-core'] },
