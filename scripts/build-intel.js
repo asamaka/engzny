@@ -194,6 +194,7 @@ RULES — attribution is the whole point:
 5. Keep it tight and TV-ready. Ground everything in the bodies above + your web-search findings.
 6. Output CLEAN PROSE only — do NOT put <cite> tags, citation markers, or bracketed footnotes ([1], [3-5]) inside any field; attribute in words instead ("Reuters reports…").
 7. timeline: ONLY if this story is a real multi-step chronology AND you know the EXACT time of each step — stamp each point with a clock time ("Thu 14:00") or a specific date ("Jun 4"), each a distinct event. If you'd have to approximate ("Thu evening", "recently") or you don't have datable steps, return an empty array []. Do not pad a single event into fake steps. Not every story needs a timeline.
+8. latestDevelopmentHoursAgo: how many HOURS ago the most recent ACTUAL development in this story happened (a strike, a death toll, an announcement, a move) — judged from the article content + web search, NOT from when an article was published. A wire can RE-REPORT or analyze a days-old event today: if the missiles were fired Friday and today's coverage only recaps/analyzes them with nothing new, this is ~72, not ~1. Only use a small number when something genuinely NEW happened that recently. This is the story's true freshness.
 
 Return ONLY JSON (no prose, no fences):
 {
@@ -201,6 +202,7 @@ Return ONLY JSON (no prose, no fences):
   "brief": "<1-2 sentences, <=180 chars, attribution-aware>",
   "aiSummary": "<3-5 sentences from the full text + corroboration; single-source claims attributed>",
   "timeline": [ {"time":"<EXACT: a clock time 'Thu 14:00' or a specific date 'Jun 4'>","cap":"<<=40 chars, a distinct event>","now":<bool>} ],
+  "latestDevelopmentHoursAgo": <integer hours since the most recent REAL development (not an article's publish time)>,
   "corroboration": "high|mixed|single-source"
 }`;
 
@@ -754,6 +756,16 @@ function mergeSegment(reg, seg, sources, now) {
   rec.timeline = Array.isArray(seg.timeline) ? seg.timeline : (rec.timeline || []);
   rec.marketIds = (seg.marketIds || []).map(String);
   rec.newestSourceAt = sm.newestAt || rec.newestSourceAt || nowISO;
+  // Content-grounded freshness: the newsroom dates the most recent ACTUAL
+  // development (not an article's publish time). Recomputed each run, clamped to
+  // [first reported … now] so a recap can't make a Friday strike read as "1h ago".
+  if (Number.isFinite(seg.latestDevHoursAgo)) {
+    const floor = Date.parse(rec.firstSeenSourceAt || rec.firstReportedAt || nowISO);
+    const devAt = now - seg.latestDevHoursAgo * 3600000;
+    rec.latestDevelopmentAt = new Date(Math.min(now, Math.max(floor || 0, devAt))).toISOString();
+  } else if (!rec.latestDevelopmentAt) {
+    rec.latestDevelopmentAt = rec.firstSeenSourceAt || rec.firstReportedAt || nowISO;
+  }
   if (grew || isMajor) rec.latestUpdateAt = nowISO;
   if (isMajor) { rec.latestMajorUpdateAt = nowISO; rec.updateCount = (rec.updateCount || 0) + 1; }
   if (!rec.latestUpdateAt) rec.latestUpdateAt = nowISO;
@@ -937,6 +949,8 @@ async function main() {
           seg.timeline = rw.timeline.map(t => ({ ...t, cap: stripCites(t.cap) }));
         }
         if (rw.corroboration) seg.corroboration = rw.corroboration;
+        const h = Number(rw.latestDevelopmentHoursAgo);
+        if (Number.isFinite(h) && h >= 0) seg.latestDevHoursAgo = h;
       }
     }
 
@@ -1026,6 +1040,7 @@ async function main() {
       meta: {
         firstReportedAt: rec.firstSeenSourceAt || rec.firstReportedAt,
         newestSourceAt: rec.newestSourceAt || null,   // newest underlying source (true freshness signal)
+        latestDevelopmentAt: rec.latestDevelopmentAt || null,  // content-dated latest real development (drives order)
         latestUpdateAt: rec.latestUpdateAt,
         latestMajorUpdateAt: rec.latestMajorUpdateAt,
         updateCount: rec.updateCount || 0,
@@ -1036,20 +1051,27 @@ async function main() {
         corroboration: seg.corroboration || null,   // high | mixed | single-source (newsroom web-search verdict)
         status: 'active',
       },
-      // Honest freshness: a long-running story (Lebanon front, Hormuz) keeps the
-      // SAME segment for days for continuity, but if its newest source is recent
-      // it is NOT stale — show "updated <recent>" so a 4h-old development doesn't
-      // read as "first reported 2 days ago". Only genuinely quiet stories show
-      // their original first-reported time. firstReportedAt is always carried so
-      // the client can still show "tracking since …".
+      // Honest freshness, content-grounded: the PRIMARY age shown is the latest
+      // ACTUAL development (newsroom-dated from article content), NOT the newest
+      // article's publish time — so a Friday strike recapped 35m ago reads as the
+      // 3-day-old story it is, with the recent recap shown only as a secondary
+      // "updated" note. A genuinely advancing story (a new strike today) has a
+      // recent development time and stays fresh.
       freshness: (() => {
-        const newest = rec.newestSourceAt ? Date.parse(rec.newestSourceAt) : 0;
         const FRESH_LABEL_MS = Number(process.env.INTEL_FRESH_LABEL_MIN || 360) * 60000; // 6h
         const firstAt = rec.firstSeenSourceAt || rec.firstReportedAt;
-        if (rec.resurfaced || (newest && (NOW - newest) <= FRESH_LABEL_MS)) {
-          return { label: 'updated', at: rec.newestSourceAt || rec.latestMajorUpdateAt, firstReportedAt: firstAt };
-        }
-        return { label: 'first reported', at: firstAt, firstReportedAt: firstAt };
+        const devAt = rec.latestDevelopmentAt || firstAt;
+        const devMs = Date.parse(devAt) || 0;
+        const firstMs = Date.parse(firstAt) || 0;
+        const newest = rec.newestSourceAt ? Date.parse(rec.newestSourceAt) : 0;
+        // Secondary "updated" note: only when the newest SOURCE is fresh AND
+        // meaningfully more recent than the latest real development (a recap/
+        // follow-up on an older event). Otherwise null (no misleading note).
+        const updatedAt = (newest && (NOW - newest) <= FRESH_LABEL_MS && (newest - devMs) > 30 * 60000)
+          ? rec.newestSourceAt : null;
+        // 'latest update' when the story advanced past its first report; else 'first reported'.
+        const label = (devMs - firstMs) > 6 * 3600000 ? 'latest update' : 'first reported';
+        return { at: devAt, label, firstReportedAt: firstAt, latestDevelopmentAt: devAt, updatedAt };
       })(),
       drilldown: {
         layout,
@@ -1096,7 +1118,17 @@ async function main() {
     if (dropped.length) {
       console.log('[intel] dropped stale stories:', dropped.map(t => `${t.st.id}(${t.ad == null ? '?' : t.ad.toFixed(0) + 'd'})`).join(', '));
     }
-    chosen.sort((a, b) => a.i - b.i);
+    // Freshness-aware ORDER: lead with stories whose latest REAL development is
+    // most recent (content-dated), so a days-old strike that's only being recapped
+    // today drops below a story that genuinely broke/advanced in the last hours —
+    // Opus's importance order is the tiebreak WITHIN each freshness tier.
+    const devAgeH = (st) => {
+      const at = st.meta?.latestDevelopmentAt || st.meta?.firstReportedAt;
+      const ms = at ? Date.parse(at) : NaN;
+      return isNaN(ms) ? 1e6 : (nowMs - ms) / 3600000;
+    };
+    const tier = h => (h < 12 ? 0 : h < 36 ? 1 : h < 72 ? 2 : 3);   // <12h, <36h, <3d, older
+    chosen.sort((a, b) => (tier(devAgeH(a.st)) - tier(devAgeH(b.st))) || (a.i - b.i));
     stories.length = 0;
     stories.push(...chosen.map(t => t.st));
   }
@@ -1158,8 +1190,11 @@ async function main() {
     summary: `${stories.length} stories · ${bundle.signals.length} market signals · status "${bundle.status.label}" (${sev})${breaking ? ' · BREAKING' : ''}`,
     detail: {
       status: bundle.status, breaking,
-      stories: stories.map(st => ({
-        id: st.id, headline: st.headline,
+      stories: stories.map((st, rank) => ({
+        rank: rank + 1, id: st.id, headline: st.headline,
+        latestDevelopment: st.meta?.latestDevelopmentAt ? relAge(st.meta.latestDevelopmentAt) : '?',
+        firstReported: st.meta?.firstReportedAt ? relAge(st.meta.firstReportedAt) : '?',
+        freshnessLabel: st.freshness?.label, updated: st.freshness?.updatedAt ? relAge(st.freshness.updatedAt) : null,
         videos: (st.drilldown.videos || []).map(v => `[${v.channel}] ${v.title}`),
         timelineLen: (st.drilldown.timeline || []).length,
         modules: st.drilldown.layout?.modules || [],

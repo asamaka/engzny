@@ -82,6 +82,7 @@
     text-shadow:0 3px 18px rgba(0,0,0,.6);margin-bottom:8px}
   .scard .brief{font-size:13.5px;line-height:1.45;color:#c7cad2;max-height:58px;overflow:hidden}
   .scard .foot{margin-top:11px;display:flex;align-items:center;gap:8px;font-size:11px;color:#aeb2bb;font-weight:600}
+  .foot .upd{opacity:.6;font-weight:500}
 
   /* ---------- market rail ---------- */
   .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 16px 6px;margin:0 -16px;
@@ -308,6 +309,17 @@
     var meta=document.querySelector('meta[name=theme-color]'); if(meta)meta.setAttribute('content','#06080d'); }
   function sparkPts(arr,w,h){var n=arr.length;if(n<2)return '0,'+(h/2)+' '+w+','+(h/2);
     return arr.map(function(y,i){return (i*(w/(n-1))).toFixed(1)+','+(h-(y*(h/22))).toFixed(1);}).join(' ');}
+  // Footer freshness: PRIMARY age = the latest real development (content-dated by
+  // the pipeline), so an old strike reads as old; a recent recap shows only as a
+  // secondary "· updated Xm ago" note rather than masquerading as the story's age.
+  function freshFoot(st){
+    var f=st.freshness||{};
+    var first=f.at?(Date.now()-Date.parse(f.at)):storyFirstMs(st);
+    if(first==null||isNaN(first))return '';
+    var out=ageBadgeMs(first)+'<span>'+esc(f.label||'first reported')+'</span>';
+    if(f.updatedAt){var u=Date.now()-Date.parse(f.updatedAt);if(!isNaN(u))out+='<span class="upd"> · updated '+timeAgo(u)+'</span>';}
+    return out;
+  }
 
   // ---------- clock + chrome ----------
   // Relative "updated Xm ago" \u2014 timezone-proof (the raw ISO HH:MM read as UTC,
@@ -339,9 +351,6 @@
     else {
       var html='';
       for(var i=0;i<ss.length;i++){ var st=ss[i];
-        var first=st.freshness&&st.freshness.at?(Date.now()-Date.parse(st.freshness.at)):storyFirstMs(st);
-        if(isNaN(first))first=null;
-        var lbl=(st.freshness&&st.freshness.label)||'first reported';
         var hasPhoto=!!st.image;
         html+='<div class="scard'+(hasPhoto?'':' nophoto')+'" data-story="'+esc(st.id)+'">'
           +(hasPhoto?'<img class="ph" loading="lazy" src="'+esc(st.image)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'nophoto\')">':'')
@@ -349,7 +358,7 @@
           +(st.kicker?'<div class="kicker"><span class="ic">&#10022;</span>'+esc(st.kicker)+'</div>':'')
           +'<h2>'+esc(st.headline||'')+'</h2>'
           +(st.brief?'<div class="brief">'+esc(st.brief)+'</div>':'')
-          +'<div class="foot">'+(first!=null?ageBadgeMs(first)+'<span>'+esc(lbl)+'</span>':'')+'</div>'
+          +'<div class="foot">'+freshFoot(st)+'</div>'
           +'</div></div>';
       }
       $('feed').innerHTML=html;
@@ -397,9 +406,6 @@
     var d=st.drilldown||{};
     var L=d.layout||{modules:['summary']};
     var mods=(L.modules&&L.modules.length?L.modules:['summary']).slice();
-    var first=st.freshness&&st.freshness.at?(Date.now()-Date.parse(st.freshness.at)):storyFirstMs(st);
-    if(isNaN(first))first=null;
-    var lbl=(st.freshness&&st.freshness.label)||'first reported';
     var hasPhoto=!!st.image;
 
     var html='<button class="backbtn" data-back="1"><span class="a">&#9664;</span>STORIES</button>';
@@ -408,7 +414,7 @@
       +'<div class="scrim"></div><div class="body">'
       +(st.kicker?'<div class="kicker"><span class="ic">&#10022;</span>'+esc(st.kicker)+'</div>':'')
       +'<h1>'+esc(st.headline||'')+'</h1>'
-      +'<div class="foot">'+(first!=null?ageBadgeMs(first)+'<span>'+esc(lbl)+'</span>':'')+'</div>'
+      +'<div class="foot">'+freshFoot(st)+'</div>'
       +'</div></div>';
     html+='<div class="dbody">';
 
