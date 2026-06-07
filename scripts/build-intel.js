@@ -824,9 +824,15 @@ async function main() {
   log(`headlines=${headlines.length} markets=${markets.length} candidates=${candidates.length} spikes=${spikes.length} videos=${videosAll.length} weather=${weather ? weather.tempC + 'C' : 'n/a'}`);
 
   TRACE.inputs = { headlines: headlines.length, markets: markets.length, spikes: spikes.length, videos: videosAll.length };
+  const div = hRes.diversity || {};
+  const failing = hRes.failingSources || [];
+  const sourceCounts = hRes.sourceCounts || {};
+  TRACE.inputs.diversity = { ...div, failing };
+  if (failing.length) log(`source polling: ${failing.length} feed(s) returned nothing this run: ${failing.join(', ')}`);
   traceStep('inputs', 'Fetched live sources', {
-    summary: `${headlines.length} headlines · ${markets.length} markets · ${spikes.length} spikes · ${videosAll.length} videos · weather ${weather ? weather.tempC + '°C' : 'n/a'}`,
+    summary: `${headlines.length} headlines from ${div.outlets || '?'} outlets · ${div.feedsOk || '?'}/${div.feedsTotal || '?'} feeds OK${failing.length ? ` · ${failing.length} failing` : ''} · ${markets.length} markets · ${spikes.length} spikes · ${videosAll.length} videos`,
     detail: {
+      diversity: { outlets: div.outlets, feedsOk: div.feedsOk, feedsTotal: div.feedsTotal, perSourceCounts: sourceCounts, failingFeeds: failing, feedStatus: hRes.sourceStatus || {} },
       headlines: headlines.map(h => ({ source: h.source, bloc: h.sourceCategory, ageMin: h.ageMinutes, title: h.title, link: h.link })),
       spikes: spikes.map(s => ({ id: s.id, question: s.question, prob: s.prob, delta: s.delta, deltaColor: s.deltaColor })),
       videos: videosAll.map(v => ({ tier: v.tier, channel: v.channel, title: v.title, publishedAt: v.publishedAt })),

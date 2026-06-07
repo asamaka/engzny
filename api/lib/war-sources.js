@@ -88,6 +88,39 @@ const WAR_FEEDS = [
   { id: 'toi', name: 'Times of Israel', url: 'https://www.timesofisrael.com/feed/', category: 'israeli', tier: 2, fronts: ['levant', 'israel-gaza', 'iran-core'] },
   { id: 'presstv', name: 'Press TV', url: 'https://www.presstv.ir/rss.xml', category: 'iranian', tier: 3, fronts: ['iran-core'] },
   { id: 'tehrantimes', name: 'Tehran Times', url: 'https://www.tehrantimes.com/rss', category: 'iranian', tier: 3, fronts: ['iran-core', 'nuclear-diplomacy'] },
+
+  // --- diversity expansion: reliable Google-News site: feeds per outlet (GN is
+  // the most reliable fetch path) so no single state outlet (Press TV) dominates,
+  // plus a few week-window front queries that carry a full 7 days of context. ---
+  // western / wires
+  { id: 'gn-ap', name: 'AP', url: 'https://news.google.com/rss/search?q=site:apnews.com+(Iran+OR+Israel+OR+Lebanon+OR+Hezbollah)+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 1, fronts: ['iran-core', 'levant', 'israel-gaza'] },
+  { id: 'gn-npr', name: 'NPR', url: 'https://news.google.com/rss/search?q=site:npr.org+(Iran+OR+Israel+OR+Lebanon)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 2, fronts: ['iran-core', 'nuclear-diplomacy'] },
+  { id: 'gn-sky', name: 'Sky News', url: 'https://news.google.com/rss/search?q=site:news.sky.com+(Iran+OR+Israel+OR+Lebanon)+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 2, fronts: ['iran-core', 'levant'] },
+  { id: 'gn-bloomberg', name: 'Bloomberg', url: 'https://news.google.com/rss/search?q=site:bloomberg.com+(Iran+OR+Hormuz+OR+oil)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 2, fronts: ['energy-fallout', 'gulf-hormuz'] },
+  { id: 'gn-axios', name: 'Axios', url: 'https://news.google.com/rss/search?q=site:axios.com+(Iran+OR+Israel)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 2, fronts: ['nuclear-diplomacy', 'iran-core'] },
+  { id: 'gn-politico', name: 'Politico', url: 'https://news.google.com/rss/search?q=site:politico.com+(Iran+OR+Israel+OR+ceasefire)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'western', tier: 2, fronts: ['nuclear-diplomacy'] },
+  { id: 'gn-afp', name: 'AFP', url: 'https://news.google.com/rss/search?q=(site:barrons.com+OR+%22Agence+France-Presse%22)+Iran+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['iran-core', 'levant'] },
+  // arab bloc
+  { id: 'gn-almonitor', name: 'Al-Monitor', url: 'https://news.google.com/rss/search?q=site:al-monitor.com+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 2, fronts: ['iran-core', 'levant', 'gulf-hormuz'] },
+  { id: 'gn-mee', name: 'Middle East Eye', url: 'https://news.google.com/rss/search?q=site:middleeasteye.net+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 3, fronts: ['levant', 'israel-gaza'] },
+  { id: 'gn-thenational', name: 'The National', url: 'https://news.google.com/rss/search?q=site:thenationalnews.com+(Iran+OR+Gulf+OR+Lebanon)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 2, fronts: ['gulf-hormuz', 'levant'] },
+  { id: 'gn-arabnews', name: 'Arab News', url: 'https://news.google.com/rss/search?q=site:arabnews.com+(Iran+OR+Gulf+OR+Hormuz)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 2, fronts: ['gulf-hormuz'] },
+  { id: 'gn-lorient', name: "L'Orient Today", url: 'https://news.google.com/rss/search?q=site:lorientlejour.com+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 3, fronts: ['levant'] },
+  { id: 'gn-anadolu', name: 'Anadolu Agency', url: 'https://news.google.com/rss/search?q=site:aa.com.tr+(Iran+OR+Israel+OR+Lebanon)+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'arab', tier: 3, fronts: ['levant', 'iran-core'] },
+  // israeli bloc
+  { id: 'gn-haaretz', name: 'Haaretz', url: 'https://news.google.com/rss/search?q=site:haaretz.com+(Iran+OR+Lebanon+OR+Hezbollah)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'israeli', tier: 2, fronts: ['iran-core', 'levant'] },
+  { id: 'gn-i24', name: 'i24NEWS', url: 'https://news.google.com/rss/search?q=site:i24news.tv+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'israeli', tier: 3, fronts: ['levant', 'israel-gaza'] },
+  { id: 'gn-ynet', name: 'Ynetnews', url: 'https://news.google.com/rss/search?q=site:ynetnews.com+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'israeli', tier: 3, fronts: ['iran-core', 'israel-gaza'] },
+  // iranian / axis bloc (diversify beyond Press TV)
+  { id: 'gn-irna', name: 'IRNA', url: 'https://news.google.com/rss/search?q=site:en.irna.ir+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'iranian', tier: 3, fronts: ['iran-core', 'nuclear-diplomacy'] },
+  { id: 'gn-mehr', name: 'Mehr News', url: 'https://news.google.com/rss/search?q=site:en.mehrnews.com+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'iranian', tier: 3, fronts: ['iran-core'] },
+  { id: 'gn-almayadeen', name: 'Al Mayadeen', url: 'https://news.google.com/rss/search?q=site:english.almayadeen.net+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'iranian', tier: 3, fronts: ['levant', 'iran-core'] },
+  // week-window front queries (full 7-day context, per front)
+  { id: 'gn-nuclear-week', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Iran+nuclear+OR+IAEA+OR+enrichment+OR+Fordow)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['nuclear-diplomacy'] },
+  { id: 'gn-hormuz-week', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Strait+of+Hormuz+OR+Persian+Gulf+tanker+OR+Bandar+Abbas+OR+Kuwait+OR+Bahrain)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['gulf-hormuz'] },
+  { id: 'gn-energy-week', name: 'Google News', url: 'https://news.google.com/rss/search?q=(oil+price+Iran+OR+Brent+crude+Hormuz+OR+OPEC+Iran)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['energy-fallout'] },
+  { id: 'gn-gaza-week', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Gaza+OR+West+Bank)+Israel+strike+when:3d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['israel-gaza'] },
+  { id: 'gn-context-week', name: 'Google News', url: 'https://news.google.com/rss/search?q=(Iran+OR+Hezbollah+OR+Lebanon)+(war+OR+strike+OR+ceasefire)+when:7d&hl=en-US&gl=US&ceid=US:en', category: 'wire', tier: 1, fronts: ['iran-core', 'levant'] },
 ];
 
 // Editorial blocs that earn a reserved slice of the headline set (so the wall is
@@ -173,14 +206,37 @@ async function fetchWarHeadlines() {
   deduped.forEach(i => { i._ts = i.publishedAt ? new Date(i.publishedAt).getTime() : (now - 3600000); });
   deduped.sort((a, b) => b._ts - a._ts);
 
+  // Selection with a PER-SOURCE CAP so no single prolific outlet (e.g. Press TV)
+  // floods the set — diversity over volume. We (1) reserve a per-bloc slice for
+  // balance, then (2) fill by recency, both honoring the per-source cap.
+  const PER_SOURCE_CAP = Number(process.env.INTEL_PER_SOURCE_CAP || 4);
+  const BLOC_RESERVE = Number(process.env.INTEL_BLOC_RESERVE || 6);
+  const HEADLINE_CAP = Number(process.env.INTEL_HEADLINE_CAP || 60);
   const buckets = Object.fromEntries(SOURCE_BLOCS.map(b => [b, []]));
   for (const i of deduped) { if (buckets[i.sourceCategory]) buckets[i.sourceCategory].push(i); }
-  const reserved = [];
-  for (const items of Object.values(buckets)) reserved.push(...items.slice(0, 5));
-  const reservedIds = new Set(reserved.map(i => i.feedId + ':' + i.title));
-  const remaining = deduped.filter(i => !reservedIds.has(i.feedId + ':' + i.title));
-  const final = [...reserved, ...remaining].slice(0, 50);
+  const counts = {};                                   // per-source (outlet) tally
+  const final = []; const chosen = new Set();
+  const keyOf = i => (i.source || i.feedId || 'unknown');
+  const tryAdd = (i) => {
+    if (final.length >= HEADLINE_CAP) return false;
+    const id = i.feedId + ':' + i.title;
+    if (chosen.has(id)) return false;
+    const k = keyOf(i);
+    if ((counts[k] || 0) >= PER_SOURCE_CAP) return false;
+    counts[k] = (counts[k] || 0) + 1; chosen.add(id); final.push(i); return true;
+  };
+  for (const bloc of SOURCE_BLOCS) {                    // 1) per-bloc reserve (balanced)
+    let n = 0;
+    for (const i of (buckets[bloc] || [])) { if (n >= BLOC_RESERVE) break; if (tryAdd(i)) n++; }
+  }
+  for (const i of deduped) { if (final.length >= HEADLINE_CAP) break; tryAdd(i); }  // 2) fill by recency
   final.sort((a, b) => b._ts - a._ts);
+
+  // Diversity + polling-health signal so the pipeline (and /m/debug) can watch
+  // source spread and flag feeds that returned nothing this run.
+  const failing = Object.entries(sourceStatus).filter(([, s]) => s !== 'ok').map(([id]) => id);
+  const sourceCounts = {};
+  for (const i of final) sourceCounts[keyOf(i)] = (sourceCounts[keyOf(i)] || 0) + 1;
 
   return {
     headlines: final.map((item, i) => ({
@@ -189,7 +245,9 @@ async function fetchWarHeadlines() {
       publishedAt: item.publishedAt, imageUrl: item.imageUrl,
       ageMinutes: item._ts ? Math.round((now - item._ts) / 60000) : null,
     })),
-    sourceStatus, fetchedAt: new Date().toISOString(),
+    sourceStatus, sourceCounts, failingSources: failing,
+    diversity: { outlets: Object.keys(sourceCounts).length, feedsOk: WAR_FEEDS.length - failing.length, feedsTotal: WAR_FEEDS.length },
+    fetchedAt: new Date().toISOString(),
   };
 }
 
