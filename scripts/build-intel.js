@@ -164,11 +164,16 @@ function stripCites(s) {
     .trim();
 }
 
-async function newsroomRewrite(seg, sources, redis) {
+async function newsroomRewrite(seg, sources, redis, siblings) {
   const withBodies = await Promise.all((sources || []).map(async s => ({
     ...s, body: await W.extractArticleText(s.link, { maxChars: ARTICLE_CHARS, redis }),
   })));
   const fetched = withBodies.filter(s => s.body).length;
+  // Sibling segments shown alongside this one — the rewrite must keep THIS headline
+  // distinct from them instead of converging on the day's dominant macro-event.
+  const siblingBlock = (siblings || [])
+    .filter(s => s && s.headline)
+    .map(s => `- ${s.headline}${s.brief ? ` — ${s.brief}` : ''}`).join('\n');
   const blocks = withBodies.map((s, i) =>
     `[SOURCE ${i + 1}] ${s.outlet || '?'} (${s.category || 'n/a'} bloc)${s.publishedAt ? ', published ' + s.publishedAt : ''}\n`
     + `headline: ${s.title}\nurl: ${s.link}\n`
@@ -186,11 +191,14 @@ brief: ${seg.brief || ''}
 SOURCE ARTICLES (${fetched}/${withBodies.length} full bodies fetched):
 ${blocks}
 
+OTHER STORIES ALREADY ON THE WALL (sibling segments shown next to this one — your headline MUST be clearly DISTINCT from every one of them; never converge on the shared macro-event another segment already owns):
+${siblingBlock || '(none)'}
+
 RULES — attribution is the whole point:
 1. Web-search the central facts (who said/did what, casualty figures, dates) against INDEPENDENT outlets before writing.
 2. A fact confirmed by 2+ independent outlets (different blocs) may be stated plainly. A claim found in only ONE source — especially state media (Press TV, Tehran Times) or any single partisan outlet — MUST be attributed in the prose ("Press TV reports…", "the IDF says…", "according to Iranian state media…"). NEVER restate one partisan source's framing ("humiliated enemy", "decisive victory") as neutral fact.
 3. If web search contradicts a source, prefer the corroborated version and flag the dispute. Do not fabricate; mark anything uncorroborated as unconfirmed.
-4. Lead the headline with the genuinely NEWEST, most significant development. Do NOT dress up a routine or anniversary statement as breaking news.
+4. Lead the headline with the genuinely NEWEST development that is SPECIFIC TO THIS STORY — and make it clearly DISTINCT from the sibling stories above. When this story is one facet of a bigger event (its market reaction, an airspace closure, a shipping ban, a diplomatic response), lead with THIS facet's OWN angle (markets, airspace, Houthis, Trump), NOT the shared macro-event ("Israel, Iran trade strikes") that another segment already owns. Two stories on the wall must NEVER share the same lead clause. Do NOT dress up a routine or anniversary statement as breaking news.
 5. Keep it tight and TV-ready. Ground everything in the bodies above + your web-search findings.
 6. Output CLEAN PROSE only — do NOT put <cite> tags, citation markers, or bracketed footnotes ([1], [3-5]) inside any field; attribute in words instead ("Reuters reports…").
 7. timeline: ONLY if this story is a real multi-step chronology AND you know the EXACT time of each step — stamp each point with a clock time ("Thu 14:00") or a specific date ("Jun 4"), each a distinct event. If you'd have to approximate ("Thu evening", "recently") or you don't have datable steps, return an empty array []. Do not pad a single event into fake steps. Not every story needs a timeline.
@@ -345,6 +353,8 @@ Return ONLY JSON (no prose, no fences):
 
 Rules (you have final say):
 - CONTINUITY OF IDENTITY, FRESHNESS OF HEADLINE: If a cluster is the SAME underlying story as one in EXISTING SEGMENTS, you MUST reuse that segment's id (do not invent a new slug for it). BUT the headline must always describe the LATEST development — when isMajorUpdate=true, REWRITE the headline + brief to lead with what is newest (never keep a stale headline frozen across days just because the id is reused). Create a NEW id ONLY for a genuinely new, distinct development not already tracked.
+- NO PARALLEL DUPLICATES: never put two segments describing the SAME underlying event on the wall. EXISTING SEGMENTS is polluted with parallel ids that are really one story (several that all say "Israel and Iran trade strikes" / "Iran fires missiles at Israel"); when you find such a set, carry only the SINGLE strongest id and DROP the redundant ones — reusing an id is for continuity, NEVER a license to keep parallel copies of one event alive. Do not split one event into near-identical clusters either.
+- DISTINCT ANGLE PER SEGMENT: when several segments stem from one mega-event (the strike exchange PLUS its market reaction, airspace closures, shipping bans, diplomatic fallout), each segment's headline must lead with ITS OWN angle (markets, airspace, Houthis, Trump) — the shared strike exchange may be the lead of AT MOST ONE segment. If two of your segments would read as the same headline, merge them or drop the weaker.
 - isMajorUpdate=true when a real new development has occurred since this story was last covered (a new strike, a new casualty count, a new diplomatic move); false only when it is the same information merely re-sourced or reworded with nothing new.
 - Do NOT manufacture breaking-ness: breakingIdx is for a genuinely fresh major item, not a reword. But DO keep the wall alive — a running story with a real new development today should lead with today's angle, not yesterday's headline.
 - Choose the segment set, titles, ordering, and the TOP sources per story. Prefer stories with a real new development (isMajorUpdate=true) or strong fresh sourcing. RETIRE a story that has had no genuinely new development in over a day to make room for a fresher distinct one when slots are contested — do not let the same 7 headlines sit unchanged for days.
@@ -558,6 +568,47 @@ function sanitizeTimeline(tl) {
   }
   if (cleaned.filter(e => !e.now).length < 2) return [];   // no real datable sequence
   return cleaned.slice(0, 5);
+}
+
+// ---- final-headline de-dup (deterministic safety net) -----------------------
+// Even with sibling-aware rewrites, two segments can still surface with near-
+// identical headlines: the newsroom rewrite runs per-segment and, told to "lead
+// with the biggest development", can independently converge on the day's dominant
+// macro-event ("Israel, Iran trade strikes ..."). This is the last line of defense
+// — among the FINAL ordered stories it drops any whose headline reads as the SAME
+// story as an earlier (higher-priority) one, so the wall never shows two near-
+// identical titles even if the LLMs slip. Pure + unit-tested.
+const DEDUP_STOP = new Set(('the a an of to in on for and or with by from at is are be as was were has have had ' +
+  'after before amid over into out up down its their his her this that these those new latest live').split(/\s+/));
+function headlineTokens(h) {
+  return String(h || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)
+    .map(normToken).filter(w => w && w.length > 2 && !DEDUP_STOP.has(w));
+}
+// Two headlines read as "the same story" if they share the same LEADING sequence of
+// significant tokens (an identical lead clause — the precise signal that catches a
+// shared "Israel iran trade strike ..." opener) OR their token sets overlap heavily
+// (Jaccard — catches a reordered restatement of the same facts).
+function headlinesDuplicate(a, b, opts = {}) {
+  const ta = headlineTokens(a), tb = headlineTokens(b);
+  if (!ta.length || !tb.length) return false;
+  const prefixN = opts.prefix || 3;
+  let shared = 0;
+  for (let i = 0; i < Math.min(ta.length, tb.length); i++) { if (ta[i] === tb[i]) shared++; else break; }
+  if (shared >= prefixN) return true;
+  const A = new Set(ta), B = new Set(tb);
+  let inter = 0; for (const w of A) if (B.has(w)) inter++;
+  const jac = inter / (A.size + B.size - inter);
+  return jac >= (opts.jaccard || 0.6);
+}
+// Walk stories in display order; keep the first of any near-duplicate cluster, drop
+// the rest (lower-priority copies of the same event).
+function dedupeStories(stories, opts = {}) {
+  const kept = [], dropped = [];
+  for (const st of (stories || [])) {
+    if (kept.some(k => headlinesDuplicate(k.headline, st.headline, opts))) dropped.push(st);
+    else kept.push(st);
+  }
+  return { kept, dropped };
 }
 
 // ---- persistence ------------------------------------------------------------
@@ -940,7 +991,10 @@ async function main() {
     // then replace the headline-only triage draft (and store the richer text in the
     // registry below). Skipped with INTEL_NEWSROOM_OFF=1.
     if (process.env.INTEL_NEWSROOM_OFF !== '1' && sources.length) {
-      const rw = await newsroomRewrite(seg, sources, redis);
+      // Sibling-aware: hand the rewrite the OTHER segments' headlines so it keeps
+      // THIS one distinct instead of converging on the day's dominant macro-event.
+      const siblings = segments.filter((_, j) => j !== si).map(s => ({ id: s.id, headline: s.headline, brief: s.brief }));
+      const rw = await newsroomRewrite(seg, sources, redis, siblings);
       if (rw) {
         if (rw.headline) seg.headline = stripCites(String(rw.headline)).slice(0, 80);
         if (rw.brief) seg.brief = stripCites(rw.brief);
@@ -1133,6 +1187,26 @@ async function main() {
     stories.push(...chosen.map(t => t.st));
   }
 
+  // Final safety net: never show two stories that read as the same headline. The
+  // sibling-aware rewrite + Opus's de-dup rules prevent this upstream, but if the
+  // per-segment newsroom rewrites still converged on the day's macro-event, drop the
+  // lower-priority duplicate here so the wall is always visibly distinct.
+  {
+    const before = stories.length;
+    const { kept, dropped } = dedupeStories(stories, {
+      prefix: Number(process.env.INTEL_DEDUP_PREFIX || 3),
+      jaccard: Number(process.env.INTEL_DEDUP_JACCARD || 0.6),
+    });
+    if (dropped.length) {
+      log(`dedup: dropped ${dropped.length} near-duplicate headline(s): ` + dropped.map(s => `${s.id} "${s.headline}"`).join(' | '));
+      stories.length = 0; stories.push(...kept);
+    }
+    traceStep('dedup', `Headline de-dup — ${before} → ${stories.length}`, {
+      summary: dropped.length ? `dropped ${dropped.length}: ${dropped.map(s => s.id).join(', ')}` : 'all headlines distinct',
+      detail: { kept: kept.map(s => ({ id: s.id, headline: s.headline })), dropped: dropped.map(s => ({ id: s.id, headline: s.headline })) },
+    });
+  }
+
   // Reconcile registry status against what actually reached the screen, then persist
   // the segment memory (the iceberg) so the next run continues these stories.
   finalizeRegistry(registry, stories.map(s => s.id), NOW);
@@ -1217,4 +1291,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens };
+module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens, headlineTokens, headlinesDuplicate, dedupeStories };
