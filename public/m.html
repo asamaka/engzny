@@ -240,9 +240,17 @@
   .mbig .mp.g{color:var(--green)} .mbig .mp.r{color:var(--red)} .mbig .mp.a{color:var(--accent)}
   .mbig .md{font-size:18px;font-weight:800} .mbig .md.g{color:var(--green)} .mbig .md.r{color:var(--red)}
   .mbig .mby{font-size:13px;color:var(--faint);font-weight:600;width:100%}
-  .chartbox{background:#0c0e14;border:1px solid var(--line);border-radius:17px;padding:16px;margin-bottom:6px}
+  .chartbox{background:#0c0e14;border:1px solid var(--line);border-radius:17px;padding:14px 12px 10px;margin-bottom:6px}
   .chartbox svg{width:100%;height:auto;display:block}
   .chartfb{text-align:center;color:var(--faint);font-size:13px;padding:26px 0}
+  .mstats{display:flex;gap:8px;margin:2px 0 16px}
+  .mstat{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 11px;min-width:0}
+  .mstat .mk{display:block;font-size:9px;letter-spacing:1px;font-weight:800;color:var(--faint);margin-bottom:5px}
+  .mstat .mv{font-size:18px;font-weight:900;letter-spacing:-.5px;color:#eef0f4;white-space:nowrap}
+  .mstat .mv.g{color:var(--green)} .mstat .mv.r{color:var(--red)} .mstat .mv.a{color:var(--accent)}
+  .chartlegend{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:11.5px;color:var(--faint);font-weight:600}
+  .chartlegend .lgd{width:11px;height:11px;border-radius:3px;flex:none}
+  .chartlegend .rsv{margin-left:auto;color:#a9adb7}
   .relhead{font-size:14px;color:#dfe2e8;line-height:1.4;padding:11px 0;border-bottom:1px solid var(--line)}
   .relhead:last-child{border-bottom:none}
   .relhead .o{color:var(--faint);font-weight:700;font-size:12px;margin-right:7px}
@@ -508,6 +516,39 @@
 
   // ===== detail HTML =====
   function fmtDur(s){ s=Math.round(s); var m=Math.floor(s/60),ss=s%60; return m+':'+(ss<10?'0':'')+ss; }
+  function pctv(v){ return Math.round(v*100); }
+  // A proper labelled probability chart: y-axis % gridlines, a 7-day time axis,
+  // and current / high / low markers. History is 0..1 over the last week (60-min
+  // fidelity), so x spans 7d→now. Aspect-preserving viewBox (no stretch).
+  function marketChartSvg(hist,col){
+    var n=hist.length, W=344,H=200,padL=34,padR=14,padT=12,padB=26;
+    var pw=W-padL-padR, ph=H-padT-padB;
+    var lo=Math.min.apply(null,hist), hi=Math.max.apply(null,hist), rng=(hi-lo)||0.02;
+    var loP=lo-rng*0.14, hiP=hi+rng*0.14, rngP=(hiP-loP)||0.02;   // breathing room
+    var X=function(i){ return padL + (n>1? i/(n-1)*pw : pw/2); };
+    var Y=function(v){ return padT + (1-(v-loP)/rngP)*ph; };
+    var pts=[]; for(var i=0;i<n;i++) pts.push(X(i).toFixed(1)+','+Y(hist[i]).toFixed(1));
+    var base=(padT+ph).toFixed(1);
+    var area=pts.join(' ')+' '+X(n-1).toFixed(1)+','+base+' '+X(0).toFixed(1)+','+base;
+    // horizontal gridlines at real high / mid / low, labelled in %
+    var grid=[hi,(hi+lo)/2,lo], gsvg='';
+    for(var g=0;g<grid.length;g++){ var gv=grid[g],gy=Y(gv).toFixed(1);
+      gsvg+='<line x1="'+padL+'" y1="'+gy+'" x2="'+(W-padR)+'" y2="'+gy+'" stroke="#222631" stroke-width="1"/>'
+        +'<text x="'+(padL-6)+'" y="'+(Y(gv)+3.5).toFixed(1)+'" text-anchor="end" fill="#777b86" font-size="10.5">'+pctv(gv)+'%</text>'; }
+    var mid=(padL+(W-padR))/2;
+    var xlab='<text x="'+padL+'" y="'+(H-8)+'" text-anchor="start" fill="#777b86" font-size="10.5">7d ago</text>'
+      +'<text x="'+mid+'" y="'+(H-8)+'" text-anchor="middle" fill="#777b86" font-size="10.5">3d</text>'
+      +'<text x="'+(W-padR)+'" y="'+(H-8)+'" text-anchor="end" fill="#777b86" font-size="10.5">now</text>';
+    var hiI=hist.indexOf(hi), loI=hist.indexOf(lo), cx=X(n-1), cy=Y(hist[n-1]);
+    var marks='<circle cx="'+X(hiI).toFixed(1)+'" cy="'+Y(hi).toFixed(1)+'" r="2.8" fill="#7ee2a4"/>'
+      +'<circle cx="'+X(loI).toFixed(1)+'" cy="'+Y(lo).toFixed(1)+'" r="2.8" fill="#f08e86"/>';
+    var dot='<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="8" fill="none" stroke="'+col+'" stroke-opacity=".3" stroke-width="2"/>'
+      +'<circle cx="'+cx.toFixed(1)+'" cy="'+cy.toFixed(1)+'" r="4.5" fill="'+col+'"/>';
+    return '<svg viewBox="0 0 '+W+' '+H+'" style="font-family:Inter,system-ui,sans-serif">'
+      +gsvg+'<polygon points="'+area+'" fill="'+col+'1f"/>'
+      +'<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>'
+      +marks+dot+xlab+'</svg>';
+  }
   function moduleHtml(name,st,d){
     var L=d.layout||{};
     if(name==='summary') return '<div class="block aibox"><div class="blabel">&#10022; THE STORY</div><p class="lead-p">'+esc(d.aiSummary||st.brief||'')+'</p></div>';
@@ -575,13 +616,18 @@
       +'<span class="md '+(s.deltaColor==='red'?'r':'g')+'">'+(s.deltaColor==='red'?'▼ ':'▲ ')+esc(s.delta||'')+'</span>'
       +(s.byDate?'<span class="mby">'+esc(s.byDate)+'</span>':'')+'</div>';
     var hist=(s.history||[]).filter(function(x){return typeof x==='number';});
+    var col=(s.deltaColor==='red'?'#f0584e':(s.deltaColor==='green'?'#4ade80':'#f4b03e'));
     if(hist.length>=2){
-      var W=320,H=120,lo=Math.min.apply(null,hist),hi=Math.max.apply(null,hist),rg=(hi-lo)||0.02;
-      var pts=hist.map(function(p,i){return (i*(W/(hist.length-1))).toFixed(1)+','+(H-((p-lo)/rg)*H).toFixed(1);});
-      var area=pts.join(' ')+' '+W+','+H+' 0,'+H;
-      var col=(s.deltaColor==='red'?'#f0584e':'#4ade80');
-      html+='<div class="chartbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
-        +'<polygon points="'+area+'" fill="'+col+'22"/><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2.5"/></svg></div>';
+      var lo=Math.min.apply(null,hist),hi=Math.max.apply(null,hist),cur=hist[hist.length-1],first=hist[0];
+      var d7=Math.round((cur-first)*100);
+      html+='<div class="mstats">'
+        +'<div class="mstat"><span class="mk">7D HIGH</span><span class="mv">'+pctv(hi)+'%</span></div>'
+        +'<div class="mstat"><span class="mk">7D LOW</span><span class="mv">'+pctv(lo)+'%</span></div>'
+        +'<div class="mstat"><span class="mk">7D CHANGE</span><span class="mv '+(d7>0?'g':(d7<0?'r':''))+'">'+(d7>0?'+':'')+d7+' pts</span></div>'
+        +'</div>';
+      html+='<div class="chartbox">'+marketChartSvg(hist,col)+'</div>';
+      html+='<div class="chartlegend"><span class="lgd" style="background:'+col+'"></span>Yes probability · last 7 days'
+        +(s.byDate?'<span class="rsv">Resolves '+esc((s.byDate||'').replace(/^\s*by\s+/i,''))+'</span>':'')+'</div>';
     } else {
       html+='<div class="chartbox"><div class="chartfb">Price history builds as the market moves.</div></div>';
     }
