@@ -20,15 +20,34 @@
     --safeT:env(safe-area-inset-top,0px); --safeB:env(safe-area-inset-bottom,0px);
   }
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{background:var(--bg);color:var(--ink);
+  /* The whole app lives in a FIXED, CLIPPED shell that never scrolls or drags. The
+     page itself (html/body) is locked — this is what kills the "drag the canvas
+     sideways / feels like an iframe" behaviour: no element can extend past the
+     viewport, because the off-screen views are ABSOLUTE children of an
+     overflow-hidden fixed shell (fixed elements escape clipping; absolute ones do not). */
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
     font-family:'Inter','Helvetica Neue',Arial,sans-serif;-webkit-font-smoothing:antialiased;
-    overscroll-behavior-y:none;text-rendering:optimizeLegibility}
-  body{min-height:100vh;position:relative}
+    overscroll-behavior:none;text-rendering:optimizeLegibility;position:fixed;inset:0;width:100%}
   img{display:block}
   .hidden{display:none !important}
   button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
   a{color:inherit;text-decoration:none}
   ::selection{background:var(--accentSoft)}
+
+  #shell{position:fixed;inset:0;overflow:hidden;background:var(--bg);z-index:1}
+  /* every screen is a full-viewport, independently-scrolling layer */
+  .view{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;background:var(--bg)}
+  .view::-webkit-scrollbar{display:none}
+  #home{z-index:1}
+  .detail{z-index:3;transform:translateX(100%);pointer-events:none;
+    transition:transform .32s cubic-bezier(.32,.72,0,1);will-change:transform;touch-action:pan-y;
+    box-shadow:-18px 0 40px -20px rgba(0,0,0,.8)}
+  .detail.on{transform:translateX(0);pointer-events:auto}
+  .detail.drag{transition:none}          /* follow the finger during a back-swipe */
+  .scrimback{position:absolute;inset:0;z-index:2;background:#000;opacity:0;pointer-events:none;
+    transition:opacity .32s ease}        /* darkens home as a detail slides over it */
+  .scrimback.on{opacity:.5}
 
   /* ===== splash ===== */
   #splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(120% 80% at 50% 30%,#0c1018,#04060a);
@@ -50,8 +69,8 @@
   .toprow{display:flex;align-items:center;justify-content:space-between;gap:12px}
   .brand{font-size:15px;font-weight:300;letter-spacing:6px;color:#eef0f4;display:flex;align-items:center;gap:9px}
   .brand b{font-weight:900;color:var(--accent)}
-  .brand .day{font-size:9px;letter-spacing:1.5px;font-weight:700;color:var(--faint);
-    border:1px solid var(--line2);border-radius:5px;padding:2px 6px;letter-spacing:1px}
+  .brand .day{font-size:9px;letter-spacing:1px;font-weight:700;color:var(--faint);
+    border:1px solid var(--line2);border-radius:5px;padding:2px 6px}
   .topright{display:flex;align-items:center;gap:12px}
   .clock{font-size:11.5px;color:#c5c8d1;font-weight:600;text-align:right;white-space:nowrap;line-height:1.35}
   .clock .wx{color:#eef0f4}
@@ -77,7 +96,7 @@
   .breaking .bt{font-size:13px;color:#f6ddd9;font-weight:600;line-height:1.32}
 
   /* ===== generic chrome ===== */
-  .wrap{padding:6px 16px calc(var(--safeB) + 46px)}
+  .wrap{padding:6px 16px 8px}
   .sech{display:flex;align-items:center;gap:9px;margin:26px 2px 13px;font-size:11px;letter-spacing:2.5px;font-weight:800;color:#c5c8d1}
   .sech .ic{color:var(--accent);font-size:13px}
   .sech .src{color:var(--faint);font-size:10.5px;letter-spacing:.5px;font-weight:600;margin-left:auto;text-transform:none}
@@ -100,8 +119,7 @@
   .scard:active{transform:scale(.982)}
   .scard.in{animation:cardin .5s cubic-bezier(.2,.7,.3,1) both}
   @keyframes cardin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
-  .scard .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;
-    transform:scale(1.02);transition:transform .6s ease}
+  .scard .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;transform:scale(1.02)}
   .scard .scrim{position:absolute;inset:0;z-index:1;
     background:linear-gradient(177deg,rgba(6,8,13,.03) 0%,rgba(6,8,13,.32) 40%,rgba(6,8,13,.88) 100%)}
   .scard.nophoto{background:linear-gradient(135deg,#121a2c,#0a0e17)}
@@ -115,7 +133,6 @@
   .scard .foot{margin-top:12px;display:flex;align-items:center;gap:7px;font-size:11px;color:#a9adb7;font-weight:600;flex-wrap:wrap}
   .foot .lab{color:#a9adb7}
   .foot .upd{opacity:.62;font-weight:500}
-  /* lead (first) story — taller, larger headline */
   .scard.lead{min-height:300px;border-radius:22px}
   .scard.lead h2{font-size:31px;font-weight:900;line-height:1.04;letter-spacing:-.6px}
   .scard.lead .brief{font-size:14px;max-height:60px;-webkit-line-clamp:3}
@@ -125,7 +142,7 @@
   .leadkick::before{content:"";width:16px;height:1.5px;background:var(--accent)}
 
   /* ===== market rail ===== */
-  .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 16px 8px;margin:0 -16px;
+  .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 16px calc(var(--safeB) + 40px);
     -webkit-overflow-scrolling:touch}
   .rail::-webkit-scrollbar{display:none}
   .mcard{scroll-snap-align:start;flex:0 0 80%;max-width:300px;background:linear-gradient(180deg,var(--panel2),var(--panel));
@@ -143,10 +160,7 @@
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .quiet{color:var(--faint);font-size:13.5px;padding:14px 2px;line-height:1.5}
 
-  /* ===== detail panels ===== */
-  .detail{position:fixed;inset:0;z-index:40;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;
-    transform:translateX(100%);transition:transform .3s cubic-bezier(.32,.72,0,1);will-change:transform;visibility:hidden}
-  .detail.on{transform:translateX(0);visibility:visible}
+  /* ===== detail content ===== */
   .dhero{position:relative;min-height:330px;display:flex;align-items:flex-end}
   .dhero .ph{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
   .dhero .scrim{position:absolute;inset:0;z-index:1;
@@ -157,25 +171,24 @@
     text-shadow:0 3px 20px rgba(0,0,0,.7)}
   .dhero .foot{margin-top:15px;display:flex;align-items:center;gap:8px;font-size:12px;color:#cfd2d9;font-weight:600;flex-wrap:wrap}
 
-  /* sticky reading header (back + condensed title revealed on scroll) */
   .dbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:11px;
-    padding:calc(var(--safeT) + 11px) 14px 11px;
-    background:linear-gradient(180deg,rgba(6,8,13,0),rgba(6,8,13,0));transition:background .25s,backdrop-filter .25s}
-  .dbar.solid{background:rgba(8,10,16,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    padding:calc(var(--safeT) + 10px) 12px 10px;background:linear-gradient(180deg,rgba(6,8,13,0),rgba(6,8,13,0));
+    transition:background .25s,backdrop-filter .25s}
+  .dbar.solid{background:rgba(8,10,16,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line)}
-  .dback{display:flex;align-items:center;gap:7px;font-size:12px;letter-spacing:2px;font-weight:800;color:#eef0f4;flex:none}
-  .dback .a{color:var(--accent);font-size:16px;line-height:1}
+  .dback{display:flex;align-items:center;gap:6px;font-size:12px;letter-spacing:2px;font-weight:800;color:#eef0f4;flex:none;
+    padding:6px 10px 6px 6px;border-radius:20px}
+  .dback:active{background:rgba(255,255,255,.07)}
+  .dback .bi{width:19px;height:19px;color:var(--accent);flex:none}
   .dbar .ctitle{font-size:13px;font-weight:700;color:#dfe2e8;opacity:0;transition:opacity .25s;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dbar.solid .ctitle{opacity:1}
-  /* the bar floats over the hero, so pull it up over the hero image */
   .detail .dbar{margin-bottom:-58px}
 
   .dbody{padding:6px 19px calc(var(--safeB) + 54px)}
   .block{margin-bottom:24px}
   .blabel{font-size:10.5px;letter-spacing:2.5px;font-weight:800;color:var(--accent);margin-bottom:11px;display:flex;align-items:center;gap:7px}
-  .lead-p{font-family:'Inter',sans-serif;font-size:16.5px;line-height:1.62;color:#dadde3;font-weight:400;letter-spacing:.1px}
-  .lead-p::first-letter{} /* reserved */
+  .lead-p{font-size:16.5px;line-height:1.62;color:#dadde3;font-weight:400;letter-spacing:.1px}
   .aibox{border-left:3px solid var(--accent);padding-left:16px}
   .mktimpact{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(244,176,62,.4);border-radius:15px;padding:15px 16px}
   .mktimpact .miq{font-size:14px;color:#eef0f4;font-weight:600;margin-bottom:12px;line-height:1.32}
@@ -197,23 +210,19 @@
   .srcrow .age{margin-top:1px;flex:none}
   .srcrow .ext{margin-left:auto;color:var(--faint);flex:none;font-size:13px}
 
-  /* videos */
   .vgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .vtile{background:var(--panel2);border:1px solid var(--line);border-radius:14px;overflow:hidden;transition:transform .14s ease}
   .vtile:active{transform:scale(.97)}
   .vthumb{position:relative;width:100%;aspect-ratio:16/9;background:#1a1d24;overflow:hidden}
   .vthumb img{width:100%;height:100%;object-fit:cover}
   .vthumb .pl{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;
-    background:rgba(0,0,0,.55);border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;padding-left:3px;
-    backdrop-filter:blur(2px)}
-  .vthumb .dur{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;
-    border-radius:4px;padding:1px 5px}
+    background:rgba(0,0,0,.55);border:2px solid #fff;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;padding-left:3px}
+  .vthumb .dur{position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.8);color:#fff;font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px}
   .vmeta{padding:10px 11px}
   .vmeta .vt{font-size:12px;color:#eef0f4;font-weight:600;line-height:1.28;max-height:46px;overflow:hidden;
     display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
   .vmeta .vc{font-size:10.5px;color:var(--faint);font-weight:600;margin-top:6px}
 
-  /* timeline */
   .tl{position:relative;padding-left:23px}
   .tl::before{content:"";position:absolute;left:5px;top:5px;bottom:5px;width:2px;
     background:linear-gradient(180deg,#4a3c1c,var(--accent),var(--red))}
@@ -226,7 +235,6 @@
   .tlev.now .tt{color:var(--red)}
   .tlev .cap{font-size:13px;color:#a9adb7;line-height:1.4;margin-top:3px}
 
-  /* market detail */
   .mbig{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:20px}
   .mbig .mp{font-size:56px;font-weight:900;letter-spacing:-2.5px;line-height:1}
   .mbig .mp.g{color:var(--green)} .mbig .mp.r{color:var(--red)} .mbig .mp.a{color:var(--accent)}
@@ -244,7 +252,7 @@
   .relchip .rr{font-size:12.5px;color:var(--faint);font-weight:700;margin-top:7px}
   .relchip .rr b{color:var(--accent)}
 
-  /* update pill (non-disruptive refresh affordance over an open article) */
+  /* update pill */
   .upill{position:fixed;left:50%;transform:translateX(-50%) translateY(-20px);z-index:60;
     bottom:calc(var(--safeB) + 18px);background:var(--accent);color:#0a0b0f;font-size:12.5px;font-weight:800;letter-spacing:.3px;
     border-radius:22px;padding:11px 18px;display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;
@@ -252,9 +260,9 @@
   .upill.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
   .upill svg{width:14px;height:14px}
 
-  /* pull-to-refresh indicator */
+  /* pull-to-refresh */
   .ptr{position:fixed;top:calc(var(--safeT) + 6px);left:50%;transform:translateX(-50%) scale(.6);z-index:25;
-    width:34px;height:34px;border-radius:50%;background:rgba(15,18,25,.9);border:1px solid var(--line2);
+    width:34px;height:34px;border-radius:50%;background:rgba(15,18,25,.92);border:1px solid var(--line2);
     display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .15s}
   .ptr svg{width:17px;height:17px;color:var(--accent)}
   .ptr.spin svg{animation:spin .8s linear infinite}
@@ -281,50 +289,48 @@
   </div>
 </div>
 
-<!-- pull-to-refresh spinner -->
 <div class="ptr" id="ptr">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
 </div>
 
-<div id="app">
-  <div class="top">
-    <div class="toprow">
-      <div class="brand">IRAN <b>WATCH</b><span class="day" id="dayLbl"></span></div>
-      <div class="topright">
-        <div class="clock"><span class="wx" id="wx"></span><br><span id="clock">--:--</span></div>
-        <button class="refbtn" id="refBtn" aria-label="Refresh">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-        </button>
+<div id="shell">
+  <!-- HOME -->
+  <section class="view" id="home">
+    <div class="top">
+      <div class="toprow">
+        <div class="brand">IRAN <b>WATCH</b><span class="day" id="dayLbl"></span></div>
+        <div class="topright">
+          <div class="clock"><span class="wx" id="wx"></span><br><span id="clock">--:--</span></div>
+          <button class="refbtn" id="refBtn" aria-label="Refresh">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+          </button>
+        </div>
       </div>
+      <div class="statusrow"><span class="dot"></span><span id="statusLbl">LOADING</span><span class="upd" id="updLbl"></span></div>
     </div>
-    <div class="statusrow"><span class="dot"></span><span id="statusLbl">LOADING</span><span class="upd" id="updLbl"></span></div>
-  </div>
 
-  <div class="breaking hidden" id="breaking"><span class="bd"></span><span class="bl">BREAKING</span><span class="bt" id="ebtext"></span></div>
-  <div class="errbar" id="errbar"></div>
+    <div class="breaking hidden" id="breaking"><span class="bd"></span><span class="bl">BREAKING</span><span class="bt" id="ebtext"></span></div>
+    <div class="errbar" id="errbar"></div>
 
-  <div class="wrap">
-    <div class="sech"><span class="ic">&#9678;</span><span>TOP STORIES</span><span class="src" id="storySrc"></span></div>
-    <div class="feed" id="feed"></div>
+    <div class="wrap">
+      <div class="sech"><span class="ic">&#9678;</span><span>TOP STORIES</span><span class="src" id="storySrc"></span></div>
+      <div class="feed" id="feed"></div>
+      <div class="sech" id="mktHead"><span class="ic">&#9889;</span><span>MARKET SPIKES &middot; POLYMARKET</span></div>
+    </div>
+    <div class="rail" id="rail"></div>
+  </section>
 
-    <div class="sech" id="mktHead"><span class="ic">&#9889;</span><span>MARKET SPIKES &middot; POLYMARKET</span></div>
-  </div>
-  <div class="rail" id="rail"></div>
-  <div style="height:calc(var(--safeB) + 40px)"></div>
+  <div class="scrimback" id="scrimback"></div>
+  <!-- DETAIL PANELS (absolute siblings inside the clipped shell → no canvas drag) -->
+  <section class="view detail" id="storyView"></section>
+  <section class="view detail" id="marketView"></section>
 </div>
 
-<!-- STORY DETAIL -->
-<div class="detail" id="storyView"></div>
-<!-- MARKET DETAIL -->
-<div class="detail" id="marketView"></div>
-
-<!-- update pill -->
 <button class="upill" id="upill">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
   <span>New update — tap to refresh</span>
 </button>
 
-<!-- VIDEO OVERLAY -->
 <div id="ov">
   <div class="ovbar"><button class="ovclose" id="ovClose">&#10005; CLOSE</button></div>
   <div class="ovframe"><iframe id="ovFrame" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>
@@ -333,8 +339,6 @@
 <script>
 (function(){
   "use strict";
-  // Same content the TV reads, via the token-free public mirror (read-only — no
-  // write-capable token ever reaches the browser). Relative URL works in prod + local.
   var SOURCE="/api/tv/intel/public";
   var POLL_MS=60000;
   var SEV={
@@ -342,11 +346,9 @@
     warning:{a:"#f4b03e",glow:"rgba(244,140,60,.22)"},
     calm:{a:"#4ade80",glow:"rgba(74,222,128,.2)"}
   };
+  var BACK_SVG='<svg class="bi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 
-  // ----- app state. The golden rule of this rewrite: a background refresh NEVER
-  // mutates the article you're actively reading. It updates the data model + the
-  // home feed (which you're not looking at), and if the open story changed it shows
-  // a tap-to-refresh pill instead of yanking the page out from under you. -----
+  // Golden rule: a background refresh NEVER mutates the article you're reading.
   var state={ data:null, openType:null, openId:null, firstPaint:true, openSig:null };
 
   function $(id){return document.getElementById(id);}
@@ -356,7 +358,7 @@
   function storyById(id){var s=stories();for(var i=0;i<s.length;i++)if(String(s[i].id)===String(id))return s[i];return null;}
   function sigById(id){var s=signals();for(var i=0;i<s.length;i++)if(String(s[i].id)===String(id))return s[i];return null;}
 
-  // ===== freshness (content-grounded, ported from the TV) =====
+  // ===== freshness (content-grounded) =====
   function parseTs(s){ if(!s)return null; var t=Date.parse(s); return isNaN(t)?null:t; }
   function genTime(){ return state.data?parseTs(state.data.generatedAt):null; }
   function relToMs(str){ if(!str||!/ago/i.test(str))return null;
@@ -393,7 +395,6 @@
   function ageClass(ms){ if(ms==null)return 'recent'; var h=ms/3600000; if(h<=24)return 'fresh'; if(h<=72)return 'recent'; return 'old'; }
   function ageBadgeMs(ms,extra){ if(ms==null)return ''; return '<span class="age '+ageClass(ms)+(extra?' '+extra:'')+'">'+esc(timeAgo(ms))+'</span>'; }
   function ageBadge(item){ return ageBadgeMs(ageMs(item)); }
-  // Corroboration trust chip (newsroom web-search verdict surfaced from the pipeline).
   function corroChip(st){
     var c=st&&st.meta&&st.meta.corroboration; if(!c)return '';
     if(c==='high')return '<span class="chip high">&#10003; Corroborated</span>';
@@ -401,9 +402,6 @@
     if(c==='single-source')return '<span class="chip single">&#9888; Single source</span>';
     return '';
   }
-  // Footer freshness: PRIMARY age = the latest real development (content-dated by the
-  // pipeline) so an old strike reads as old; a recent recap shows only as a secondary
-  // "· updated Xm ago" note rather than masquerading as the story's age.
   function freshFoot(st){
     var f=st.freshness||{};
     var first=f.at?(Date.now()-Date.parse(f.at)):storyFirstMs(st);
@@ -442,8 +440,7 @@
     applyBreaking(intel);
   }
 
-  // ===== HOME feed — keyed, in-place reconciliation (no innerHTML wipe → no flicker,
-  // no scroll jump, images don't re-download). =====
+  // ===== HOME feed — keyed, in-place reconciliation =====
   function cardInner(st,lead){
     var hasPhoto=!!st.image;
     return (hasPhoto?'<img class="ph" loading="lazy" src="'+esc(st.image)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'nophoto\')">':'')
@@ -463,19 +460,14 @@
     return el;
   }
   function updateCard(el,st,i){
-    // toggle lead/photo classes by current position
     el.classList.toggle('lead',i===0);
     el.classList.toggle('nophoto',!st.image);
-    // only rewrite the image tag if the URL actually changed (avoid re-fetch/flash)
     var img=el.querySelector('img.ph');
     var curSrc=img?img.getAttribute('src'):null;
-    if(st.image && curSrc!==st.image){ el.innerHTML=cardInner(st,i===0); return; }
-    if(!st.image && img){ el.innerHTML=cardInner(st,i===0); return; }
-    // headline/brief/foot can change without an image swap → patch the body only
+    if((st.image && curSrc!==st.image) || (!st.image && img)){ el.innerHTML=cardInner(st,i===0); return; }
     var h2=el.querySelector('h2'); if(h2)h2.textContent=st.headline||'';
     var br=el.querySelector('.brief');
-    if(st.brief){ if(br)br.textContent=st.brief; }
-    else if(br){ br.parentNode.removeChild(br); }
+    if(st.brief){ if(br)br.textContent=st.brief; } else if(br){ br.parentNode.removeChild(br); }
     var foot=el.querySelector('.foot'); if(foot)foot.innerHTML=freshFoot(st)+corroChip(st);
     var kick=el.querySelector('.leadkick');
     if(i===0 && !kick){ var k=document.createElement('div');k.className='leadkick';k.textContent='LEAD STORY';
@@ -489,9 +481,8 @@
     var existing={};
     Array.prototype.forEach.call(feed.querySelectorAll('[data-story]'),function(el){existing[el.getAttribute('data-story')]=el;});
     for(var i=0;i<ss.length;i++){ var st=ss[i], id=String(st.id), el=existing[id];
-      if(el){ updateCard(el,st,i); delete existing[id]; }
-      else { el=buildCard(st,i); }
-      feed.appendChild(el);   // appendChild on an existing node MOVES it into order
+      if(el){ updateCard(el,st,i); delete existing[id]; } else { el=buildCard(st,i); }
+      feed.appendChild(el);
     }
     Object.keys(existing).forEach(function(id){ feed.removeChild(existing[id]); });
   }
@@ -515,7 +506,8 @@
     rail.innerHTML=html;
   }
 
-  // ===== STORY DETAIL =====
+  // ===== detail HTML =====
+  function fmtDur(s){ s=Math.round(s); var m=Math.floor(s/60),ss=s%60; return m+':'+(ss<10?'0':'')+ss; }
   function moduleHtml(name,st,d){
     var L=d.layout||{};
     if(name==='summary') return '<div class="block aibox"><div class="blabel">&#10022; THE STORY</div><p class="lead-p">'+esc(d.aiSummary||st.brief||'')+'</p></div>';
@@ -538,10 +530,9 @@
   function storyDetailHtml(st){
     var d=st.drilldown||{}, L=d.layout||{modules:['summary']};
     var mods=(L.modules&&L.modules.length?L.modules:['summary']).slice();
-    var hasPhoto=!!st.image;
-    var cov=''; var m=st.meta||{};
+    var hasPhoto=!!st.image, m=st.meta||{}, cov='';
     if(m.outletCount)cov='<span class="lab">'+esc(m.outletCount)+' outlet'+(m.outletCount>1?'s':'')+'</span>';
-    var html='<div class="dbar"><button class="dback" data-back="1"><span class="a">&#9664;</span>STORIES</button><span class="ctitle">'+esc(st.headline||'')+'</span></div>';
+    var html='<div class="dbar"><button class="dback" data-back="1">'+BACK_SVG+'STORIES</button><span class="ctitle">'+esc(st.headline||'')+'</span></div>';
     html+='<div class="dhero'+(hasPhoto?'':' nophoto')+'">'
       +(hasPhoto?'<img class="ph" src="'+esc(st.image)+'" alt="" onerror="this.style.display=\'none\';this.parentNode.classList.add(\'nophoto\')">':'')
       +'<div class="scrim"></div><div class="body">'
@@ -549,7 +540,7 @@
       +'<div class="foot">'+freshFoot(st)+corroChip(st)+cov+'</div>'
       +'</div></div>';
     html+='<div class="dbody">';
-    var textMods=mods.filter(function(m){return m!=='videos'&&m!=='timeline';});
+    var textMods=mods.filter(function(x){return x!=='videos'&&x!=='timeline';});
     if(textMods.indexOf('summary')<0)textMods.unshift('summary');
     html+=textMods.map(function(mm){return moduleHtml(mm,st,d);}).join('');
     var vids=(mods.indexOf('videos')>=0)?(d.videos||[]):[];
@@ -574,12 +565,9 @@
     html+='</div>';
     return html;
   }
-  function fmtDur(s){ s=Math.round(s); var m=Math.floor(s/60),ss=s%60; return m+':'+(ss<10?'0':'')+ss; }
-
-  // ===== MARKET DETAIL =====
   function marketDetailHtml(s){
     var pc={amber:'a',green:'g',red:'r'};
-    var html='<div class="dbar"><button class="dback" data-back="1"><span class="a">&#9664;</span>MARKET</button><span class="ctitle">'+esc(s.question||'')+'</span></div>';
+    var html='<div class="dbar"><button class="dback" data-back="1">'+BACK_SVG+'MARKET</button><span class="ctitle">'+esc(s.question||'')+'</span></div>';
     html+='<div class="dbody" style="padding-top:calc(var(--safeT) + 8px)">';
     html+='<div class="block"><div class="blabel">&#9889; PREDICTION MARKET</div>'
       +'<h1 style="font-family:\'Playfair Display\',Georgia,serif;font-size:26px;line-height:1.14;font-weight:800;letter-spacing:-.3px;margin-bottom:18px">'+esc(s.question||'')+'</h1>'
@@ -607,23 +595,19 @@
     html+='</div>';
     return html;
   }
-
-  // a cheap content signature so a refresh can tell whether the OPEN article actually
-  // changed (→ offer a pill) vs. is identical (→ leave the reader completely alone).
   function storySig(st){ if(!st)return ''; var d=st.drilldown||{};
     return [st.headline,st.brief,d.aiSummary,(st.freshness||{}).updatedAt,(st.meta||{}).latestUpdateAt,
       (d.sources||[]).length,(d.videos||[]).length,(d.timeline||[]).length].join('|'); }
 
-  // ===== routing (hash-based → hardware/gesture back works) =====
+  // ===== routing — navigation only (open/close + scroll-to-top); driven by
+  // hashchange, never by the poll. =====
+  function activeDetailEl(){ return state.openType==='market'?$('marketView'):$('storyView'); }
   function bindDetailScroll(el){
     var bar=el.querySelector('.dbar'); if(!bar)return;
     el.onscroll=function(){ if(el.scrollTop>120)bar.classList.add('solid'); else bar.classList.remove('solid'); };
   }
-  function openDetailPanel(el){ el.scrollTop=0; el.classList.add('on'); bindDetailScroll(el); }
-  function closeDetailPanel(el){ el.classList.remove('on'); el.onscroll=null; }
-  // route() handles NAVIGATION only (open/close + scroll-to-top on entry). It is
-  // driven by hashchange — never by the data poll. This is the core fix: the poll
-  // can no longer scroll the open article to the top.
+  function openDetailPanel(el){ el.scrollTop=0; el.style.transform=''; el.classList.add('on'); $('scrimback').classList.add('on'); bindDetailScroll(el); }
+  function closeDetailPanel(el){ el.classList.remove('on'); el.style.transform=''; el.onscroll=null; }
   function route(){
     var h=location.hash||'';
     var mS=/^#\/story\/(.+)$/.exec(h), mM=/^#\/market\/(.+)$/.exec(h);
@@ -641,6 +625,7 @@
     } else {
       state.openType=null; state.openId=null; state.openSig=null;
       closeDetailPanel($('storyView')); closeDetailPanel($('marketView'));
+      $('scrimback').classList.remove('on');
     }
   }
   function goHome(){ if(location.hash){ location.hash=''; } else { route(); } }
@@ -648,7 +633,7 @@
   function openMarket(id){ location.hash='#/market/'+encodeURIComponent(id); }
   window.addEventListener('hashchange',route);
 
-  // ===== update pill — re-render the OPEN detail in place, preserving scroll =====
+  // ===== update pill =====
   function showUpill(){ $('upill').classList.add('on'); }
   function hideUpill(){ $('upill').classList.remove('on'); }
   function applyOpenUpdate(){
@@ -674,26 +659,67 @@
     var vt=t.closest&&t.closest('[data-video]'); if(vt){ ev.preventDefault(); playVideo(vt.getAttribute('data-video')); return; }
     var sc=t.closest&&t.closest('[data-story]'); if(sc){ openStory(sc.getAttribute('data-story')); return; }
     var mc=t.closest&&t.closest('[data-market]'); if(mc){ openMarket(mc.getAttribute('data-market')); return; }
-    // (source rows are real <a> links → open the original article in a new tab)
   });
 
-  // ===== data application — the non-disruptive heart of the app =====
+  // ===== swipe-to-go-back (native-feel: the panel follows your finger) =====
+  (function(){
+    var el=null,sx=0,sy=0,axis=null,dx=0,W=function(){return window.innerWidth||360;};
+    function onStart(e){
+      if(state.openType==null||e.touches.length!==1)return;
+      el=activeDetailEl();
+      if(el.scrollLeft>0){ el=null; return; }
+      sx=e.touches[0].clientX; sy=e.touches[0].clientY; axis=null; dx=0;
+    }
+    function onMove(e){
+      if(!el)return;
+      var x=e.touches[0].clientX,y=e.touches[0].clientY,ddx=x-sx,ddy=y-sy;
+      if(axis==null){
+        if(Math.abs(ddx)<7&&Math.abs(ddy)<7)return;
+        axis=Math.abs(ddx)>Math.abs(ddy)?'x':'y';
+        if(axis==='x'){ el.classList.add('drag'); $('scrimback').style.transition='none'; }
+      }
+      if(axis!=='x')return;
+      if(ddx<0)ddx=0; dx=ddx;
+      if(e.cancelable)e.preventDefault();
+      el.style.transform='translateX('+dx+'px)';
+      $('scrimback').style.opacity=String(0.5*Math.max(0,1-dx/W()));
+    }
+    function onEnd(){
+      if(!el)return;
+      var v=el,wasX=(axis==='x'),commit=dx>W()*0.32||dx>120;
+      v.classList.remove('drag'); $('scrimback').style.transition='';
+      el=null; axis=null;
+      if(wasX&&commit){
+        // animate the rest of the way out, then return home
+        v.style.transform='translateX(100%)'; $('scrimback').style.opacity='';
+        setTimeout(goHome,150);
+      } else {
+        v.style.transform=''; $('scrimback').style.opacity='';   // snap back
+      }
+      dx=0;
+    }
+    var sh=$('shell');
+    sh.addEventListener('touchstart',onStart,{passive:true});
+    sh.addEventListener('touchmove',onMove,{passive:false});
+    sh.addEventListener('touchend',onEnd);
+    sh.addEventListener('touchcancel',onEnd);
+  })();
+
+  // ===== data application =====
   function applyData(intel){
     state.data=intel;
     renderChrome(intel);
     renderFeed();
     renderRail();
-    // If a detail is open, DO NOT re-render it. Only surface a pill if it changed.
     if(state.openType==='story'){
       var st=storyById(state.openId);
-      if(!st){ goHome(); }                                  // story dropped from feed
-      else if(storySig(st)!==state.openSig){ showUpill(); } // changed → offer refresh
+      if(!st){ goHome(); }
+      else if(storySig(st)!==state.openSig){ showUpill(); }
     } else if(state.openType==='market'){
       if(!sigById(state.openId)){ goHome(); }
     }
     state.firstPaint=false;
   }
-
   function fetchIntel(){
     return fetch(SOURCE+(SOURCE.indexOf('?')<0?'?t=':'&t=')+Date.now(),{cache:'no-store'})
       .then(function(r){ if(!r.ok)throw new Error('status '+r.status); return r.json(); })
@@ -707,7 +733,7 @@
       $('errbar').classList.remove('on');
       var firstEver=!state.data;
       applyData(d);
-      if(firstEver) route();   // honor a deep-link hash on the very first load only
+      if(firstEver) route();
       reveal();
     }).catch(function(){
       if(!state.data){ $('statusLbl').textContent='NO DATA';
@@ -716,39 +742,39 @@
   }
   $('refBtn').addEventListener('click',function(){ load({spin:true}); });
 
-  // ===== pull-to-refresh (home only, when scrolled to the top) =====
+  // ===== pull-to-refresh (home view only, at the top) =====
   (function(){
-    var ptr=$('ptr'),startY=0,pulling=false,dist=0,MAX=90,TRIG=62;
-    function atTop(){ return state.openType==null && (window.scrollY||document.documentElement.scrollTop||0)<=0; }
-    window.addEventListener('touchstart',function(e){ if(!atTop()||e.touches.length!==1){pulling=false;return;} startY=e.touches[0].clientY; pulling=true; dist=0; },{passive:true});
-    window.addEventListener('touchmove',function(e){ if(!pulling)return;
+    var ptr=$('ptr'),home=$('home'),startY=0,pulling=false,dist=0,MAX=90,TRIG=62;
+    function atTop(){ return state.openType==null && home.scrollTop<=0; }
+    home.addEventListener('touchstart',function(e){ if(!atTop()||e.touches.length!==1){pulling=false;return;} startY=e.touches[0].clientY; pulling=true; dist=0; },{passive:true});
+    home.addEventListener('touchmove',function(e){ if(!pulling)return;
       dist=e.touches[0].clientY-startY;
       if(dist<=0){ ptr.style.opacity='0'; return; }
-      if(atTop()){ e.preventDefault();
+      if(atTop()){ if(e.cancelable)e.preventDefault();
         var d=Math.min(dist*0.6,MAX);
-        ptr.style.opacity=Math.min(d/TRIG,1);
+        ptr.style.opacity=String(Math.min(d/TRIG,1));
         ptr.style.transform='translateX(-50%) scale('+(0.6+Math.min(d/MAX,1)*0.4)+') rotate('+(d*2.4)+'deg)';
       }
     },{passive:false});
-    window.addEventListener('touchend',function(){ if(!pulling)return; pulling=false;
+    function endPull(){ if(!pulling)return; pulling=false;
       if(dist>=TRIG){ ptr.classList.add('spin'); ptr.style.opacity='1'; ptr.style.transform='translateX(-50%) scale(1)';
         load({}); setTimeout(function(){ ptr.classList.remove('spin'); ptr.style.opacity='0'; },650); }
       else { ptr.style.opacity='0'; }
       dist=0;
-    });
+    }
+    home.addEventListener('touchend',endPull); home.addEventListener('touchcancel',endPull);
   })();
 
-  // ===== splash reveal =====
+  // ===== splash =====
   var _revealed=false;
   function reveal(){ if(_revealed)return; _revealed=true;
     var sp=$('splash'); if(!sp)return; sp.classList.add('gone'); setTimeout(function(){sp.style.display='none';},500); }
 
   // ===== boot =====
   load({});
-  setTimeout(reveal,8000);            // hard safety: never sit on splash
+  setTimeout(reveal,8000);
   setInterval(clock,15000);
-  setInterval(function(){ load({}); },POLL_MS);   // background refresh — never disruptive
-  // refresh when the app comes back to the foreground (common on mobile)
+  setInterval(function(){ load({}); },POLL_MS);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) load({}); });
 })();
 </script>
