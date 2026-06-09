@@ -795,6 +795,10 @@ async function searchVideos(query, opts = {}) {
   if (!query) return [];
   const max = Number(opts.max || 6);
   const maxAgeDays = Number(opts.maxAgeDays || process.env.INTEL_VIDEO_SEARCH_AGE_DAYS || 45);
+  // Floor (epoch ms): drop any clip published BEFORE this. Used to require a clip be
+  // fresher than the event it covers — a recurring event's earlier clips (even if only
+  // days old) predate the new development's first-reported time and are the wrong clip.
+  const notBefore = Number(opts.notBefore || 0);
   const minSec = Number(process.env.INTEL_VIDEO_MIN_SEC || 45);
   const maxSec = Number(process.env.INTEL_VIDEO_MAX_SEC || 1500);
   try {
@@ -830,7 +834,11 @@ async function searchVideos(query, opts = {}) {
       const channel = (v.ownerText && v.ownerText.runs && v.ownerText.runs[0] && v.ownerText.runs[0].text)
         || (v.longBylineText && v.longBylineText.runs && v.longBylineText.runs[0] && v.longBylineText.runs[0].text) || '';
       const ts = parseRelativeAge(v.publishedTimeText && v.publishedTimeText.simpleText);
-      if (ts != null && (Date.now() - ts) / 86400000 > maxAgeDays) continue;
+      // Drop clips we can't date (no timestamp to show + no way to verify freshness),
+      // clips older than the hard age cap, and clips older than the event itself.
+      if (ts == null) continue;
+      if ((Date.now() - ts) / 86400000 > maxAgeDays) continue;
+      if (notBefore && ts < notBefore) continue;
       seen.add(videoId);
       out.push({
         videoId, title: title.trim(), channel: channel.trim(),

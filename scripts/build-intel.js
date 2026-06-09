@@ -486,6 +486,145 @@ Return ONLY JSON mapping story index to chosen candidate index, e.g. {"0":2,"1":
   } catch (e) { log('image pick failed', e.message); return {}; }
 }
 
+// ---- Batched Opus curation: final video + timeline review across ALL segments ------
+// The deterministic pool/score is good at GATHERING fresh, on-event candidates but it
+// can't tell that a clip about an EARLIER instance of a recurring event is the wrong
+// clip, and it has no cross-segment view (so one generic clip sprayed across stories).
+// This single Opus pass sees every segment's candidates + current timeline at once and
+// makes the final call: keep ONLY clips that cover THIS exact development, never reuse
+// a clip across segments it doesn't truly cover, request more searches when the pool is
+// thin, and rewrite or drop each timeline. It can override anything.
+function buildCurationPrompt(items) {
+  const blocks = items.map((it, si) => {
+    const cands = it.cands.map((c, ci) =>
+      `    [${ci}] ${c.title} — ${c.channel || '?'} · ${c.publishedAt ? relAge(c.publishedAt) : 'undated'} · ${c.durationSec != null ? c.durationSec + 's' : 'len?'} · tier${c.tier} · covers${c.covers}`
+    ).join('\n') || '    (no candidates)';
+    const tl = (it.timeline && it.timeline.length)
+      ? it.timeline.map(t => `    - ${t.time}: ${t.cap}`).join('\n') : '    (none)';
+    return `SEGMENT ${si}  id=${it.id}\n`
+      + `  headline: ${it.headline}\n`
+      + `  summary: ${(it.summary || '').slice(0, 400)}\n`
+      + `  event first reported: ${relAge(it.firstReportedAt)}; latest development: ${relAge(it.latestDevelopmentAt)}\n`
+      + `  VIDEO CANDIDATES (index: title — channel · age · length · tier · covers):\n${cands}\n`
+      + `  CURRENT TIMELINE:\n${tl}`;
+  }).join('\n\n');
+  return `You are the senior video editor + fact-checker for the IRAN WATCH cinematic TV wall. For EACH segment below, choose which candidate clips to show and finalize the timeline. You may override everything.
+
+NOW: ${new Date().toISOString()}
+
+${blocks}
+
+RULES:
+- VIDEOS: keep ONLY clips that cover THIS segment's SPECIFIC, CURRENT development — the same event, people, place AND time. A clip's title can match by keyword while being about an EARLIER instance of a recurring event (e.g. a previous strike on the same place, an older round of the same talks): judge by the clip's age vs this event and by its specificity, and REJECT earlier-event clips even when the words match. Order best-first; when two clips cover equally, prefer the more reputable source (lower tier number). It is CORRECT to return an empty list if nothing truly covers the story — never pad with a loosely-related clip.
+- NO CROSS-SEGMENT SPRAY: do not place the same clip on multiple segments unless it genuinely, directly covers each one. A generic leaders/deal/ceasefire clip belongs on at most ONE segment.
+- MORE SEARCHES: if a segment's candidates are thin or off-event, propose up to 2 SPECIFIC search queries (full, distinctive phrasings — not 2-3 generic words) in moreSearches; we will run them and let you re-pick once.
+- TIMELINE: keep ONLY a genuine multi-step chronology where you know the EXACT time of each step (a clock time like "Fri 22:00" or a specific date like "Jun 4"); each step a DISTINCT event, the newest may be "now". Rewrite it to be accurate, or set it to null if the story is not a real datable sequence (most stories are NOT). Never invent times.
+
+Return ONLY JSON (no prose, no fences):
+{
+  "segments": [
+    { "index": <segment number>, "videoIdxs": [<candidate indices to show, best first, or []>],
+      "moreSearches": [<specific query strings, or []>],
+      "timeline": [ {"time":"<exact time/date>","cap":"<<=40 chars>","now":<bool>} ] | null }
+  ]
+}`;
+}
+
+async function curateVideosTimelines(stories) {
+  const items = stories.map(st => ({
+    id: st.id, headline: st.headline, summary: st.drilldown?.aiSummary || st.brief,
+    firstReportedAt: st.meta?.firstReportedAt, latestDevelopmentAt: st.meta?.latestDevelopmentAt,
+    timeline: Array.isArray(st.drilldown?.timeline) ? st.drilldown.timeline : [],
+    cands: (st._videoCandidates || []).slice(),
+    floorMs: st._videoFloorMs || 0,
+  }));
+  if (!items.length) return;
+
+  async function pass(label) {
+    const prompt = buildCurationPrompt(items);
+    const _t = Date.now();
+    const { json, usage } = await callJson(OPUS, 3000, prompt);
+    log(`video/timeline curation ${label}: ${(json.segments || []).length} segments (tokens ${usage?.input_tokens}/${usage?.output_tokens})`);
+    traceStep('curate', `Opus — video & timeline curation${label === 'r2' ? ' (round 2)' : ''}`, {
+      model: OPUS, usage, ms: Date.now() - _t,
+      summary: `reviewed ${items.length} segments`,
+      detail: { prompt, response: json },
+    });
+    return json;
+  }
+
+  let result;
+  try { result = await pass('r1'); }
+  catch (e) {
+    log('video/timeline curation failed — keeping provisional picks', e.message);
+    traceStep('curate', 'Opus — video & timeline curation (failed)', { summary: e.message });
+    return;
+  }
+
+  // Round 2: run any requested searches, append to that segment's candidates, re-pick once.
+  const wants = (result.segments || []).filter(s => Array.isArray(s.moreSearches) && s.moreSearches.length);
+  if (wants.length && process.env.INTEL_VIDEO_CURATE_ROUNDS !== '0' && process.env.INTEL_VIDEO_SEARCH_OFF !== '1') {
+    for (const s of wants) {
+      const it = items[s.index]; if (!it) continue;
+      for (const q of s.moreSearches.slice(0, 2)) {
+        const more = await W.searchVideos(String(q), { max: 8, notBefore: it.floorMs }).catch(() => []);
+        for (const v of more) {
+          if (!videoFresherThan(v, it.floorMs)) continue;
+          if (it.cands.some(c => c.videoId === v.videoId)) continue;
+          it.cands.push({
+            ...videoCard(v),
+            covers: videoCoversSegment(v, { headline: it.headline, aiSummary: it.summary }),
+            tier: v.tier != null ? v.tier : W.channelTier(v.channel), durFit: W.durationFit(v.durationSec), src: 'search',
+          });
+        }
+      }
+      it.cands.sort((a, b) => a.tier - b.tier || b.covers - a.covers);
+      it.cands.length = Math.min(it.cands.length, 16);
+    }
+    try { result = await pass('r2'); } catch (e) { log('curation round 2 failed — using round 1', e.message); }
+  }
+
+  // Apply (in display order so the cross-segment spray guard keeps a shared clip on the
+  // higher-priority segment): final videos + finalized timeline. Re-run sanitizeTimeline
+  // so the concrete-time guarantee holds even on an Opus rewrite.
+  const useCount = new Map();
+  const ordered = (result.segments || []).slice().sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+  for (const sres of ordered) {
+    const st = stories[sres.index]; const it = items[sres.index];
+    if (!st || !it) continue;
+    let chosen = (Array.isArray(sres.videoIdxs) ? sres.videoIdxs : []).map(i => it.cands[i]).filter(Boolean);
+    chosen = chosen.filter(c => {
+      const n = useCount.get(c.videoId) || 0;
+      if (n >= 2) return false;   // safety net against the same clip spraying across the wall
+      useCount.set(c.videoId, n + 1); return true;
+    });
+    st.drilldown.videos = chosen.slice(0, 6).map(videoCard);
+    if (sres.timeline === null) st.drilldown.timeline = [];
+    else if (Array.isArray(sres.timeline)) {
+      st.drilldown.timeline = sanitizeTimeline(sres.timeline.map(t => ({ ...t, cap: stripCites(t.cap || '') })));
+    }
+  }
+}
+
+// After curation the set of videos/timeline a segment carries may have changed, so the
+// layout's module list (chosen before curation) must be reconciled: drop 'videos'/
+// 'timeline' if they're now empty, add them back if they're now present.
+function reconcileLayoutModules(story) {
+  const dl = story.drilldown || {};
+  const lay = dl.layout || {};
+  const hasVideos = (dl.videos || []).length > 0;
+  const hasTimeline = (dl.timeline || []).length >= 2;
+  let mods = Array.isArray(lay.modules) ? lay.modules.slice() : ['summary'];
+  if (!hasTimeline) { lay.showTimeline = false; mods = mods.filter(m => m !== 'timeline'); }
+  else if (lay.showTimeline && !mods.includes('timeline')) mods.push('timeline');
+  if (!story.hasMarket) mods = mods.filter(m => m !== 'marketImpact');
+  if (!hasVideos) mods = mods.filter(m => m !== 'videos');
+  else if (!mods.includes('videos')) mods.push('videos');
+  if (!mods.includes('summary')) mods.unshift('summary');
+  lay.modules = mods.slice(0, 5);
+  dl.layout = lay;
+}
+
 // ---- video relevance: COVERS the story, not just "relevant by nature" -------
 // Everything on this wall is regionally relevant, so plain keyword overlap (the
 // old gate accepted ANY shared word >3 chars) attached generic Iran/Israel/war
@@ -507,7 +646,15 @@ const GENERIC_VIDEO_TOKENS = (() => {
     'israel israeli america american war conflict crisis region regional gulf mideast middle east '
     + 'news live breaking update latest report watch video shorts amid after over says said tell told '
     + 'warn claim vow urge accuse reject deny strike struck attack fire hit launch shell raid '
-    + 'tension escalate';
+    + 'tension escalate '
+    // Pervasive political/diplomatic vocabulary on this wall: the leaders, the
+    // deal-making, and the ceasefire churn recur in nearly EVERY headline right now,
+    // so a clip sharing only these does NOT cover a SPECIFIC story (front-specific
+    // subjects — hormuz, hezbollah, iaea, kuwait, oil — stay distinctive). This is why
+    // a generic "Trump says Iran deal could be signed" clip used to land on an
+    // Apache-crash story and an oil-price story alike.
+    + 'trump netanyahu vance president minister official leader deal talks talk agreement '
+    + 'negotiation negotiate sign signed pause paused halt ceasefire truce call calls warning threaten';
   return new Set([...core.flatMap(k => k.split(/\s+/)), ...universal.split(/\s+/)].map(normToken));
 })();
 // Light normalization so lebanese~lebanon, iranian~iran, strikes~strike unify.
@@ -535,8 +682,39 @@ function videoCoversSegment(v, seg) {
   for (const w of distinctiveTokens(v.title)) if (segTok.has(w)) hits++;
   return hits;
 }
+// Build a SPECIFIC, multi-keyword query for the targeted YouTube search. A short
+// 2-3 word query ("Iran strike Kuwait") returns the popular/generic clip for that
+// phrase — often an EARLIER instance of a recurring event. We use the full headline
+// PLUS the story's distinctive subject tokens (from the brief/summary) so the search
+// resolves to THIS specific development. (The freshness floor and the Opus review are
+// the other two layers that kill recurring-event mismatches.)
 function videoQueryFor(seg) {
-  return String(seg.headline || '').replace(/[.;|].*$/, '').replace(/["']/g, '').trim().slice(0, 90);
+  const base = String(seg.headline || '').replace(/["']/g, '').replace(/\s*\.\s*$/, '').trim();
+  const have = distinctiveTokens(base);
+  const extra = [...distinctiveTokens(seg.brief || seg.aiSummary || '')]
+    .filter(t => !have.has(t)).slice(0, 5);
+  return (base + (extra.length ? ' ' + extra.join(' ') : '')).slice(0, 160);
+}
+
+// A clip card for the bundle (single shape used by both the provisional pick and the
+// Opus curation pass). publishedAt is carried through so the TV can ALWAYS render a
+// timestamp on the thumbnail — clips with no determinable date are dropped upstream.
+function videoCard(v) {
+  return {
+    videoId: v.videoId, title: v.title, channel: v.channel,
+    thumbnailUrl: v.thumbnailUrl || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
+    publishedAt: v.publishedAt || null,
+    durationSec: v.durationSec != null ? v.durationSec : null,
+  };
+}
+
+// A video may attach to a segment only if it carries a known publish date AND that
+// date is at/after the story's first-reported time (minus a grace window). This is
+// what stops a clip of an EARLIER similar event (a strike that happened days ago)
+// from being matched to a NEW one purely on a title/keyword overlap.
+function videoFresherThan(v, floorMs) {
+  const pub = v && v.publishedAt ? Date.parse(v.publishedAt) : NaN;
+  return !isNaN(pub) && (!floorMs || pub >= floorMs);
 }
 
 // ---- timeline: only a genuine, EXACTLY-timestamped multi-step chronology -----
@@ -1039,57 +1217,48 @@ async function main() {
     // DISTINCTIVE tokens to actually cover the story (never forcing an off-story
     // clip). If nothing clears the bar, fall back to the on-topic SEARCH hits
     // (which are about this headline by construction) before giving up.
-    const toCard = v => ({
-      videoId: v.videoId, title: v.title, channel: v.channel,
-      thumbnailUrl: v.thumbnailUrl || `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
-      publishedAt: v.publishedAt || null, durationSec: v.durationSec != null ? v.durationSec : null,
-    });
+    // Build the candidate video pool for THIS segment. Two freshness rules kill the
+    // recurring-event mismatch: every clip must (a) carry a known publish date (so the
+    // TV can always show a timestamp) and (b) be published at/after this story's
+    // first-reported time minus a grace window (so a clip of an EARLIER similar event
+    // can't attach to it). The batched Opus curation pass below does the final
+    // relevance judgement, drops anything off-event, and can request more searches.
+    const GRACE_MS = Number(process.env.INTEL_VIDEO_EVENT_GRACE_H || 24) * 3600000;
+    const floorMs = (Date.parse(rec.firstSeenSourceAt || rec.firstReportedAt) || NOW) - GRACE_MS;
     const searched = process.env.INTEL_VIDEO_SEARCH_OFF === '1'
-      ? [] : await W.searchVideos(videoQueryFor(seg), { max: 10 }).catch(() => []);
+      ? [] : await W.searchVideos(videoQueryFor(seg), { max: 10, notBefore: floorMs }).catch(() => []);
     const opusPicked = (seg.videoIdxs || []).map(i => videosAll[i]).filter(Boolean);
     const pool = []; const seenV = new Set();
     for (const v of [...opusPicked, ...searched, ...videosAll]) {
       if (!v || !v.videoId || seenV.has(v.videoId)) continue;
+      if (!videoFresherThan(v, floorMs)) continue;   // unknown date OR pre-event → never attach
       seenV.add(v.videoId); pool.push(v);
     }
     const scored = pool.map(v => ({
       v, s: videoCoversSegment(v, seg),
       tier: v.tier != null ? v.tier : W.channelTier(v.channel),
       fit: W.durationFit(v.durationSec),
-    }));
-    let picks = scored.filter(x => x.s >= VIDEO_MIN_MATCH);
-    // Safety net so a segment isn't left blank: search hits are on-topic by
-    // construction (we searched THIS headline), so accept those sharing >=1
-    // distinctive token. We still refuse a pool clip that covers nothing.
-    if (!picks.length) picks = scored.filter(x => x.s >= 1 && x.v.searched);
-    // Among clips that adequately COVER the story, finetune by QUALITY: prefer the
-    // more reputable source (wire/broadcaster over a sensational aggregator), then
-    // stronger coverage, then a better-fitting duration, then the fresher clip.
-    picks.sort((a, b) => a.tier - b.tier
-      || b.s - a.s
-      || b.fit - a.fit
+    })).sort((a, b) => a.tier - b.tier || b.s - a.s || b.fit - a.fit
       || (Date.parse(b.v.publishedAt || 0) - Date.parse(a.v.publishedAt || 0)));
-    const vids = picks.slice(0, 6).map(x => toCard(x.v));
-    const _chosenIds = new Set(vids.map(v => v.videoId));
-    traceStep('video', `Video selection — ${seg.id}`, {
-      summary: `${vids.length} chosen from ${pool.length} candidates (search returned ${searched.length})`,
-      detail: {
-        query: videoQueryFor(seg),
-        chosen: vids.map(v => ({ tier: W.channelTier(v.channel), channel: v.channel, durationSec: v.durationSec, title: v.title, videoId: v.videoId })),
-        candidates: scored
-          .sort((a, b) => b.s - a.s || a.tier - b.tier)
-          .slice(0, 20)
-          .map(x => ({ chosen: _chosenIds.has(x.v.videoId), covers: x.s, tier: x.tier, durFit: x.fit, durationSec: x.v.durationSec ?? null, src: x.v.searched ? 'search' : 'pool', channel: x.v.channel, title: x.v.title })),
-      },
-    });
+    // Provisional deterministic pick — the fallback if the Opus curation pass fails.
+    let prov = scored.filter(x => x.s >= VIDEO_MIN_MATCH);
+    if (!prov.length) prov = scored.filter(x => x.s >= 1 && x.v.searched);
+    const vids = prov.slice(0, 6).map(x => videoCard(x.v));
+    // Candidates handed to the Opus curation pass (top by coverage + freshness).
+    const videoCandidates = scored.slice(0, 14).map(x => ({
+      ...videoCard(x.v), covers: x.s, tier: x.tier, durFit: x.fit, src: x.v.searched ? 'search' : 'pool',
+    }));
 
     const linkedSpikes = (seg.marketIds || []).map(id => spikeById[id]).filter(Boolean);
-    const layout = await designLayout(seg, redis, { hasMarket: linkedSpikes.length > 0, hasVideos: vids.length > 0 });
+    // hasVideos optimistic (candidates exist) — modules are reconciled post-curation.
+    const layout = await designLayout(seg, redis, { hasMarket: linkedSpikes.length > 0, hasVideos: videoCandidates.length > 0 });
     stories.push({
       id: seg.id,
       headline: seg.headline, brief: seg.brief,
       image: rec.image || null, hasMarket: linkedSpikes.length > 0,
       marketIds: (seg.marketIds || []).filter(id => spikeById[id]),
+      // Temp fields for the batched Opus video/timeline curation pass (stripped after).
+      _videoCandidates: videoCandidates, _videoFloorMs: floorMs,
       // metadata contract — the persistent "iceberg" stats the API/TV can reason over
       meta: {
         firstReportedAt: rec.firstSeenSourceAt || rec.firstReportedAt,
@@ -1138,6 +1307,21 @@ async function main() {
         } : null,
       },
     });
+  }
+
+  // Batched Opus video + timeline curation: the LLM reviews every segment's fresh
+  // candidate clips together, keeps only those that cover THIS exact development (not
+  // an earlier instance of a recurring event), avoids cross-segment spray, can run more
+  // searches, and rewrites/drops each timeline. Falls back to the provisional picks if
+  // the call fails. Skip with INTEL_VIDEO_CURATE_OFF=1.
+  if (process.env.INTEL_VIDEO_CURATE_OFF !== '1') {
+    await curateVideosTimelines(stories);
+  }
+  // Reconcile each layout's module list against the post-curation video/timeline set,
+  // then strip the temp curation fields off the bundle.
+  for (const st of stories) {
+    reconcileLayoutModules(st);
+    delete st._videoCandidates; delete st._videoFloorMs;
   }
 
   // Freshness guard: drop stories whose newest source is older than HARD_STALE_DAYS
@@ -1291,4 +1475,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens, headlineTokens, headlinesDuplicate, dedupeStories };
+module.exports = { stripCites, sanitizeTimeline, isConcreteTime, videoCoversSegment, distinctiveTokens, headlineTokens, headlinesDuplicate, dedupeStories, videoQueryFor, videoCard, videoFresherThan, reconcileLayoutModules };
