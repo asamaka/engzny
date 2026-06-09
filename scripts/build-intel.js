@@ -515,7 +515,7 @@ NOW: ${new Date().toISOString()}
 ${blocks}
 
 RULES:
-- VIDEOS: keep ONLY clips that cover THIS segment's SPECIFIC, CURRENT development — the same event, people, place AND time. A clip's title can match by keyword while being about an EARLIER instance of a recurring event (e.g. a previous strike on the same place, an older round of the same talks): judge by the clip's age vs this event and by its specificity, and REJECT earlier-event clips even when the words match. Order best-first; when two clips cover equally, prefer the more reputable source (lower tier number). It is CORRECT to return an empty list if nothing truly covers the story — never pad with a loosely-related clip.
+- VIDEOS: keep ONLY clips that cover THIS segment's SPECIFIC, CURRENT development — the same event, people, place AND time. A clip's title can match by keyword while being about an EARLIER instance of a recurring event (e.g. a previous strike on the same place, an older round of the same talks): judge by the clip's age vs this event and by its specificity, and REJECT earlier-event clips even when the words match. Order best-first; when two clips cover equally, prefer the more reputable source (lower tier number). BETTER EMPTY THAN IRRELEVANT: return an empty list whenever nothing TRULY covers this exact development — showing no video is correct and expected; never pad, never lower the bar to fill slots, never include a clip you are unsure about.
 - NO CROSS-SEGMENT SPRAY: do not place the same clip on multiple segments unless it genuinely, directly covers each one. A generic leaders/deal/ceasefire clip belongs on at most ONE segment.
 - MORE SEARCHES: if a segment's candidates are thin or off-event, propose up to 2 SPECIFIC search queries (full, distinctive phrasings — not 2-3 generic words) in moreSearches; we will run them and let you re-pick once.
 - TIMELINE: keep ONLY a genuine multi-step chronology where you know the EXACT time of each step (a clock time like "Fri 22:00" or a specific date like "Jun 4"); each step a DISTINCT event, the newest may be "now". Rewrite it to be accurate, or set it to null if the story is not a real datable sequence (most stories are NOT). Never invent times.
@@ -1241,9 +1241,10 @@ async function main() {
     })).sort((a, b) => a.tier - b.tier || b.s - a.s || b.fit - a.fit
       || (Date.parse(b.v.publishedAt || 0) - Date.parse(a.v.publishedAt || 0)));
     // Provisional deterministic pick — the fallback if the Opus curation pass fails.
-    let prov = scored.filter(x => x.s >= VIDEO_MIN_MATCH);
-    if (!prov.length) prov = scored.filter(x => x.s >= 1 && x.v.searched);
-    const vids = prov.slice(0, 6).map(x => videoCard(x.v));
+    // NO weak-bar fill: a segment with nothing that clears the covers bar shows NO
+    // videos rather than a loosely-related one. Better empty than irrelevant — the
+    // freshness floor and covers bar are hard rules, never relaxed to fill slots.
+    const vids = scored.filter(x => x.s >= VIDEO_MIN_MATCH).slice(0, 6).map(x => videoCard(x.v));
     // Candidates handed to the Opus curation pass (top by coverage + freshness).
     const videoCandidates = scored.slice(0, 14).map(x => ({
       ...videoCard(x.v), covers: x.s, tier: x.tier, durFit: x.fit, src: x.v.searched ? 'search' : 'pool',
