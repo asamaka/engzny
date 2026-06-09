@@ -1223,7 +1223,7 @@ async function main() {
     // first-reported time minus a grace window (so a clip of an EARLIER similar event
     // can't attach to it). The batched Opus curation pass below does the final
     // relevance judgement, drops anything off-event, and can request more searches.
-    const GRACE_MS = Number(process.env.INTEL_VIDEO_EVENT_GRACE_H || 24) * 3600000;
+    const GRACE_MS = Number(process.env.INTEL_VIDEO_EVENT_GRACE_H || 4) * 3600000;
     const floorMs = (Date.parse(rec.firstSeenSourceAt || rec.firstReportedAt) || NOW) - GRACE_MS;
     const searched = process.env.INTEL_VIDEO_SEARCH_OFF === '1'
       ? [] : await W.searchVideos(videoQueryFor(seg), { max: 10, notBefore: floorMs }).catch(() => []);
