@@ -1515,6 +1515,53 @@ app.get('/api/tv/intel/public', async (req, res) => {
   }
 });
 
+// GET /api/tv/intel/market/:id/live — token-free LIVE refresh of ONE market's price +
+// 7-day history straight from Polymarket, so the phone's market detail stays current
+// even when no intel cron has run for a while (the phone polls this ~every 10 min while
+// a market detail is open). A short per-market server cache keeps it cheap and shields
+// Polymarket from per-visitor hammering. Read-only public data (same CORS as /public).
+app.get('/api/tv/intel/market/:id/live', async (req, res) => {
+  setCorsHeaders(res);
+  res.set('Cache-Control', 'public, max-age=120, s-maxage=120');
+  const id = String(req.params.id || '');
+  try {
+    const W = require('./lib/war-sources');
+    const r = await getRedis();
+    const cacheKey = 'tv:war:market:live:' + id;
+    if (r) {
+      const hit = await r.get(cacheKey);
+      if (hit) return res.json(typeof hit === 'string' ? JSON.parse(hit) : hit);
+    }
+    // Resolve the market's CLOB yes-token from the current bundle.
+    let sig = null;
+    if (r) {
+      const cached = await r.get('tv:war:intel:v1');
+      const bundle = cached ? (typeof cached === 'string' ? JSON.parse(cached) : cached) : null;
+      if (bundle) sig = (bundle.signals || []).find(s => String(s.id) === id) || null;
+    }
+    if (!sig || !sig.yesToken) return res.status(404).json({ error: 'unknown_or_untokened_market', id });
+
+    const hist = await W.fetchMarketHistory(sig.yesToken, { interval: '1w', fidelity: 60 });
+    if (!hist || hist.length < 3) return res.status(503).json({ error: 'no_history', id });
+    const lastP = hist[hist.length - 1].p;
+    const d24 = W.measuredDelta(hist, 24) || 0;
+    const pct = Math.round(lastP * 100);
+    const up = d24 >= 0;
+    const out = {
+      id, refreshedAt: new Date().toISOString(),
+      prob: pct + '%', probColor: pct <= 15 ? 'red' : (pct >= 60 ? 'green' : 'amber'),
+      delta: (up ? '+' : '') + Math.round(d24 * 100) + ' pts', deltaColor: up ? 'green' : 'red',
+      history: hist.map(p => Math.round(p.p * 1000) / 1000),
+      spark: W.sparkFromHistory(hist.map(p => p.p)),
+    };
+    if (r) { try { await r.set(cacheKey, JSON.stringify(out), { ex: 120 }); } catch {} }
+    res.json(out);
+  } catch (err) {
+    logger.error('Intel', 'market live refresh failed', { id, error: err.message });
+    res.status(502).json({ error: 'live_refresh_failed', id });
+  }
+});
+
 // GET /m — the mobile web briefing (phone-friendly mirror of the TV intel view).
 app.get('/m', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm.html'));

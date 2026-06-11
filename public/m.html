@@ -96,7 +96,7 @@
   .breaking .bt{font-size:13px;color:#f6ddd9;font-weight:600;line-height:1.32}
 
   /* ===== generic chrome ===== */
-  .wrap{padding:6px 16px 8px}
+  .wrap{padding:6px 16px calc(var(--safeB) + 40px)}
   .sech{display:flex;align-items:center;gap:9px;margin:26px 2px 13px;font-size:11px;letter-spacing:2.5px;font-weight:800;color:#c5c8d1}
   .sech .ic{color:var(--accent);font-size:13px}
   .sech .src{color:var(--faint);font-size:10.5px;letter-spacing:.5px;font-weight:600;margin-left:auto;text-transform:none}
@@ -142,10 +142,9 @@
   .leadkick::before{content:"";width:16px;height:1.5px;background:var(--accent)}
 
   /* ===== market rail ===== */
-  .rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 16px calc(var(--safeB) + 40px);
-    -webkit-overflow-scrolling:touch}
-  .rail::-webkit-scrollbar{display:none}
-  .mcard{scroll-snap-align:start;flex:0 0 80%;max-width:300px;background:linear-gradient(180deg,var(--panel2),var(--panel));
+  /* Vertical stack — homogeneous with the story feed above (no horizontal scroll). */
+  .rail{display:flex;flex-direction:column;gap:15px}
+  .mcard{background:linear-gradient(180deg,var(--panel2),var(--panel));
     border:1px solid var(--line);border-radius:17px;padding:15px 16px;transition:transform .14s ease}
   .mcard:active{transform:scale(.98)}
   .mcard .q{font-size:14px;line-height:1.3;color:#e7e9ee;font-weight:600;height:54px;overflow:hidden;margin-bottom:13px;
@@ -324,8 +323,8 @@
       <div class="sech"><span class="ic">&#9678;</span><span>TOP STORIES</span><span class="src" id="storySrc"></span></div>
       <div class="feed" id="feed"></div>
       <div class="sech" id="mktHead"><span class="ic">&#9889;</span><span>MARKET SPIKES &middot; POLYMARKET</span></div>
+      <div class="rail" id="rail"></div>
     </div>
-    <div class="rail" id="rail"></div>
   </section>
 
   <div class="scrimback" id="scrimback"></div>
@@ -349,6 +348,7 @@
   "use strict";
   var SOURCE="/api/tv/intel/public";
   var POLL_MS=60000;
+  var LIVE_MS=600000;   // live re-pull of the OPEN market detail (~10 min)
   var SEV={
     critical:{a:"#f0584e",glow:"rgba(240,88,78,.24)"},
     warning:{a:"#f4b03e",glow:"rgba(244,140,60,.22)"},
@@ -424,8 +424,16 @@
     R.setProperty('--accent',s.a); R.setProperty('--accentGlow',s.glow);
     var h=s.a.replace('#',''),r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
     R.setProperty('--accentSoft','rgba('+r+','+g+','+b+',.13)'); }
-  function sparkPts(arr,w,h){var n=arr.length;if(n<2)return '0,'+(h/2)+' '+w+','+(h/2);
-    return arr.map(function(y,i){return (i*(w/(n-1))).toFixed(1)+','+(h-(y*(h/22))).toFixed(1);}).join(' ');}
+  // Mini trend line from the SAME history the detail chart uses (probabilities 0..1
+  // over ~7d), normalized into the card's tiny viewbox with the SAME orientation as
+  // marketChartSvg (higher probability → higher on screen). This keeps the rail line
+  // consistent with the real trend and the detail page — the old precomputed `spark`
+  // field was vertically inverted (an up-trend rendered as a down-line).
+  function miniSparkPts(hist,w,h){ var n=hist.length; if(n<2)return '0,'+(h/2).toFixed(1)+' '+w+','+(h/2).toFixed(1);
+    var lo=Math.min.apply(null,hist), hi=Math.max.apply(null,hist), rng=(hi-lo)||0.02;
+    var loP=lo-rng*0.14, hiP=hi+rng*0.14, rngP=(hiP-loP)||0.02, pad=2.5;
+    return hist.map(function(v,i){ var x=(i/(n-1))*w, y=pad+(1-(v-loP)/rngP)*(h-2*pad);
+      return x.toFixed(1)+','+y.toFixed(1); }).join(' ');}
   function updatedLbl(){ var g=genTime();
     $('updLbl').textContent=(g!=null)?('updated '+timeAgo(Math.max(0,Date.now()-g))):''; }
   function clock(){ var d=new Date(),h=d.getHours(),m=d.getMinutes(),ap=h<12?'AM':'PM';h=h%12||12;
@@ -500,14 +508,15 @@
     if(!sigs.length){ rail.innerHTML='<div class="quiet" style="padding-left:16px">◉ Markets quiet — no major spikes right now.</div>'; return; }
     var html='';
     for(var c=0;c<sigs.length;c++){ var s=sigs[c];
-      var sp=(s.spark&&s.spark.length)?s.spark:[12,12,12,12,12,12];
       var stroke=(s.deltaColor==='green'?'#4ade80':(s.deltaColor==='red'?'#f0584e':'#caa24a'));
+      var hist=(s.history||[]).filter(function(x){return typeof x==='number';});
+      var pts=(hist.length>=2)?miniSparkPts(hist,84,28):'0,14.0 84,14.0';
       var foot=[]; if(s.byDate)foot.push(esc(s.byDate)); if(s.meta)foot.push(esc(s.meta));
       html+='<div class="mcard" data-market="'+esc(s.id)+'">'
         +'<div class="q">'+esc(s.question)+'</div>'
         +'<div class="row"><div class="prob '+(pc[s.probColor]||'a')+'">'+esc(s.prob)+'</div>'
         +'<div><div class="delta '+(dc[s.deltaColor]||'g')+'">'+(arr[s.deltaColor]||'•')+' '+esc(s.delta)+'</div>'
-        +'<svg class="spark" viewBox="0 0 84 28" preserveAspectRatio="none"><polyline fill="none" stroke="'+stroke+'" stroke-width="2.5" points="'+sparkPts(sp,84,28)+'"/></svg></div></div>'
+        +'<svg class="spark" viewBox="0 0 84 28" preserveAspectRatio="none"><polyline fill="none" stroke="'+stroke+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="'+pts+'"/></svg></div></div>'
         +(foot.length?'<div class="meta">'+foot.join('  ·  ')+'</div>':'')
         +'</div>';
     }
@@ -668,11 +677,30 @@
       state.openType='market'; state.openId=mid; state.openSig=null;
       $('marketView').innerHTML=marketDetailHtml(s);
       closeDetailPanel($('storyView')); openDetailPanel($('marketView'));
+      refreshOpenMarket();   // pull a live price the moment it opens
     } else {
       state.openType=null; state.openId=null; state.openSig=null;
       closeDetailPanel($('storyView')); closeDetailPanel($('marketView'));
       $('scrimback').classList.remove('on');
     }
+  }
+  // Keep the OPEN market detail live independent of the cron: pull this one market's
+  // fresh price + 7-day history straight from Polymarket (server-cached) and re-render
+  // in place, preserving scroll. Only the open market refreshes (not the whole rail),
+  // so per-visitor load on Polymarket stays minimal.
+  function refreshOpenMarket(){
+    if(state.openType!=='market'||!state.openId) return;
+    var id=state.openId;
+    fetch('/api/tv/intel/market/'+encodeURIComponent(id)+'/live',{cache:'no-store'})
+      .then(function(r){return r.ok?r.json():null;})
+      .then(function(live){
+        if(!live||live.error||state.openType!=='market'||state.openId!==id) return;
+        var s=sigById(id); if(!s) return;
+        ['prob','probColor','delta','deltaColor','history','spark'].forEach(function(k){ if(live[k]!=null) s[k]=live[k]; });
+        var mv=$('marketView'), top=mv.scrollTop;
+        mv.innerHTML=marketDetailHtml(s); mv.scrollTop=top;   // re-render in place, keep scroll
+        renderRail();   // keep the home rail card consistent with the live trend
+      }).catch(function(){});
   }
   function goHome(){ if(location.hash){ location.hash=''; } else { route(); } }
   function openStory(id){ location.hash='#/story/'+encodeURIComponent(id); }
@@ -821,7 +849,8 @@
   setTimeout(reveal,8000);
   setInterval(clock,15000);
   setInterval(function(){ load({}); },POLL_MS);
-  document.addEventListener('visibilitychange',function(){ if(!document.hidden) load({}); });
+  setInterval(refreshOpenMarket,LIVE_MS);   // keep an open market detail live (~10 min)
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden){ load({}); refreshOpenMarket(); } });
 })();
 </script>
 </body>
