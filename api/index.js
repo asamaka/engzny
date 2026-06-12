@@ -1562,6 +1562,12 @@ app.get('/api/tv/intel/market/:id/live', async (req, res) => {
   }
 });
 
+// GET /skytower — Sky Tower defense game (isolated mini-app, fully
+// self-contained static page; shares nothing with the analysis pipeline).
+app.get('/skytower', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'skytower', 'index.html'));
+});
+
 // GET /m — the mobile web briefing (phone-friendly mirror of the TV intel view).
 app.get('/m', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm.html'));

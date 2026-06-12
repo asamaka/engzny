@@ -105,6 +105,7 @@ api/
 
 public/
   hub-v2.html                 # Main page (served at /)
+  skytower/index.html         # Sky Tower defense game (isolated mini-app, served at /skytower)
   keypoints.html              # Keypoint card navigation view
   canvas.html                 # GIUE canvas view
   styles/
