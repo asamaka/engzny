@@ -347,17 +347,24 @@ scene.background = new THREE.Color('#ecc99c');
 scene.fog = new THREE.Fog(0xecc99c, 80, 130);
 
 const cam = new THREE.PerspectiveCamera(40, 1, 1, 220);
-const CAM_DIR = new THREE.Vector3(0.30, 1.18, 0.84).normalize();
-const CAM_TARGET = new THREE.Vector3(-1.2, 0, 0.8);
+// fixed view azimuth; elevation (tilt), zoom and target are user-controlled
+const AZ = Math.atan2(0.30, 0.84);
+const TILT0 = Math.atan2(1.18, Math.hypot(0.30, 0.84));
+const camCtl = { tx: -1.2, tz: 0.8, zoom: 1, tilt: TILT0 };
+function resetCamera() { camCtl.tx = -1.2; camCtl.tz = 0.8; camCtl.zoom = 1; camCtl.tilt = TILT0; }
+const _camDir = new THREE.Vector3();
 function fitCamera() {
   const aspect = window.innerWidth / window.innerHeight;
   cam.aspect = aspect;
   const vF = cam.fov * Math.PI / 360;
   const hF = Math.atan(Math.tan(vF) * aspect);
   const halfW = 12.3, halfDproj = 19.8;
-  const d = Math.max(halfW / Math.tan(hF), halfDproj / Math.tan(vF));
-  cam.position.copy(CAM_DIR).multiplyScalar(d).add(CAM_TARGET);
-  cam.lookAt(CAM_TARGET);
+  const d = Math.max(halfW / Math.tan(hF), halfDproj / Math.tan(vF)) * camCtl.zoom;
+  const cosE = Math.cos(camCtl.tilt);
+  _camDir.set(Math.sin(AZ) * cosE, Math.sin(camCtl.tilt), Math.cos(AZ) * cosE);
+  cam.position.copy(_camDir).multiplyScalar(d);
+  cam.position.x += camCtl.tx; cam.position.z += camCtl.tz;
+  cam.lookAt(camCtl.tx, 0, camCtl.tz);
   cam.updateProjectionMatrix();
 }
 
@@ -393,6 +400,14 @@ function groundH(x, z) {
   if (e > 0.82) h = Math.min(h, lerp(h, -7.5, smooth((e - 0.82) / 0.35)));
   if (carve > 0.95 && e < 0.8) h += noise2(x, z) * 0.16;        // plateau bumps
   else if (carve > 0.1 && carve < 0.95) h += noise2(x * 2, z * 2) * 0.12; // cliff facets
+  // flatten a ledge under each build pad so pads sit on solid, level ground
+  for (const ps of PAD_SPOTS) {
+    const dd = hyp(x - ps[0], z - ps[1]);
+    if (dd < 2.1) {
+      h = lerp(h, PLATEAU + 0.04, smooth((2.1 - dd) / 0.85) * carve);
+      break;
+    }
+  }
   return h;
 }
 const C_PATH = new THREE.Color('#eed9ac'), C_PATH2 = new THREE.Color('#dfc391');
@@ -569,24 +584,27 @@ buildDecor();
 
 // build pads (stone circles)
 const padRingMat = new THREE.MeshBasicMaterial({ color: 0xffe082, transparent: true, opacity: 0.0, side: THREE.DoubleSide });
+const padTopMat = new THREE.MeshLambertMaterial({ color: 0xbfb091, flatShading: true });
+const padRimMat = new THREE.MeshLambertMaterial({ color: 0x97866b, flatShading: true });
 function buildPads() {
   for (const p of game.pads) {
     const y = groundH(p.x, p.z);
     p.y = y;
     const g2 = new THREE.Group();
-    const disc = cyl(1.15, 1.3, 0.22, M.stone, 0, 0.11, 0, 10);
+    // low profile, sunk into the flattened ledge
+    const rim = cyl(1.06, 1.16, 0.1, padRimMat, 0, 0.0, 0, 12);
+    rim.receiveShadow = true;
+    g2.add(rim);
+    const disc = cyl(0.92, 1.04, 0.12, padTopMat, 0, 0.07, 0, 12);
     disc.receiveShadow = true;
     g2.add(disc);
-    const rim = cyl(1.3, 1.38, 0.1, M.stoneDark, 0, 0.05, 0, 10);
-    g2.add(rim);
     // glow ring (pulsing while buildable)
-    const ring = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.55, 24), padRingMat.clone());
+    const ring = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.24, 24), padRingMat.clone());
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.26;
+    ring.position.y = 0.18;
     g2.add(ring);
     p.glow = ring;
-    g2.scale.setScalar(1.2);
-    g2.position.set(p.x, y, p.z);
+    g2.position.set(p.x, y - 0.04, p.z);
     scene.add(g2);
     p.mesh = g2;
   }
@@ -1084,6 +1102,7 @@ function buildTowerMesh(type, lvl) {
   G.head = head;
   G.scale.setScalar(1.45);
   G.muzzleY = (G.muzzleY || 1.5) * 1.45;
+  G.muzzleF = { archer: 0.5, cannon: 2.0, frost: 0, gunslinger: 0.95, longrifle: 1.7 }[type];
   G.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return G;
 }
@@ -1133,6 +1152,7 @@ function resetGame() {
   STAND_SLOTS.forEach(s => s.used = false);
   banners = [];
   hideRange();
+  resetCamera();
   updateWaveMarker();
   banner('WAVE 1', 'INCOMING — BUILD YOUR DEFENSES', '#ffd34d');
 }
@@ -1325,11 +1345,12 @@ function updateTower(t, dt) {
   if (!e) return;
   const want = Math.atan2(e.z - t.z, e.x - t.x);
   t.aim += angDiff(t.aim, want) * Math.min(1, dt * 9);
-  t.mesh.head.rotation.y = -t.aim - Math.PI / 2;
+  t.mesh.head.rotation.y = -t.aim + Math.PI / 2; // model faces +z
   if (t.cd > 0) return;
   const aimed = Math.abs(angDiff(t.aim, want)) < 0.35;
   const my = t.y + (t.mesh.muzzleY || 1.5);
-  const mx = t.x + Math.cos(t.aim) * 0.5, mz = t.z + Math.sin(t.aim) * 0.5;
+  const mF = t.mesh.muzzleF || 0.5;
+  const mx = t.x + Math.cos(t.aim) * mF, mz = t.z + Math.sin(t.aim) * mF;
   if (t.type === 'archer') {
     if (!aimed) return;
     t.cd = st.rate;
@@ -1345,8 +1366,8 @@ function updateTower(t, dt) {
       tx = p.x - Math.sin(p.a) * e.lat; tz = p.z + Math.cos(p.a) * e.lat;
     }
     fireBall(mx, my, mz, tx, tz, st.dmg, st.splash);
-    puff(mx + Math.cos(t.aim) * 0.7, my, mz + Math.sin(t.aim) * 0.7, 0xffe27a, 0.4, 1, 0.12, 1, 0);
-    puff(mx + Math.cos(t.aim) * 0.9, my, mz + Math.sin(t.aim) * 0.9, 0xbbb0a4, 0.4, 1.5, 0.5, 0.6, 0.8);
+    puff(mx, my + 0.3, mz, 0xffe27a, 0.4, 1, 0.12, 1, 0);
+    puff(mx + Math.cos(t.aim) * 0.3, my + 0.3, mz + Math.sin(t.aim) * 0.3, 0xbbb0a4, 0.4, 1.5, 0.5, 0.6, 0.8);
     SFX.cannon();
     game.shake = Math.min(game.shake + 1.5, 8);
   } else if (t.type === 'frost') {
@@ -1715,6 +1736,21 @@ function drawHUD() {
     g.strokeText(msg, CW / 2, 112 * U);
     g.fillText(msg, CW / 2, 112 * U);
   }
+  // camera reset (floating, hidden while a sheet is open)
+  if (game.state === 'playing' && !game.selPad && !game.selTower &&
+      (Math.abs(camCtl.zoom - 1) > 0.02 || Math.abs(camCtl.tilt - TILT0) > 0.02 ||
+       Math.abs(camCtl.tx + 1.2) > 0.3 || Math.abs(camCtl.tz - 0.8) > 0.3)) {
+    const cx = CW - 32 * U, cy2 = CH - 36 * U;
+    g.fillStyle = 'rgba(35,20,8,0.7)';
+    g.beginPath(); g.arc(cx, cy2, 21 * U, 0, TAU); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,0.45)'; g.lineWidth = 1.6 * U;
+    g.beginPath(); g.arc(cx, cy2, 21 * U, 0, TAU); g.stroke();
+    g.fillStyle = '#fff';
+    g.font = '900 ' + Math.round(17 * U) + 'px ' + FONT;
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('⊕', cx, cy2 + 1);
+    addBtn(cx - 25 * U, cy2 - 25 * U, 50 * U, 50 * U, 'cam');
+  }
 }
 function drawHpBars() {
   // fort bar (blue, segmented — like the reference)
@@ -2050,6 +2086,7 @@ function handleBtn(b) {
     case 'pause': game.paused = !game.paused; break;
     case 'speed': game.speed = game.speed === 1 ? 2 : 1; break;
     case 'sound': SFX.on = !SFX.on; break;
+    case 'cam': resetCamera(); break;
     case 'rush':
       if (!game.waveActive) {
         const bonus = Math.floor(Math.max(game.nextWaveT, 0)) * 2;
@@ -2079,9 +2116,67 @@ function handleBtn(b) {
       break;
   }
 }
+// camera gestures: drag = pan, pinch = zoom, two-finger drag / right-drag = tilt,
+// wheel = zoom. A short press without movement is a tap (select/build).
+const _rc = new THREE.Raycaster();
+function groundPoint(cx, cy) {
+  _rc.setFromCamera({ x: cx / CW * 2 - 1, y: -(cy / CH * 2 - 1) }, cam);
+  const t = -_rc.ray.origin.y / (_rc.ray.direction.y || -1e-6);
+  return { x: _rc.ray.origin.x + _rc.ray.direction.x * t, z: _rc.ray.origin.z + _rc.ray.direction.z * t };
+}
+const ptrs = new Map();
+let gesture = null;
 ui.addEventListener('pointerdown', ev => {
   ev.preventDefault();
-  onTap(ev.clientX, ev.clientY);
+  SFX.init();
+  try { ui.setPointerCapture(ev.pointerId); } catch (e) {}
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (ptrs.size === 1) {
+    gesture = { mode: ev.button === 2 ? 'tilt' : 'pan', sx: ev.clientX, sy: ev.clientY,
+      moved: false, anchor: groundPoint(ev.clientX, ev.clientY), tilt0: camCtl.tilt };
+  } else if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    gesture = { mode: 'pinch', moved: true, dist0: Math.max(hyp(a.x - b.x, a.y - b.y), 20),
+      midY0: (a.y + b.y) / 2, zoom0: camCtl.zoom, tilt0: camCtl.tilt };
+  } else gesture = null;
+}, { passive: false });
+ui.addEventListener('pointermove', ev => {
+  if (!ptrs.has(ev.pointerId)) return;
+  ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  if (!gesture) return;
+  if (gesture.mode === 'pan' || gesture.mode === 'tilt') {
+    if (!gesture.moved && hyp(ev.clientX - gesture.sx, ev.clientY - gesture.sy) > 9) gesture.moved = true;
+    if (!gesture.moved) return;
+    if (gesture.mode === 'tilt') {
+      camCtl.tilt = clamp(gesture.tilt0 + (ev.clientY - gesture.sy) * 0.004, 0.55, 1.25);
+    } else {
+      const gp = groundPoint(ev.clientX, ev.clientY);
+      camCtl.tx = clamp(camCtl.tx + gesture.anchor.x - gp.x, -18, 18);
+      camCtl.tz = clamp(camCtl.tz + gesture.anchor.z - gp.z, -28, 28);
+      fitCamera();
+    }
+  } else if (gesture.mode === 'pinch' && ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()];
+    const d = Math.max(hyp(a.x - b.x, a.y - b.y), 20);
+    camCtl.zoom = clamp(gesture.zoom0 * gesture.dist0 / d, 0.4, 1.6);
+    camCtl.tilt = clamp(gesture.tilt0 + ((a.y + b.y) / 2 - gesture.midY0) * 0.003, 0.55, 1.25);
+  }
+});
+function endPtr(ev) {
+  const tap = ptrs.size === 1 && gesture && gesture.mode !== 'pinch' && !gesture.moved;
+  ptrs.delete(ev.pointerId);
+  if (ptrs.size === 0) gesture = null;
+  else if (ptrs.size === 1) {
+    const [a] = [...ptrs.values()];
+    gesture = { mode: 'pan', sx: a.x, sy: a.y, moved: true, anchor: groundPoint(a.x, a.y) };
+  }
+  if (tap) onTap(ev.clientX, ev.clientY);
+}
+ui.addEventListener('pointerup', endPtr);
+ui.addEventListener('pointercancel', ev => { ptrs.delete(ev.pointerId); if (!ptrs.size) gesture = null; });
+ui.addEventListener('wheel', ev => {
+  ev.preventDefault();
+  camCtl.zoom = clamp(camCtl.zoom * (1 + ev.deltaY * 0.001), 0.4, 1.6);
 }, { passive: false });
 document.addEventListener('touchmove', ev => ev.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', ev => ev.preventDefault());
@@ -2122,7 +2217,7 @@ requestAnimationFrame(frame);
 
 // test hooks (headless verification)
 window.__sky = { game, FORT, PATH, startWave, spawnEnemy, buildTower, resetGame, TOWERS, ENEMIES, THREE, scene, cam,
-  btnsRef: () => btns, project };
+  btnsRef: () => btns, project, camCtl, resetCamera };
 </script>
 </body>
 </html>
