@@ -17,6 +17,19 @@
       "dest": "/api/index.js"
     },
     {
+      "src": "/skytower",
+      "status": 308,
+      "headers": { "Location": "/skytower/" }
+    },
+    {
+      "src": "/skytower/",
+      "dest": "/public/skytower/index.html"
+    },
+    {
+      "src": "/skytower/(.+)",
+      "dest": "/public/skytower/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "/api/index.js"
     }
