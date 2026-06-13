@@ -117,11 +117,22 @@ const SFX = {
   win()     { if (this.ok('win'))     { this.tone('triangle', 523, 523, 0.15, 0.2); this.tone('triangle', 659, 659, 0.18, 0.2); } },
 };
 
-// ---------- path (world units, XZ plane) ----------
-const WP = [
-  [-14.5, -21.1], [8.9, -21.1], [8.9, -11.6], [-9.3, -11.6], [-9.3, -1.3],
-  [8.9, -1.3], [8.9, 8.9], [-7.1, 8.9], [-7.1, 16.7], [0, 19.8]
-];
+// ---------- deterministic RNG (stable world layout across loads) ----------
+let _rngS = 0x6d2b79f5;
+function srnd() { _rngS = (_rngS * 1664525 + 1013904223) >>> 0; return _rngS / 4294967296; }
+function srange(a, b) { return a + srnd() * (b - a); }
+
+// ---------- mesa shape: a natural blobby plateau centred on the keep ----------
+function plateauRadius(ang) {
+  return 21.0 + 2.7 * Math.sin(ang * 3 + 0.6) + 1.6 * Math.sin(ang * 5 - 1.2)
+    + 1.1 * Math.sin(ang * 2 + 2.3);
+}
+function edgeFactor(x, z) {           // <1 inside the mesa, ~1 at the rim
+  const r = hyp(x, z);
+  return r / plateauRadius(Math.atan2(z, x));
+}
+
+// ---------- paths: several natural trails from the rim to the centre keep ----------
 function buildPath(pts, r) {
   const raw = [{ x: pts[0][0], z: pts[0][1] }];
   for (let i = 1; i < pts.length - 1; i++) {
@@ -134,7 +145,7 @@ function buildPath(pts, r) {
     const ax = p1[0] - v1x * rad, az = p1[1] - v1z * rad;
     const bx = p1[0] + v2x * rad, bz = p1[1] + v2z * rad;
     raw.push({ x: ax, z: az });
-    for (let t = 0.12; t < 1; t += 0.12) {
+    for (let t = 0.1; t < 1; t += 0.1) {
       const u = 1 - t;
       raw.push({
         x: u * u * ax + 2 * u * t * p1[0] + t * t * bx,
@@ -152,10 +163,13 @@ function buildPath(pts, r) {
   }
   return { pts: out, length: len };
 }
-const PATH = buildPath(WP, 2.4);
-function pathAt(d, hint) {
-  d = clamp(d, 0, PATH.length);
-  const P = PATH.pts;
+const NPATHS = 5;
+const PATHS = [];
+const PATH_ENTRIES = [];
+function pathAt(pi, d, hint) {
+  const PA = PATHS[pi];
+  d = clamp(d, 0, PA.length);
+  const P = PA.pts;
   let i = hint && hint.si ? hint.si : 0;
   if (i > P.length - 2) i = P.length - 2;
   while (i < P.length - 2 && P[i + 1].d < d) i++;
@@ -165,33 +179,71 @@ function pathAt(d, hint) {
   const t = (d - a.d) / Math.max(b.d - a.d, 1e-6);
   return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), a: Math.atan2(b.z - a.z, b.x - a.x) };
 }
-function distToPath(x, z) {
+(function genPaths() {
+  for (let k = 0; k < NPATHS; k++) {
+    const ang = k / NPATHS * TAU + srange(-0.32, 0.32);
+    const startR = plateauRadius(ang) - 1.3;
+    const bendSign = srnd() < 0.5 ? -1 : 1;
+    const bendMag = srange(0.45, 1.15);
+    const steps = 4 + Math.floor(srnd() * 3);   // 4..6 interior bends
+    const pts = [[Math.cos(ang) * startR, Math.sin(ang) * startR]];
+    for (let i = 1; i <= steps; i++) {
+      const t = i / (steps + 1);
+      const r = lerp(startR, 5.4, t);
+      const a = ang + bendSign * bendMag * Math.sin(t * Math.PI) + srange(-0.16, 0.16) * (1 - t);
+      pts.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    pts.push([Math.cos(ang) * 4.6, Math.sin(ang) * 4.6]);   // arrive at the keep basin
+    PATHS.push(buildPath(pts, 2.3));
+    const ep = pathAt(k, 3.2);                              // marker sits a few units in
+    PATH_ENTRIES.push({ x: ep.x, z: ep.z, a: ep.a });
+  }
+})();
+function distToPathArr(x, z, P) {
   let best = 1e9;
-  const P = PATH.pts;
   for (let i = 0; i < P.length - 1; i++) {
     const a = P[i], b = P[i + 1];
     const abx = b.x - a.x, abz = b.z - a.z;
     const t = clamp(((x - a.x) * abx + (z - a.z) * abz) / (abx * abx + abz * abz || 1e-6), 0, 1);
-    const d = hyp(x - (a.x + abx * t), z - (a.z + abz * t));
+    const dd = hyp(x - (a.x + abx * t), z - (a.z + abz * t));
+    if (dd < best) best = dd;
+  }
+  return best;
+}
+function distToPath(x, z) {
+  let best = 1e9;
+  for (let k = 0; k < PATHS.length; k++) {
+    const d = distToPathArr(x, z, PATHS[k].pts);
     if (d < best) best = d;
   }
   return best;
 }
 
-// ---------- world layout ----------
-const FORT = { x: 0, z: 21.6, hpMax: 25, hp: 25 };
-const BASIN = { x: 0, z: 20.6, r: 5.8 };
-const PAD_SPOTS = [
-  [-2.7, -16.4], [13.1, -16.9], [-13.2, -6.8], [-0.1, -6.4], [13.1, -6.0],
-  [-0.1, 3.8], [-12.9, 13.6], [-1.3, 13.6], [11.6, 13.6]
-];
+// ---------- world layout (keep at the centre, slots ringing it) ----------
+const FORT = { x: 0, z: 0, hpMax: 25, hp: 25 };
+const BASIN = { x: 0, z: 0, r: 5.2 };
 const STAND_SLOTS = [];
-[[3.4, [-58, -29, 0, 29, 58]], [4.9, [-72, -48, -24, 0, 24, 48, 72]]].forEach(([r, angs]) => {
-  angs.forEach(a => {
-    const ar = a * Math.PI / 180;
-    STAND_SLOTS.push({ x: BASIN.x + Math.sin(ar) * r, z: BASIN.z - 1.4 - Math.cos(ar) * r * 0.85, used: false });
-  });
+[[3.4, 8, 0], [4.8, 12, 0.26]].forEach(([r, n, off]) => {
+  for (let i = 0; i < n; i++) {
+    const a = i / n * TAU + off;
+    STAND_SLOTS.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, used: false });
+  }
 });
+const PAD_SPOTS = [];
+(function genPads() {
+  let tries = 0;
+  while (PAD_SPOTS.length < 14 && tries++ < 5000) {
+    const a = srange(0, TAU), r = srange(6.5, 18.5);
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (edgeFactor(x, z) > 0.74) continue;
+    const dp = distToPath(x, z);
+    if (dp < 2.5 || dp > 5.2) continue;            // beside a trail, within tower range
+    if (hyp(x, z) < BASIN.r + 1.8) continue;
+    let ok = true;
+    for (const p of PAD_SPOTS) if (hyp(p[0] - x, p[1] - z) < 4.0) { ok = false; break; }
+    if (ok) PAD_SPOTS.push([+x.toFixed(2), +z.toFixed(2)]);
+  }
+})();
 
 // ---------- tower / enemy definitions ----------
 const TOWERS = {
@@ -275,12 +327,13 @@ const LANES = [-0.95, -0.33, 0.33, 0.95];
 function genWave(n) {
   const q = [];
   let t = 0.5;
-  const pushSquad = (type, count, rowGap) => {
+  const pushSquad = (type, count, rowGap, pi) => {
+    if (pi === undefined) pi = randi(0, NPATHS - 1);
     const cols = ENEMIES[type].squad || 1;
     for (let i = 0; i < count; i++) {
       const row = Math.floor(i / cols), col = i % cols;
       const lat = cols > 1 ? LANES[col + Math.floor((4 - cols) / 2)] : rand(-0.6, 0.6);
-      q.push({ t: t + row * rowGap, type, lat });
+      q.push({ t: t + row * rowGap, type, lat, pi });
     }
     t += Math.ceil(count / cols) * rowGap + 1.4;
   };
@@ -288,7 +341,7 @@ function genWave(n) {
     pushSquad('rifle', 8 + Math.floor(n / 3), 0.5);
     pushSquad('heavy', 2 + Math.floor(n / 8), 1.2);
     const bosses = 1 + Math.floor(n / 24);
-    for (let i = 0; i < bosses; i++) { q.push({ t, type: 'boss', lat: 0 }); t += 4; }
+    for (let i = 0; i < bosses; i++) { q.push({ t, type: 'boss', lat: 0, pi: randi(0, NPATHS - 1) }); t += 4; }
     pushSquad('medic', Math.max(1, Math.floor(n / 6)), 1.2);
     return q.sort((a, b) => a.t - b.t);
   }
@@ -347,21 +400,22 @@ scene.background = new THREE.Color('#ecc99c');
 scene.fog = new THREE.Fog(0xecc99c, 80, 130);
 
 const cam = new THREE.PerspectiveCamera(40, 1, 1, 220);
-// fixed view azimuth; elevation (tilt), zoom and target are user-controlled
-const AZ = Math.atan2(0.30, 0.84);
-const TILT0 = Math.atan2(1.18, Math.hypot(0.30, 0.84));
-const camCtl = { tx: -1.2, tz: 0.8, zoom: 1, tilt: TILT0 };
-function resetCamera() { camCtl.tx = -1.2; camCtl.tz = 0.8; camCtl.zoom = 1; camCtl.tilt = TILT0; }
+// orbit camera: azimuth (rot), elevation (tilt), zoom and pan target are all
+// user-controlled. The keep sits at the origin, so the default target is (0,0).
+const TILT0 = Math.atan2(1.12, Math.hypot(0.30, 0.84));
+const ROT0 = Math.atan2(0.30, 0.84);
+const camCtl = { tx: 0, tz: 0, zoom: 1, tilt: TILT0, rot: ROT0 };
+function resetCamera() { camCtl.tx = 0; camCtl.tz = 0; camCtl.zoom = 1; camCtl.tilt = TILT0; camCtl.rot = ROT0; }
 const _camDir = new THREE.Vector3();
 function fitCamera() {
   const aspect = window.innerWidth / window.innerHeight;
   cam.aspect = aspect;
   const vF = cam.fov * Math.PI / 360;
   const hF = Math.atan(Math.tan(vF) * aspect);
-  const halfW = 12.3, halfDproj = 19.8;
+  const halfW = 16.5, halfDproj = 22.0;
   const d = Math.max(halfW / Math.tan(hF), halfDproj / Math.tan(vF)) * camCtl.zoom;
   const cosE = Math.cos(camCtl.tilt);
-  _camDir.set(Math.sin(AZ) * cosE, Math.sin(camCtl.tilt), Math.cos(AZ) * cosE);
+  _camDir.set(Math.sin(camCtl.rot) * cosE, Math.sin(camCtl.tilt), Math.cos(camCtl.rot) * cosE);
   cam.position.copy(_camDir).multiplyScalar(d);
   cam.position.x += camCtl.tx; cam.position.z += camCtl.tz;
   cam.lookAt(camCtl.tx, 0, camCtl.tz);
@@ -383,10 +437,6 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.12));
 
 // ---------- terrain heightfield ----------
 const PLATEAU = 2.6;
-function edgeFactor(x, z) { // superellipse mesa boundary: <1 inside
-  const nx = x / 15.8, nz = z / 26.2;
-  return nx * nx * nx * nx + nz * nz * nz * nz;
-}
 function noise2(x, z) {
   return Math.sin(x * 2.13 + z * 1.71) * 0.5 + Math.sin(x * 0.83 - z * 2.47 + 1.7) * 0.3
     + Math.sin(x * 4.7 + z * 3.9 + 4.2) * 0.2;
@@ -397,7 +447,7 @@ function groundH(x, z) {
   const carve = Math.min(smooth((dPath - 1.8) / 1.45), smooth((dBasin - BASIN.r) / 1.5));
   let h = PLATEAU * carve;
   const e = edgeFactor(x, z);
-  if (e > 0.82) h = Math.min(h, lerp(h, -7.5, smooth((e - 0.82) / 0.35)));
+  if (e > 0.86) h = Math.min(h, lerp(h, -7.8, smooth((e - 0.86) / 0.3)));
   if (carve > 0.95 && e < 0.8) h += noise2(x, z) * 0.16;        // plateau bumps
   else if (carve > 0.1 && carve < 0.95) h += noise2(x * 2, z * 2) * 0.12; // cliff facets
   // flatten a ledge under each build pad so pads sit on solid, level ground
@@ -432,8 +482,8 @@ function groundColor(x, z, h) {
   return c;
 }
 function buildTerrain() {
-  const SX = 116, SZ = 196;        // grid resolution
-  const X0 = -21, X1 = 21, Z0 = -30, Z1 = 30;
+  const SX = 156, SZ = 156;        // grid resolution
+  const X0 = -27, X1 = 27, Z0 = -27, Z1 = 27;
   const pos = [], col = [], idx = [];
   for (let j = 0; j <= SZ; j++) {
     for (let i = 0; i <= SX; i++) {
@@ -503,17 +553,17 @@ function cyl(rt, rb, h, mat, x, y, z, seg) {
 
 // ---------- decor ----------
 function decorOK(x, z) {
-  if (edgeFactor(x, z) > 0.72) return false;
-  if (distToPath(x, z) < 4.3) return false;
-  if (hyp(x - BASIN.x, z - BASIN.z) < BASIN.r + 2.2) return false;
-  for (const p of game.pads) if (hyp(p.x - x, p.z - z) < 2.6) return false;
+  if (edgeFactor(x, z) > 0.74) return false;
+  if (distToPath(x, z) < 2.9) return false;
+  if (hyp(x - BASIN.x, z - BASIN.z) < BASIN.r + 1.8) return false;
+  for (const p of game.pads) if (hyp(p.x - x, p.z - z) < 2.3) return false;
   return true;
 }
 function buildDecor() {
   const grp = new THREE.Group();
   let n = 0, tries = 0;
-  while (n < 16 && tries++ < 400) {   // rocks
-    const x = rand(-15, 15), z = rand(-25, 25);
+  while (n < 26 && tries++ < 700) {   // rocks
+    const x = rand(-24, 24), z = rand(-24, 24);
     if (!decorOK(x, z)) continue;
     n++;
     const s = rand(0.4, 1.3);
@@ -525,8 +575,8 @@ function buildDecor() {
     grp.add(r);
   }
   n = 0; tries = 0;
-  while (n < 7 && tries++ < 300) {    // dead trees
-    const x = rand(-15, 15), z = rand(-25, 25);
+  while (n < 12 && tries++ < 500) {    // dead trees
+    const x = rand(-24, 24), z = rand(-24, 24);
     if (!decorOK(x, z)) continue;
     n++;
     const t = new THREE.Group();
@@ -542,8 +592,8 @@ function buildDecor() {
     grp.add(t);
   }
   n = 0; tries = 0;
-  while (n < 9 && tries++ < 300) {    // shrubs
-    const x = rand(-15, 15), z = rand(-25, 25);
+  while (n < 16 && tries++ < 500) {    // shrubs
+    const x = rand(-24, 24), z = rand(-24, 24);
     if (!decorOK(x, z)) continue;
     n++;
     const s = rand(0.25, 0.5);
@@ -553,9 +603,10 @@ function buildDecor() {
     b.castShadow = true;
     grp.add(b);
   }
-  // pebbles scattered on the path floor (visual only)
-  for (let i = 0; i < 14; i++) {
-    const p = pathAt(rand(3, PATH.length - 6));
+  // pebbles scattered along every trail floor (visual only)
+  for (let i = 0; i < 34; i++) {
+    const pi = randi(0, NPATHS - 1);
+    const p = pathAt(pi, rand(3, PATHS[pi].length - 4));
     const off = rand(-1.25, 1.25);
     const px = p.x - Math.sin(p.a) * off, pz = p.z + Math.cos(p.a) * off;
     const s = rand(0.08, 0.2);
@@ -567,9 +618,10 @@ function buildDecor() {
     peb.castShadow = true;
     grp.add(peb);
   }
-  // cattle skull near path
-  const skX = -11.5, skZ = -17.5;
-  if (true) {
+  // cattle skulls near a couple of trailheads
+  for (const ei of [1, 3]) {
+    const ent = PATH_ENTRIES[ei];
+    const skX = ent.x * 0.78 + rand(-0.5, 0.5), skZ = ent.z * 0.78 + rand(-0.5, 0.5);
     const sk = new THREE.Group();
     const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 0),
       new THREE.MeshLambertMaterial({ color: 0xe8dcc8, flatShading: true }));
@@ -611,20 +663,22 @@ function buildPads() {
 }
 buildPads();
 
-// wave marker decal on the path
-let markerTex, markerMesh;
+// wave marker decals — one stamped on each trailhead
+let markerTex; const markerMeshes = [];
 function updateWaveMarker() {
   if (!markerTex) {
     const c = document.createElement('canvas');
     c.width = c.height = 256;
     markerTex = new THREE.CanvasTexture(c);
-    const mat = new THREE.MeshBasicMaterial({ map: markerTex, transparent: true, depthWrite: false });
-    markerMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), mat);
-    markerMesh.rotation.x = -Math.PI / 2;
-    const mp = pathAt(7);
-    markerMesh.position.set(mp.x, 0.06, mp.z);
-    markerMesh.rotation.z = -mp.a;
-    scene.add(markerMesh);
+    for (const ent of PATH_ENTRIES) {
+      const mat = new THREE.MeshBasicMaterial({ map: markerTex, transparent: true, depthWrite: false });
+      const mm = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 4.0), mat);
+      mm.rotation.x = -Math.PI / 2;
+      mm.position.set(ent.x, 0.06, ent.z);
+      mm.rotation.z = -ent.a;
+      scene.add(mm);
+      markerMeshes.push(mm);
+    }
   }
   const c = markerTex.image, x = c.getContext('2d');
   x.clearRect(0, 0, 256, 256);
@@ -1157,13 +1211,14 @@ function resetGame() {
   banner('WAVE 1', 'INCOMING — BUILD YOUR DEFENSES', '#ffd34d');
 }
 
-function spawnEnemy(type, lat) {
+function spawnEnemy(type, lat, pi) {
   const def = ENEMIES[type];
   const m = hpMul(game.wave);
-  const start = pathAt(0);
+  if (pi === undefined) pi = randi(0, NPATHS - 1);
+  const start = pathAt(pi, 0);
   lat = lat === undefined ? rand(-0.6, 0.6) : lat;
   const e = {
-    type, def, dead: false,
+    type, def, dead: false, pi,
     hp: Math.round(def.hp * m), hpMax: Math.round(def.hp * m),
     speed: def.speed * spdMul(game.wave),
     gold: Math.round(def.gold * goldMul(game.wave)),
@@ -1212,12 +1267,12 @@ function updateEnemy(e, dt) {
     e.walk += dt * spd * 2.1;
     e.moving = true;
     e.d += spd * dt;
-    const p = pathAt(e.d, e);
+    const p = pathAt(e.pi, e.d, e);
     e.x = p.x - Math.sin(p.a) * e.lat;
     e.z = p.z + Math.cos(p.a) * e.lat;
     e.y = 0;
     e.angle += angDiff(e.angle, p.a) * Math.min(1, dt * 10);
-    if (e.d >= PATH.length - 0.6) {
+    if (e.d >= PATHS[e.pi].length - 0.6) {
       let si = -1, best = 1e9;
       for (let i = 0; i < STAND_SLOTS.length; i++) {
         if (STAND_SLOTS[i].used) continue;
@@ -1322,11 +1377,12 @@ function sellTower(t) {
 }
 function towerStats(t) { return t.def.lv[t.lvl - 1]; }
 function acquireTarget(t, st) {
-  let best = null, bestScore = -1;
+  let best = null, bestScore = -Infinity;
   for (const e of game.enemies) {
     if (e.hp <= 0) continue;
     if (hyp(e.x - t.x, e.z - t.z) > st.range) continue;
-    const score = t.def.targetStrong ? e.hp : (e.state === 'walk' ? e.d : PATH.length + 5);
+    // default priority: closest to the keep (smallest distance to centre)
+    const score = t.def.targetStrong ? e.hp : -hyp(e.x, e.z);
     if (score > bestScore) { bestScore = score; best = e; }
   }
   return best;
@@ -1362,7 +1418,7 @@ function updateTower(t, dt) {
     let tx = e.x, tz = e.z;
     if (e.state === 'walk') {
       const eta = hyp(e.x - t.x, e.z - t.z) / 11;
-      const p = pathAt(e.d + e.speed * e.slowF * eta, { si: e.si });
+      const p = pathAt(e.pi, e.d + e.speed * e.slowF * eta, { si: e.si });
       tx = p.x - Math.sin(p.a) * e.lat; tz = p.z + Math.cos(p.a) * e.lat;
     }
     fireBall(mx, my, mz, tx, tz, st.dmg, st.splash);
@@ -1536,7 +1592,7 @@ function update(dt) {
       game.spawnT += dt;
       while (game.spawnQueue.length && game.spawnQueue[0].t <= game.spawnT) {
         const s = game.spawnQueue.shift();
-        spawnEnemy(s.type, s.lat);
+        spawnEnemy(s.type, s.lat, s.pi);
       }
       if (!game.spawnQueue.length && !game.enemies.length) {
         game.waveActive = false;
@@ -1739,7 +1795,7 @@ function drawHUD() {
   // camera reset (floating, hidden while a sheet is open)
   if (game.state === 'playing' && !game.selPad && !game.selTower &&
       (Math.abs(camCtl.zoom - 1) > 0.02 || Math.abs(camCtl.tilt - TILT0) > 0.02 ||
-       Math.abs(camCtl.tx + 1.2) > 0.3 || Math.abs(camCtl.tz - 0.8) > 0.3)) {
+       Math.abs(angDiff(camCtl.rot, ROT0)) > 0.02 || Math.abs(camCtl.tx) > 0.4 || Math.abs(camCtl.tz) > 0.4)) {
     const cx = CW - 32 * U, cy2 = CH - 36 * U;
     g.fillStyle = 'rgba(35,20,8,0.7)';
     g.beginPath(); g.arc(cx, cy2, 21 * U, 0, TAU); g.fill();
@@ -2116,8 +2172,9 @@ function handleBtn(b) {
       break;
   }
 }
-// camera gestures: drag = pan, pinch = zoom, two-finger drag / right-drag = tilt,
-// wheel = zoom. A short press without movement is a tap (select/build).
+// camera gestures: one-finger drag = pan, two-finger pinch = zoom + twist =
+// rotate + vertical = tilt, right-drag = rotate/tilt, wheel = zoom. A short
+// press without movement is a tap (select/build).
 const _rc = new THREE.Raycaster();
 function groundPoint(cx, cy) {
   _rc.setFromCamera({ x: cx / CW * 2 - 1, y: -(cy / CH * 2 - 1) }, cam);
@@ -2126,44 +2183,49 @@ function groundPoint(cx, cy) {
 }
 const ptrs = new Map();
 let gesture = null;
+function twoRefs() {
+  const [a, b] = [...ptrs.values()];
+  return { dist: Math.max(hyp(a.x - b.x, a.y - b.y), 20), ang: Math.atan2(b.y - a.y, b.x - a.x), midY: (a.y + b.y) / 2 };
+}
 ui.addEventListener('pointerdown', ev => {
   ev.preventDefault();
   SFX.init();
   try { ui.setPointerCapture(ev.pointerId); } catch (e) {}
   ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   if (ptrs.size === 1) {
-    gesture = { mode: ev.button === 2 ? 'tilt' : 'pan', sx: ev.clientX, sy: ev.clientY,
-      moved: false, anchor: groundPoint(ev.clientX, ev.clientY), tilt0: camCtl.tilt };
+    gesture = { mode: ev.button === 2 ? 'orbit' : 'pan', sx: ev.clientX, sy: ev.clientY,
+      moved: false, anchor: groundPoint(ev.clientX, ev.clientY), tilt0: camCtl.tilt, rot0: camCtl.rot };
   } else if (ptrs.size === 2) {
-    const [a, b] = [...ptrs.values()];
-    gesture = { mode: 'pinch', moved: true, dist0: Math.max(hyp(a.x - b.x, a.y - b.y), 20),
-      midY0: (a.y + b.y) / 2, zoom0: camCtl.zoom, tilt0: camCtl.tilt };
+    const r = twoRefs();
+    gesture = { mode: 'multi', moved: true, dist0: r.dist, ang0: r.ang, midY0: r.midY,
+      zoom0: camCtl.zoom, rot0: camCtl.rot, tilt0: camCtl.tilt };
   } else gesture = null;
 }, { passive: false });
 ui.addEventListener('pointermove', ev => {
   if (!ptrs.has(ev.pointerId)) return;
   ptrs.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
   if (!gesture) return;
-  if (gesture.mode === 'pan' || gesture.mode === 'tilt') {
+  if (gesture.mode === 'pan' || gesture.mode === 'orbit') {
     if (!gesture.moved && hyp(ev.clientX - gesture.sx, ev.clientY - gesture.sy) > 9) gesture.moved = true;
     if (!gesture.moved) return;
-    if (gesture.mode === 'tilt') {
-      camCtl.tilt = clamp(gesture.tilt0 + (ev.clientY - gesture.sy) * 0.004, 0.55, 1.25);
+    if (gesture.mode === 'orbit') {
+      camCtl.rot = gesture.rot0 - (ev.clientX - gesture.sx) * 0.006;
+      camCtl.tilt = clamp(gesture.tilt0 + (ev.clientY - gesture.sy) * 0.004, 0.5, 1.32);
     } else {
       const gp = groundPoint(ev.clientX, ev.clientY);
-      camCtl.tx = clamp(camCtl.tx + gesture.anchor.x - gp.x, -18, 18);
-      camCtl.tz = clamp(camCtl.tz + gesture.anchor.z - gp.z, -28, 28);
+      camCtl.tx = clamp(camCtl.tx + gesture.anchor.x - gp.x, -20, 20);
+      camCtl.tz = clamp(camCtl.tz + gesture.anchor.z - gp.z, -20, 20);
       fitCamera();
     }
-  } else if (gesture.mode === 'pinch' && ptrs.size === 2) {
-    const [a, b] = [...ptrs.values()];
-    const d = Math.max(hyp(a.x - b.x, a.y - b.y), 20);
-    camCtl.zoom = clamp(gesture.zoom0 * gesture.dist0 / d, 0.4, 1.6);
-    camCtl.tilt = clamp(gesture.tilt0 + ((a.y + b.y) / 2 - gesture.midY0) * 0.003, 0.55, 1.25);
+  } else if (gesture.mode === 'multi' && ptrs.size >= 2) {
+    const r = twoRefs();
+    camCtl.zoom = clamp(gesture.zoom0 * gesture.dist0 / r.dist, 0.4, 1.75);
+    camCtl.rot = gesture.rot0 - angDiff(gesture.ang0, r.ang);
+    camCtl.tilt = clamp(gesture.tilt0 + (r.midY - gesture.midY0) * 0.0028, 0.5, 1.32);
   }
 });
 function endPtr(ev) {
-  const tap = ptrs.size === 1 && gesture && gesture.mode !== 'pinch' && !gesture.moved;
+  const tap = ptrs.size === 1 && gesture && (gesture.mode === 'pan' || gesture.mode === 'orbit') && !gesture.moved;
   ptrs.delete(ev.pointerId);
   if (ptrs.size === 0) gesture = null;
   else if (ptrs.size === 1) {
@@ -2176,7 +2238,7 @@ ui.addEventListener('pointerup', endPtr);
 ui.addEventListener('pointercancel', ev => { ptrs.delete(ev.pointerId); if (!ptrs.size) gesture = null; });
 ui.addEventListener('wheel', ev => {
   ev.preventDefault();
-  camCtl.zoom = clamp(camCtl.zoom * (1 + ev.deltaY * 0.001), 0.4, 1.6);
+  camCtl.zoom = clamp(camCtl.zoom * (1 + ev.deltaY * 0.001), 0.4, 1.75);
 }, { passive: false });
 document.addEventListener('touchmove', ev => ev.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', ev => ev.preventDefault());
@@ -2201,7 +2263,8 @@ function frame(now) {
     p.glow.material.opacity = show ? 0.35 + 0.3 * Math.sin(game.time * 4 + p.x) : 0;
   }
   animFlag(game.time);
-  if (markerMesh) markerMesh.material.opacity = 0.65 + 0.3 * Math.sin(game.time * 3);
+  const _mo = 0.6 + 0.3 * Math.sin(game.time * 3);
+  for (const mm of markerMeshes) mm.material.opacity = _mo;
   writeSoldierInstances();
   // camera shake
   fitCamera();
@@ -2216,7 +2279,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // test hooks (headless verification)
-window.__sky = { game, FORT, PATH, startWave, spawnEnemy, buildTower, resetGame, TOWERS, ENEMIES, THREE, scene, cam,
+window.__sky = { game, FORT, PATHS, PATH_ENTRIES, NPATHS, startWave, spawnEnemy, buildTower, resetGame, TOWERS, ENEMIES, THREE, scene, cam,
   btnsRef: () => btns, project, camCtl, resetCamera };
 </script>
 </body>
