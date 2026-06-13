@@ -626,7 +626,14 @@ async function enrichSpikesWithHistory(candidates, { threshold = 0.03, max = 4, 
     .sort((a, b) => b.moveAbs - a.moveAbs)
     .slice(0, max)
     .map(({ m, history, spark, signed, moveAbs }) => {
-      const pct = Math.round(m.probability * 100);
+      // The headline price MUST come from the SAME CLOB series that powers the
+      // chart (history), NOT the Gamma snapshot (m.probability). The two sources
+      // drift apart — sometimes wildly (16% vs 50%) — which made a market card's
+      // big number disagree with its own chart and with the detail view. Use the
+      // last history point; fall back to the Gamma probability only when we have
+      // no history at all. (refreshSignals already does this on the reuse path.)
+      const lastP = (history && history.length) ? history[history.length - 1] : m.probability;
+      const pct = Math.round(lastP * 100);
       const deltaPts = Math.round(signed * 100);
       const up = signed >= 0;
       return {
