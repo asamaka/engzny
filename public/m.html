@@ -419,8 +419,13 @@
     var f=st.freshness||{};
     var first=f.at?(Date.now()-Date.parse(f.at)):storyFirstMs(st);
     if(first==null||isNaN(first))return '';
-    var out=ageBadgeMs(first)+'<span class="lab">'+esc(f.label||'first reported')+'</span>';
-    if(f.updatedAt){var u=Date.now()-Date.parse(f.updatedAt);if(!isNaN(u))out+='<span class="upd"> · updated '+timeAgo(u)+'</span>';}
+    // The badge time is the latest REAL development (content-dated), not an article's
+    // publish time. Label says whether that's the first report or a later development.
+    var lab=(f.label==='latest update')?'latest development':(f.label||'first reported');
+    var out=ageBadgeMs(first)+'<span class="lab">'+esc(lab)+'</span>';
+    // Secondary note is the newest SOURCE article (a recap/follow-up) — distinct from
+    // the development time, so word it as coverage ("newest report"), not "updated".
+    if(f.updatedAt){var u=Date.now()-Date.parse(f.updatedAt);if(!isNaN(u))out+='<span class="upd"> · newest report '+timeAgo(u)+'</span>';}
     return out;
   }
 
