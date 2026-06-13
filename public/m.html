@@ -190,11 +190,15 @@
   .lead-p{font-size:16.5px;line-height:1.62;color:#dadde3;font-weight:400;letter-spacing:.1px}
   .aibox{border-left:3px solid var(--accent);padding-left:16px}
   .mktimpact{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid rgba(244,176,62,.4);border-radius:15px;padding:15px 16px}
+  .mktimpact.tap{transition:transform .14s ease}
+  .mktimpact.tap:active{transform:scale(.98)}
   .mktimpact .miq{font-size:14px;color:#eef0f4;font-weight:600;margin-bottom:12px;line-height:1.32}
   .mktimpact .mirow{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
   .mktimpact .miprob{font-size:32px;font-weight:900;color:var(--accent);letter-spacing:-1px;line-height:1}
+  .mktimpact .miprob.g{color:var(--green)} .mktimpact .miprob.r{color:var(--red)} .mktimpact .miprob.a{color:var(--accent)}
   .mktimpact .midelta{font-size:15px;font-weight:800} .midelta.g{color:var(--green)} .midelta.r{color:var(--red)}
   .mktimpact .miby{font-size:12px;color:var(--faint);font-weight:600}
+  .mktimpact .migo{margin-left:auto;font-size:12px;font-weight:800;letter-spacing:.5px;color:var(--accent);align-self:center}
   .keyquote{font-family:'Playfair Display',Georgia,serif;font-size:21px;line-height:1.36;color:#f1f3f6;font-weight:700;
     border-left:3px solid var(--accent);padding-left:17px;font-style:italic}
   .keyquote .kqa{font-family:'Inter',sans-serif;font-size:12.5px;font-weight:700;color:var(--faint);margin-top:10px;letter-spacing:.5px;font-style:normal}
@@ -561,10 +565,19 @@
   function moduleHtml(name,st,d){
     var L=d.layout||{};
     if(name==='summary') return '<div class="block aibox"><div class="blabel">&#10022; THE STORY</div><p class="lead-p">'+esc(d.aiSummary||st.brief||'')+'</p></div>';
-    if(name==='marketImpact'&&d.marketImpact){var mi=d.marketImpact;
-      return '<div class="block"><div class="blabel">&#9889; MARKET IMPACT</div><div class="mktimpact"><div class="miq">'+esc(mi.question)+'</div>'
-        +'<div class="mirow"><span class="miprob">'+esc(mi.prob)+'</span><span class="midelta '+(mi.deltaColor==='red'?'r':'g')+'">'+esc(mi.delta)+'</span>'
-        +(mi.byDate?'<span class="miby">'+esc(mi.byDate)+'</span>':'')+'</div></div></div>';}
+    if(name==='marketImpact'&&d.marketImpact){
+      // Render from the LIVE signal (same source as the home rail card + the market
+      // chart) so the price is always in sync; the per-story snapshot is only a
+      // fallback for a linked market that isn't on the home rail. When we have the
+      // live market, the card is tappable and opens the same market detail as home.
+      var mi=d.marketImpact, live=sigById(mi.id), m=live||mi, clickable=!!live;
+      var pcMap={amber:'a',green:'g',red:'r'}, probCls=pcMap[m.probColor]||'a';
+      var dCls=(m.deltaColor==='red'?'r':'g');
+      return '<div class="block"><div class="blabel">&#9889; MARKET IMPACT</div>'
+        +'<div class="mktimpact'+(clickable?' tap" data-market="'+esc(m.id)+'"':'"')+'><div class="miq">'+esc(m.question)+'</div>'
+        +'<div class="mirow"><span class="miprob '+probCls+'">'+esc(m.prob)+'</span><span class="midelta '+dCls+'">'+esc(m.delta)+'</span>'
+        +(m.byDate?'<span class="miby">'+esc(m.byDate)+'</span>':'')
+        +(clickable?'<span class="migo">View market &#8250;</span>':'')+'</div></div></div>';}
     if(name==='keyQuote'&&L.keyQuote&&L.keyQuote.text)
       return '<div class="block"><div class="keyquote">“'+esc(L.keyQuote.text)+'”<div class="kqa">'+esc(L.keyQuote.attribution||'')+'</div></div></div>';
     if(name==='statCallouts'&&L.statCallouts&&L.statCallouts.length)
