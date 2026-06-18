@@ -172,6 +172,19 @@ function trend(history){
     '<span>'+esc(fmtTime(last.evaluatedAt))+'</span></div></div>';
 }
 
+// ---- compact recommendation list (used in historical reflections) ----
+function recListCompact(recs){
+  if (!recs || !recs.length) return '';
+  return '<div style="margin-top:6px">'+recs.map(r=>{
+    const col = PRIO[r.priority] || 'var(--tx3)';
+    return '<div style="margin:6px 0;padding-left:9px;border-left:2px solid '+col+'">'+
+      '<span class="badge" style="background:'+col+'22;color:'+col+'">'+esc(r.priority||'?')+'</span> '+
+      '<b style="color:var(--tx)">'+esc(r.target||'')+'</b> '+
+      '<span class="mut">('+esc(r.type||'')+')</span>'+
+      '<div style="margin-top:2px">'+esc(r.detail||'')+'</div></div>';
+  }).join('')+'</div>';
+}
+
 // ---- collapsible item ----
 function item(color, head, bodyHtml){
   return '<div class="item" style="border-left-color:'+color+'">'+
@@ -205,6 +218,32 @@ function render(data){
 
   // trend
   html += '<div class="card"><h2>Composite trend</h2>'+trend(H)+'</div>';
+
+  // past evaluations — every historical run's reflection (newest first, latest
+  // excluded since it's shown in full below). Older entries (pre-dating reflection
+  // capture) fall back to their summary stats.
+  const past = H.filter(h=> h.evaluatedAt !== L.evaluatedAt);
+  if (past.length){
+    html += '<div class="card"><h2>Past evaluations ('+past.length+')</h2>'+
+      past.map(h=>{
+        const sc = (h.scores && h.scores.composite!=null) ? h.scores.composite : h.composite;
+        const gc = gradeColor(h.grade);
+        const head = '<span class="badge" style="background:'+gc+'22;color:'+gc+'">'+esc(h.grade||'–')+'</span>'+
+          '<span class="imp" style="color:'+scoreColor(sc)+'">'+esc(sc)+'</span>'+
+          '<span class="ttl wrap">'+esc(fmtTime(h.evaluatedAt))+' <span class="mut">· '+esc(rel(h.evaluatedAt))+'</span></span>';
+        let body = '';
+        const refl = h.reflection;
+        if (refl && (refl.narrative || (refl.recommendations||[]).length)){
+          if (refl.narrative) body += '<p>'+esc(refl.narrative)+'</p>';
+          body += recListCompact(refl.recommendations||[]);
+        } else {
+          body += '<p class="mut">Full reflection not captured for this run.</p>';
+          if (h.topMiss) body += '<p><b>Top miss:</b> '+esc(h.topMiss)+'</p>';
+          body += '<div class="kvline">gaps '+esc(h.gapCount)+' · missing '+esc(h.missingCount)+' · missed '+esc(h.missedCount)+' · recs '+esc(h.recCount)+'</div>';
+        }
+        return item(gc, head, body);
+      }).join('')+'</div>';
+  }
 
   // reflection narrative
   if (L.reflection && L.reflection.narrative)
