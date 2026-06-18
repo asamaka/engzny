@@ -459,6 +459,10 @@ function summarize(report) {
     missedCount: (report.coverage.missed || []).length,
     topMiss: topGap ? topGap.title : null,
     recCount: (report.reflection && report.reflection.recommendations || []).length,
+    // Full reflection (grade + narrative + recommendations) so /m/eval can show
+    // every run's reasoning historically, not just the latest. Null when the
+    // reflection pass was skipped (--no-reflect).
+    reflection: report.reflection || null,
   };
 }
 async function saveReport(report, redis = W.getRedis()) {
