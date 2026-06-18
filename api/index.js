@@ -1527,6 +1527,14 @@ app.get('/m/debug', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm-debug.html'));
 });
 
+// GET /m/eval — accuracy eval viewer (composite score + trend, sub-score bars,
+// Opus grade/narrative, structural recommendations, gap analysis, missed/feed-only
+// stories, reference worldview). Page shell is public; the data API
+// (GET /api/tv/intel/eval) is token-gated (war OR debug token).
+app.get('/m/eval', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'm-eval.html'));
+});
+
 // GET /api/tv/intel/runs — newest-first list of cron-run summaries (build-intel
 // writes a structured trace per run to Redis; see persistTrace there).
 app.get('/api/tv/intel/runs', requireEvalAuth, async (req, res) => {
