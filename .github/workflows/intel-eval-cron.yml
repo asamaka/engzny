@@ -3,13 +3,13 @@ name: Intel Accuracy Eval
 # Grades the live "Iran Watch" intel bundle against an independently web-searched
 # picture of reality (coverage/misses, freshness, staleness, market alignment),
 # asks Opus to reflect on the gaps, and stores the report with history
-# (tv:war:eval:*). Scheduled a few times a day so accuracy can be tracked as the
-# curation/sourcing is tuned; also runnable on demand (workflow_dispatch) and via
-# POST /api/tv/intel/eval.
+# (tv:war:eval:*).
+#
+# No GitHub `schedule:` — GitHub's cron has been unreliable for this repo. Run on
+# demand via workflow_dispatch (Actions tab), the external trigger
+# (POST /api/tv/intel/eval/trigger), or inline via POST /api/tv/intel/eval.
 
 on:
-  schedule:
-    - cron: '20 */3 * * *'   # every 3 hours, offset from the hourly intel build
   workflow_dispatch:
     inputs:
       reflect:
