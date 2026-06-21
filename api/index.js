@@ -1588,6 +1588,49 @@ app.get('/m/eval', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm-eval.html'));
 });
 
+// ===================== Strait of Hormuz AIS monitor =====================
+// Standalone page (thinx.fun/hormuz) showing only vessels that MOVED through the
+// strait in the last 48h, with direction + a fact-based open/closed verdict from
+// transit counts. Data is self-collected from AISStream.io (free, real-time only)
+// into Redis; see api/lib/hormuz.js.
+
+// GET /hormuz — the page shell (public).
+app.get('/hormuz', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'hormuz.html'));
+});
+
+// GET /api/hormuz/data — processed 48h snapshot (public, CORS) so anyone can see
+// the traffic for themselves. Read-only; never exposes the collector token.
+app.get('/api/hormuz/data', async (req, res) => {
+  setCorsHeaders(res);
+  try {
+    const hormuz = require('./lib/hormuz');
+    const store = await hormuz.loadStore();
+    res.json(hormuz.summarize(store, Date.now()));
+  } catch (err) {
+    logger.error('Hormuz', 'Failed to read data', { error: err.message });
+    res.status(500).json({ error: 'Failed to read hormuz data' });
+  }
+});
+
+// POST /api/hormuz/collect — open the AISStream socket for a short window and merge
+// what's seen into the rolling store. Token-gated (war OR debug token); driven by
+// an external every-~2-min cron. Body/query: ms (collection window, default 15000).
+app.post('/api/hormuz/collect', express.json({ limit: '16kb' }), requireEvalAuth, async (req, res) => {
+  try {
+    const hormuz = require('./lib/hormuz');
+    const apiKey = process.env.AISSTREAM_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'AISSTREAM_API_KEY not configured' });
+    const ms = Math.max(3000, Math.min(60000, Number(req.query.ms || (req.body && req.body.ms)) || 15000));
+    const result = await hormuz.collectWindow({ apiKey, ms });
+    logger.info('Hormuz', 'Collected AIS window', result);
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    logger.error('Hormuz', 'Collect failed', { error: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/tv/intel/runs — newest-first list of cron-run summaries (build-intel
 // writes a structured trace per run to Redis; see persistTrace there).
 app.get('/api/tv/intel/runs', requireEvalAuth, async (req, res) => {
