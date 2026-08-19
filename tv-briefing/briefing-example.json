@@ -1,399 +1,428 @@
 {
-    "agentRunAt": "2026-03-21T19:00:16+02:00",
-    "generatedAt": "2026-03-21T19:00:16+02:00",
-    "timezone": "Africa/Cairo",
-    "location": {
-        "city": "New Cairo",
-        "country": "Egypt"
+  "agentRunAt": "2026-03-22T00:00:00+02:00",
+  "generatedAt": "2026-03-22T00:00:00+02:00",
+  "timezone": "Africa/Cairo",
+  "location": {
+    "city": "New Cairo",
+    "country": "Egypt"
+  },
+  "liveFeeds": {
+    "weather": {
+      "url": "https://api.open-meteo.com/v1/forecast?latitude=30.04&longitude=31.24&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Africa%2FCairo&forecast_days=1",
+      "refreshSeconds": 1800,
+      "parser": "openmeteo"
     },
-    "liveFeeds": {
-        "weather": {
-            "url": "https://api.open-meteo.com/v1/forecast?latitude=30.04&longitude=31.24&current=temperature_2m,apparent_temperature,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Africa%2FCairo&forecast_days=1",
-            "refreshSeconds": 1800,
-            "parser": "openmeteo"
-        },
-        "crypto": {
-            "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true",
-            "refreshSeconds": 600,
-            "parser": "coingecko",
-            "display": {
-                "label": "Bitcoin",
-                "prefix": "$",
-                "changeKey": "usd_24h_change"
-            }
-        },
-        "sports": {
-            "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
-            "refreshSeconds": 120,
-            "parser": "espn",
-            "display": {
-                "label": "Liverpool",
-                "teamFilter": "Liverpool"
-            }
-        },
-        "breakingNews": {
-            "url": "https://saurav.tech/NewsAPI/top-headlines/category/general/us.json",
-            "refreshSeconds": 900,
-            "parser": "saurav-news"
-        },
-        "briefing": {
-            "url": "https://thinx.fun/api/tv/briefing",
-            "refreshSeconds": 300,
-            "parser": "self"
-        }
+    "crypto": {
+      "url": "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true&include_last_updated_at=true",
+      "refreshSeconds": 600,
+      "parser": "coingecko",
+      "display": {
+        "label": "Bitcoin",
+        "prefix": "$",
+        "changeKey": "usd_24h_change"
+      }
     },
-    "header": {
-        "weather": {
-            "temperatureC": 22,
-            "feelsLikeC": 23,
-            "condition": "Clear",
-            "highC": 28,
-            "lowC": 16
-        },
-        "metrics": [
-            {
-                "id": "holiday-day-2",
-                "label": "Holiday",
-                "title": "Eid Al-Fitr",
-                "value": "Day 2",
-                "changeText": "Through Monday",
-                "trend": "flat"
-            },
-            {
-                "id": "liverpool-last-match",
-                "label": "Liverpool",
-                "title": "Liverpool vs Galatasaray",
-                "value": "4-0",
-                "changeText": "Salah milestone",
-                "trend": "up"
-            },
-            {
-                "id": "btc-last-price",
-                "label": "Crypto",
-                "title": "Bitcoin",
-                "value": "$70K",
-                "changeText": "Max pain week",
-                "trend": "down"
-            },
-            {
-                "id": "egypt-closures",
-                "label": "Cairo",
-                "title": "Shop closures",
-                "value": "9 PM",
-                "changeText": "Starts Mar 28",
-                "trend": "flat"
-            }
-        ]
+    "sports": {
+      "url": "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
+      "refreshSeconds": 120,
+      "parser": "espn",
+      "display": {
+        "label": "Liverpool",
+        "teamFilter": "Liverpool"
+      }
     },
-    "hero": {
-        "greeting": "Good Morning, Aser!",
-        "context": "Past 48 hours: Eid day 2 in Cairo, Egypt energy rules moved closer, the Iran-Hormuz story stayed hot, and AI coverage was led by OpenAI, Anthropic, and major hardware news.",
-        "photoOfDay": {
-            "imageUrl": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?auto=format&fit=crop&w=1600&q=80",
-            "title": "Eid morning over New Cairo",
-            "caption": "Warm light over the city on the second day of Eid, with Cairo settling into a quieter family-first morning.",
-            "internalReason": "Chose a local Cairo skyline photo for Eid context -- familiar yet elevated, grounding the briefing in the user's location and cultural moment."
-        }
+    "breakingNews": {
+      "url": "https://saurav.tech/NewsAPI/top-headlines/category/general/us.json",
+      "refreshSeconds": 900,
+      "parser": "saurav-news"
     },
-    "videoRecommendations": [
-        {
-            "id": "story-iran-war-marines",
-            "storyTitle": "US Sends 2,500 Marines as Ground Option Emerges in Iran War",
-            "storyContext": "Highest-signal geopolitical story in the last 48 hours",
-            "tag": "Breaking",
-            "label": "Iran War",
-            "ongoingStory": true,
-            "ongoingStoryId": "iran-war-2026",
-            "videoId": "65C0XcmruTI",
-            "videoTitle": "US Sends 2,500 More Marines | Ground War in Iran? | WION",
-            "videoChannel": "WION",
-            "videoPublishedAt": "2026-03-21T00:40:00Z",
-            "videoDurationText": "9:48",
-            "videoDurationSeconds": 588,
-            "thumbnailUrl": "https://img.youtube.com/vi/65C0XcmruTI/hqdefault.jpg",
-            "searchQuery": "US marines Iran ground war 2026",
-            "searchIterations": 1,
-            "internalReason": "Direct news coverage from WION, published 12h ago, 9min duration -- perfect news format",
-            "previousPosition": null,
-            "playable": true
-        },
-        {
-            "id": "story-tesla-terafab",
-            "storyTitle": "Tesla Launches Terafab -- $25B AI Chip Factory Goes Live",
-            "storyContext": "Major AI hardware launch inside the 48-hour window",
-            "tag": "Tech",
-            "label": "Tesla",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": "QtUD9AxBan8",
-            "videoTitle": "Tesla Launches Terafab Today",
-            "videoChannel": "Machine Herald",
-            "videoPublishedAt": "2026-03-21T02:15:00Z",
-            "videoDurationText": "11:32",
-            "videoDurationSeconds": 692,
-            "thumbnailUrl": "https://img.youtube.com/vi/QtUD9AxBan8/hqdefault.jpg",
-            "searchQuery": "Tesla Terafab launch AI chip factory",
-            "searchIterations": 1,
-            "internalReason": "Machine Herald coverage of Terafab launch, 11min, published 14h ago",
-            "previousPosition": null,
-            "playable": true
-        },
-        {
-            "id": "story-nvidia-vera-rubin",
-            "storyTitle": "NVIDIA Vera Rubin and Groq 3 Shift the AI Hardware Race",
-            "storyContext": "High-priority AI silicon recap from the same news cycle",
-            "tag": "Tech",
-            "label": "NVIDIA",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": "aDT9bBt9HxM",
-            "videoTitle": "NVIDIA Vera Rubin and Groq 3 Shift the AI Hardware Race",
-            "videoChannel": "CNBC",
-            "videoPublishedAt": "2026-03-20T19:20:00Z",
-            "videoDurationText": "8:21",
-            "videoDurationSeconds": 501,
-            "thumbnailUrl": "https://img.youtube.com/vi/aDT9bBt9HxM/hqdefault.jpg",
-            "searchQuery": "NVIDIA Vera Rubin Groq 3 AI hardware",
-            "searchIterations": 1,
-            "internalReason": "CNBC coverage, 8min, published 22h ago -- within 48h window",
-            "previousPosition": null,
-            "playable": true
-        },
-        {
-            "id": "story-salah-50",
-            "storyTitle": "Mohamed Salah Scores 50th Champions League Goal",
-            "storyContext": "Egyptian athlete milestone -- first African player to reach 50 CL goals",
-            "tag": "Sports",
-            "label": "Salah",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "Mohamed Salah became the first African player to score 50 Champions League goals during Liverpool's 4-0 win over Galatasaray.",
-            "storySource": "Liverpool FC / The Guardian",
-            "storyPublishedAt": "2026-03-19T21:00:00Z",
-            "searchQuery": "Salah goal Liverpool vs Galatasaray highlights",
-            "searchIterations": 3,
-            "internalReason": "Searched highlights, UCL official, BT Sport -- no qualifying video found within 48h window at generation time",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-egypt-energy",
-            "storyTitle": "Egypt Orders Early Closures and Reduced Lighting",
-            "storyContext": "Direct daily-life impact for Cairo over the next week",
-            "tag": "Local",
-            "label": "Egypt",
-            "ongoingStory": true,
-            "ongoingStoryId": "egypt-energy-crisis",
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "Egypt mandates 9 PM shop closures and reduced public lighting starting March 28 as part of energy conservation measures.",
-            "storySource": "Reuters / Egyptian Streets",
-            "storyPublishedAt": "2026-03-20T08:00:00Z",
-            "searchQuery": "Egypt energy closures shops 9pm March 2026",
-            "searchIterations": 2,
-            "internalReason": "Local regulatory story -- limited YouTube coverage in English or Arabic",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-hormuz-six-months",
-            "storyTitle": "US Intelligence Warns Iran Could Keep Hormuz Closed for Six Months",
-            "storyContext": "Fresh intelligence angle on the most important geopolitical story",
-            "tag": "Breaking",
-            "label": "Hormuz",
-            "ongoingStory": true,
-            "ongoingStoryId": "iran-war-2026",
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "US intelligence assessments warn that Iran has the capability to keep the Strait of Hormuz closed for up to six months, disrupting global oil supply.",
-            "storySource": "CNN",
-            "storyPublishedAt": "2026-03-20T15:45:00Z",
-            "searchQuery": "Iran Hormuz closed six months intelligence 2026",
-            "searchIterations": 2,
-            "internalReason": "Intelligence leak story -- CNN exclusive, no dedicated YouTube video found within 48h",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-anthropic-ban",
-            "storyTitle": "Pentagon Designates Anthropic a Supply Chain Risk",
-            "storyContext": "Institutional AI drama -- Pentagon bans Anthropic from defense contracts",
-            "tag": "AI",
-            "label": "Anthropic",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "The Pentagon has designated Anthropic as a supply chain risk, barring its AI models from defense contracts following security concerns raised after internal audits.",
-            "storySource": "TechCrunch / Reuters",
-            "storyPublishedAt": "2026-03-20T14:30:00Z",
-            "searchQuery": "Pentagon Anthropic supply chain risk ban 2026",
-            "searchIterations": 3,
-            "internalReason": "Searched 3 times, no video specifically covering this Pentagon decision within 48h",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-gpt54-launch",
-            "storyTitle": "OpenAI Launches GPT-5.4 for Enterprise",
-            "storyContext": "Core AI model launch within the same 48-hour window",
-            "tag": "AI",
-            "label": "OpenAI",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "OpenAI released GPT-5.4, its latest enterprise-focused model, with benchmark improvements across coding, reasoning, and multi-step task completion.",
-            "storySource": "OpenAI / Industry Coverage",
-            "storyPublishedAt": "2026-03-20T10:45:00Z",
-            "searchQuery": "GPT-5.4 launch enterprise OpenAI",
-            "searchIterations": 2,
-            "internalReason": "Model launch -- searched AI Breakdown, Matt Wolfe channels",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-cuba-blackout",
-            "storyTitle": "Cuba Suffers 29-Hour Blackout as Trump Escalates Rhetoric",
-            "storyContext": "High-drama geopolitics beyond the Middle East",
-            "tag": "Breaking",
-            "label": "Global",
-            "ongoingStory": false,
-            "ongoingStoryId": null,
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "Cuba experienced a 29-hour nationwide blackout as the US intensified sanctions and Trump escalated rhetoric against the island nation.",
-            "storySource": "Reuters / AP News",
-            "storyPublishedAt": "2026-03-20T16:30:00Z",
-            "searchQuery": "Cuba blackout Trump sanctions 2026",
-            "searchIterations": 2,
-            "internalReason": "Dramatic geopolitics -- searched Reuters, CNN, BBC channels",
-            "previousPosition": null,
-            "playable": false
-        },
-        {
-            "id": "story-tech-layoffs",
-            "storyTitle": "45,700 Tech Workers Cut in Two Months",
-            "storyContext": "AI-linked layoffs -- career-relevant for engineering leaders",
-            "tag": "Career",
-            "label": "Career",
-            "ongoingStory": true,
-            "ongoingStoryId": "tech-layoffs-2026",
-            "videoId": null,
-            "videoTitle": null,
-            "videoChannel": null,
-            "videoPublishedAt": null,
-            "videoDurationText": null,
-            "videoDurationSeconds": null,
-            "thumbnailUrl": null,
-            "storySummary": "Over 45,700 tech workers have been laid off in the first two months of 2026, with AI automation cited as a key factor in restructuring decisions.",
-            "storySource": "Multiple Sources",
-            "storyPublishedAt": "2026-03-20T07:00:00Z",
-            "searchQuery": "tech layoffs 2026 AI replacing jobs",
-            "searchIterations": 2,
-            "internalReason": "Aggregate story -- no single video covers the 45K number specifically",
-            "previousPosition": null,
-            "playable": false
-        }
-    ],
-    "bannerItems": [
-        {
-            "id": "banner-eid-day-2",
-            "tag": "Alert",
-            "text": "Eid Al-Fitr day 2 continues across Egypt through Monday.",
-            "priority": 100,
-            "kind": "alert",
-            "timestamp": "2026-03-21T04:00:00+02:00"
-        },
-        {
-            "id": "banner-egypt-closures",
-            "tag": "Alert",
-            "text": "Egypt early closure rules begin March 28, including 9 PM shop closings.",
-            "priority": 96,
-            "kind": "alert",
-            "timestamp": "2026-03-20T08:00:00+02:00"
-        },
-        {
-            "id": "banner-hormuz",
-            "tag": "Breaking",
-            "text": "Iran-Hormuz risk remains the highest-signal geopolitical thread of the last 48 hours.",
-            "priority": 92,
-            "kind": "breaking",
-            "timestamp": "2026-03-21T02:00:00+02:00"
-        },
-        {
-            "id": "banner-tech-layoffs",
-            "tag": "Context",
-            "text": "AI-linked layoffs stayed one of the most career-relevant stories for engineering leaders.",
-            "priority": 84,
-            "kind": "context",
-            "timestamp": "2026-03-20T07:00:00+02:00"
-        },
-        {
-            "id": "banner-salah",
-            "tag": "Local",
-            "text": "Mohamed Salah reached 50 Champions League goals and became the first African player to do it.",
-            "priority": 80,
-            "kind": "context",
-            "timestamp": "2026-03-19T21:00:00+02:00"
-        },
-        {
-            "id": "banner-apple",
-            "tag": "Follow",
-            "text": "Apple and Samsung both landed notable product-and-AI coverage in the same two-day cycle.",
-            "priority": 72,
-            "kind": "context",
-            "timestamp": "2026-03-20T09:30:00+02:00"
-        }
-    ],
-    "storyTracker": {
-        "iran-war-2026": {
-            "firstSeen": "2026-03-18",
-            "updateCount": 5,
-            "status": "active"
-        },
-        "egypt-energy-crisis": {
-            "firstSeen": "2026-03-20",
-            "updateCount": 2,
-            "status": "active"
-        },
-        "tech-layoffs-2026": {
-            "firstSeen": "2026-03-19",
-            "updateCount": 3,
-            "status": "active"
-        }
+    "briefing": {
+      "url": "https://www.thinx.fun/api/tv/briefing",
+      "refreshSeconds": 300,
+      "parser": "self"
+    }
+  },
+  "header": {
+    "weather": {
+      "temperatureC": 14,
+      "feelsLikeC": 13,
+      "condition": "Overcast",
+      "highC": 19,
+      "lowC": 14
     },
-    "watchLog": []
+    "metrics": [
+      {
+        "id": "eid-day-2-night",
+        "label": "Holiday",
+        "title": "Eid Al-Fitr",
+        "value": "Day 2",
+        "changeText": "Day 3 tomorrow, through Mon",
+        "trend": "flat"
+      },
+      {
+        "id": "iran-wind-down",
+        "label": "Iran War",
+        "title": "Trump Signals Wind-Down",
+        "value": "4-6 wks",
+        "changeText": "No ceasefire yet",
+        "trend": "flat"
+      },
+      {
+        "id": "liverpool-brighton-loss",
+        "label": "Liverpool",
+        "title": "Brighton 2-1 Liverpool",
+        "value": "Loss",
+        "changeText": "No Salah, Ekitike off 8'",
+        "trend": "down"
+      },
+      {
+        "id": "oil-hormuz-reopen",
+        "label": "Oil",
+        "title": "Hormuz Reopening",
+        "value": "$110+",
+        "changeText": "Open to all except US",
+        "trend": "down"
+      }
+    ]
+  },
+  "hero": {
+    "greeting": "Good Evening, Aser!",
+    "context": "Trump says Iran war is 'winding down' but rejects ceasefire while Iran reopens Hormuz to everyone except the US. Liverpool fell 2-1 at Brighton without Salah. Oracle and Atlassian announced massive AI-driven layoffs. OpenAI is building an autonomous AI researcher. Eid continues through Monday.",
+    "photoOfDay": {
+      "imageUrl": "https://images.unsplash.com/photo-1746424919575-af1c193de14d?auto=format&fit=crop&w=1600&q=80",
+      "title": "Bioluminescent Waves",
+      "caption": "The ocean glows electric blue as billions of microscopic organisms light up the surf \u2014 nature's own light show, no electricity required.",
+      "internalReason": "Chose bioluminescence for visual contrast to the heavy war/layoff news cycle. Beautiful, calming, scientifically fascinating, completely unrelated to user's daily concerns. Different from previous aurora photo."
+    }
+  },
+  "videoRecommendations": [
+    {
+      "id": "story-trump-wind-down-iran",
+      "storyTitle": "Trump Signals Wind-Down of Iran War \u2014 But Rejects Ceasefire",
+      "storyContext": "Biggest geopolitical shift today: Trump says US is 'getting very close to meeting objectives' in 4-6 weeks",
+      "tag": "Breaking",
+      "label": "Iran War",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "Bx_AD5kfp0Q",
+      "videoTitle": "President Trump says he may \"wind down\" Iran War and let others police region | BBC News",
+      "videoChannel": "BBC News",
+      "videoPublishedAt": "2026-03-21T16:00:00Z",
+      "videoDurationText": "8:30",
+      "videoDurationSeconds": 510,
+      "thumbnailUrl": "https://img.youtube.com/vi/Bx_AD5kfp0Q/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "BBC / CNN / Reuters",
+      "storyPublishedAt": "2026-03-21T18:00:00Z",
+      "searchQuery": "Trump Iran war winding down ceasefire March 2026",
+      "searchIterations": 1,
+      "internalReason": "Top story of the day \u2014 Trump's first wind-down signal while rejecting ceasefire is the most significant geopolitical development. BBC News coverage with proper context.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-iran-hormuz-reopen-except-us",
+      "storyTitle": "Iran Reopens Hormuz for All Nations Except the United States",
+      "storyContext": "Iran's strategic masterstroke: selective reopening splits the US from its allies on the Strait",
+      "tag": "Breaking",
+      "label": "Hormuz",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "KqN7hvC8c_U",
+      "videoTitle": "BREAKING: Iran Opens Hormuz for Everyone Except America \u2014 Trump COLLAPSES as Strategy Burns",
+      "videoChannel": "Global Politics",
+      "videoPublishedAt": "2026-03-21T12:00:00Z",
+      "videoDurationText": "12:15",
+      "videoDurationSeconds": 735,
+      "thumbnailUrl": "https://img.youtube.com/vi/KqN7hvC8c_U/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "AP News / Reuters",
+      "storyPublishedAt": "2026-03-21T10:00:00Z",
+      "searchQuery": "Iran opens Hormuz except America Trump 2026",
+      "searchIterations": 1,
+      "internalReason": "Fresh twist on the Hormuz crisis \u2014 Iran's selective reopening is a major strategic development that directly impacts oil prices and Egypt's energy costs.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-oracle-30000-layoffs",
+      "storyTitle": "Oracle Plans 30,000 Layoffs \u2014 Largest AI-Driven Cut of 2026",
+      "storyContext": "Oracle burning $58B in debt to fund AI data centers while cutting 18% of workforce",
+      "tag": "Career",
+      "label": "Career",
+      "ongoingStory": true,
+      "ongoingStoryId": "tech-layoffs-2026",
+      "videoId": "UcULDkRWTgo",
+      "videoTitle": "BREAKING: ORACLE FIRES 30,000 | 14 Million Unemployed",
+      "videoChannel": "Tech News",
+      "videoPublishedAt": "2026-03-21T14:00:00Z",
+      "videoDurationText": "11:45",
+      "videoDurationSeconds": 705,
+      "thumbnailUrl": "https://img.youtube.com/vi/UcULDkRWTgo/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "Times of India / Yahoo Finance",
+      "storyPublishedAt": "2026-03-21T08:00:00Z",
+      "searchQuery": "Oracle layoffs 30000 jobs 2026 AI",
+      "searchIterations": 1,
+      "internalReason": "Directly career-relevant: Oracle cutting 18% of workforce to fund Stargate/OpenAI partnership. $1.6B severance cost. Different company from Block/Meta covered previously.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-atlassian-1600-ai-cto",
+      "storyTitle": "Atlassian Fires 1,600 Engineers, Replaces CTO with 'AI Talent'",
+      "storyContext": "Knowledge extraction sprints over 6 months before laying off the engineers whose workflows were recorded",
+      "tag": "Career",
+      "label": "Career",
+      "ongoingStory": true,
+      "ongoingStoryId": "tech-layoffs-2026",
+      "videoId": "m8CsCq0_2kg",
+      "videoTitle": "Atlassian to cut 1600 jobs to make way for AI",
+      "videoChannel": "Tech News Australia",
+      "videoPublishedAt": "2026-03-20T22:00:00Z",
+      "videoDurationText": "7:20",
+      "videoDurationSeconds": 440,
+      "thumbnailUrl": "https://img.youtube.com/vi/m8CsCq0_2kg/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "The Next Web / AFR",
+      "storyPublishedAt": "2026-03-20T10:00:00Z",
+      "searchQuery": "Atlassian layoffs 1600 jobs 2026 AI CTO",
+      "searchIterations": 1,
+      "internalReason": "The 'knowledge extraction sprint' angle is chilling for EMs \u2014 company recorded engineers' workflows for 6 months before replacing them. CTO replaced by 'AI talent'. Stock at 6-year low.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-brighton-liverpool-2-1",
+      "storyTitle": "Brighton 2-1 Liverpool \u2014 Welbeck Double Sinks Depleted Reds",
+      "storyContext": "No Salah, Ekitike off at 8 minutes \u2014 Liverpool's 10th defeat damages top-4 hopes",
+      "tag": "Sports",
+      "label": "Liverpool",
+      "ongoingStory": false,
+      "ongoingStoryId": null,
+      "videoId": "e-K48utct0c",
+      "videoTitle": "AGENT WELBECK DOES IT AGAIN! Brighton 2-1 Liverpool | URKG Reacts",
+      "videoChannel": "URKG",
+      "videoPublishedAt": "2026-03-21T18:30:00Z",
+      "videoDurationText": "14:22",
+      "videoDurationSeconds": 862,
+      "thumbnailUrl": "https://img.youtube.com/vi/e-K48utct0c/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "ESPN / Liverpool Echo",
+      "storyPublishedAt": "2026-03-21T17:00:00Z",
+      "searchQuery": "Brighton Liverpool highlights 2-1 March 2026",
+      "searchIterations": 2,
+      "internalReason": "Just happened today. Welbeck double, Salah missing, Ekitike injured at 8'. Reaction video is best available \u2014 official highlights not yet published. Liverpool's 10th defeat this season.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-natanz-iaea-radiation",
+      "storyTitle": "Natanz Nuclear Site Struck Again \u2014 IAEA Warns of Radiation Risk",
+      "storyContext": "Nuclear safety crisis remains the most alarming angle in the Iran war",
+      "tag": "Breaking",
+      "label": "Iran War",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "D-GvBRpXCoc",
+      "videoTitle": "\"Chernobyl for Iran\": Natanz nuclear complex hit - IAEA warns of radiation leak risk",
+      "videoChannel": "Times of India",
+      "videoPublishedAt": "2026-03-21T08:00:00Z",
+      "videoDurationText": "9:42",
+      "videoDurationSeconds": 582,
+      "thumbnailUrl": "https://img.youtube.com/vi/D-GvBRpXCoc/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "AP News / IAEA",
+      "storyPublishedAt": "2026-03-21T14:00:00Z",
+      "searchQuery": "Natanz nuclear struck IAEA radiation Chernobyl 2026",
+      "searchIterations": 1,
+      "internalReason": "Still the most alarming angle in the war \u2014 IAEA Chernobyl warning. Shifted from position 1 to make room for the wind-down development.",
+      "previousPosition": 1,
+      "playable": true
+    },
+    {
+      "id": "story-us-lifts-iran-oil-sanctions",
+      "storyTitle": "US Lifts Sanctions on 140 Million Barrels of Iranian Oil for 30 Days",
+      "storyContext": "Third temporary waiver in two weeks as gas prices threaten midterm politics",
+      "tag": "Breaking",
+      "label": "Oil",
+      "ongoingStory": true,
+      "ongoingStoryId": "iran-war-2026",
+      "videoId": "ec_L75Q7mUs",
+      "videoTitle": "US lifts Iran oil sanctions for 30 days to ease price surge; 140 mn barrels to hit global markets",
+      "videoChannel": "Business News",
+      "videoPublishedAt": "2026-03-21T10:00:00Z",
+      "videoDurationText": "6:15",
+      "videoDurationSeconds": 375,
+      "thumbnailUrl": "https://img.youtube.com/vi/ec_L75Q7mUs/hqdefault.jpg",
+      "storySummary": null,
+      "storySource": "Reuters / CNN",
+      "storyPublishedAt": "2026-03-21T12:00:00Z",
+      "searchQuery": "US lifts Iran oil sanctions 140 million barrels 2026",
+      "searchIterations": 1,
+      "internalReason": "Directly relevant to Egypt's energy costs. Third waiver in two weeks signals desperation. IEA also recommending record 400M barrel strategic reserve release.",
+      "previousPosition": null,
+      "playable": true
+    },
+    {
+      "id": "story-openai-autonomous-researcher",
+      "storyTitle": "OpenAI Is Building a Fully Autonomous AI Researcher by September",
+      "storyContext": "OpenAI's 'north star': an AI that independently discovers new ideas and conducts research",
+      "tag": "AI",
+      "label": "OpenAI",
+      "ongoingStory": false,
+      "ongoingStoryId": null,
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "OpenAI is building an autonomous AI research intern targeting September 2026, with a full multi-agent system by 2028. Chief scientist Pachocki says they're approaching models that 'work indefinitely in a coherent way just like people do' \u2014 a whole research lab in a data center.",
+      "storySource": "MIT Technology Review",
+      "storyPublishedAt": "2026-03-20T14:00:00Z",
+      "searchQuery": "OpenAI autonomous AI researcher 2026",
+      "searchIterations": 2,
+      "internalReason": "MIT Tech Review exclusive from March 20. No qualifying video within 48h \u2014 the Karpathy and Mark Chen videos are from 2025. Story itself is tier-1 AI breakthrough territory.",
+      "previousPosition": null,
+      "playable": false
+    },
+    {
+      "id": "story-egypt-closures-march-28",
+      "storyTitle": "Egypt 9PM Closures + 17% Fuel Hike Take Effect March 28",
+      "storyContext": "Energy costs doubled since the war began \u2014 government mandates conservation measures after Eid",
+      "tag": "Local",
+      "label": "Egypt",
+      "ongoingStory": true,
+      "ongoingStoryId": "egypt-energy-crisis",
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "Egypt's energy import bill more than doubled (from $560M to $1.65B/month). Starting March 28: shops close at 9PM, public lighting cut, government offices close at 6PM. Diesel up to 20.50 LE/L, gasoline up 17%, CNG up 30%. Some WFH days being studied.",
+      "storySource": "Egyptian Streets / Reuters",
+      "storyPublishedAt": "2026-03-20T08:00:00Z",
+      "searchQuery": "Egypt energy closures 9pm fuel hike March 2026",
+      "searchIterations": 2,
+      "internalReason": "Direct daily-life impact. Energy costs doubled, closures start right after Eid ends. Updated with fuel price specifics from Reuters.",
+      "previousPosition": 9,
+      "playable": false
+    },
+    {
+      "id": "story-claude-code-agent-channels",
+      "storyTitle": "Anthropic's Claude Code Adds MCP Channels and Cloud Task Scheduling",
+      "storyContext": "Claude Code can now react to Discord/Telegram events and run scheduled tasks in the cloud",
+      "tag": "AI",
+      "label": "Anthropic",
+      "ongoingStory": false,
+      "ongoingStoryId": null,
+      "videoId": null,
+      "videoTitle": null,
+      "videoChannel": null,
+      "videoPublishedAt": null,
+      "videoDurationText": null,
+      "videoDurationSeconds": null,
+      "thumbnailUrl": null,
+      "storySummary": "Anthropic launched Claude Code channels \u2014 MCP server bridges that let Claude react to events from messaging apps while running in background. Also added scheduled cloud-based task execution. Countering the open-source OpenClaw project (250K+ GitHub stars).",
+      "storySource": "How Do I Use AI / Gentic News",
+      "storyPublishedAt": "2026-03-21T10:00:00Z",
+      "searchQuery": "Claude Code agent channels Anthropic 2026",
+      "searchIterations": 2,
+      "internalReason": "Fresh Anthropic development from today. No qualifying video within 48h. Directly relevant to user as an EM who uses AI tools.",
+      "previousPosition": null,
+      "playable": false
+    }
+  ],
+  "bannerItems": [
+    {
+      "id": "banner-trump-wind-down",
+      "tag": "Breaking",
+      "text": "Trump signals Iran war wind-down in 4-6 weeks but rejects ceasefire \u2014 Iran skeptical.",
+      "priority": 100,
+      "kind": "breaking",
+      "timestamp": "2026-03-21T20:00:00+02:00"
+    },
+    {
+      "id": "banner-hormuz-selective-reopen",
+      "tag": "Breaking",
+      "text": "Iran reopens Strait of Hormuz to all commercial traffic EXCEPT American vessels.",
+      "priority": 96,
+      "kind": "breaking",
+      "timestamp": "2026-03-21T14:00:00+02:00"
+    },
+    {
+      "id": "banner-eid-day-2",
+      "tag": "Alert",
+      "text": "Eid Al-Fitr continues through Monday March 23 \u2014 work resumes Tuesday.",
+      "priority": 92,
+      "kind": "alert",
+      "timestamp": "2026-03-21T06:00:00+02:00"
+    },
+    {
+      "id": "banner-oracle-30k",
+      "tag": "Context",
+      "text": "Oracle planning 30,000 layoffs \u2014 potentially the largest single AI-driven cut in tech history.",
+      "priority": 88,
+      "kind": "breaking",
+      "timestamp": "2026-03-21T10:00:00+02:00"
+    },
+    {
+      "id": "banner-liverpool-loss",
+      "tag": "Local",
+      "text": "Liverpool fell 2-1 at Brighton \u2014 10th defeat this season, top-4 race tightens.",
+      "priority": 80,
+      "kind": "context",
+      "timestamp": "2026-03-21T19:00:00+02:00"
+    },
+    {
+      "id": "banner-egypt-closures-countdown",
+      "tag": "Alert",
+      "text": "Egypt 9PM shop closures and reduced lighting begin in 6 days (March 28).",
+      "priority": 84,
+      "kind": "alert",
+      "timestamp": "2026-03-21T08:00:00+02:00"
+    },
+    {
+      "id": "banner-us-oil-sanctions-waiver",
+      "tag": "Context",
+      "text": "US lifts sanctions on 140M barrels of Iranian oil for 30 days \u2014 third waiver in two weeks.",
+      "priority": 76,
+      "kind": "context",
+      "timestamp": "2026-03-21T14:00:00+02:00"
+    },
+    {
+      "id": "banner-openai-researcher",
+      "tag": "Follow",
+      "text": "OpenAI targeting September for an autonomous AI research intern \u2014 full system by 2028.",
+      "priority": 72,
+      "kind": "context",
+      "timestamp": "2026-03-20T16:00:00+02:00"
+    }
+  ],
+  "storyTracker": {
+    "iran-war-2026": {
+      "firstSeen": "2026-03-18",
+      "updateCount": 9,
+      "status": "active"
+    },
+    "egypt-energy-crisis": {
+      "firstSeen": "2026-03-20",
+      "updateCount": 5,
+      "status": "active"
+    },
+    "tech-layoffs-2026": {
+      "firstSeen": "2026-03-19",
+      "updateCount": 7,
+      "status": "active"
+    }
+  },
+  "watchLog": [
+    "65C0XcmruTI",
+    "QtUD9AxBan8",
+    "aDT9bBt9HxM"
+  ]
 }
