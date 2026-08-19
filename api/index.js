@@ -1573,6 +1573,15 @@ app.get('/m', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'm.html'));
 });
 
+// GET /briefing and /tv — public web view of the live TV briefing payload.
+app.get('/briefing', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'briefing.html'));
+});
+
+app.get('/tv', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'briefing.html'));
+});
+
 // GET /m/debug — pipeline run viewer (lists each intel cron run; drill into the
 // whole flow with each model's prompt in / response out). The page shell is
 // public; its data API below is token-gated (war OR debug token).

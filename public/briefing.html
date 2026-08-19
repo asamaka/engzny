@@ -1,0 +1,1815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#09111f">
+<title>thinx.fun Briefing</title>
+<meta name="description" content="A responsive public view of the live thinx.fun TV briefing.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme:dark;
+    --bg:#060913;
+    --bg-2:#0b1120;
+    --panel:#111827;
+    --panel-2:#182133;
+    --line:#27344a;
+    --line-soft:rgba(120,150,210,.16);
+    --text:#f5f7fb;
+    --muted:#9ba8bf;
+    --soft:#c9d4e7;
+    --accent:#8fd7ff;
+    --accent-2:#c4ff7a;
+    --danger:#ff7e74;
+    --warning:#ffbc62;
+    --success:#6fe6a4;
+    --shadow:0 28px 60px -34px rgba(0,0,0,.75);
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{
+    background:
+      radial-gradient(circle at top left, rgba(143,215,255,.16), transparent 28%),
+      radial-gradient(circle at 80% 0%, rgba(196,255,122,.08), transparent 22%),
+      linear-gradient(180deg, #07101d 0%, #05080f 100%);
+    color:var(--text);
+    font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  a{color:inherit;text-decoration:none}
+  button{font:inherit}
+  img{display:block;max-width:100%}
+  .hidden{display:none !important}
+
+  .page{
+    width:min(1280px, calc(100% - 32px));
+    margin:0 auto;
+  }
+
+  .topbar{
+    position:sticky;
+    top:0;
+    z-index:40;
+    padding-top:var(--safe-top);
+    background:linear-gradient(180deg, rgba(6,9,19,.96) 0%, rgba(6,9,19,.88) 72%, rgba(6,9,19,.4) 100%);
+    backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);
+    border-bottom:1px solid rgba(143,215,255,.08);
+  }
+
+  .topbar-inner{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:18px;
+    padding:18px 0 16px;
+  }
+
+  .brand{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:0;
+  }
+
+  .brand-mark{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    font-size:15px;
+    letter-spacing:.42em;
+    text-transform:uppercase;
+    font-weight:600;
+    color:#dce8fb;
+    white-space:nowrap;
+  }
+
+  .brand-mark b{
+    color:var(--accent);
+    font-weight:900;
+  }
+
+  .brand-sub{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:.02em;
+  }
+
+  .topbar-meta{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  .status-pill,
+  .meta-chip,
+  .panel-link{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    min-height:40px;
+    padding:10px 14px;
+    border-radius:999px;
+    border:1px solid rgba(143,215,255,.16);
+    background:rgba(15,21,34,.88);
+    color:#d9e7fa;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  }
+
+  .status-pill{
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+  }
+
+  .status-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--success);
+    box-shadow:0 0 16px rgba(111,230,164,.65);
+    animation:pulse 1.8s ease-in-out infinite;
+  }
+
+  @keyframes pulse{
+    0%,100%{opacity:1;transform:scale(1)}
+    50%{opacity:.35;transform:scale(.78)}
+  }
+
+  .clock-box{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    padding:0 4px 0 2px;
+    text-align:right;
+  }
+
+  .clock-box strong{
+    font-size:13px;
+    color:#f5f7fb;
+    font-weight:800;
+  }
+
+  .clock-box span{
+    font-size:11px;
+    color:var(--muted);
+  }
+
+  .refresh-btn,
+  .cta-btn{
+    border:1px solid rgba(143,215,255,.18);
+    background:linear-gradient(180deg, rgba(20,31,51,.95), rgba(14,20,32,.95));
+    color:#ecf4ff;
+    border-radius:999px;
+    padding:11px 16px;
+    font-weight:700;
+    cursor:pointer;
+    transition:transform .14s ease,border-color .14s ease,background .14s ease;
+  }
+
+  .refresh-btn:hover,
+  .cta-btn:hover,
+  .panel-link:hover{
+    border-color:rgba(143,215,255,.34);
+    transform:translateY(-1px);
+  }
+
+  .refresh-btn:active,
+  .cta-btn:active{
+    transform:scale(.98);
+  }
+
+  .refresh-btn.loading{
+    color:var(--accent);
+  }
+
+  .hero-grid{
+    display:grid;
+    grid-template-columns:minmax(0, 1.18fr) minmax(0, .92fr);
+    gap:24px;
+    padding:28px 0 18px;
+  }
+
+  .panel{
+    position:relative;
+    overflow:hidden;
+    border-radius:26px;
+    border:1px solid var(--line-soft);
+    background:linear-gradient(180deg, rgba(17,24,39,.96), rgba(10,15,26,.98));
+    box-shadow:var(--shadow);
+  }
+
+  .panel::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background:linear-gradient(180deg, rgba(255,255,255,.025), transparent 24%);
+  }
+
+  .hero-stack,
+  .side-stack{
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+    min-width:0;
+  }
+
+  .hero-copy{
+    padding:28px 28px 24px;
+  }
+
+  .eyebrow{
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+
+  .eyebrow::before{
+    content:"";
+    width:30px;
+    height:1px;
+    background:currentColor;
+  }
+
+  .hero-copy h1{
+    margin:18px 0 14px;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:clamp(2.2rem, 5vw, 4.2rem);
+    line-height:.98;
+    letter-spacing:-.04em;
+  }
+
+  .hero-context{
+    margin:0;
+    color:var(--soft);
+    font-size:16px;
+    line-height:1.7;
+    max-width:62ch;
+  }
+
+  .hero-meta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-top:22px;
+  }
+
+  .meta-chip,
+  .panel-link{
+    font-size:12px;
+    font-weight:700;
+    color:#dbe6f8;
+  }
+
+  .meta-chip span{
+    color:var(--muted);
+    font-weight:600;
+  }
+
+  .metrics-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:14px;
+  }
+
+  .metric-card{
+    padding:18px 18px 16px;
+  }
+
+  .metric-top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .metric-label{
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .metric-value{
+    margin-top:10px;
+    font-size:32px;
+    font-weight:900;
+    letter-spacing:-.04em;
+    line-height:1;
+  }
+
+  .metric-title{
+    margin-top:10px;
+    font-size:14px;
+    font-weight:700;
+    color:#edf4ff;
+  }
+
+  .metric-change{
+    margin-top:6px;
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+
+  .trend-chip{
+    border-radius:999px;
+    padding:6px 10px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .trend-up{
+    background:rgba(111,230,164,.14);
+    color:var(--success);
+    border:1px solid rgba(111,230,164,.26);
+  }
+
+  .trend-down{
+    background:rgba(255,126,116,.14);
+    color:var(--danger);
+    border:1px solid rgba(255,126,116,.26);
+  }
+
+  .trend-flat{
+    background:rgba(255,188,98,.13);
+    color:var(--warning);
+    border:1px solid rgba(255,188,98,.24);
+  }
+
+  .photo-card{
+    display:flex;
+    flex-direction:column;
+  }
+
+  .photo-frame{
+    position:relative;
+    aspect-ratio:16/11;
+    overflow:hidden;
+    background:#0d1728;
+  }
+
+  .photo-frame img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .photo-copy{
+    padding:20px 22px 22px;
+  }
+
+  .photo-copy h2{
+    margin:0 0 10px;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:28px;
+    line-height:1.08;
+    letter-spacing:-.03em;
+  }
+
+  .photo-copy p{
+    margin:0;
+    color:var(--soft);
+    font-size:14px;
+    line-height:1.65;
+  }
+
+  .photo-kicker{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+  }
+
+  .photo-kicker::before{
+    content:"";
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:currentColor;
+    box-shadow:0 0 18px rgba(196,255,122,.44);
+  }
+
+  .weather-card{
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .weather-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+  }
+
+  .weather-title{
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .weather-hero{
+    display:flex;
+    align-items:baseline;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+
+  .weather-temp{
+    font-size:54px;
+    font-weight:900;
+    letter-spacing:-.06em;
+    line-height:.95;
+  }
+
+  .weather-condition{
+    font-size:18px;
+    font-weight:700;
+    color:#ebf3ff;
+  }
+
+  .weather-grid{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+  }
+
+  .weather-stat{
+    border-radius:18px;
+    border:1px solid rgba(143,215,255,.12);
+    background:rgba(11,17,32,.68);
+    padding:14px;
+  }
+
+  .weather-stat span{
+    display:block;
+    font-size:11px;
+    color:var(--muted);
+    font-weight:700;
+    letter-spacing:.04em;
+  }
+
+  .weather-stat strong{
+    display:block;
+    margin-top:8px;
+    font-size:20px;
+    font-weight:900;
+    letter-spacing:-.03em;
+  }
+
+  .weather-meta{
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.5;
+  }
+
+  .banner-wrap{
+    padding:8px 0 6px;
+  }
+
+  .section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin:22px 0 14px;
+  }
+
+  .section-head h3{
+    margin:0;
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:.22em;
+    text-transform:uppercase;
+    color:#d9e6fb;
+  }
+
+  .section-head p{
+    margin:0;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  .banner-strip{
+    display:grid;
+    grid-auto-flow:column;
+    grid-auto-columns:minmax(260px, 1fr);
+    gap:14px;
+    overflow-x:auto;
+    padding-bottom:6px;
+    scroll-snap-type:x proximity;
+  }
+
+  .banner-strip::-webkit-scrollbar{
+    height:10px;
+  }
+
+  .banner-strip::-webkit-scrollbar-thumb{
+    background:rgba(143,215,255,.16);
+    border-radius:999px;
+  }
+
+  .banner-item{
+    scroll-snap-align:start;
+    padding:16px 18px;
+    border-radius:22px;
+    border:1px solid rgba(255,255,255,.06);
+    background:linear-gradient(180deg, rgba(20,25,38,.95), rgba(14,18,29,.95));
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .banner-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .banner-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+  }
+
+  .banner-tag.alert{color:var(--danger)}
+  .banner-tag.breaking{color:var(--danger)}
+  .banner-tag.context{color:var(--accent)}
+
+  .banner-text{
+    font-size:14px;
+    line-height:1.55;
+    color:#edf4ff;
+  }
+
+  .banner-age{
+    font-size:12px;
+    color:var(--muted);
+    white-space:nowrap;
+  }
+
+  .story-grid{
+    display:grid;
+    grid-template-columns:repeat(12, minmax(0, 1fr));
+    gap:18px;
+    padding-bottom:26px;
+  }
+
+  .story-card{
+    grid-column:span 12;
+    overflow:hidden;
+    cursor:pointer;
+    transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease;
+  }
+
+  .story-card:hover{
+    transform:translateY(-2px);
+    border-color:rgba(143,215,255,.26);
+  }
+
+  .story-card.lead{
+    background:
+      radial-gradient(circle at top right, rgba(143,215,255,.12), transparent 36%),
+      linear-gradient(180deg, rgba(17,24,39,.98), rgba(10,15,26,.98));
+  }
+
+  .story-media{
+    position:relative;
+    aspect-ratio:16/9;
+    overflow:hidden;
+    background:linear-gradient(135deg, #111a2f, #0a0f1c);
+  }
+
+  .story-card.lead .story-media{
+    aspect-ratio:21/9;
+  }
+
+  .story-media img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .story-media::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg, rgba(6,9,19,.08) 0%, rgba(6,9,19,.64) 100%);
+  }
+
+  .story-fallback{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:flex-end;
+    padding:18px;
+    color:#f3f7ff;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:26px;
+    line-height:1.02;
+    letter-spacing:-.03em;
+    background:
+      radial-gradient(circle at 16% 18%, rgba(143,215,255,.38), transparent 24%),
+      radial-gradient(circle at 84% 12%, rgba(255,126,116,.22), transparent 20%),
+      linear-gradient(135deg, rgba(20,28,46,.98), rgba(8,12,21,.98));
+  }
+
+  .story-badges{
+    position:absolute;
+    left:18px;
+    right:18px;
+    top:16px;
+    z-index:2;
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .story-chip-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .story-chip{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:28px;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(7,12,22,.72);
+    backdrop-filter:blur(10px);
+    -webkit-backdrop-filter:blur(10px);
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:#f3f7ff;
+  }
+
+  .story-chip.tag-Breaking{
+    color:var(--danger);
+    border-color:rgba(255,126,116,.26);
+  }
+
+  .story-chip.tag-AI{
+    color:#c9b3ff;
+    border-color:rgba(201,179,255,.24);
+  }
+
+  .story-chip.tag-Tech{
+    color:var(--accent);
+    border-color:rgba(143,215,255,.26);
+  }
+
+  .story-chip.tag-Sports{
+    color:var(--success);
+    border-color:rgba(111,230,164,.26);
+  }
+
+  .story-chip.tag-Local{
+    color:var(--warning);
+    border-color:rgba(255,188,98,.24);
+  }
+
+  .story-chip.tag-Career{
+    color:#dbe6fb;
+    border-color:rgba(219,230,251,.18);
+  }
+
+  .story-play{
+    position:absolute;
+    right:18px;
+    bottom:16px;
+    z-index:2;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 12px;
+    border-radius:999px;
+    background:rgba(7,12,22,.84);
+    border:1px solid rgba(255,255,255,.12);
+    color:#fff;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+  }
+
+  .play-icon{
+    width:28px;
+    height:28px;
+    border-radius:50%;
+    background:#fff;
+    color:#081120;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    padding-left:2px;
+    flex:0 0 auto;
+  }
+
+  .story-body{
+    padding:18px 18px 20px;
+  }
+
+  .story-title{
+    margin:0;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:clamp(1.5rem, 2vw, 2rem);
+    line-height:1.08;
+    letter-spacing:-.03em;
+  }
+
+  .story-card:not(.lead) .story-title{
+    font-size:1.55rem;
+  }
+
+  .story-context{
+    margin:12px 0 0;
+    color:#eef4ff;
+    font-size:14px;
+    line-height:1.6;
+    font-weight:600;
+  }
+
+  .story-summary{
+    margin:12px 0 0;
+    color:var(--soft);
+    font-size:14px;
+    line-height:1.65;
+    display:-webkit-box;
+    -webkit-line-clamp:3;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+
+  .story-card.lead .story-summary{
+    -webkit-line-clamp:4;
+  }
+
+  .story-footer{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-top:18px;
+  }
+
+  .story-meta{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.5;
+  }
+
+  .story-meta strong{
+    color:#eef4ff;
+    font-weight:700;
+  }
+
+  .story-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  .ghost-link{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid rgba(143,215,255,.14);
+    border-radius:999px;
+    padding:10px 14px;
+    background:rgba(10,16,28,.7);
+    color:#dce9fb;
+    font-size:12px;
+    font-weight:700;
+    cursor:pointer;
+  }
+
+  .primary-link{
+    background:linear-gradient(180deg, rgba(143,215,255,.98), rgba(108,192,235,.96));
+    color:#081120;
+    border-color:rgba(143,215,255,.4);
+  }
+
+  .empty-state,
+  .loading-state,
+  .error-state{
+    padding:30px 24px;
+    margin:28px 0 0;
+    text-align:center;
+  }
+
+  .loading-state h2,
+  .error-state h2,
+  .empty-state h2{
+    margin:0 0 10px;
+    font-size:24px;
+    font-weight:800;
+  }
+
+  .loading-state p,
+  .error-state p,
+  .empty-state p{
+    margin:0;
+    color:var(--muted);
+    line-height:1.6;
+  }
+
+  .footer-note{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+    flex-wrap:wrap;
+    color:var(--muted);
+    font-size:12px;
+    line-height:1.6;
+    padding:0 0 calc(26px + var(--safe-bottom));
+  }
+
+  .footer-note a{
+    color:#d9e7fa;
+    text-decoration:underline;
+    text-decoration-color:rgba(143,215,255,.3);
+  }
+
+  .overlay{
+    position:fixed;
+    inset:0;
+    z-index:60;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .24s ease;
+  }
+
+  .overlay.open{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  .overlay-backdrop{
+    position:absolute;
+    inset:0;
+    background:rgba(3,6,12,.72);
+    backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+  }
+
+  .overlay-card{
+    position:absolute;
+    top:0;
+    right:0;
+    width:min(760px, 100%);
+    height:100%;
+    background:linear-gradient(180deg, rgba(11,17,32,.98), rgba(7,11,20,.99));
+    border-left:1px solid rgba(143,215,255,.14);
+    box-shadow:-18px 0 50px rgba(0,0,0,.35);
+    transform:translateX(100%);
+    transition:transform .32s cubic-bezier(.22,.82,.28,1);
+    display:flex;
+    flex-direction:column;
+  }
+
+  .overlay.open .overlay-card{
+    transform:translateX(0);
+  }
+
+  .overlay-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    padding:calc(14px + var(--safe-top)) 18px 14px;
+    border-bottom:1px solid rgba(143,215,255,.1);
+    background:rgba(9,14,25,.8);
+  }
+
+  .overlay-head strong{
+    font-size:13px;
+    font-weight:800;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:#dce8fb;
+  }
+
+  .detail-close{
+    border:none;
+    background:rgba(22,30,46,.92);
+    color:#f1f6ff;
+    border-radius:999px;
+    padding:10px 16px;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    cursor:pointer;
+  }
+
+  .overlay-scroll{
+    overflow-y:auto;
+    height:100%;
+  }
+
+  .detail-media{
+    position:relative;
+    aspect-ratio:16/9;
+    background:linear-gradient(135deg, #111a2f, #09101d);
+    overflow:hidden;
+  }
+
+  .detail-media img,
+  .detail-media iframe{
+    width:100%;
+    height:100%;
+    border:0;
+  }
+
+  .detail-media img{
+    object-fit:cover;
+  }
+
+  .detail-media::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:linear-gradient(180deg, rgba(6,9,19,.05) 0%, rgba(6,9,19,.72) 100%);
+    pointer-events:none;
+  }
+
+  .detail-media.playing::after{
+    display:none;
+  }
+
+  .detail-fallback{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:flex-end;
+    padding:28px;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:38px;
+    line-height:.98;
+    letter-spacing:-.04em;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(143,215,255,.35), transparent 24%),
+      radial-gradient(circle at 85% 15%, rgba(255,126,116,.18), transparent 20%),
+      linear-gradient(135deg, rgba(17,26,47,.98), rgba(8,12,21,.98));
+  }
+
+  .detail-content{
+    padding:22px 22px calc(42px + var(--safe-bottom));
+  }
+
+  .detail-chip-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .detail-title{
+    margin:18px 0 12px;
+    font-family:"Playfair Display",Georgia,serif;
+    font-size:clamp(2rem, 4vw, 3.2rem);
+    line-height:1.02;
+    letter-spacing:-.04em;
+  }
+
+  .detail-context{
+    margin:0;
+    color:#edf3ff;
+    font-size:15px;
+    line-height:1.65;
+    font-weight:600;
+  }
+
+  .detail-meta{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin:16px 0 22px;
+    color:var(--muted);
+    font-size:12px;
+  }
+
+  .detail-block{
+    margin-top:18px;
+    padding:18px;
+    border-radius:22px;
+    border:1px solid rgba(143,215,255,.12);
+    background:rgba(12,18,31,.75);
+  }
+
+  .detail-block h3{
+    margin:0 0 10px;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+
+  .detail-block p{
+    margin:0;
+    color:var(--soft);
+    font-size:15px;
+    line-height:1.72;
+  }
+
+  .detail-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:20px;
+  }
+
+  .embed-wrap{
+    position:relative;
+    width:100%;
+    aspect-ratio:16/9;
+    background:#000;
+  }
+
+  .embed-wrap iframe{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+  }
+
+  .detail-list{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:12px;
+    margin-top:16px;
+  }
+
+  .detail-item{
+    padding:14px;
+    border-radius:18px;
+    border:1px solid rgba(143,215,255,.1);
+    background:rgba(7,11,20,.72);
+  }
+
+  .detail-item span{
+    display:block;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .detail-item strong{
+    display:block;
+    margin-top:8px;
+    color:#f3f7ff;
+    font-size:14px;
+    line-height:1.5;
+  }
+
+  @media (min-width: 760px){
+    .story-card{grid-column:span 6}
+    .story-card.lead{grid-column:span 12}
+  }
+
+  @media (min-width: 1120px){
+    .story-card{grid-column:span 4}
+    .story-card.lead{grid-column:span 8}
+  }
+
+  @media (max-width: 1040px){
+    .hero-grid{
+      grid-template-columns:1fr;
+    }
+
+    .photo-card{
+      order:-1;
+    }
+  }
+
+  @media (max-width: 760px){
+    .page{
+      width:min(100%, calc(100% - 22px));
+    }
+
+    .topbar-inner{
+      align-items:flex-start;
+      flex-direction:column;
+      gap:14px;
+    }
+
+    .topbar-meta{
+      width:100%;
+      justify-content:flex-start;
+    }
+
+    .hero-copy,
+    .weather-card,
+    .photo-copy{
+      padding-left:18px;
+      padding-right:18px;
+    }
+
+    .metrics-grid,
+    .detail-list,
+    .weather-grid{
+      grid-template-columns:1fr;
+    }
+
+    .overlay-card{
+      width:100%;
+      border-left:none;
+    }
+
+    .banner-strip{
+      grid-auto-columns:minmax(86%, 1fr);
+    }
+
+    .story-badges{
+      left:14px;
+      right:14px;
+      top:14px;
+    }
+
+    .story-play{
+      right:14px;
+      bottom:14px;
+    }
+
+    .story-body{
+      padding:16px;
+    }
+
+    .photo-copy h2{
+      font-size:24px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *,
+    *::before,
+    *::after{
+      animation:none !important;
+      transition:none !important;
+      scroll-behavior:auto !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="page topbar-inner">
+      <div class="brand">
+        <div class="brand-mark">thinx <b>briefing</b></div>
+        <div class="brand-sub">Responsive public mirror of the live Samsung TV briefing</div>
+      </div>
+      <div class="topbar-meta">
+        <div class="status-pill" id="statusPill"><span class="status-dot"></span><span id="statusLabel">Loading</span></div>
+        <div class="clock-box">
+          <strong id="clockLabel">--:--</strong>
+          <span id="updatedLabel">Syncing live briefing…</span>
+        </div>
+        <button class="refresh-btn" id="refreshBtn" type="button">Refresh</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="panel loading-state" id="loadingState">
+      <h2>Loading the live briefing…</h2>
+      <p>Pulling the same card-based briefing payload used by the TV experience.</p>
+    </section>
+
+    <section class="panel error-state hidden" id="errorState">
+      <h2>Could not load the briefing</h2>
+      <p id="errorText">Please try refreshing in a moment.</p>
+    </section>
+
+    <section class="hidden" id="content">
+      <div class="hero-grid">
+        <div class="hero-stack">
+          <article class="panel hero-copy">
+            <div class="eyebrow">Live TV briefing</div>
+            <h1 id="heroGreeting">Good Morning</h1>
+            <p class="hero-context" id="heroContext"></p>
+            <div class="hero-meta">
+              <div class="meta-chip" id="locationChip"></div>
+              <div class="meta-chip" id="generatedChip"></div>
+              <a class="panel-link" href="/api/tv/briefing" target="_blank" rel="noopener">Open raw JSON feed</a>
+            </div>
+          </article>
+
+          <div class="metrics-grid" id="metricsGrid"></div>
+        </div>
+
+        <div class="side-stack">
+          <article class="panel photo-card">
+            <div class="photo-frame">
+              <img id="photoImage" alt="Photo of the day">
+            </div>
+            <div class="photo-copy">
+              <div class="photo-kicker">Photo of the day</div>
+              <h2 id="photoTitle"></h2>
+              <p id="photoCaption"></p>
+            </div>
+          </article>
+
+          <article class="panel weather-card">
+            <div class="weather-head">
+              <div>
+                <div class="weather-title">Cairo conditions</div>
+                <div class="weather-hero">
+                  <div class="weather-temp" id="weatherTemp">--</div>
+                  <div class="weather-condition" id="weatherCondition">--</div>
+                </div>
+              </div>
+              <div class="meta-chip" id="timezoneChip"></div>
+            </div>
+            <div class="weather-grid" id="weatherGrid"></div>
+            <div class="weather-meta" id="weatherMeta"></div>
+          </article>
+        </div>
+      </div>
+
+      <section class="banner-wrap">
+        <div class="section-head">
+          <h3>Headlines and alerts</h3>
+          <p id="bannerLabel"></p>
+        </div>
+        <div class="banner-strip" id="bannerStrip"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <h3>Story wall</h3>
+          <p id="storyCountLabel"></p>
+        </div>
+        <div class="story-grid" id="storyGrid"></div>
+      </section>
+
+      <div class="footer-note">
+        <span>This page refreshes itself every minute from the live briefing API and is designed to work well on phones, tablets, and laptops.</span>
+        <a href="/api/tv/briefing" target="_blank" rel="noopener">View the source feed</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-backdrop" id="overlayBackdrop"></div>
+    <aside class="overlay-card" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+      <div class="overlay-head">
+        <strong>Story detail</strong>
+        <button class="detail-close" id="detailClose" type="button">Close</button>
+      </div>
+      <div class="overlay-scroll">
+        <div class="detail-media" id="detailMedia"></div>
+        <div class="detail-content">
+          <div class="detail-chip-row" id="detailChipRow"></div>
+          <h2 class="detail-title" id="detailTitle"></h2>
+          <p class="detail-context" id="detailContext"></p>
+          <div class="detail-meta" id="detailMeta"></div>
+          <div class="detail-actions" id="detailActions"></div>
+          <div class="detail-block">
+            <h3>Why it matters</h3>
+            <p id="detailSummary"></p>
+          </div>
+          <div class="detail-list" id="detailList"></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+
+  var SOURCE = "/api/tv/briefing";
+  var POLL_MS = 60000;
+  var state = {
+    data: null,
+    currentStoryId: null,
+    playerStoryId: null,
+    loading: false
+  };
+
+  var TAG_CLASS = {
+    "Breaking": "tag-Breaking",
+    "AI": "tag-AI",
+    "Tech": "tag-Tech",
+    "Sports": "tag-Sports",
+    "Local": "tag-Local",
+    "Career": "tag-Career",
+    "Follow": "tag-Follow"
+  };
+
+  function $(id){
+    return document.getElementById(id);
+  }
+
+  function esc(value){
+    return String(value == null ? "" : value).replace(/[&<>"]/g, function(char){
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;"
+      }[char];
+    });
+  }
+
+  function getTimezone(){
+    return state.data && state.data.timezone ? state.data.timezone : "UTC";
+  }
+
+  function getStories(){
+    return state.data && Array.isArray(state.data.videoRecommendations) ? state.data.videoRecommendations : [];
+  }
+
+  function getStory(id){
+    var stories = getStories();
+    for (var i = 0; i < stories.length; i += 1) {
+      if (String(stories[i].id) === String(id)) return stories[i];
+    }
+    return null;
+  }
+
+  function relativeTime(iso){
+    if (!iso) return "";
+    var diff = Date.now() - Date.parse(iso);
+    if (!isFinite(diff)) return "";
+    if (diff < 60000) return "just now";
+    var minutes = Math.floor(diff / 60000);
+    if (minutes < 60) return minutes + "m ago";
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + "h ago";
+    var days = Math.floor(hours / 24);
+    if (days < 7) return days + "d ago";
+    var weeks = Math.floor(days / 7);
+    if (days < 30) return weeks + "w ago";
+    var months = Math.floor(days / 30);
+    if (days < 365) return months + "mo ago";
+    return Math.floor(days / 365) + "y ago";
+  }
+
+  function formatDateTime(iso, timezone){
+    if (!iso) return "";
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: timezone || getTimezone()
+      }).format(new Date(iso));
+    } catch (error) {
+      return new Date(iso).toLocaleString();
+    }
+  }
+
+  function formatClock(){
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: getTimezone()
+      }).format(new Date());
+    } catch (error) {
+      return new Date().toLocaleString();
+    }
+  }
+
+  function formatDuration(seconds){
+    if (typeof seconds !== "number" || !isFinite(seconds) || seconds <= 0) return "";
+    var total = Math.round(seconds);
+    var hours = Math.floor(total / 3600);
+    var minutes = Math.floor((total % 3600) / 60);
+    var remain = total % 60;
+    if (hours > 0) {
+      return hours + ":" + String(minutes).padStart(2, "0") + ":" + String(remain).padStart(2, "0");
+    }
+    return minutes + ":" + String(remain).padStart(2, "0");
+  }
+
+  function trendClass(trend){
+    if (trend === "up") return "trend-up";
+    if (trend === "down") return "trend-down";
+    return "trend-flat";
+  }
+
+  function storyTimestamp(story){
+    return story.videoPublishedAt || story.storyPublishedAt || "";
+  }
+
+  function storyAge(story){
+    return relativeTime(storyTimestamp(story));
+  }
+
+  function storyMode(story){
+    return story.playable && story.videoId ? "Watch" : "Read";
+  }
+
+  function storyKind(story){
+    return story.playable && story.videoId ? "Video story" : "Story card";
+  }
+
+  function storyChips(story){
+    var chips = [];
+    chips.push('<span class="story-chip ' + (TAG_CLASS[story.tag] || "") + '">' + esc(story.tag || "Story") + '</span>');
+    if (story.label) {
+      chips.push('<span class="story-chip">' + esc(story.label) + '</span>');
+    }
+    if (story.ongoingStory) {
+      chips.push('<span class="story-chip">Ongoing</span>');
+    } else {
+      chips.push('<span class="story-chip">New</span>');
+    }
+    return chips.join("");
+  }
+
+  function detailChips(story){
+    var chips = [];
+    chips.push('<span class="story-chip ' + (TAG_CLASS[story.tag] || "") + '">' + esc(story.tag || "Story") + '</span>');
+    if (story.label) chips.push('<span class="story-chip">' + esc(story.label) + '</span>');
+    chips.push('<span class="story-chip">' + esc(storyKind(story)) + '</span>');
+    if (storyAge(story)) chips.push('<span class="story-chip">' + esc(storyAge(story)) + '</span>');
+    return chips.join("");
+  }
+
+  function detailMediaHtml(story){
+    if (state.playerStoryId === story.id && story.videoId) {
+      return '<div class="embed-wrap"><iframe src="https://www.youtube.com/embed/' + encodeURIComponent(story.videoId) + '?autoplay=1&playsinline=1&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="' + esc(story.videoTitle || story.storyTitle) + '"></iframe></div>';
+    }
+
+    if (story.thumbnailUrl) {
+      return '<img src="' + esc(story.thumbnailUrl) + '" alt="' + esc(story.storyTitle) + '">';
+    }
+
+    return '<div class="detail-fallback">' + esc(story.tag || "Story") + "</div>";
+  }
+
+  function cardHtml(story, index){
+    var playable = story.playable && story.videoId;
+    var hasImage = !!story.thumbnailUrl;
+    var age = storyAge(story);
+    var summary = story.storySummary ? '<p class="story-summary">' + esc(story.storySummary) + '</p>' : "";
+    var footerAge = age ? '<span>' + esc(age) + "</span>" : "";
+    var source = story.storySource ? '<span><strong>' + esc(story.storySource) + "</strong></span>" : "";
+    var watchText = playable ? "Watch video" : "Open story";
+    return ''
+      + '<article class="panel story-card' + (index === 0 ? ' lead' : '') + '" data-story="' + esc(story.id) + '">'
+      +   '<div class="story-media">'
+      +     (hasImage ? '<img src="' + esc(story.thumbnailUrl) + '" alt="' + esc(story.storyTitle) + '">' : '<div class="story-fallback">' + esc(story.label || story.tag || "Story") + '</div>')
+      +     '<div class="story-badges">'
+      +       '<div class="story-chip-row">' + storyChips(story) + '</div>'
+      +     '</div>'
+      +     (playable ? '<div class="story-play"><span class="play-icon">&#9654;</span><span>' + esc(formatDuration(story.videoDurationSeconds) || story.videoDurationText || "Watch") + '</span></div>' : '')
+      +   '</div>'
+      +   '<div class="story-body">'
+      +     '<h2 class="story-title">' + esc(story.storyTitle || "") + '</h2>'
+      +     (story.storyContext ? '<p class="story-context">' + esc(story.storyContext) + '</p>' : '')
+      +     summary
+      +     '<div class="story-footer">'
+      +       '<div class="story-meta">' + source + footerAge + '</div>'
+      +       '<div class="story-actions">'
+      +         (playable ? '<button type="button" class="ghost-link primary-link" data-watch="' + esc(story.id) + '">' + watchText + '</button>' : '')
+      +         '<button type="button" class="ghost-link" data-open="' + esc(story.id) + '">' + (playable ? 'Details' : 'Read briefing') + '</button>'
+      +       '</div>'
+      +     '</div>'
+      +   '</div>'
+      + '</article>';
+  }
+
+  function metricHtml(metric){
+    return ''
+      + '<article class="panel metric-card">'
+      +   '<div class="metric-top">'
+      +     '<div class="metric-label">' + esc(metric.label || "Metric") + '</div>'
+      +     '<span class="trend-chip ' + trendClass(metric.trend) + '">' + esc(metric.trend || "flat") + '</span>'
+      +   '</div>'
+      +   '<div class="metric-value">' + esc(metric.value || "--") + '</div>'
+      +   '<div class="metric-title">' + esc(metric.title || "") + '</div>'
+      +   '<div class="metric-change">' + esc(metric.changeText || "") + '</div>'
+      + '</article>';
+  }
+
+  function bannerHtml(item){
+    var kind = String(item.kind || "").toLowerCase();
+    return ''
+      + '<article class="banner-item">'
+      +   '<div class="banner-top">'
+      +     '<div class="banner-tag ' + esc(kind || "context") + '">' + esc(item.tag || "Update") + '</div>'
+      +     '<div class="banner-age">' + esc(relativeTime(item.timestamp)) + '</div>'
+      +   '</div>'
+      +   '<div class="banner-text">' + esc(item.text || "") + '</div>'
+      + '</article>';
+  }
+
+  function renderHero(data){
+    var hero = data.hero || {};
+    var photo = hero.photoOfDay || {};
+    var weather = data.header && data.header.weather ? data.header.weather : {};
+
+    $("heroGreeting").textContent = hero.greeting || "Live Briefing";
+    $("heroContext").textContent = hero.context || "A live card-based view of the current TV briefing.";
+
+    $("locationChip").innerHTML = '<span>Location</span>&nbsp;' + esc(((data.location && data.location.city) || "Unknown") + ", " + ((data.location && data.location.country) || ""));
+    $("generatedChip").innerHTML = '<span>Generated</span>&nbsp;' + esc(formatDateTime(data.generatedAt, data.timezone));
+    $("timezoneChip").innerHTML = '<span>Timezone</span>&nbsp;' + esc(data.timezone || "UTC");
+
+    $("photoImage").src = photo.imageUrl || "";
+    $("photoImage").alt = photo.title || "Photo of the day";
+    $("photoTitle").textContent = photo.title || "Photo of the day";
+    $("photoCaption").textContent = photo.caption || "A visual reset beside the briefing.";
+
+    $("weatherTemp").textContent = typeof weather.temperatureC === "number" ? weather.temperatureC + "C" : "--";
+    $("weatherCondition").textContent = weather.condition || "Unknown";
+    $("weatherGrid").innerHTML = ''
+      + '<div class="weather-stat"><span>Feels like</span><strong>' + esc(weather.feelsLikeC != null ? weather.feelsLikeC + "C" : "--") + '</strong></div>'
+      + '<div class="weather-stat"><span>High / Low</span><strong>' + esc((weather.highC != null ? weather.highC + "C" : "--") + " / " + (weather.lowC != null ? weather.lowC + "C" : "--")) + '</strong></div>';
+    $("weatherMeta").textContent = "Fallback weather from the live briefing payload while the TV app refreshes its own feeds.";
+  }
+
+  function renderMetrics(data){
+    var metrics = data.header && Array.isArray(data.header.metrics) ? data.header.metrics : [];
+    $("metricsGrid").innerHTML = metrics.map(metricHtml).join("");
+  }
+
+  function renderBanners(data){
+    var banners = Array.isArray(data.bannerItems) ? data.bannerItems : [];
+    $("bannerLabel").textContent = banners.length ? banners.length + " live items" : "No alerts right now";
+    $("bannerStrip").innerHTML = banners.length ? banners.map(bannerHtml).join("") : '<article class="panel empty-state"><h2>No live alerts</h2><p>The briefing did not publish any banner items in this snapshot.</p></article>';
+  }
+
+  function renderStories(data){
+    var stories = getStories();
+    $("storyCountLabel").textContent = stories.length ? stories.length + " curated stories" : "No stories";
+    $("storyGrid").innerHTML = stories.length ? stories.map(cardHtml).join("") : '<article class="panel empty-state"><h2>No stories yet</h2><p>The briefing feed is live, but this snapshot did not include any story cards.</p></article>';
+  }
+
+  function updateClock(){
+    $("clockLabel").textContent = formatClock();
+    if (state.data && state.data.generatedAt) {
+      $("updatedLabel").textContent = "Updated " + relativeTime(state.data.generatedAt);
+    }
+  }
+
+  function setStatus(text, isError){
+    $("statusLabel").textContent = text;
+    $("statusPill").style.borderColor = isError ? "rgba(255,126,116,.24)" : "";
+    $("statusPill").style.color = isError ? "#ffd1cd" : "";
+  }
+
+  function showError(message){
+    $("errorText").textContent = message;
+    $("loadingState").classList.add("hidden");
+    $("errorState").classList.remove("hidden");
+  }
+
+  function hideError(){
+    $("errorState").classList.add("hidden");
+  }
+
+  function renderDetail(){
+    var story = getStory(state.currentStoryId);
+    if (!story) {
+      closeStory(false);
+      return;
+    }
+
+    $("detailMedia").innerHTML = detailMediaHtml(story);
+    $("detailMedia").classList.toggle("playing", state.playerStoryId === story.id && !!story.videoId);
+    $("detailChipRow").innerHTML = detailChips(story);
+    $("detailTitle").textContent = story.storyTitle || "";
+    $("detailContext").textContent = story.storyContext || "";
+    $("detailSummary").textContent = story.storySummary || "No additional summary provided.";
+
+    var meta = [];
+    if (story.storySource) meta.push("Source: " + story.storySource);
+    if (story.storyPublishedAt) meta.push("Story: " + formatDateTime(story.storyPublishedAt, getTimezone()));
+    if (story.videoPublishedAt) meta.push("Video: " + formatDateTime(story.videoPublishedAt, getTimezone()));
+    if (story.videoChannel) meta.push("Channel: " + story.videoChannel);
+    $("detailMeta").textContent = meta.join("  •  ");
+
+    var actions = [];
+    if (story.playable && story.videoId) {
+      if (state.playerStoryId === story.id) {
+        actions.push('<button type="button" class="cta-btn" data-watch="' + esc(story.id) + '">Reload video</button>');
+      } else {
+        actions.push('<button type="button" class="cta-btn" data-watch="' + esc(story.id) + '">Play inline</button>');
+      }
+      actions.push('<a class="ghost-link" href="https://www.youtube.com/watch?v=' + encodeURIComponent(story.videoId) + '" target="_blank" rel="noopener">Open on YouTube</a>');
+    }
+    actions.push('<button type="button" class="ghost-link" data-close="1">Back to story wall</button>');
+    $("detailActions").innerHTML = actions.join("");
+
+    var detailItems = [];
+    detailItems.push('<div class="detail-item"><span>Card type</span><strong>' + esc(storyKind(story)) + '</strong></div>');
+    detailItems.push('<div class="detail-item"><span>Freshness</span><strong>' + esc(storyAge(story) || "Unknown") + '</strong></div>');
+    detailItems.push('<div class="detail-item"><span>Story label</span><strong>' + esc(story.label || story.tag || "Story") + '</strong></div>');
+    detailItems.push('<div class="detail-item"><span>Coverage</span><strong>' + esc(story.ongoingStory ? "Ongoing topic update" : "New story") + '</strong></div>');
+    if (story.videoDurationSeconds || story.videoDurationText) {
+      detailItems.push('<div class="detail-item"><span>Video length</span><strong>' + esc(formatDuration(story.videoDurationSeconds) || story.videoDurationText) + '</strong></div>');
+    }
+    if (story.videoTitle) {
+      detailItems.push('<div class="detail-item"><span>Video title</span><strong>' + esc(story.videoTitle) + '</strong></div>');
+    }
+    $("detailList").innerHTML = detailItems.join("");
+
+    $("overlay").classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function parseHash(){
+    var match = /^#story=(.+)$/.exec(location.hash || "");
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  function syncRoute(){
+    var id = parseHash();
+    if (!id) {
+      state.currentStoryId = null;
+      state.playerStoryId = null;
+      $("overlay").classList.remove("open");
+      document.body.style.overflow = "";
+      return;
+    }
+
+    state.currentStoryId = id;
+    renderDetail();
+  }
+
+  function openStory(id, autoplay){
+    if (state.currentStoryId !== id) {
+      state.playerStoryId = null;
+    }
+    state.currentStoryId = id;
+    if (autoplay) state.playerStoryId = id;
+    if (location.hash !== "#story=" + encodeURIComponent(id)) {
+      location.hash = "story=" + encodeURIComponent(id);
+    }
+    renderDetail();
+  }
+
+  function closeStory(updateHash){
+    $("overlay").classList.remove("open");
+    document.body.style.overflow = "";
+    state.currentStoryId = null;
+    state.playerStoryId = null;
+    if (updateHash !== false && location.hash) {
+      history.pushState("", document.title, location.pathname + location.search);
+    }
+  }
+
+  function applyData(data){
+    state.data = data;
+    hideError();
+    $("loadingState").classList.add("hidden");
+    $("content").classList.remove("hidden");
+    setStatus("Live", false);
+    document.title = (data.hero && data.hero.greeting ? data.hero.greeting + " — " : "") + "thinx.fun Briefing";
+    renderHero(data);
+    renderMetrics(data);
+    renderBanners(data);
+    renderStories(data);
+    updateClock();
+    syncRoute();
+  }
+
+  function loadData(opts){
+    opts = opts || {};
+    if (state.loading) return;
+    state.loading = true;
+    $("refreshBtn").classList.add("loading");
+    setStatus(state.data ? "Refreshing" : "Loading", false);
+
+    fetch(SOURCE + "?t=" + Date.now(), { cache: "no-store" })
+      .then(function(response){
+        if (!response.ok) throw new Error("status " + response.status);
+        return response.json();
+      })
+      .then(function(data){
+        applyData(data);
+      })
+      .catch(function(error){
+        if (!state.data) {
+          showError("The live briefing API could not be reached (" + error.message + ").");
+        } else {
+          setStatus("Offline snapshot", true);
+        }
+      })
+      .finally(function(){
+        state.loading = false;
+        $("refreshBtn").classList.remove("loading");
+      });
+  }
+
+  document.addEventListener("click", function(event){
+    var watchButton = event.target.closest("[data-watch]");
+    if (watchButton) {
+      event.preventDefault();
+      openStory(watchButton.getAttribute("data-watch"), true);
+      return;
+    }
+
+    var openButton = event.target.closest("[data-open]");
+    if (openButton) {
+      event.preventDefault();
+      openStory(openButton.getAttribute("data-open"), false);
+      return;
+    }
+
+    var storyCard = event.target.closest("[data-story]");
+    if (storyCard) {
+      openStory(storyCard.getAttribute("data-story"), false);
+      return;
+    }
+
+    if (event.target.closest("[data-close]")) {
+      event.preventDefault();
+      closeStory(true);
+    }
+  });
+
+  $("refreshBtn").addEventListener("click", function(){
+    loadData({ manual: true });
+  });
+
+  $("detailClose").addEventListener("click", function(){
+    closeStory(true);
+  });
+
+  $("overlayBackdrop").addEventListener("click", function(){
+    closeStory(true);
+  });
+
+  document.addEventListener("keydown", function(event){
+    if (event.key === "Escape" && state.currentStoryId) {
+      closeStory(true);
+    }
+  });
+
+  window.addEventListener("hashchange", syncRoute);
+  window.addEventListener("visibilitychange", function(){
+    if (!document.hidden) loadData();
+  });
+
+  loadData();
+  updateClock();
+  setInterval(updateClock, 15000);
+  setInterval(function(){ loadData(); }, POLL_MS);
+})();
+</script>
+</body>
+</html>
