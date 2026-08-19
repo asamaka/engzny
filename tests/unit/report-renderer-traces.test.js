@@ -11,7 +11,7 @@ describe('renderLlmTracesHtml', () => {
       llmTraces: [
         {
           id: 't1', phase: 'classify', agent: 'FastClassifier',
-          model: 'claude-haiku-4-5-latest', duration: 2500,
+          model: 'claude-haiku-4-5-20251001', duration: 2500,
           request: { userPrompt: 'Analyze...', hasImage: true },
           response: { text: '{}', usage: { input_tokens: 1000, output_tokens: 200 } },
           toolCalls: [], error: null,
@@ -19,7 +19,7 @@ describe('renderLlmTracesHtml', () => {
       ],
       llmTraceSummary: {
         traceCount: 1,
-        models: ['claude-haiku-4-5-latest'],
+        models: ['claude-haiku-4-5-20251001'],
         totalInputTokens: 1000,
         totalOutputTokens: 200,
         totalLlmDuration: 2500,
@@ -39,7 +39,7 @@ describe('renderLlmTracesHtml', () => {
       llmTraces: [
         {
           id: 't1', phase: 'classify', agent: 'FastClassifier',
-          model: 'claude-haiku-4-5-latest', duration: 2000,
+          model: 'claude-haiku-4-5-20251001', duration: 2000,
           request: {}, response: {}, toolCalls: [], error: null,
         },
         {
@@ -50,7 +50,7 @@ describe('renderLlmTracesHtml', () => {
       ],
       llmTraceSummary: {
         traceCount: 2,
-        models: ['claude-haiku-4-5-latest', 'claude-sonnet-4-20250514'],
+        models: ['claude-haiku-4-5-20251001', 'claude-sonnet-4-20250514'],
         totalInputTokens: 0, totalOutputTokens: 0,
         totalLlmDuration: 17000,
         byPhase: {},
