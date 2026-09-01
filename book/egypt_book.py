@@ -173,6 +173,25 @@ def draw_fill(c, path, x, y, w, h, bias=0.42):
     c.setStrokeColor(Color(0, 0, 0, 0.18)); c.setLineWidth(0.5); c.rect(x, y, w, h)
 
 
+def draw_contain(c, path, x, y, w, h):
+    """Tall artefacts (a palette, a mask, a painted portrait) lose their subject to a
+    landscape crop, so show them whole on a sand panel instead."""
+    from PIL import Image
+    im = Image.open(path)
+    if im.mode not in ("RGB", "L"):
+        im = im.convert("RGB")
+    scale = min(w / im.width, h / im.height)
+    iw, ih = im.width * scale, im.height * scale
+    c.setFillColor(SAND); c.rect(x, y, w, h, stroke=0, fill=1)
+    c.setStrokeColor(RULE); c.setLineWidth(0.5); c.rect(x, y, w, h, stroke=1, fill=0)
+    target_px = int(iw * DPI / 72.0)
+    if im.width > target_px:
+        im = im.resize((target_px, max(1, int(target_px * im.height / im.width))), Image.LANCZOS)
+    buf = io.BytesIO(); im.convert("RGB").save(buf, "JPEG", quality=JPEG_Q, optimize=True)
+    buf.seek(0)
+    c.drawImage(ImageReader(buf), x + (w - iw) / 2, y + (h - ih) / 2, iw, ih, mask=None)
+
+
 def plate(c, motif, x, y, w, h):
     """Drawn fallback when no photograph is available for a slot."""
     c.saveState()
@@ -223,7 +242,10 @@ def image_or_plate(c, page, x, y, w, h):
     p = photo_path(page["slot"])
     if p:
         try:
-            draw_fill(c, p, x, y, w, h)
+            from PIL import Image
+            with Image.open(p) as probe:
+                tall = probe.width / probe.height < 0.8
+            (draw_contain if tall else draw_fill)(c, p, x, y, w, h)
             return True
         except Exception:
             pass
@@ -472,7 +494,9 @@ def credits_page(c, rows, folio):
         c.setFillColor(INK); c.setFont(F["sansb"], 8.2)
         c.drawString(M, y, page_name)
         c.setFillColor(BODY); c.setFont(F["serif"], 8.4)
-        author = re.sub(r"\s+", " ", r.get("author", "") or "unknown")[:90]
+        author = re.sub(r"\s+", " ", r.get("author", "") or "unknown")
+        author = re.sub(r"(?i)^(unknown( author)?|not credited|anonymous)\b.*$", "unknown author", author)
+        author = re.sub(r"(?i)\s+talk$", "", author)[:90] or "unknown author"
         title = r["commons_title"].split(":", 1)[-1]
         line = f"{title} — {author} — {r['licence']} — via Wikimedia Commons"
         yy = y - 10.4

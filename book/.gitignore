@@ -2,3 +2,7 @@
 photos/*.jpg
 photos/*.jpeg
 photos/*.png
+
+# the built book is committed; ignore stray renders
+*.png
+__pycache__/

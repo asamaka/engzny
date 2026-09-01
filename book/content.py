@@ -22,7 +22,7 @@ PAGES = [
  # ───────────────────────────── PART I ─────────────────────────────
  dict(part=0, slot="nile", motif="wave",
    era="c. 5000 – 3100 BC", title="The Gift of the River",
-   caption="Feluccas on the Nile at Aswan. The current runs north, the prevailing wind blows "
+   caption="A felucca on the Nile at Kom Ombo. The current runs north, the prevailing wind blows "
            "south: the river carried traffic both ways long before there were roads.",
    deck="Egypt is a thread of green drawn through a desert the size of a continent — and every "
         "inch of it was laid down by one river.",
@@ -50,8 +50,9 @@ PAGES = [
 
  dict(part=0, slot="narmer", motif="star",
    era="c. 3100 BC", title="Two Lands, One Crown",
-   caption="The Narmer Palette, found at Hierakonpolis in 1898. The king, wearing the white crown "
-           "of Upper Egypt, strikes down an enemy — the oldest royal image we can read.",
+   caption="The Narmer Palette, found at Hierakonpolis in 1898: the king in the white crown of "
+           "Upper Egypt raises his mace over a kneeling captive — the oldest royal image we can "
+           "read.",
    deck="The first thing Egypt recorded about itself was a conquest, carved on a slab used for "
         "grinding eye paint.",
    body=[
@@ -152,8 +153,9 @@ PAGES = [
 
  dict(part=0, slot="akhenaten", motif="sun",
    era="c. 1353 – 1336 BC", title="The Heretic and the Queen",
-   caption="The painted bust of Nefertiti, found at Amarna in 1912 in the workshop of the "
-           "sculptor Thutmose, now in Berlin.",
+   caption="A colossal statue of Amenhotep IV from his temple at Karnak, carved before he moved "
+           "the court to Amarna and took the name Akhenaten. The elongated face and heavy hips are "
+           "the signature of the new style.",
    deck="One king tried to replace the gods of Egypt with a single disc of light. It lasted "
         "about seventeen years.",
    body=[
@@ -204,8 +206,9 @@ PAGES = [
 
  dict(part=0, slot="ramesses", motif="column",
    era="c. 1279 – 1213 BC", title="The Builder and the Battle",
-   caption="The Great Temple at Abu Simbel, cut into the cliff and guarded by four seated "
-           "colossi of Ramesses II, each about twenty metres high.",
+   caption="The Great Temple at Abu Simbel in an early photograph from the Museo Egizio archive, "
+           "before the facade was cut up and moved. Each seated colossus is about twenty metres "
+           "high.",
    deck="Ramesses II reigned for sixty-six years, fought the ancient world's most famous draw, "
         "and then signed the first peace treaty we can still read.",
    body=[
@@ -229,8 +232,9 @@ PAGES = [
 
  dict(part=0, slot="cleopatra", motif="star",
    era="51 – 30 BC", title="The Last Pharaoh",
-   caption="Ptolemaic and Roman-era relief carving at Dendera, where the temple of Hathor "
-           "preserves images of Cleopatra VII and her son Caesarion.",
+   caption="Cleopatra VII and her son Caesarion, carved on the south-west exterior wall of the "
+           "temple of Hathor at Dendera — one of the few images of her made in Egypt, in Egyptian "
+           "style.",
    deck="She was Greek, she was the first of her dynasty to bother learning Egyptian, and she was "
         "the last person to rule Egypt as an independent state for nearly two thousand years.",
    body=[
@@ -333,8 +337,8 @@ PAGES = [
 
  dict(part=1, slot="carter1922", motif="star",
    era="1922", title="Wonderful Things",
-   caption="Howard Carter and his assistant Arthur Callender at work in the tomb of Tutankhamun, "
-           "photographed by Harry Burton during the clearance.",
+   caption="Howard Carter and his assistant Arthur Callender examining objects from the tomb, "
+           "photographed by Harry Burton during the clearance, around 1924.",
    deck="Egypt got its nominal independence and its most famous tomb in the same year, and the "
         "two facts turned out to be connected.",
    body=[
@@ -358,8 +362,8 @@ PAGES = [
 
  dict(part=1, slot="revolution1952", motif="star",
    era="1952 – 1954", title="The Officers",
-   caption="Muhammad Naguib, the public face of the Free Officers, with Gamal Abdel Nasser, who "
-           "organised the movement and later replaced him.",
+   caption="The Free Officers welcomed by crowds in Cairo in the months after the coup. Gamal "
+           "Abdel Nasser is third from the left in the car.",
    deck="A conspiracy of junior officers took Cairo in a night, and the monarchy was on a boat "
         "within three days.",
    body=[
@@ -518,8 +522,8 @@ PAGES = [
 
  dict(part=1, slot="gem2025", motif="pyramid",
    era="2025", title="The House of the Pharaohs",
-   caption="The Grand Egyptian Museum at Giza, two kilometres from the pyramids, which opened in "
-           "full on 1 November 2025.",
+   caption="The pyramids seen from inside the Grand Egyptian Museum, which opened in full on 1 "
+           "November 2025.",
    deck="Twenty years, half a million square metres and a billion dollars later, Tutankhamun's "
         "burial is shown whole for the first time since it was buried.",
    body=[

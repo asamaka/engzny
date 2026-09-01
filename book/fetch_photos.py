@@ -15,11 +15,12 @@ import requests
 from PIL import Image
 
 BASE = "https://commons.wikimedia.org"
+WP = "https://en.wikipedia.org"      # same file repository, separate rate limiter
 UA = {"User-Agent": "EgyptBookBot/1.0 (https://github.com/asamaka/engzny) python-requests"}
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "photos")
 MIN_WIDTH = 700
 TARGET_WIDTH = 2000
-MIN_GAP = 1.5                     # polite pacing between requests
+MIN_GAP = 4.0                     # polite pacing between requests
 IMAGE_EXT = (".jpg", ".jpeg", ".png")
 
 S = requests.Session(); S.headers.update(UA)
@@ -28,12 +29,12 @@ _last = [0.0]
 
 def _get(url, **kw):
     err = "?"
-    for attempt in range(5):
+    for attempt in range(3):
         gap = MIN_GAP - (time.time() - _last[0])
         if gap > 0:
             time.sleep(gap)
         try:
-            r = S.get(url, timeout=60, **kw)
+            r = S.get(url, timeout=30, **kw)
             _last[0] = time.time()
             if r.status_code == 200:
                 return r
@@ -43,7 +44,7 @@ def _get(url, **kw):
         except Exception as exc:
             _last[0] = time.time()
             err = repr(exc)[:60]
-        time.sleep(min(4.0 * (attempt + 1), 30))
+        time.sleep(8.0 * (attempt + 1))
     print(f"    ! {err}", flush=True)
     return None
 
@@ -64,6 +65,65 @@ def rest_search(query, limit=10):
         key = (p.get("key") or "").replace("_", " ")
         if key.startswith("File:") and key.lower().endswith(IMAGE_EXT):
             out.append(key)
+    return out
+
+
+def wikipedia_images(article, limit=30):
+    """Files used by an English Wikipedia article. Commons-hosted, curated by editors,
+    and served by a host with its own (much friendlier) rate limit."""
+    if not article:
+        return []
+    r = _get(f"{WP}/w/api.php", params={"action": "query", "format": "json", "prop": "images",
+                                        "titles": article, "imlimit": 50})
+    if not r:
+        return []
+    try:
+        pages = r.json().get("query", {}).get("pages", {})
+    except ValueError:
+        return []
+    out = []
+    for p in pages.values():
+        for im in p.get("images", []):
+            t = im.get("title", "")
+            if t.lower().endswith(IMAGE_EXT):
+                out.append(t)
+    return out[:limit]
+
+
+def meta_via_wikipedia(title):
+    """Licence + author from the shared-repo metadata, via en.wikipedia."""
+    r = _get(f"{WP}/w/api.php", params={"action": "query", "format": "json", "titles": title,
+                                        "prop": "imageinfo", "iiprop": "extmetadata"})
+    if not r:
+        return None
+    try:
+        pages = r.json().get("query", {}).get("pages", {})
+    except ValueError:
+        return None
+    for p in pages.values():
+        ii = (p.get("imageinfo") or [{}])[0]
+        em = ii.get("extmetadata", {}) or {}
+        lic = _clean(em.get("LicenseShortName", {}).get("value", ""))
+        author = _clean(em.get("Artist", {}).get("value", ""))
+        if lic or author:
+            return {"licence": lic or "see Commons file page",
+                    "author": (author or "unknown")[:120]}
+    return None
+
+
+def category_files(category, limit=30):
+    """File titles listed on a category page. A plain page view, so it keeps working
+    when both search endpoints are being throttled."""
+    r = _get(f"{BASE}/wiki/Category:" + requests.utils.quote(category.replace(" ", "_")))
+    if not r:
+        return []
+    seen, out = set(), []
+    for m in re.finditer(r'href="/wiki/(File:[^"?#]+)"', r.text):
+        title = requests.utils.unquote(m.group(1)).replace("_", " ")
+        if title.lower().endswith(IMAGE_EXT) and title not in seen:
+            seen.add(title); out.append(title)
+        if len(out) >= limit:
+            break
     return out
 
 
@@ -145,9 +205,9 @@ def licence_from_html(title):
 
 
 def download(title, dest):
-    name = title.split(":", 1)[1].replace(" ", "_")
-    r = _get(f"{BASE}/wiki/Special:FilePath/{requests.utils.quote(name)}",
-             params={"width": TARGET_WIDTH})
+    name = requests.utils.quote(title.split(":", 1)[1].replace(" ", "_"))
+    r = (_get(f"{WP}/wiki/Special:FilePath/{name}", params={"width": TARGET_WIDTH})
+         or _get(f"{BASE}/wiki/Special:FilePath/{name}", params={"width": TARGET_WIDTH}))
     if not r or not r.headers.get("content-type", "").startswith("image/"):
         return False
     with open(dest, "wb") as fh:
@@ -166,19 +226,34 @@ def download(title, dest):
     return True
 
 
-def fetch(slot, titles, query):
-    """Hand-picked titles first; then whatever the search turns up."""
+def rank(found, query, already):
+    """A page's images come back alphabetically; put the ones that actually match first."""
+    terms = [w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) > 3]
+    scored = []
+    for t in found:
+        if t in already:
+            continue
+        words = set(re.findall(r"[a-z0-9]+", t.lower()))
+        scored.append((-sum(1 for w in terms if w in words), t))
+    scored.sort(key=lambda p: p[0])
+    return [t for _, t in scored]
+
+
+def fetch(slot, titles, query, category="", article=""):
+    """Hand-picked titles first, then a category listing, then search."""
     dest = os.path.join(OUT, slot + ".jpg")
     print(f"  · {slot}", flush=True)
     candidates = list(titles)
     if len(candidates) < 3:
-        found = rest_search(query) or api_search(query)
-        candidates += [t for t in found if t not in candidates]
-    for title in candidates[:8]:
+        found = (wikipedia_images(article) or (category_files(category) if category else [])
+                 or rest_search(query) or api_search(query))
+        candidates += rank(found, query, candidates)
+    for title in candidates[:10]:
         if not title.lower().endswith(IMAGE_EXT):
             continue
         if download(title, dest):
-            meta = wikitext_meta(title) or {"licence": "see Commons file page", "author": "unknown"}
+            meta = (meta_via_wikipedia(title) or wikitext_meta(title)
+                    or {"licence": "see Commons file page", "author": "unknown"})
             print(f"    -> {title}  [{meta['licence']}]", flush=True)
             return {"slot": slot, "file": slot + ".jpg", "commons_title": title,
                     "licence": meta["licence"], "author": meta["author"],
@@ -212,16 +287,22 @@ SLOTS = [
     ("suez1869",     ["File:Открытие Суэцкого канала, 1869.jpg"], "Opening of the Suez Canal 1869"),
     ("carter1922",   ["File:Howard Carter and Arthur Callender in Tutankhamun's tomb.jpg"],
                      "Howard Carter Tutankhamun tomb 1922"),
-    ("revolution1952", [], "Muhammad Naguib Gamal Abdel Nasser 1952 revolution Egypt"),
+    ("revolution1952", [], "Muhammad Naguib Gamal Abdel Nasser 1952 revolution Egypt",
+                     "Egyptian revolution of 1952", "Egyptian revolution of 1952"),
     ("nasser",       ["File:Gamal Abdel Nasser Portrait 1962 (3x4 cropped).jpg"],
                      "Gamal Abdel Nasser portrait"),
     ("aswan",        ["File:Aswan Dam 21-2-08.jpg"], "Aswan High Dam Egypt"),
     ("war1973",      ["File:Egyptians Crossing Suez Canal.jpg",
                       "File:Egyptian forces crossing the Suez Canal.jpg"],
                      "Egyptian forces crossing Suez Canal October War"),
-    ("campdavid",    [], "Camp David Accords 1978 Sadat Begin Carter"),
-    ("tahrir2011",   [], "Tahrir Square February 2011 Cairo protest"),
-    ("gem2025",      [], "Grand Egyptian Museum Giza"),
+    ("campdavid",    [], "Camp David Accords 1978 Sadat Begin Carter", "Camp David Accords",
+                     "Camp David Accords"),
+    ("tahrir2011",   [], "Tahrir Square February 2011 Cairo protest",
+                     "Tahrir Square during the Egyptian revolution of 2011",
+                     "Egyptian revolution of 2011"),
+    ("gem2025",      ["File:View of Pyramids of Giza from Grand Egyptian Museum.jpg"],
+                     "Grand Egyptian Museum Giza", "Grand Egyptian Museum",
+                     "Grand Egyptian Museum"),
 ]
 
 
@@ -234,19 +315,32 @@ def main():
         with open(csv_path, newline="", encoding="utf-8") as fh:
             rows = list(csv.DictReader(fh))
     print(f"Fetching into {OUT}")
-    for slot, titles, query in SLOTS:
+    for entry in SLOTS:
+        slot, titles, query = entry[0], entry[1], entry[2]
+        category = entry[3] if len(entry) > 3 else ""
+        article = entry[4] if len(entry) > 4 else ""
         if only and slot not in only:
             continue
         have = os.path.join(OUT, slot + ".jpg")
         if slot not in only and os.path.exists(have) and any(r["slot"] == slot for r in rows):
             print(f"  = {slot} (already have it)")
             continue
-        row = fetch(slot, titles, query)
+        row = fetch(slot, titles, query, category, article)
         if row:
             rows = [r for r in rows if r["slot"] != slot] + [row]
             with open(csv_path, "w", newline="", encoding="utf-8") as fh:
                 w = csv.DictWriter(fh, ["slot", "file", "commons_title", "licence", "author", "url"])
                 w.writeheader(); w.writerows(rows)
+    stale = [r for r in rows if r["licence"] == "see Commons file page"]
+    for r in stale:
+        meta = meta_via_wikipedia(r["commons_title"]) or wikitext_meta(r["commons_title"])
+        if meta and meta["licence"] != "see Commons file page":
+            r.update(licence=meta["licence"], author=meta["author"])
+            print(f"  ~ {r['slot']} licence resolved: {meta['licence']}")
+    if stale:
+        with open(csv_path, "w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, ["slot", "file", "commons_title", "licence", "author", "url"])
+            w.writeheader(); w.writerows(rows)
     print(f"\n{len(rows)}/{len(SLOTS)} slots filled — credits in {csv_path}")
 
 
