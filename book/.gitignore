@@ -1,0 +1,4 @@
+# Downloaded photographs are re-fetchable with fetch_photos.py; keep them out of git.
+photos/*.jpg
+photos/*.jpeg
+photos/*.png
